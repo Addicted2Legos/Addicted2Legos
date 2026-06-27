@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buff Man!</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #0d061f;
+            background-image: radial-gradient(circle at center, #231145 0%, #0d061f 100%);
+            color: #ffffff;
+            font-family: 'Impact', 'Arial Black', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Neon Lightning Border Frame */
+        .arcade-cabinet-frame {
+            width: 100%;
+            max-width: 960px;
+            background: #160b2e;
+            border: 6px solid #bf0006;
+            box-shadow: 0 0 20px #bf0006, inset 0 0 20px #00ffff;
+            border-radius: 24px;
+            padding: 30px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Header */
+        h1 {
+            font-size: 3rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            background: linear-gradient(to bottom, #fffb00 0%, #ff0077 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 3px 3px 0px #000;
+            margin-bottom: 25px;
+            text-align: center;
+            animation: pulse 1.5s infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); filter: drop-shadow(0 0 2px #ff00ff); }
+            100% { transform: scale(1.02); filter: drop-shadow(0 0 12px #ff00ff); }
+        }
+
+        /* Top Status Bars Grid */
+        .status-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            width: 100%;
+            margin-bottom: 30px;
+        }
+
+        .meter-box {
+            background: rgba(0, 0, 0, 0.4);
+            border: 2px solid #3d1b6d;
+            border-radius: 15px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .meter-label {
+            font-size: 1.2rem;
+            color: #00ffff;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+
+        .progress-bar-outer {
+            width: 100%;
+            height: 25px;
+            background: #22143a;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 2px solid #ff00ff;
+            position: relative;
+        }
+
+        .progress-bar-inner {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #ff0077, #ffaa00, #fffb00);
+            transition: width 0.2s ease;
+            box-shadow: 0 0 10px #fffb00;
+        }
+
+        /* Center Layout: Buttons & Buff Man */
+        .game-arena {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr 1fr;
+            gap: 20px;
+            width: 100%;
+            align-items: center;
+        }
+
+        .button-column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Interactive Speech Bubble Quote Buttons */
+        .quote-btn {
+            background: #22124d;
+            border: 3px solid #00ffff;
+            border-radius: 20px;
+            padding: 18px 12px;
+            color: #fff;
+            font-size: 1.3rem;
+            cursor: pointer;
+            position: relative;
+            font-family: inherit;
+            transition: all 0.2s ease;
+            box-shadow: 0 6px 0 #0088cc, 0 10px 15px rgba(0,0,0,0.5);
+        }
+
+        .quote-btn:hover {
+            transform: translateY(-2px);
+            background: #311b6b;
+            box-shadow: 0 8px 0 #0088cc, 0 12px 20px rgba(0,213,255,0.3);
+        }
+
+        .quote-btn:active {
+            transform: translateY(6px);
+            box-shadow: 0 0px 0 #0088cc, 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        /* Specific Color Themes based on image layout */
+        .btn-cyan { border-color: #00ffff; box-shadow: 0 6px 0 #009999; }
+        .btn-yellow { border-color: #fffb00; box-shadow: 0 6px 0 #999900; }
+        .btn-green { border-color: #00ff66; box-shadow: 0 6px 0 #009933; }
+        .btn-red { border-color: #ff0055; box-shadow: 0 6px 0 #990033; }
+        .btn-purple { border-color: #cc00ff; box-shadow: 0 6px 0 #770099; }
+
+        /* Buff Man Hero Graphic Display Area */
+        .hero-display {
+            text-align: center;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .avatar-frame {
+            font-size: 7rem;
+            line-height: 1;
+            filter: drop-shadow(0 0 15px #ffaa00);
+            animation: float 2s infinite alternate ease-in-out;
+            cursor: pointer;
+            user-select: none;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px) rotate(-3deg); }
+            100% { transform: translateY(-15px) rotate(3deg); }
+        }
+
+        .twitching {
+            animation: rapid-twitch 0.15s infinite linear !important;
+        }
+
+        @keyframes rapid-twitch {
+            0% { transform: translate(2px, 1px) rotate(5deg); }
+            100% { transform: translate(-2px, -1px) rotate(-5deg); }
+        }
+
+        /* Interactive Dashboard Accessories */
+        .dashboard-accessories {
+            margin-top: 35px;
+            width: 100%;
+            border-top: 3px dashed #bf0006;
+            padding-top: 25px;
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .dashboard-accessories a {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 18px;
+            border-radius: 16px;
+            border: 2px solid #bf0006;
+            background: rgba(255, 255, 255, 0.08);
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: 800;
+            transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .dashboard-accessories a:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 0, 255, 0.18);
+            box-shadow: 0 10px 20px rgba(255, 0, 255, 0.18);
+        }
+
+        .host-toggle-panel {
+            background: #1f0f3d;
+            border: 2px solid #ff00ff;
+            border-radius: 12px;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .toggle-btn {
+            background: #ff0055;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            font-family: inherit;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 3px 0 #990033;
+        }
+
+        .toggle-btn.active {
+            background: #00ff66;
+            color: black;
+            box-shadow: 0 3px 0 #009933;
+        }
+
+        /* Floating +10 points text effects */
+        .floating-score {
+            position: absolute;
+            color: #fffb00;
+            font-size: 1.8rem;
+            text-shadow: 2px 2px 0 #000;
+            pointer-events: none;
+            animation: floatUp 0.8s forwards ease-out;
+            z-index: 10;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-80px) scale(1.4); }
+        }
+
+        /* Big Win Screen Overlay */
+        .victory-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(13, 6, 31, 0.95);
+            border-radius: 18px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+
+        .victory-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .victory-title {
+            font-size: 4rem;
+            color: #fffb00;
+            text-shadow: 0 0 20px #ffaa00;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .victory-prize {
+            font-size: 5rem;
+            color: #00ff66;
+            text-shadow: 0 0 15px #00ff66;
+            animation: bounce 0.5s infinite alternate;
+        }
+
+        @keyframes bounce {
+            0% { transform: scale(0.95); }
+            100% { transform: scale(1.05); }
+        }
+
+        .restart-btn {
+            margin-top: 30px;
+            background: #00ffff;
+            color: #000;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            font-family: inherit;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #009999;
+        }
+        
+        .restart-btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        .video-links {
+            margin-top: 28px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 18px;
+            padding: 18px 22px;
+        }
+
+        .video-links h2 {
+            margin: 0 0 12px;
+            font-size: 0.95rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: #00ffff;
+        }
+
+        .video-links ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            gap: 10px;
+        }
+
+        .video-links a {
+            color: #b2ffff;
+            text-decoration: none;
+            font-weight: 700;
+        }
+
+        .video-links a:hover {
+            text-decoration: underline;
+            color: #ffffff;
+        }
+
+        .video-preview {
+            position: fixed;
+            z-index: 999;
+            pointer-events: none;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #000;
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+            height: 200px;
+        }
+
+        .video-preview video {
+            display: block;
+            height: 200px;
+            width: auto;
+            max-width: 360px;
+        }
+
+        .video-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: min(360px, 100%);
+            height: 200px;
+            transform: translate(-50%, -50%);
+            border-radius: 18px;
+            overflow: hidden;
+            background: #000;
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.35);
+            display: none;
+            z-index: 10;
+        }
+
+        .video-overlay.show {
+            display: block;
+        }
+
+        .video-overlay video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .close-video {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            z-index: 12;
+            border: none;
+            background: rgba(0, 0, 0, 0.55);
+            color: #fff;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .hidden-video {
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        .show-video {
+            opacity: 1;
+        }
+
+        .avatar-frame { display:flex; align-items:center; justify-content:center; }
+        .avatar-img { height:160px; object-fit:cover; border-radius:12px; display:block; }
+    </style>
+</head>
+<body>
+
+    <div class="arcade-cabinet-frame">
+        
+        <!-- Victory Pop-up screen overlay -->
+        <div class="victory-overlay" id="victoryScreen">
+            <div class="victory-title">HYPERBUFF UNLEASHED!</div>
+            <p style="font-size: 1.5rem; color: #ff00ff; margin-bottom: 15px;">BUFF MAN WINS WIPEOUT AUSTRALIA!</p>
+            <div class="victory-prize">$20,000</div>
+            <button class="restart-btn" onclick="resetGame()">PLAY AGAIN</button>
+        </div>
+
+        <h1>Buff Man!</h1>
+
+        <!-- Top Dashboard Progress Meters -->
+        <div class="status-container">
+            <div class="meter-box">
+                <div class="meter-label">Buffness Meter</div>
+                <div class="progress-bar-outer">
+                    <div class="progress-bar-inner" id="buffMeter"></div>
+                </div>
+            </div>
+            <div class="meter-box">
+                <div class="meter-label">Hype Momentum</div>
+                <div class="progress-bar-outer" style="border-color: #00ffff;">
+                    <div class="progress-bar-inner" id="hypeMeter" style="background: linear-gradient(90deg, #0055ff, #00ffff);"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Game Interactive Interface -->
+        <div class="game-arena">
+            
+            <!-- Left speech side -->
+            <div class="button-column">
+                <button class="quote-btn btn-cyan" onclick="triggerHype('oh-yeah', this)">"Oh Yeah!"</button>
+                <button class="quote-btn btn-yellow" onclick="triggerHype('buffman', this)">"I'm Buff Man!"</button>
+                <button class="quote-btn btn-green" onclick="triggerHype('power', this)">"No Twitch, No Way!"</button>
+            </div>
+
+            <!-- Central Figure Graphic Display -->
+            <div class="hero-display" id="heroDisplayArea">
+                <div class="avatar-frame" id="buffmanAvatar" onclick="triggerHype('twitch', this)">
+                    <img src="Buff_Man/Buff Man - I'm Buff Man.png" alt="Buffman" class="avatar-img">
+                </div>
+                <div style="color: #fffb00; margin-top: 10px; font-size: 1.1rem; letter-spacing: 1px;">Shannon Fowler</div>
+
+                <div class="video-overlay" id="heroVideoOverlay">
+                    <button class="close-video" id="closeHeroVideo" aria-label="Close video">✕</button>
+                    <video id="heroPreviewVideo" class="hidden-video" autoplay loop playsinline preload="auto">
+                        <source src="your-video.mp4#t=0.001" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            </div>
+
+            <!-- Right speech side -->
+            <div class="button-column">
+                <button class="quote-btn btn-red" onclick="triggerHype('hyperbuff', this)">"Super Buff!"</button>
+                <button class="quote-btn btn-purple" onclick="triggerHype('flex', this)">"Super Strong!"</button>
+                <button class="quote-btn btn-cyan" onclick="triggerHype('suckerpunch', this)">"Sucker Punch'd!"</button>
+            </div>
+
+        </div>
+
+        <!-- Footer Control Accessories -->
+        <div class="dashboard-accessories">
+            <a href="Buff_Man/Buff Man - I'm Buff Man.mp4" target="_blank">I'm Buff Man</a>
+            <a href="Buff_Man/Buff Man - No Twitch No Way.mp4" target="_blank">No Twitch, No Way</a>
+            <a href="Buff_Man/Buff Man - Super Buff Super Strong Oh Yeah.mp4" target="_blank">Super Buff, Super Strong</a>
+            <a href="Buff_Man/Buff Man - Oh Yeah.mp4" target="_blank">Oh Yeah</a>
+            <a href="Buff_Man/Buff Man - Big Red Balls.mp4" target="_blank">Big Red Balls</a>
+        </div>
+
+    </div>
+
+    <script>
+        const heroVideoOverlay = document.getElementById('heroVideoOverlay');
+        const heroPreviewVideo = document.getElementById('heroPreviewVideo');
+        const closeHeroVideo = document.getElementById('closeHeroVideo');
+
+        // Remove the old one-time 'seeked' listener if present.
+
+        document.querySelectorAll('.dashboard-accessories a').forEach(link => {
+            link.addEventListener('click', event => {
+                event.preventDefault();
+
+                const videoSrc = encodeURI(link.getAttribute('href'));
+                heroPreviewVideo.pause();
+                heroPreviewVideo.muted = true;            // start muted to allow load
+                heroPreviewVideo.volume = 1;
+                heroPreviewVideo.classList.add('hidden-video');
+                heroPreviewVideo.classList.remove('show-video');
+                heroPreviewVideo.src = videoSrc;
+                heroPreviewVideo.load();
+
+                // Handler to run once the video is ready to play through
+                const onReady = () => {
+                    heroPreviewVideo.removeEventListener('canplaythrough', onReady);
+                    heroPreviewVideo.muted = false;         // unmute now that it's loaded
+                    heroPreviewVideo.classList.remove('hidden-video');
+                    heroPreviewVideo.classList.add('show-video');
+                    heroPreviewVideo.play().catch(()=>{});
+                    heroVideoOverlay.classList.add('show');
+                };
+
+                heroPreviewVideo.addEventListener('canplaythrough', onReady, { once: true });
+
+                // Fallback: if canplaythrough doesn't fire, try after short delay when readyState >= 2
+                setTimeout(() => {
+                    if (heroPreviewVideo.readyState >= 2) onReady();
+                }, 800);
+            });
+        });
+
+        closeHeroVideo.addEventListener('click', () => {
+            heroPreviewVideo.pause();
+            heroPreviewVideo.removeAttribute('src');
+            heroPreviewVideo.load();
+            heroVideoOverlay.classList.remove('show');
+        });
+
+        let buffScore = 0;
+        let hypeScore = 0;
+        let hostsEnabled = true;
+        
+        // Setup Web Audio API Context for synthesizer sounds
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+            }
+        }
+
+        // Web Audio Synthesizer Engine to generate distinct physical soundbytes
+        function synthSound(type) {
+            initAudio();
+            if (!audioCtx) return;
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'oh-yeah' || type === 'buffman') {
+                // Energetic upward arcade jump style
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(160, now);
+                osc.frequency.exponentialRampToValueAtTime(440, now + 0.15);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'power' || type === 'flex') {
+                // High-energy laser pulse flex hit
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.linearRampToValueAtTime(600, now + 0.1);
+                osc.frequency.linearRampToValueAtTime(150, now + 0.25);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            } else if (type === 'hyperbuff') {
+                // Intense sci-fi powerup rise
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.exponentialRampToValueAtTime(1200, now + 0.4);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            } else if (type === 'suckerpunch') {
+                // Flat explosion noise crash impact
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.linearRampToValueAtTime(40, now + 0.3);
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'twitch') {
+                // Short buzz twitch string
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(90, now);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            } else if (type === 'victory') {
+                // Classic arpeggiated winning fanfare sequence
+                [0, 0.1, 0.2, 0.3].forEach((delay, idx) => {
+                    const noteOsc = audioCtx.createOscillator();
+                    const noteGain = audioCtx.createGain();
+                    noteOsc.type = 'triangle';
+                    const freqs = [261.63, 329.63, 392.00, 523.25];
+                    noteOsc.frequency.setValueAtTime(freqs[idx], now + delay);
+                    noteGain.gain.setValueAtTime(0.2, now + delay);
+                    noteGain.gain.exponentialRampToValueAtTime(0.01, now + delay + 0.2);
+                    noteOsc.connect(noteGain);
+                    noteGain.connect(audioCtx.destination);
+                    noteOsc.start(now + delay);
+                    noteOsc.stop(now + delay + 0.2);
+                });
+            }
+        }
+
+        // Core Interactive Processing Loop
+        function triggerHype(actionType, element) {
+            // Trigger synthesized audio soundbyte
+            synthSound(actionType);
+
+            // Trigger visual muscle-avatar animation response
+            const avatar = document.getElementById('buffmanAvatar');
+            avatar.classList.add('twitching');
+            setTimeout(() => { avatar.classList.remove('twitching'); }, 250);
+
+            // Point calculations & dynamic generation
+            let pointsGained = 8;
+            if (actionType === 'hyperbuff') pointsGained = 15;
+            if (actionType === 'suckerpunch') pointsGained = -10;
+
+            buffScore = Math.max(0, Math.min(100, buffScore + pointsGained));
+            hypeScore = Math.max(0, Math.min(100, hypeScore + 12));
+
+            // Generate floating score effect offset at cursor/element bounds
+            createFloatingText(element, pointsGained >= 0 ? `+${pointsGained} BUFF` : `${pointsGained} MUD`);
+
+            // Update UI meters smoothly
+            document.getElementById('buffMeter').style.width = buffScore + '%';
+            document.getElementById('hypeMeter').style.width = hypeScore + '%';
+
+            // Win Condition Verification
+            if (buffScore >= 100) {
+                setTimeout(() => {
+                    synthSound('victory');
+                    document.getElementById('victoryScreen').classList.add('show');
+                }, 300);
+            }
+        }
+
+        // Generate dynamic floating text labels
+        function createFloatingText(targetElement, textStr) {
+            const container = document.getElementById('heroDisplayArea');
+            const floater = document.createElement('div');
+            floater.className = 'floating-score';
+            floater.innerText = textStr;
+            
+            // Randomize position shift near center avatar
+            floater.style.left = (Math.random() * 60 - 30) + 'px';
+            floater.style.top = '-20px';
+
+            container.appendChild(floater);
+            setTimeout(() => { floater.remove(); }, 800);
+        }
+
+        // Natural decay loop for the Hype Momentum Meter
+        setInterval(() => {
+            if (hypeScore > 0) {
+                hypeScore = Math.max(0, hypeScore - 2.5);
+                document.getElementById('hypeMeter').style.width = hypeScore + '%';
+            }
+        }, 200);
+
+        function toggleHosts() {
+            hostsEnabled = !hostsEnabled;
+            const btn = document.getElementById('hostToggle');
+            if (hostsEnabled) {
+                btn.innerText = "J&J HYP_MODE ON";
+                btn.classList.add('active');
+            } else {
+                btn.innerText = "J&J HYP_MODE OFF";
+                btn.classList.remove('active');
+            }
+        }
+
+        function resetGame() {
+            buffScore = 0;
+            hypeScore = 0;
+            document.getElementById('buffMeter').style.width = '0%';
+            document.getElementById('hypeMeter').style.width = '0%';
+            document.getElementById('victoryScreen').classList.remove('show');
+        }
+    </script>
+</body>
+</html>
