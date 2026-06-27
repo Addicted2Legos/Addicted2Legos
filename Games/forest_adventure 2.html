@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Verdant Realm — A Forest Adventure</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Crimson+Pro:ital,wght=0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --g1: #0a1f0a;
+    --g2: #0f2e0f;
+    --g3: #163d16;
+    --g4: #1f5c1f;
+    --g5: #2d8a2d;
+    --g6: #3db33d;
+    --g7: #5fd45f;
+    --g8: #96e896;
+    --g9: #c8f5c8;
+    --g10: #eafcea;
+    --gold: #c8a84b;
+    --gold-light: #e8c97a;
+    --cream: #f5f0e0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--g1);
+    color: var(--cream);
+    font-family: 'Crimson Pro', serif;
+    font-size: 18px;
+    line-height: 1.75;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 20% 10%, rgba(45,138,45,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 30% at 80% 90%, rgba(15,46,15,0.3) 0%, transparent 60%),
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(45,138,45,0.02) 2px,
+        rgba(45,138,45,0.02) 4px
+      );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .leaves {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 120px;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.35;
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 3rem 2rem 4rem;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+
+  .title-eyebrow {
+    font-family: 'Crimson Pro', serif;
+    font-style: italic;
+    font-size: 14px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--g7);
+    margin-bottom: 0.75rem;
+  }
+
+  h1 {
+    font-family: 'Cinzel Decorative', serif;
+    font-size: clamp(2rem, 5vw, 3.4rem);
+    font-weight: 700;
+    color: var(--g7);
+    text-shadow: 0 0 40px rgba(93,212,93,0.35), 0 2px 0 rgba(0,0,0,0.5);
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+  }
+
+  .title-sub {
+    font-family: 'Cinzel Decorative', serif;
+    font-size: clamp(0.85rem, 2vw, 1.1rem);
+    font-weight: 400;
+    color: var(--gold);
+    letter-spacing: 0.12em;
+  }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 2rem 0;
+  }
+
+  .divider-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--g5), transparent);
+  }
+
+  .divider-gem {
+    width: 10px; height: 10px;
+    background: var(--g6);
+    transform: rotate(45deg);
+    box-shadow: 0 0 10px rgba(93,212,93,0.6);
+  }
+
+  .scene-card {
+    background: linear-gradient(160deg, var(--g2) 0%, var(--g1) 100%);
+    border: 1px solid var(--g4);
+    border-radius: 4px;
+    padding: 2.5rem 2.5rem 2rem;
+    margin-bottom: 2rem;
+    box-shadow:
+      inset 0 1px 0 rgba(93,212,93,0.1),
+      0 0 60px rgba(0,0,0,0.5);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .scene-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--g4), var(--g6), var(--g4));
+  }
+
+  .scene-tag {
+    display: inline-block;
+    font-family: 'Crimson Pro', serif;
+    font-style: italic;
+    font-size: 12px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--g7);
+    background: rgba(45,138,45,0.15);
+    border: 1px solid rgba(93,212,93,0.25);
+    padding: 3px 12px;
+    border-radius: 2px;
+    margin-bottom: 1.25rem;
+  }
+
+  /* --- ARTWORK CONTAINER FRAME --- */
+  .art-frame {
+    width: 100%;
+    height: 240px;
+    border-radius: 6px;
+    margin: 1rem 0 2rem;
+    border: 1px solid rgba(200, 168, 75, 0.2);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 0 20px rgba(0,0,0,0.6);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .art-svg {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Artwork Animations */
+  @keyframes pulse-slow {
+    0%, 100% { opacity: 0.2; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.05); }
+  }
+  @keyframes float-slow {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-6px) rotate(2deg); }
+  }
+  @keyframes shimmer {
+    0% { opacity: 0.3; }
+    50% { opacity: 0.8; }
+    100% { opacity: 0.3; }
+  }
+
+  .anim-pulse { animation: pulse-slow 6s ease-in-out infinite; }
+  .anim-float { animation: float-slow 5s ease-in-out infinite; }
+  .anim-shimmer { animation: shimmer 3s ease-in-out infinite; }
+
+  .scene-title {
+    font-family: 'Cinzel Decorative', serif;
+    font-size: 1.3rem;
+    font-weight: 400;
+    color: var(--g8);
+    margin-bottom: 1rem;
+    text-shadow: 0 0 20px rgba(150,232,150,0.3);
+  }
+
+  .scene-text {
+    font-size: 1.05rem;
+    line-height: 1.85;
+    color: var(--cream);
+    font-weight: 300;
+  }
+
+  .scene-text em {
+    color: var(--g8);
+    font-style: italic;
+  }
+
+  .choices {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    margin-top: 2rem;
+  }
+
+  .choice-btn {
+    background: transparent;
+    border: 1px solid var(--g4);
+    border-radius: 3px;
+    color: var(--cream);
+    font-family: 'Crimson Pro', serif;
+    font-size: 1rem;
+    line-height: 1.5;
+    padding: 1rem 1.5rem 1rem 3.5rem;
+    cursor: pointer;
+    text-align: left;
+    position: relative;
+    transition: all 0.25s ease;
+    overflow: hidden;
+  }
+
+  .choice-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(45,138,45,0) 0%, rgba(45,138,45,0.08) 100%);
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+
+  .choice-btn:hover::before { opacity: 1; }
+
+  .choice-btn:hover {
+    border-color: var(--g6);
+    color: var(--g9);
+    transform: translateX(4px);
+    box-shadow: -4px 0 0 var(--g6), 0 0 20px rgba(93,212,93,0.1);
+  }
+
+  .choice-letter {
+    position: absolute;
+    left: 1.2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Cinzel Decorative', serif;
+    font-size: 0.75rem;
+    color: var(--g6);
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--g5);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(45,138,45,0.1);
+  }
+
+  .ending-card {
+    background: linear-gradient(160deg, rgba(22,61,22,0.6) 0%, var(--g1) 100%);
+    border: 1px solid var(--g5);
+    border-radius: 4px;
+    padding: 2rem;
+    text-align: center;
+    margin-top: 2rem;
+  }
+
+  .ending-badge {
+    display: inline-block;
+    font-family: 'Cinzel Decorative', serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    padding: 5px 14px;
+    border-radius: 2px;
+    margin-bottom: 1rem;
+  }
+
+  .ending-badge.victory {
+    background: rgba(45,138,45,0.25);
+    border: 1px solid var(--g6);
+    color: var(--g8);
+  }
+
+  .ending-badge.defeat {
+    background: rgba(100,20,20,0.25);
+    border: 1px solid #8b3a3a;
+    color: #e88;
+  }
+
+  .ending-badge.secret {
+    background: rgba(200,168,75,0.15);
+    border: 1px solid var(--gold);
+    color: var(--gold-light);
+  }
+
+  .restart-btn {
+    margin-top: 1.5rem;
+    background: rgba(45,138,45,0.2);
+    border: 1px solid var(--g5);
+    border-radius: 3px;
+    color: var(--g8);
+    font-family: 'Cinzel Decorative', serif;
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    padding: 0.7rem 2rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .restart-btn:hover {
+    background: rgba(45,138,45,0.35);
+    border-color: var(--g6);
+    color: var(--g9);
+    box-shadow: 0 0 20px rgba(93,212,93,0.15);
+  }
+
+  .fade-in {
+    animation: fadeIn 0.6s ease forwards;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .progress-track {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    margin-bottom: 2.5rem;
+  }
+
+  .progress-pip {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    border: 1px solid var(--g4);
+    background: transparent;
+    transition: all 0.3s;
+  }
+
+  .progress-pip.filled {
+    background: var(--g6);
+    border-color: var(--g6);
+    box-shadow: 0 0 6px rgba(93,212,93,0.5);
+  }
+
+  footer {
+    text-align: center;
+    margin-top: 3rem;
+    font-style: italic;
+    font-size: 0.85rem;
+    color: var(--g5);
+    opacity: 0.7;
+  }
+</style>
+</head>
+<body>
+
+<svg class="leaves" viewBox="0 0 800 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M0,80 Q50,20 120,60 Q180,10 240,50 Q300,0 360,40 Q420,5 480,45 Q540,10 600,50 Q660,15 720,55 Q760,30 800,60 L800,0 L0,0 Z" fill="rgba(22,61,22,0.5)"/>
+  <path d="M-20,95 Q60,55 140,75 Q200,45 280,70 Q340,40 420,65 Q480,35 560,60 Q620,38 700,65 Q750,50 820,72 L820,0 L-20,0 Z" fill="rgba(15,46,15,0.7)"/>
+</svg>
+
+<div class="wrapper">
+  <header>
+    <p class="title-eyebrow">An Interactive Tale</p>
+    <h1>The Verdant Realm</h1>
+    <p class="title-sub">A Forest Adventure</p>
+    <div class="divider">
+      <div class="divider-line"></div>
+      <div class="divider-gem"></div>
+      <div class="divider-line"></div>
+    </div>
+  </header>
+
+  <div class="progress-track" id="progress-track"></div>
+
+  <div id="game-area"></div>
+
+  <footer>Whispered to you by the ancient forest &middot; <em>May your path be green and your heart be true</em></footer>
+</div>
+
+<script>
+const SCENES = {
+  start: {
+    tag: "Chapter One",
+    title: "The Threshold of Moss and Shadow",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="bg-start" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#071407"/><stop offset="100%" stop-color="#133a13"/></linearGradient>
+              <radialGradient id="mist" cx="50%" cy="80%" r="60%"><stop offset="0%" stop-color="#3db33d" stop-opacity="0.25"/><stop offset="100%" stop-color="#000" stop-opacity="0"/></radialGradient>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#bg-start)"/>
+            <circle class="anim-pulse" cx="200" cy="130" r="120" fill="url(#mist)"/>
+            <!-- Gates/Trees -->
+            <path d="M-20,220 C40,120 80,80 70,-20 C50,80 10,140 -20,220 Z" fill="#040a04"/>
+            <path d="M420,220 C360,120 320,80 330,-20 C350,80 390,140 420,220 Z" fill="#040a04"/>
+            <!-- Signpost -->
+            <g class="anim-float">
+              <rect x="195" y="90" width="10" height="110" fill="#2d1e0f"/>
+              <path d="M170,105 L235,105 L225,92 L170,92 Z" fill="#4d3319"/>
+              <path d="M230,125 L165,125 L175,112 L230,112 Z" fill="#3d2914"/>
+              <path d="M180,145 L225,145 L220,132 L180,132 Z" fill="#5c3d1f"/>
+              <circle cx="200" cy="70" r="4" fill="#c8a84b" class="anim-shimmer"/>
+            </g>
+          </svg>`,
+    text: `You stand at the edge of the <em>Verdant Realm</em>, the oldest forest in the known world. Morning mist clings to the gnarled roots of trees wider than houses. The air smells of damp earth, pine, and something stranger — something <em>alive</em> in a way that ordinary forests are not.<br><br>A weathered signpost stands before you, carved with three directions. Somewhere deep in the forest, a bell chimes once. Then silence.`,
+    choices: [
+      { text: "Follow the moss-covered stone path deeper into the forest", next: "stone_path" },
+      { text: "Climb the ancient oak to survey the canopy from above", next: "oak_climb" },
+      { text: "Investigate the strange glowing mushroom ring nearby", next: "mushroom_ring" },
+    ]
+  },
+  stone_path: {
+    tag: "The Deep Wood",
+    title: "The Keeper's Cottage",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="bg-cottage" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0c250c"/><stop offset="100%" stop-color="#050f05"/></linearGradient>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#bg-cottage)"/>
+            <!-- Path -->
+            <path d="M160,200 L240,200 L210,140 L190,140 Z" fill="#1b2e1b"/>
+            <!-- Cottage Structure -->
+            <polygon points="140,140 260,140 240,90 160,90" fill="#2a442a"/>
+            <polygon points="120,95 280,95 200,40" fill="#142414" stroke="#3db33d" stroke-width="1"/>
+            <!-- Glowing Door/Window -->
+            <rect x="185" y="105" width="30" height="35" fill="#e8c97a" opacity="0.85"/>
+            <circle cx="200" cy="70" r="10" fill="#e8c97a" opacity="0.4" class="anim-pulse"/>
+            <!-- Smoke -->
+            <path d="M250,50 Q240,30 255,15 T240,-10" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4" stroke-linecap="round" class="anim-float"/>
+          </svg>`,
+    text: `The stone path winds for what feels like miles before you discover a cottage grown over entirely with living vines and luminous green moss. Smoke curls lazily from a chimney made of river stones.<br><br>The door creaks open before you can knock. Inside, an old woman with eyes like forest pools beckons you. <em>"I've been waiting,"</em> she says. <em>"The forest sent you for a reason. But which gift do you seek?"</em>`,
+    choices: [
+      { text: "Ask for the gift of speaking to animals", next: "animal_speech" },
+      { text: "Ask for the gift of finding hidden paths", next: "hidden_paths" },
+      { text: "Politely decline any gifts and ask about the bell you heard", next: "the_bell" },
+    ]
+  },
+  oak_climb: {
+    tag: "Above the Canopy",
+    title: "A Sea of Green",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="sky-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4ea1d5"/><stop offset="60%" stop-color="#91cb3e"/><stop offset="100%" stop-color="#143d14"/></linearGradient>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#sky-grad)"/>
+            <!-- Mountainous canopy layers -->
+            <path d="M0,130 Q100,90 200,120 T400,100 L400,200 L0,200 Z" fill="#123812"/>
+            <path d="M0,150 Q130,120 250,150 T400,130 L400,200 L0,200 Z" fill="#092409"/>
+            <!-- Dead patch east -->
+            <path d="M280,145 Q330,125 400,135 L400,180 L300,180 Z" fill="#404540" opacity="0.8"/>
+            <!-- Raven Silhouette -->
+            <g class="anim-float" transform="translate(60, 60)">
+              <path d="M10,15 C20,12 25,5 35,8 C33,14 38,18 30,22 C25,25 15,22 10,15 Z" fill="#0b131f"/>
+              <path d="M32,10 L38,9 L35,13 Z" fill="#1a2636"/>
+              <circle cx="28" cy="11" r="1.5" fill="#5fd45f"/>
+            </g>
+          </svg>`,
+    text: `Hand over hand, you ascend the ancient oak. At the top, you break through the canopy into brilliant sunlight. The forest stretches endlessly in every direction — a great green ocean.<br><br>But something is wrong. Far to the east, a patch of the canopy is <em>grey and dying</em>, spreading slowly like a wound. And perched on the branch beside you is a raven with eyes of deep emerald. It tilts its head. <em>"You've seen it then,"</em> it croaks. <em>"Will you help?"</em>`,
+    choices: [
+      { text: "Ask the raven to guide you to the dying patch", next: "blight_east" },
+      { text: "Descend and look for others who might know about the blight", next: "seek_others" },
+      { text: "Pluck a leaf from the ancient oak — it hums with warmth in your hand", next: "oak_leaf" },
+    ]
+  },
+  mushroom_ring: {
+    tag: "The Fae Circle",
+    title: "Between the Worlds",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#081708"/>
+            <ellipse cx="200" cy="140" rx="130" ry="40" fill="none" stroke="#5fd45f" stroke-width="2" stroke-dasharray="6,8" class="anim-pulse"/>
+            <!-- Magical Spores -->
+            <circle cx="120" cy="130" r="3" fill="#c8a84b" class="anim-shimmer"/>
+            <circle cx="280" cy="125" r="4" fill="#c8a84b" class="anim-float"/>
+            <circle cx="200" cy="150" r="2.5" fill="#5fd45f" class="anim-shimmer"/>
+            <!-- Mushrooms -->
+            <g transform="translate(100,120)"><path d="M10,20 Q15,5 20,20 Z" fill="#881111"/><ellipse cx="15" cy="10" rx="7" ry="4" fill="#cc3333"/></g>
+            <g transform="translate(270,115)"><path d="M10,20 Q15,5 20,20 Z" fill="#881111"/><ellipse cx="15" cy="10" rx="7" ry="4" fill="#cc3333"/></g>
+            <g transform="translate(185,140)"><path d="M10,20 Q15,5 20,20 Z" fill="#c8a84b"/><ellipse cx="15" cy="10" rx="7" ry="4" fill="#e8c97a" class="anim-shimmer"/></g>
+          </svg>`,
+    text: `You step closer and realize the mushrooms are <em>humming</em> in a frequency you feel more than hear. The mist inside the ring swirls with tiny lights.<br><br>Before you can decide whether to step inside, a figure no taller than your knee emerges — a sprite, green-skinned, with dragonfly wings and an expression of profound irritation. <em>"Another wanderer. FINE. You may pass to the Underneath, or I'll trade you a secret for a secret."</em>`,
+    choices: [
+      { text: "Step into the ring and descend to the Underneath", next: "underneath" },
+      { text: "Offer your secret: you once freed a captive bird as a child", next: "bird_memory" },
+      { text: "Back away slowly — you've heard tales about fae bargains", next: "stone_path" },
+    ]
+  },
+  animal_speech: {
+    tag: "The Gift",
+    title: "Voice of the Wild",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#0a240a"/>
+            <!-- Sound waves / Aura -->
+            <circle cx="200" cy="100" r="60" fill="none" stroke="#96e896" stroke-width="1" opacity="0.3" class="anim-pulse"/>
+            <circle cx="200" cy="100" r="90" fill="none" stroke="#96e896" stroke-width="1" opacity="0.15" class="anim-pulse"/>
+            <!-- Stag/Deer Silhouette -->
+            <g transform="translate(160, 60)" class="anim-float">
+              <path d="M20,70 L25,45 L40,30 L55,35 L45,50 L40,70 Z" fill="#4a321a"/>
+              <!-- Antlers -->
+              <path d="M40,30 L35,10 M38,20 L28,15 M40,20 L45,10" stroke="#4a321a" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="48" cy="33" r="2" fill="#96e896" class="anim-shimmer"/>
+            </g>
+          </svg>`,
+    text: `The old woman cups your face in her bark-rough hands and whispers in a language you don't know — but somehow understand completely. A warmth spreads from your ears down through your chest.<br><br>You step outside and immediately hear an argument between two squirrels about a stolen acorn cache. A deer nudges your hand with her nose. <em>"The Heartwood is sick,"</em> she murmurs. <em>"Follow me. Only someone with the gift can help now."</em><br><br>You follow the deer deeper into the ancient green dark — and as you walk, the forest seems to breathe around you in welcome.`,
+    choices: [
+      { text: "Ask the deer what ails the Heartwood", next: "ending_guardian" },
+      { text: "Pause to speak with the ancient tortoise watching from a log", next: "ending_guardian" },
+    ]
+  },
+  hidden_paths: {
+    tag: "The Secret Ways",
+    title: "What Only Eyes of Knowing Can See",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#031203"/>
+            <!-- Luminous veins -->
+            <path d="M-10,180 Q100,160 200,100 T410,80" fill="none" stroke="#e8c97a" stroke-width="3" opacity="0.7" class="anim-shimmer"/>
+            <path d="M150,210 Q220,130 180,60 T300,-10" fill="none" stroke="#5fd45f" stroke-width="2" opacity="0.5" class="anim-pulse"/>
+            <path d="M-20,50 Q120,90 250,170 T420,190" fill="none" stroke="#e8c97a" stroke-width="1.5" opacity="0.4"/>
+            <!-- Root network backdrop -->
+            <circle cx="200" cy="100" r="6" fill="#e8c97a" class="anim-pulse"/>
+          </svg>`,
+    text: `The keeper draws a symbol on your brow with sap from a silver flask. <em>"Blink,"</em> she says.<br><br>You blink — and the world is transformed. Where bare earth stood, luminous paths thread through the roots like golden rivers. Paths between places. Paths between <em>times</em>. You could follow any of them.<br><br>One glimmers brightest: it leads toward a sound you hadn't noticed before — a heartbeat, slow and immense, somewhere far below the forest floor.`,
+    choices: [
+      { text: "Follow the glowing path toward the great heartbeat", next: "ending_heartwood" },
+      { text: "Choose a smaller path that spirals upward into the sky", next: "ending_sky" },
+    ]
+  },
+  the_bell: {
+    tag: "The Ancient Warning",
+    title: "Tolled But Once in a Century",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#0d1f11"/>
+            <g class="anim-float" transform="translate(170, 40)">
+              <!-- Bell Design -->
+              <path d="M10,70 C10,30 50,30 50,70 L55,85 L5,85 Z" fill="#b59438" stroke="#e8c97a" stroke-width="1"/>
+              <rect x="27" y="85" width="6" height="15" fill="#d4b34a" rx="3"/>
+              <circle cx="30" cy="102" r="4" fill="#e8c97a" class="anim-shimmer"/>
+              <!-- Hanger -->
+              <path d="M25,30 Q30,15 35,30" fill="none" stroke="#555" stroke-width="3"/>
+            </g>
+            <!-- Shockwaves -->
+            <ellipse cx="200" cy="120" rx="90" ry="25" fill="none" stroke="#c8a84b" stroke-width="1" opacity="0.3" class="anim-pulse"/>
+          </svg>`,
+    text: `The keeper's eyes go very still. She sets down her cup of bark-tea and folds her hands carefully.<br><br><em>"The Bell of the Verdant Realm,"</em> she says at last, <em>"rings only when the Green is in danger of unraveling. It rings for whoever will listen."</em> She holds your gaze. <em>"It rang for you. That means you are either very brave, or very foolish. Possibly both."</em><br><br>She stands and takes a gnarled walking stick from the wall. <em>"I'll guide you. But we must leave before the next moonrise."</em>`,
+    choices: [
+      { text: "Follow the keeper immediately", next: "ending_guardian" },
+      { text: "Ask for time to prepare — gather supplies first", next: "ending_defeat" },
+    ]
+  },
+  blight_east: {
+    tag: "The Wounded Forest",
+    title: "Where Nothing Grows",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#1c1c1c"/>
+            <radialGradient id="blight-glow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#3a233a"/><stop offset="100%" stop-color="#1c1c1c"/></radialGradient>
+            <rect width="100%" height="100%" fill="url(#blight-glow)"/>
+            <!-- Twisted Dead Trees -->
+            <path d="M80,200 L90,120 L70,80 L85,40" fill="none" stroke="#444" stroke-width="5" stroke-linecap="round"/>
+            <path d="M320,200 L305,110 L325,70 L310,30" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round"/>
+            <!-- Runic Monolith -->
+            <polygon points="180,200 220,200 210,90 190,90" fill="#2b2b2b" stroke="#555"/>
+            <path d="M195,120 L205,120 M200,110 L200,130" stroke="#ff6666" stroke-width="2" class="anim-shimmer"/>
+          </svg>`,
+    text: `The raven leads you east for hours. When you arrive, the silence is awful. The trees here are bleached and brittle, their leaves grey ash. The ground is cold even in sunlight.<br><br>At the center stands a stone, and carved into it a word in an old language. You somehow understand it: <em>FORGOTTEN</em>.<br><br>The raven lands beside you. <em>"A spirit was bound here long ago and never released. The grief has poisoned the land. Only one who remembers can free it."</em>`,
+    choices: [
+      { text: "Place your hand on the stone and speak the spirit's name into the silence", next: "ending_remember" },
+      { text: "Return to find help — this is too great a task alone", next: "seek_others" },
+    ]
+  },
+  seek_others: {
+    tag: "The Wanderers",
+    title: "Found in Fellowship",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#091c12"/>
+            <!-- Campfire -->
+            <circle cx="200" cy="140" r="45" fill="url(#mist)" opacity="0.5"/>
+            <polygon points="185,150 215,150 200,110" fill="#ff9933" class="anim-float"/>
+            <polygon points="192,150 208,150 200,120" fill="#ffcc00" class="anim-pulse"/>
+            <!-- Logs / Figures shadows -->
+            <rect x="150" y="152" width="100" height="10" fill="#3d2314" rx="4"/>
+            <circle cx="170" cy="135" r="12" fill="#1b3325"/>
+            <circle cx="230" cy="135" r="12" fill="#1b3325"/>
+          </svg>`,
+    text: `You descend and find a small camp of forest-folk: a weathered herbalist, a young mapmaker, and an elderly lute-player who claims the songs of the forest still speak to her.<br><br>You tell them what you saw. None of them look surprised. <em>"We've been gathering,"</em> says the herbalist. <em>"Waiting for someone who could see it from above."</em><br><br>Together you are four. Together you might be enough.`,
+    choices: [
+      { text: "Lead the group east toward the blight", next: "ending_fellowship" },
+      { text: "Let the lute-player lead — she knows the songs", next: "ending_fellowship" },
+    ]
+  },
+  oak_leaf: {
+    tag: "The Gift Unasked",
+    title: "What the Oak Chooses to Give",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#0d2b17"/>
+            <!-- Glowing Floating Leaf -->
+            <g class="anim-float" transform="translate(160,50)">
+              <path d="M40,20 C80,20 90,50 40,80 C-10,50 0,20 40,20 Z" fill="#5fd45f" opacity="0.85" stroke="#96e896" stroke-width="2"/>
+              <path d="M40,20 L40,80" stroke="#96e896" stroke-width="1"/>
+              <circle cx="40" cy="50" r="20" fill="url(#mist)" opacity="0.6" class="anim-pulse"/>
+            </g>
+            <circle cx="200" cy="100" r="40" fill="none" stroke="#e8c97a" stroke-width="1" stroke-dasharray="4,4" class="anim-shimmer"/>
+          </svg>`,
+    text: `The leaf in your palm glows faintly gold-green. Warmth pulses through you like a second heartbeat.<br><br>The raven watches with those impossible emerald eyes. <em>"The oak gives its leaves only to forest-friends. You have been chosen as a Warden."</em><br><br>And suddenly you understand: this was always the path. The leaf is a key. You know, without knowing how you know, exactly where to go.`,
+    choices: [
+      { text: "Follow the pull of the leaf into the heart of the forest", next: "ending_warden" },
+    ]
+  },
+  underneath: {
+    tag: "The Underneath",
+    title: "Where Roots Dream",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#050b14"/>
+            <!-- Cathedral Hanging Roots -->
+            <path d="M40,0 Q60,120 20,200" fill="none" stroke="#2d8a2d" stroke-width="4" opacity="0.7"/>
+            <path d="M360,0 Q330,140 380,200" fill="none" stroke="#2d8a2d" stroke-width="5" opacity="0.6"/>
+            <path d="M200,0 Q220,90 190,150" fill="none" stroke="#5fd45f" stroke-width="2" opacity="0.4" class="anim-pulse"/>
+            <!-- Subterranean Luminescence -->
+            <ellipse cx="200" cy="180" rx="120" ry="30" fill="radial-gradient(#1f5c1f, transparent)" opacity="0.6"/>
+          </svg>`,
+    text: `The descent is a heartbeat long and a lifetime deep. You arrive in a vast underground chamber where the roots of the great trees hang like cathedral columns, each one glowing softly green.<br><br>At the center, an ancient spirit in the shape of an enormous deer raises her crowned head. Her voice is the sound of rivers. <em>"You were not afraid to descend. That is the first test. The second is: will you stay long enough to listen?"</em>`,
+    choices: [
+      { text: "Sit down and listen — for as long as it takes", next: "ending_heartwood" },
+      { text: "Ask what the spirit needs from you", next: "ending_guardian" },
+    ]
+  },
+  bird_memory: {
+    tag: "A Secret for a Secret",
+    title: "The Weight of Kindness",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#120d1c"/>
+            <!-- Floating Cage Open -->
+            <g class="anim-float" transform="translate(170, 40)">
+              <rect x="15" y="20" width="30" height="50" fill="none" stroke="#c8a84b" stroke-width="2" rx="3"/>
+              <path d="M15,35 L45,35 M15,50 L45,50 M25,20 L25,70 M35,20 L35,70" stroke="#c8a84b" stroke-width="1"/>
+              <!-- Open Door Frame -->
+              <path d="M45,30 L60,25 L60,65 L45,60" fill="none" stroke="#c8a84b" stroke-width="1.5"/>
+            </g>
+            <!-- Spirit Bird flying out -->
+            <g class="anim-pulse" transform="translate(230, 30)">
+              <path d="M0,20 Q15,0 30,10 Q15,15 0,20" fill="#e8c97a"/>
+              <circle cx="25" cy="8" r="1.5" fill="#fff"/>
+            </g>
+          </svg>`,
+    text: `The sprite's irritation evaporates instantly. Her wings flutter. <em>"A kindness freely given without witness — those are the rarest secrets."</em><br><br>She hops from foot to foot. <em>"My secret in return: the Heartwood Tree at the center of this forest is lonely. It has not been visited by a human in four hundred years. If you go to it and simply sit with it — just be there — the forest will remember that humans can be good."</em><br><br>She vanishes before you can thank her.`,
+    choices: [
+      { text: "Find the Heartwood Tree and keep it company", next: "ending_heartwood" },
+      { text: "Search for others who might know the way", next: "seek_others" },
+    ]
+  },
+
+  ending_guardian: {
+    tag: "Ending",
+    type: "victory",
+    title: "The Guardian of Green",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#0a3a0a"/>
+            <!-- Huge Burst of Green and Gold Light -->
+            <circle cx="200" cy="100" r="80" fill="radial-gradient(#96e896, transparent)" class="anim-pulse" opacity="0.6"/>
+            <path d="M0,200 Q200,100 400,200" fill="#2d8a2d"/>
+            <path d="M0,200 Q200,140 400,200" fill="#5fd45f" opacity="0.7"/>
+            <!-- Growing sprouts -->
+            <path d="M180,150 Q190,120 200,120 T210,100" fill="none" stroke="#eafcea" stroke-width="3" stroke-linecap="round" class="anim-float"/>
+            <path d="M220,160 Q215,135 225,130" fill="none" stroke="#eafcea" stroke-width="2" stroke-linecap="round"/>
+          </svg>`,
+    text: `The heart of the Verdant Realm is healed. The grey withdraws. The dying patches bloom with sudden fierce green, flowers erupting from cracked earth, color flooding back into the canopy like sunrise.<br><br>You stand at the center of it, breathing hard, and the forest breathes back.<br><br>The keeper, or the deer, or the spirit — whoever guided you here — speaks one final time: <em>"The forest remembers all who serve it. You will always have a home in the green."</em><br><br>And when you finally walk out to the ordinary world, you notice: moss grows where your footsteps fall.`
+  },
+  ending_heartwood: {
+    tag: "Ending",
+    type: "victory",
+    title: "Heart of the World",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#082414"/>
+            <!-- Massive Ancient Tree Base -->
+            <path d="M120,200 C150,120 130,50 200,0 C270,50 250,120 280,200 Z" fill="#184a25"/>
+            <!-- Ring lines details -->
+            <path d="M170,200 C180,150 190,110 200,110 C210,110 220,150 230,200" fill="none" stroke="#2d8a2d" stroke-width="2"/>
+            <!-- Pulsing Center Core -->
+            <circle cx="200" cy="110" r="15" fill="#96e896" class="anim-pulse" filter="blur(2px)"/>
+          </svg>`,
+    text: `The Heartwood at the center of all forests stands before you — vast, impossibly old, humming with four thousand years of memory.<br><br>You sit with it. An hour. A day. You lose track. You tell it stories. It tells you older ones, in the language of rings and roots and rain.<br><br>When you finally rise to go, you find that your hair has grown long, your clothes are covered in living moss, and you know the name of every tree you'll ever meet. A fair trade, you think. <em>A more than fair trade.</em>`
+  },
+  ending_fellowship: {
+    tag: "Ending",
+    type: "victory",
+    title: "The Song That Heals",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#0b2424"/>
+            <!-- Musical/Harmonic Resonance waves -->
+            <path d="M20,100 Q100,20 200,100 T380,100" fill="none" stroke="#96e896" stroke-width="2" class="anim-float"/>
+            <path d="M20,120 Q100,50 200,120 T380,120" fill="none" stroke="#e8c97a" stroke-width="1.5" class="anim-shimmer"/>
+            <!-- Forest rising up -->
+            <path d="M0,160 C120,130 280,130 400,160 L400,200 L0,200 Z" fill="#0d3826"/>
+          </svg>`,
+    text: `The lute-player begins to play at the edge of the blight, and the others add their voices — the herbalist with a low hum, the mapmaker with a whistled melody. You add yours without thinking.<br><br>The music moves through the grey trees like water. Color bleeds back into the bark. Slowly, impossibly, the blight retreats.<br><br>It takes three days and three nights. When it's done, you are all hoarse and exhausted and <em>luminously happy</em>.<br><br><em>"The forest needed to hear that it is loved,"</em> says the lute-player. <em>"It just needed enough voices."</em>`
+  },
+  ending_remember: {
+    tag: "Secret Ending",
+    type: "secret",
+    title: "The Name That Was Forgotten",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#261c28"/>
+            <!-- Cracking monolith with pink/purple spiritual energy -->
+            <polygon points="180,200 220,200 210,90 190,90" fill="#1c131f" stroke="#444"/>
+            <path d="M200,90 L200,200 M195,130 L208,135 M193,165 L205,160" stroke="#f5c8f5" stroke-width="3" class="anim-shimmer"/>
+            <circle cx="200" cy="70" r="30" fill="radial-gradient(#f5c8f5, transparent)" class="anim-pulse" opacity="0.7"/>
+          </svg>`,
+    text: `You place your hand on the stone. The cold rushes up your arm.<br><br>Into the silence, you speak a name. You don't know where it comes from — perhaps the raven knew all along, perhaps you carried it inside you, perhaps the forest whispered it into the gap between heartbeats.<br><br>The stone cracks. Light pours through. A spirit rises — not in anger, but in <em>relief</em> so profound it looks like sorrow. It touches your forehead with one luminous finger and passes on.<br><br>Around you, the grey trees begin to green.`,
+    secret: true
+  },
+  ending_warden: {
+    tag: "Secret Ending",
+    type: "secret",
+    title: "The Warden's Mantle",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#17240f"/>
+            <!-- Alter with Relics -->
+            <polygon points="130,170 270,170 250,130 150,130" fill="#382a17" stroke="#c8a84b"/>
+            <!-- Staff & Lantern -->
+            <line x1="160" y1="150" x2="140" y2="80" stroke="#5c4033" stroke-width="4" stroke-linecap="round"/>
+            <circle cx="240" cy="115" r="8" fill="#eafcea" class="anim-shimmer"/>
+            <path d="M235,115 L245,115 L240,100 Z" fill="#c8a84b"/>
+            <!-- Crown/Mantle glow -->
+            <ellipse cx="200" cy="125" rx="40" ry="15" fill="none" stroke="#5fd45f" stroke-width="2" class="anim-pulse"/>
+          </svg>`,
+    text: `You follow the leaf's warmth to a glade of impossible beauty — flowers that glow, a pool like liquid starlight, and a great stone table on which lie the tools of office: a cloak of living leaves, a staff of rowan wood, a lantern that burns green.<br><br>The forest has chosen its new Warden.<br><br>You were not looking for this. But then, you were not looking for any of this when you stepped into the green this morning.<br><br>You pick up the cloak. It settles around your shoulders like it has always been there.`,
+    secret: true
+  },
+  ending_sky: {
+    tag: "Ending",
+    type: "victory",
+    title: "The Path Between Stars",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#080b1a"/>
+            <!-- Nebula Constellations -->
+            <path d="M40,40 L80,60 L120,30 L160,70" fill="none" stroke="rgba(150,232,150,0.4)" stroke-width="1.5" class="anim-shimmer"/>
+            <circle cx="40" cy="40" r="3" fill="#fff"/>
+            <circle cx="80" cy="60" r="4" fill="#96e896" class="anim-pulse"/>
+            <circle cx="120" cy="30" r="3" fill="#fff"/>
+            <circle cx="160" cy="70" r="5" fill="#e8c97a" class="anim-pulse"/>
+            <!-- Stardust Path -->
+            <path d="M0,200 Q200,120 400,80" fill="none" stroke="#eafcea" stroke-width="4" stroke-dasharray="2,6" class="anim-float"/>
+          </svg>`,
+    text: `The path spirals upward through layers of cloud and light until you emerge into a place that is neither forest nor sky but something in between — a realm of living constellations shaped like leaves and roots and ancient trees.<br><br>A voice that is somehow made of wind says: <em>"Few find this path. Fewer still choose it."</em><br><br>You spend what feels like years here, learning the shape of things, before the path gently returns you to the forest floor.<br><br>You are different now. The forest knows it. It bows as you pass.`
+  },
+  ending_defeat: {
+    tag: "Ending",
+    type: "defeat",
+    title: "The Cost of Waiting",
+    art: `<svg class="art-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#0f0f14"/>
+            <!-- Cold Moonlight/Closed Threshold -->
+            <circle cx="200" cy="60" r="25" fill="#e1e1e1" opacity="0.2"/>
+            <path d="M0,170 Q200,140 400,170 L400,200 L0,200 Z" fill="#1c1c24"/>
+            <!-- Barren trees blocking -->
+            <line x1="150" y1="200" x2="140" y2="100" stroke="#2c2c36" stroke-width="4"/>
+            <line x1="250" y1="200" x2="265" y2="90" stroke="#2c2c36" stroke-width="4"/>
+          </svg>`,
+    text: `You spend the rest of the day preparing, gathering, hesitating. By moonrise, the keeper is gone — door locked, fire cold.<br><br>You search for the path she would have shown you. The forest is silent now in a different way — not welcoming, but watchful. Whatever window of time existed, you have stepped outside it.<br><br>The bell, you know, will not ring again for a very long time.<br><br><em>Some moments do not wait for us.</em><br><br>You find your way back to the edge of the forest. The trees let you leave. But they do not say goodbye.`
+  }
+};
+
+let currentDepth = 0;
+const MAX_DEPTH = 4;
+
+function getDepthPips(current, max) {
+  let html = '';
+  for (let i = 0; i < max; i++) {
+    html += `<div class="progress-pip ${i < current ? 'filled' : ''}"></div>`;
+  }
+  return html;
+}
+
+function renderScene(sceneId) {
+  const scene = SCENES[sceneId];
+  if (!scene) return;
+  
+  currentDepth++;
+
+  document.getElementById('progress-track').innerHTML = getDepthPips(currentDepth, MAX_DEPTH);
+
+  const area = document.getElementById('game-area');
+  const isEnding = !scene.choices;
+
+  let choicesHtml = '';
+  if (scene.choices) {
+    const letters = ['A', 'B', 'C', 'D'];
+    choicesHtml = `<div class="choices">
+      ${scene.choices.map((c, i) => `
+        <button class="choice-btn" onclick="go('${c.next}')">
+          <span class="choice-letter">${letters[i]}</span>
+          ${c.text}
+        </button>
+      `).join('')}
+    </div>`;
+  }
+
+  let endingHtml = '';
+  if (isEnding) {
+    const type = scene.type || 'victory';
+    const labels = { victory: 'Victory', defeat: 'Fate Sealed', secret: 'Secret Ending Discovered' };
+    endingHtml = `
+      <div class="ending-card">
+        <div class="ending-badge ${type}">${labels[type]}</div>
+        <p style="font-style: italic; color: var(--g8); font-size: 0.9rem; margin-bottom: 1rem;">
+          ${type === 'secret' ? '✦ You found a hidden path ✦' : type === 'victory' ? 'The forest remembers you.' : 'Perhaps next time, the green will call again.'}
+        </p>
+        <button class="restart-btn" onclick="restart()">⟳ Begin Again</button>
+      </div>
+    `;
+  }
+
+  area.innerHTML = `
+    <div class="scene-card fade-in">
+      <div class="scene-tag">${scene.tag}</div>
+      <div class="art-frame">
+        ${scene.art}
+      </div>
+      <h2 class="scene-title">${scene.title}</h2>
+      <p class="scene-text">${scene.text}</p>
+      ${choicesHtml}
+    </div>
+    ${endingHtml}
+  `;
+}
+
+function go(sceneId) {
+  renderScene(sceneId);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function restart() {
+  currentDepth = 0;
+  renderScene('start');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+renderScene('start');
+</script>
+</body>
+</html>

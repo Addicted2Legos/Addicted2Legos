@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Azure Ascent - Level 1 Fix</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #050b14;
+            color: #fff;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 40px rgba(0, 127, 255, 0.6);
+            border-radius: 12px;
+            overflow: hidden;
+            background: #000;
+        }
+
+        canvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+
+        .hud-element {
+            background: rgba(4, 18, 36, 0.85);
+            padding: 10px 20px;
+            border-radius: 30px;
+            border: 2px solid #00d2ff;
+            font-weight: bold;
+            font-size: 18px;
+            letter-spacing: 1px;
+            box-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
+        }
+
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(5, 11, 20, 0.85);
+            padding: 12px 25px;
+            border-radius: 8px;
+            border: 1px solid #0055ff;
+            pointer-events: none;
+            text-align: center;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="ui-layer">
+        <div class="hud-element" style="color: #00f0ff;">COINS: <span id="coin-count">0</span></div>
+        <div class="hud-element" style="color: #007fff;">GOAL: REACH THE TOP</div>
+    </div>
+    <div id="instructions">
+        <strong>AIM & CLICK</strong> on Azure platforms to Hook (Hold to Swing)<br>
+        Alternatively: Press <strong>SPACEBAR</strong> to auto-hook nearest | Use <strong>A / D</strong> to swing
+    </div>
+    <canvas id="gameCanvas" width="500" height="750"></canvas>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const coinCountEl = document.getElementById('coin-count');
+
+// Game State
+let coins = 0;
+
+// Physics Config
+const gravity = 0.35;
+const friction = 0.98;
+
+// Player Setup
+const player = {
+    x: 250,
+    y: 700,
+    vx: 0,
+    vy: 0,
+    radius: 14,
+    speed: 0.6
+};
+
+// Grapple Setup
+const hook = {
+    active: false,
+    x: 0,
+    y: 0,
+    length: 0
+};
+
+// Platforms (Level 1 Vertical Layout)
+const platforms = [
+    { x: 250, y: 600, radius: 24, color: '#0055ff', hasCoin: true },
+    { x: 130, y: 460, radius: 24, color: '#007fff', hasCoin: true },
+    { x: 370, y: 320, radius: 24, color: '#0055ff', hasCoin: true },
+    { x: 250, y: 140, radius: 32, color: '#00f0ff', isGoal: true } 
+];
+
+// Controller Input Tracking
+const keys = { a: false, d: false, space: false };
+
+window.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() === 'a') keys.a = true;
+    if (e.key.toLowerCase() === 'd') keys.d = true;
+    if (e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        if (!hook.active) deployAutoHook();
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    if (e.key.toLowerCase() === 'a') keys.a = false;
+    if (e.key.toLowerCase() === 'd') keys.d = false;
+    if (e.key === ' ' || e.code === 'Space') {
+        hook.active = false;
+    }
+});
+
+// Mouse Controls
+canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Smart-targeting: Checks if click is close to any platform
+    platforms.forEach(p => {
+        const dist = Math.hypot(mouseX - p.x, mouseY - p.y);
+        if (dist < p.radius + 35) { // Highly generous target area
+            hook.active = true;
+            hook.x = p.x;
+            hook.y = p.y;
+            hook.length = Math.hypot(player.x - p.x, player.y - p.y);
+        }
+    });
+});
+
+window.addEventListener('mouseup', () => hook.active = false);
+
+// Auto-Hook feature for smoother accessibility
+function deployAutoHook() {
+    let nearest = null;
+    let minDist = Infinity;
+    
+    platforms.forEach(p => {
+        let d = Math.hypot(player.x - p.x, player.y - p.y);
+        // Only target platforms above the player
+        if (p.y < player.y && d < minDist) {
+            minDist = d;
+            nearest = p;
+        }
+    });
+
+    if (nearest) {
+        hook.active = true;
+        hook.x = nearest.x;
+        hook.y = nearest.y;
+        hook.length = minDist;
+    }
+}
+
+function resetPlayer() {
+    player.x = 250;
+    player.y = 700;
+    player.vx = 0;
+    player.vy = 0;
+    hook.active = false;
+}
+
+// Engine Core Updates
+function gameLoop() {
+    // 1. Environmental & Movement Physics
+    player.vy += gravity;
+    player.vx *= friction;
+
+    if (hook.active) {
+        // Swing acceleration inputs
+        if (keys.a) player.vx -= player.speed * 0.5;
+        if (keys.d) player.vx += player.speed * 0.5;
+
+        // Pendulum constraint math
+        let dx = player.x - hook.x;
+        let dy = player.y - hook.y;
+        let currentDist = Math.hypot(dx, dy);
+
+        if (currentDist > hook.length) {
+            let angle = Math.atan2(dy, dx);
+            // Lock onto rope radius
+            player.x = hook.x + Math.cos(angle) * hook.length;
+            player.y = hook.y + Math.sin(angle) * hook.length;
+
+            // Restructure velocity tangent to hook arc
+            let tangentX = -Math.sin(angle);
+            let tangentY = Math.cos(angle);
+            let dotProduct = player.vx * tangentX + player.vy * tangentY;
+
+            player.vx = tangentX * dotProduct;
+            player.vy = tangentY * dotProduct;
+        }
+    } else {
+        // Grounded controls or freefall movement controls
+        if (keys.a) player.vx -= player.speed;
+        if (keys.d) player.vx += player.speed;
+    }
+
+    // Process positions
+    player.x += player.vx;
+    player.y += player.vy;
+
+    // Platform/Ground Safety Boundaries
+    if (player.y + player.radius > canvas.height) {
+        player.y = canvas.height - player.radius;
+        player.vy = 0;
+        player.vx *= 0.7; // Extra ground friction
+    }
+    if (player.x - player.radius < 0) { player.x = player.radius; player.vx *= -0.4; }
+    if (player.x + player.radius > canvas.width) { player.x = canvas.width - player.radius; player.vx *= -0.4; }
+
+    // 2. Progression Tracking & Intersections
+    platforms.forEach(p => {
+        let dist = Math.hypot(player.x - p.x, player.y - p.y);
+        
+        // Check coin extraction
+        if (p.hasCoin && dist < p.radius + player.radius + 10) {
+            p.hasCoin = false;
+            coins += 25;
+            coinCountEl.innerText = coins;
+        }
+        
+        // Victory Check
+        if (p.isGoal && dist < p.radius + player.radius) {
+            alert(`Victory! Total Gold Secured: ${coins + 100}G.`);
+            coins += 100;
+            coinCountEl.innerText = coins;
+            // Reset state seamlessly
+            platforms.forEach(plat => { if(!plat.isGoal) plat.hasCoin = true; });
+            resetPlayer();
+        }
+    });
+
+    // 3. Render Engine Canvas Draw Pass
+    // Draw Sky Background Gradient
+    let skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    skyGrad.addColorStop(0, '#001122');
+    skyGrad.addColorStop(0.5, '#0033aa');
+    skyGrad.addColorStop(1, '#007fff');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Render Anchors/Nodes
+    platforms.forEach(p => {
+        // Pulsing Ring Effect
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius + 6, 0, Math.PI * 2);
+        ctx.strokeStyle = p.isGoal ? '#ffea00' : '#00f0ff';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Node fill
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+
+        // Render Float Collectibles
+        if (p.hasCoin) {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y - p.radius - 20, 7, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffcc00';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        }
+    });
+
+    // Draw Grapple Cable Line
+    if (hook.active) {
+        ctx.beginPath();
+        ctx.moveTo(player.x, player.y);
+        ctx.lineTo(hook.x, hook.y);
+        ctx.strokeStyle = '#00f0ff';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+    }
+
+    // Render Character Node
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.strokeStyle = '#002244';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Directional Viz Target (Character Eyes)
+    ctx.beginPath();
+    let eyeOffset = player.vx > 0.5 ? 5 : (player.vx < -0.5 ? -5 : 0);
+    ctx.arc(player.x + eyeOffset, player.y - 2, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#0055ff';
+    ctx.fill();
+
+    requestAnimationFrame(gameLoop);
+}
+
+// Start Game Loop Engine
+gameLoop();
+</script>
+
+</body>
+</html>

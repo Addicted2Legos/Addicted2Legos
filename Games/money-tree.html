@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Money Tree</title>
+<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=DM+Mono:wght@400;500&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0f0a;
+    --bg2: #111811;
+    --card: #141f14;
+    --card2: #1a2b1a;
+    --green: #4cff72;
+    --green2: #2adf52;
+    --gold: #f5c842;
+    --gold2: #e6a800;
+    --red: #ff4f4f;
+    --text: #d8f0d8;
+    --muted: #6a8a6a;
+    --border: #2a4a2a;
+    --glow: 0 0 24px #4cff7244;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 20% 80%, #0d2a0d88 0%, transparent 70%),
+      radial-gradient(ellipse 50% 50% at 80% 20%, #1a3a0a55 0%, transparent 70%),
+      repeating-linear-gradient(0deg, transparent, transparent 48px, #1a2a1a18 48px, #1a2a1a18 49px),
+      repeating-linear-gradient(90deg, transparent, transparent 48px, #1a2a1a18 48px, #1a2a1a18 49px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 20px 16px 60px; }
+
+  /* HEADER */
+  header {
+    text-align: center;
+    padding: 32px 0 24px;
+    position: relative;
+  }
+
+  .tree-icon {
+    font-size: 64px;
+    display: block;
+    line-height: 1;
+    margin-bottom: 8px;
+    filter: drop-shadow(0 0 20px #4cff7288);
+    animation: sway 4s ease-in-out infinite;
+  }
+
+  @keyframes sway {
+    0%, 100% { transform: rotate(-3deg) scale(1); }
+    50% { transform: rotate(3deg) scale(1.05); }
+  }
+
+  h1 {
+    font-family: 'Abril Fatface', cursive;
+    font-size: clamp(2.4rem, 8vw, 4.5rem);
+    color: var(--green);
+    text-shadow: 0 0 40px #4cff7266, 0 2px 0 #1a4a1a;
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+
+  .tagline {
+    color: var(--muted);
+    font-size: 0.75rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  /* WALLET BAR */
+  .wallet-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 24px;
+    margin: 0 0 28px;
+    box-shadow: var(--glow);
+    flex-wrap: wrap;
+  }
+
+  .wallet-item { text-align: center; }
+  .wallet-label { font-size: 0.6rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+  .wallet-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gold);
+    transition: color 0.3s, transform 0.2s;
+  }
+  .wallet-value.bump {
+    animation: bump 0.4s ease;
+  }
+  @keyframes bump {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.25); color: var(--green); }
+    100% { transform: scale(1); }
+  }
+
+  .divider { width: 1px; height: 40px; background: var(--border); }
+
+  /* LEVEL PROGRESS */
+  .level-bar-wrap {
+    margin: 0 0 28px;
+  }
+  .level-header { display: flex; justify-content: space-between; font-size: 0.7rem; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .level-bar { background: var(--card2); border-radius: 99px; height: 8px; overflow: hidden; border: 1px solid var(--border); }
+  .level-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green2), var(--green));
+    border-radius: 99px;
+    transition: width 0.6s cubic-bezier(.34,1.56,.64,1);
+    box-shadow: 0 0 10px var(--green);
+  }
+
+  /* TABS */
+  .tabs { display: flex; gap: 6px; margin-bottom: 20px; }
+  .tab {
+    flex: 1; padding: 10px 4px; text-align: center; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--card);
+    cursor: pointer; font-family: 'DM Mono', monospace; font-size: 0.72rem;
+    letter-spacing: 1px; text-transform: uppercase; color: var(--muted);
+    transition: all 0.2s;
+  }
+  .tab:hover { border-color: var(--green); color: var(--green); }
+  .tab.active { background: var(--card2); border-color: var(--green); color: var(--green); box-shadow: var(--glow); }
+
+  /* PANEL */
+  .panel { display: none; }
+  .panel.active { display: block; animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  /* MARKET GRID */
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    color: var(--green);
+    margin-bottom: 14px;
+    border-left: 3px solid var(--green);
+    padding-left: 10px;
+  }
+
+  .market-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px;
+    margin-bottom: 32px;
+  }
+
+  .market-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.22s;
+    position: relative;
+    overflow: hidden;
+  }
+  .market-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #4cff7208, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .market-card:hover:not(.locked) { border-color: var(--green); transform: translateY(-3px); box-shadow: var(--glow); }
+  .market-card:hover:not(.locked)::before { opacity: 1; }
+  .market-card.locked { opacity: 0.4; cursor: default; }
+  .market-card.owned { border-color: var(--gold); }
+
+  .card-emoji { font-size: 2.2rem; line-height: 1; margin-bottom: 8px; }
+  .card-name { font-family: 'Playfair Display', serif; font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; }
+  .card-desc { font-size: 0.65rem; color: var(--muted); line-height: 1.5; margin-bottom: 10px; }
+  .card-price {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--bg); border-radius: 6px; padding: 4px 8px;
+    font-size: 0.75rem; color: var(--gold); border: 1px solid var(--border);
+  }
+  .card-price.can-afford { border-color: var(--gold); box-shadow: 0 0 8px #f5c84233; }
+  .card-sell-price { font-size: 0.62rem; color: var(--muted); margin-top: 4px; }
+  .locked-label { font-size: 0.65rem; color: var(--red); margin-top: 4px; }
+  .owned-badge {
+    position: absolute; top: 10px; right: 10px;
+    background: var(--gold); color: #000; font-size: 0.55rem;
+    letter-spacing: 1px; text-transform: uppercase; padding: 2px 6px; border-radius: 4px;
+  }
+
+  /* INVENTORY */
+  .inv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .inv-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .inv-top { display: flex; align-items: center; gap: 10px; }
+  .inv-emoji { font-size: 1.8rem; }
+  .inv-name { font-family: 'Playfair Display', serif; font-size: 0.85rem; font-weight: 700; }
+  .inv-qty { font-size: 0.65rem; color: var(--muted); }
+  .inv-actions { display: flex; gap: 6px; }
+  .btn-sell, .btn-trade {
+    flex: 1; padding: 6px 4px; border-radius: 6px; border: none; cursor: pointer;
+    font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 1px;
+    text-transform: uppercase; transition: all 0.2s;
+  }
+  .btn-sell { background: #2a1a1a; color: var(--red); border: 1px solid #4a2a2a; }
+  .btn-sell:hover { background: #4a2020; border-color: var(--red); }
+  .btn-trade { background: #1a2a1a; color: var(--green); border: 1px solid var(--border); }
+  .btn-trade:hover { background: #1f3a1f; border-color: var(--green); }
+
+  /* TRADE ROUTES */
+  .trade-list { display: flex; flex-direction: column; gap: 10px; }
+  .trade-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-wrap: wrap;
+  }
+  .trade-card:hover:not(.locked) { border-color: var(--green); box-shadow: var(--glow); }
+  .trade-card.locked { opacity: 0.4; cursor: default; }
+  .trade-from, .trade-to { font-size: 1.5rem; }
+  .trade-arrow { color: var(--green); font-size: 1.1rem; }
+  .trade-details { flex: 1; }
+  .trade-name { font-family: 'Playfair Display', serif; font-size: 0.9rem; font-weight: 700; }
+  .trade-desc { font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
+  .trade-profit {
+    font-size: 0.8rem; color: var(--green); font-weight: 500;
+    background: #1a2a1a; padding: 4px 10px; border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+
+  /* LOG */
+  .log-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 0.7rem;
+    line-height: 1.8;
+  }
+  .log-box::-webkit-scrollbar { width: 4px; }
+  .log-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .log-entry { display: flex; gap: 10px; }
+  .log-time { color: var(--muted); flex-shrink: 0; }
+  .log-msg.gain { color: var(--green); }
+  .log-msg.loss { color: var(--red); }
+  .log-msg.trade { color: var(--gold); }
+  .log-msg.level { color: #a0f0ff; }
+
+  /* NOTIFICATION TOAST */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--card2); border: 1px solid var(--green); border-radius: 10px;
+    padding: 12px 24px; font-size: 0.8rem; color: var(--green);
+    box-shadow: var(--glow); z-index: 100; transition: transform 0.4s cubic-bezier(.34,1.56,.64,1);
+    text-align: center; max-width: 300px;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* STATS */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-bottom: 24px; }
+  .stat-box {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; text-align: center;
+  }
+  .stat-val { font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 700; color: var(--green); }
+  .stat-lbl { font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+
+  /* Milestone badge */
+  .milestones { display: flex; flex-direction: column; gap: 8px; }
+  .milestone {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 14px;
+    display: flex; align-items: center; gap: 12px;
+    font-size: 0.75rem;
+  }
+  .milestone.done { border-color: var(--gold); }
+  .milestone-icon { font-size: 1.3rem; }
+  .milestone-text { flex: 1; }
+  .milestone-title { font-family: 'Playfair Display', serif; font-size: 0.85rem; }
+  .milestone-sub { color: var(--muted); font-size: 0.65rem; }
+  .milestone-check { color: var(--gold); }
+
+  .empty-state { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 0.8rem; }
+
+  @media (max-width: 480px) {
+    .tabs { flex-wrap: wrap; }
+    .tab { min-width: calc(50% - 3px); flex: unset; }
+  }
+
+  /* ===== TUTORIAL ===== */
+  /* Semi-transparent dim — pointer-events none so game is always clickable */
+  #tut-backdrop {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.55);
+    pointer-events: none;
+    transition: opacity 0.4s;
+  }
+  #tut-backdrop.hidden { opacity: 0; }
+
+  /* Glowing ring around spotlight target — also non-blocking */
+  #tut-hole {
+    position: fixed;
+    border-radius: 14px;
+    border: 2px solid var(--green);
+    z-index: 201;
+    pointer-events: none;
+    transition: all 0.45s cubic-bezier(.4,0,.2,1);
+    box-shadow: 0 0 0 6px #4cff7218, 0 0 24px #4cff7255;
+    animation: tut-ring-pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes tut-ring-pulse {
+    0%,100% { box-shadow: 0 0 0 4px #4cff7222, 0 0 16px #4cff7255; }
+    50%      { box-shadow: 0 0 0 10px #4cff7208, 0 0 36px #4cff7288; }
+  }
+  #tut-hole.hidden { opacity: 0; }
+
+  #tut-box {
+    position: fixed;
+    z-index: 203;
+    background: var(--card2);
+    border: 1px solid var(--green);
+    border-radius: 14px;
+    padding: 20px 22px;
+    max-width: 300px;
+    box-shadow: var(--glow), 0 8px 40px #000a;
+    transition: left 0.45s cubic-bezier(.4,0,.2,1), top 0.45s cubic-bezier(.4,0,.2,1), opacity 0.3s;
+    pointer-events: all;
+  }
+  #tut-box.hidden { opacity: 0; pointer-events: none; }
+
+  .tut-step-badge {
+    font-size: 0.6rem; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--green); margin-bottom: 6px;
+  }
+  .tut-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem; font-weight: 700;
+    color: var(--text); margin-bottom: 8px;
+  }
+  .tut-body {
+    font-size: 0.72rem; color: var(--muted); line-height: 1.7; margin-bottom: 16px;
+  }
+  .tut-body strong { color: var(--gold); }
+  .tut-arrow {
+    font-size: 1.4rem; margin-bottom: 6px; display: block;
+    animation: bounce 1s ease-in-out infinite;
+  }
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+
+  .tut-actions { display: flex; gap: 8px; align-items: center; }
+  .tut-btn {
+    background: var(--green); color: #000; border: none; border-radius: 8px;
+    padding: 8px 18px; font-family: 'DM Mono', monospace; font-size: 0.72rem;
+    font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    cursor: pointer; transition: all 0.2s; flex: 1;
+  }
+  .tut-btn:hover { background: var(--green2); transform: translateY(-1px); }
+  .tut-skip {
+    font-size: 0.65rem; color: var(--muted); cursor: pointer; text-decoration: underline;
+    background: none; border: none; font-family: 'DM Mono', monospace;
+    padding: 4px; white-space: nowrap;
+  }
+  .tut-skip:hover { color: var(--text); }
+
+  /* Connector line */
+  #tut-connector {
+    position: fixed; z-index: 202; pointer-events: none;
+    width: 2px; background: linear-gradient(var(--green), transparent);
+    border-radius: 2px;
+    transition: all 0.45s cubic-bezier(.4,0,.2,1);
+  }
+  #tut-connector.hidden { opacity: 0; }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<div class="wrapper">
+  <header>
+    <span class="tree-icon">🌳</span>
+    <h1>Money Tree</h1>
+    <p class="tagline">Trade your way to the top</p>
+  </header>
+
+  <div class="wallet-bar">
+    <div class="wallet-item">
+      <div class="wallet-label">Cash</div>
+      <div class="wallet-value" id="cash-display">$0.25</div>
+    </div>
+    <div class="divider"></div>
+    <div class="wallet-item">
+      <div class="wallet-label">Net Worth</div>
+      <div class="wallet-value" id="net-display">$0.25</div>
+    </div>
+    <div class="divider"></div>
+    <div class="wallet-item">
+      <div class="wallet-label">Level</div>
+      <div class="wallet-value" id="level-display">1</div>
+    </div>
+    <div class="divider"></div>
+    <div class="wallet-item">
+      <div class="wallet-label">Trades</div>
+      <div class="wallet-value" id="trades-display">0</div>
+    </div>
+  </div>
+
+  <div class="level-bar-wrap">
+    <div class="level-header">
+      <span id="level-label">Penny Pincher</span>
+      <span id="level-next">Next: $5.00</span>
+    </div>
+    <div class="level-bar"><div class="level-fill" id="level-fill" style="width:0%"></div></div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('market')">🏪 Market</div>
+    <div class="tab" onclick="showTab('inventory')">🎒 Inventory</div>
+    <div class="tab" onclick="showTab('trades')">🔄 Trades</div>
+    <div class="tab" onclick="showTab('stats')">📊 Stats</div>
+  </div>
+
+  <!-- MARKET PANEL -->
+  <div class="panel active" id="panel-market">
+    <div class="section-title">Buy Items</div>
+    <div class="market-grid" id="market-grid"></div>
+  </div>
+
+  <!-- INVENTORY PANEL -->
+  <div class="panel" id="panel-inventory">
+    <div class="section-title">Your Inventory</div>
+    <div class="inv-grid" id="inv-grid">
+      <div class="empty-state">Your inventory is empty.<br>Buy something from the Market!</div>
+    </div>
+  </div>
+
+  <!-- TRADES PANEL -->
+  <div class="panel" id="panel-trades">
+    <div class="section-title">Trade Routes</div>
+    <p style="font-size:0.7rem; color:var(--muted); margin-bottom:14px;">Exchange items you own for more valuable ones. Requires items in your inventory.</p>
+    <div class="trade-list" id="trade-list"></div>
+  </div>
+
+  <!-- STATS PANEL -->
+  <div class="panel" id="panel-stats">
+    <div class="section-title">Your Stats</div>
+    <div class="stats-grid" id="stats-grid"></div>
+    <div class="section-title" style="margin-top:10px">Milestones</div>
+    <div class="milestones" id="milestones"></div>
+  </div>
+
+  <div style="margin-top:32px">
+    <div class="section-title">Activity Log</div>
+    <div class="log-box" id="log-box">
+      <div class="log-entry"><span class="log-time">00:00</span><span class="log-msg">Welcome to Money Tree! Start with your 25 cents and grow your empire. 🌱</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- TUTORIAL OVERLAY — all pointer-events:none except tut-box -->
+<div id="tut-backdrop" class="hidden"></div>
+<div id="tut-hole" class="hidden"></div>
+<div id="tut-connector" class="hidden"></div>
+<div id="tut-box" class="hidden">
+  <div class="tut-step-badge" id="tut-badge">Step 1 of 2</div>
+  <span class="tut-arrow" id="tut-arrow">👇</span>
+  <div class="tut-title" id="tut-title"></div>
+  <div class="tut-body" id="tut-body"></div>
+  <div class="tut-actions">
+    <button class="tut-btn" id="tut-next-btn" onclick="tutNext()">Got it!</button>
+    <button class="tut-skip" onclick="tutSkip()">Skip tutorial</button>
+  </div>
+</div>
+
+<script>
+// ======= GAME DATA =======
+
+const ITEMS = [
+  { id: 'coin',       emoji: '🪙', name: 'Quarter',      desc: 'A shiny quarter. Everyone starts here.', buy: 0.25, sell: 0.15, level: 1 },
+  { id: 'candy',      emoji: '🍬', name: 'Candy Bar',    desc: 'Buy low, sell to hungry strangers.', buy: 0.50, sell: 0.35, level: 1 },
+  { id: 'pencil',     emoji: '✏️', name: 'Pencil Pack',  desc: 'School essentials. Always in demand.', buy: 1.00, sell: 0.70, level: 1 },
+  { id: 'card',       emoji: '🃏', name: 'Trading Card', desc: 'A rare-ish card. Collectors want these.', buy: 2.00, sell: 1.50, level: 1 },
+  { id: 'book',       emoji: '📚', name: 'Old Book',     desc: 'Knowledge is power. Also cash.', buy: 5.00, sell: 4.00, level: 2 },
+  { id: 'plant',      emoji: '🪴', name: 'Potted Plant', desc: 'People love plants. Flip it quick.', buy: 8.00, sell: 6.50, level: 2 },
+  { id: 'toy',        emoji: '🧸', name: 'Vintage Toy',  desc: 'Nostalgia sells. Big margins.', buy: 15.00, sell: 12.00, level: 2 },
+  { id: 'watch',      emoji: '⌚', name: 'Broken Watch', desc: 'Parts are worth more than the whole.', buy: 25.00, sell: 20.00, level: 3 },
+  { id: 'phone',      emoji: '📱', name: 'Old Phone',    desc: 'Last-gen tech. Still sellable.', buy: 50.00, sell: 42.00, level: 3 },
+  { id: 'bike',       emoji: '🚲', name: 'Used Bike',    desc: 'Two wheels of profit.', buy: 100.00, sell: 80.00, level: 3 },
+  { id: 'guitar',     emoji: '🎸', name: 'Guitar',       desc: 'Gig season is coming.', buy: 200.00, sell: 165.00, level: 4 },
+  { id: 'camera',     emoji: '📷', name: 'Film Camera',  desc: 'Vintage trend. Premium buyers.', buy: 350.00, sell: 290.00, level: 4 },
+  { id: 'laptop',     emoji: '💻', name: 'Laptop',       desc: 'Refurb and resell. Classic.', buy: 600.00, sell: 500.00, level: 5 },
+  { id: 'art',        emoji: '🖼️', name: 'Artwork',     desc: 'Eye of the beholder. Wallet of the buyer.', buy: 1000.00, sell: 850.00, level: 5 },
+  { id: 'gold',       emoji: '🏅', name: 'Gold Bar',     desc: 'The ultimate store of value.', buy: 2500.00, sell: 2200.00, level: 6 },
+  { id: 'crypto',     emoji: '💎', name: 'Rare NFT',     desc: 'Speculative. High risk, high reward.', buy: 5000.00, sell: 4400.00, level: 7 },
+  { id: 'car',        emoji: '🚗', name: 'Classic Car',  desc: 'Petrol-head treasure. Grows in value.', buy: 10000.00, sell: 9000.00, level: 8 },
+  { id: 'deed',       emoji: '🏠', name: 'Property Deed',desc: 'You own land. Land is power.', buy: 50000.00, sell: 46000.00, level: 9 },
+  { id: 'yacht',      emoji: '⛵', name: 'Luxury Yacht', desc: 'Float your money. Literally.', buy: 250000.00, sell: 230000.00, level: 10 },
+];
+
+const TRADES = [
+  { id: 't1', name: 'Candy Arbitrage', from: 'coin',   fromQty: 1, to: 'candy',  toQty: 1, desc: 'Turn a quarter into a candy bar', level: 1 },
+  { id: 't2', name: 'Student Hustle',  from: 'candy',  fromQty: 2, to: 'pencil', toQty: 1, desc: 'Trade sweets for school supplies', level: 1 },
+  { id: 't3', name: 'Card Collector',  from: 'pencil', fromQty: 2, to: 'card',   toQty: 1, desc: 'Stationery for sought-after cards', level: 1 },
+  { id: 't4', name: 'Book Deal',       from: 'card',   fromQty: 2, to: 'book',   toQty: 1, desc: 'Cards to knowledge', level: 2 },
+  { id: 't5', name: 'Green Thumb',     from: 'book',   fromQty: 1, to: 'plant',  toQty: 1, desc: 'Books for plants. Fair trade.', level: 2 },
+  { id: 't6', name: 'Nostalgia Run',   from: 'plant',  fromQty: 2, to: 'toy',    toQty: 2, desc: 'Plants are trendy. Toys are timeless.', level: 2 },
+  { id: 't7', name: 'Parts Market',    from: 'toy',    fromQty: 2, to: 'watch',  toQty: 1, desc: 'Toys for broken timepieces', level: 3 },
+  { id: 't8', name: 'Tech Flip',       from: 'watch',  fromQty: 2, to: 'phone',  toQty: 1, desc: 'Watches for old phones', level: 3 },
+  { id: 't9', name: 'Two-Wheeler',     from: 'phone',  fromQty: 2, to: 'bike',   toQty: 1, desc: 'Phones for a bike', level: 3 },
+  { id: 't10', name: 'Rock Star Deal', from: 'bike',   fromQty: 1, to: 'guitar', toQty: 1, desc: 'Bike for a guitar (upgrade!)', level: 4 },
+  { id: 't11', name: 'Shutterbugs',    from: 'guitar', fromQty: 1, to: 'camera', toQty: 1, desc: 'Music to photography', level: 4 },
+  { id: 't12', name: 'Screen Time',    from: 'camera', fromQty: 2, to: 'laptop', toQty: 1, desc: 'Two cameras for one laptop', level: 5 },
+  { id: 't13', name: 'Gallery Deal',   from: 'laptop', fromQty: 1, to: 'art',    toQty: 1, desc: 'Tech for timeless art', level: 5 },
+  { id: 't14', name: 'Gold Standard',  from: 'art',    fromQty: 2, to: 'gold',   toQty: 1, desc: 'Art trades for gold', level: 6 },
+  { id: 't15', name: 'Digital Age',    from: 'gold',   fromQty: 2, to: 'crypto', toQty: 1, desc: 'Gold to digital assets', level: 7 },
+  { id: 't16', name: 'Road to Riches', from: 'crypto', fromQty: 1, to: 'car',    toQty: 1, desc: 'NFT for a classic car', level: 8 },
+  { id: 't17', name: 'Land Baron',     from: 'car',    fromQty: 5, to: 'deed',   toQty: 1, desc: 'Five cars for property', level: 9 },
+  { id: 't18', name: 'High Seas',      from: 'deed',   fromQty: 5, to: 'yacht',  toQty: 1, desc: 'Property deeds for a yacht', level: 10 },
+];
+
+const LEVELS = [
+  { min: 0,        max: 5,        name: 'Penny Pincher',    lv: 1 },
+  { min: 5,        max: 25,       name: 'Street Trader',    lv: 2 },
+  { min: 25,       max: 100,      name: 'Market Hustler',   lv: 3 },
+  { min: 100,      max: 500,      name: 'Deal Maker',       lv: 4 },
+  { min: 500,      max: 2000,     name: 'Merchant',         lv: 5 },
+  { min: 2000,     max: 8000,     name: 'Entrepreneur',     lv: 6 },
+  { min: 8000,     max: 30000,    name: 'Investor',         lv: 7 },
+  { min: 30000,    max: 100000,   name: 'Venture Capitalist',lv: 8 },
+  { min: 100000,   max: 400000,   name: 'Tycoon',           lv: 9 },
+  { min: 400000,   max: Infinity, name: 'Money Tree',       lv: 10 },
+];
+
+const MILESTONES = [
+  { id: 'm1', emoji: '🌱', title: 'First Dollar', sub: 'Reach $1.00 net worth', check: s => s.netWorth >= 1 },
+  { id: 'm2', emoji: '💵', title: 'Ten Bucks',    sub: 'Reach $10.00 net worth', check: s => s.netWorth >= 10 },
+  { id: 'm3', emoji: '🔄', title: 'First Trade',  sub: 'Complete your first trade', check: s => s.totalTrades >= 1 },
+  { id: 'm4', emoji: '📦', title: 'Collector',    sub: 'Own 5 items at once', check: s => s.totalItems >= 5 },
+  { id: 'm5', emoji: '💯', title: 'Centurion',    sub: 'Reach $100 net worth', check: s => s.netWorth >= 100 },
+  { id: 'm6', emoji: '🏆', title: 'Grand Trader', sub: 'Complete 10 trades', check: s => s.totalTrades >= 10 },
+  { id: 'm7', emoji: '💰', title: 'Grand',        sub: 'Reach $1,000 net worth', check: s => s.netWorth >= 1000 },
+  { id: 'm8', emoji: '🌳', title: 'Money Tree',   sub: 'Reach $250,000 net worth', check: s => s.netWorth >= 250000 },
+];
+
+// ======= GAME STATE =======
+let state = {
+  cash: 5.00,
+  inventory: {},  // id -> qty
+  totalTrades: 0,
+  totalBuys: 0,
+  totalSells: 0,
+  totalProfit: 0,
+  startTime: Date.now(),
+};
+
+let logEntries = [];
+
+// ======= HELPERS =======
+const fmt = n => n >= 1000000 ? `$${(n/1000000).toFixed(2)}M` : n >= 1000 ? `$${(n/1000).toFixed(1)}K` : `$${n.toFixed(2)}`;
+
+function getNetWorth() {
+  let w = state.cash;
+  for (const [id, qty] of Object.entries(state.inventory)) {
+    const item = ITEMS.find(i => i.id === id);
+    if (item) w += item.sell * qty;
+  }
+  return w;
+}
+
+function getTotalItems() {
+  return Object.values(state.inventory).reduce((a, b) => a + b, 0);
+}
+
+function getLevel() {
+  const nw = getNetWorth();
+  return LEVELS.find(l => nw >= l.min && nw < l.max) || LEVELS[LEVELS.length - 1];
+}
+
+function getLevelProgress() {
+  const nw = getNetWorth();
+  const lv = getLevel();
+  if (lv.max === Infinity) return 100;
+  return Math.min(100, ((nw - lv.min) / (lv.max - lv.min)) * 100);
+}
+
+function addLog(msg, type = '') {
+  const now = new Date(Date.now() - state.startTime);
+  const mm = String(Math.floor(now / 60000)).padStart(2,'0');
+  const ss = String(Math.floor((now % 60000) / 1000)).padStart(2,'0');
+  logEntries.unshift({ time: `${mm}:${ss}`, msg, type });
+  if (logEntries.length > 50) logEntries.pop();
+  renderLog();
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ======= ACTIONS =======
+function buyItem(id) {
+  const item = ITEMS.find(i => i.id === id);
+  const lv = getLevel();
+  if (item.level > lv.lv) { showToast('🔒 Level too low!'); return; }
+  if (state.cash < item.buy) { showToast('💸 Not enough cash!'); return; }
+  state.cash -= item.buy;
+  state.inventory[id] = (state.inventory[id] || 0) + 1;
+  state.totalBuys++;
+  addLog(`Bought ${item.emoji} ${item.name} for ${fmt(item.buy)}`, 'loss');
+  showToast(`✅ Bought ${item.name}!`);
+  updateUI();
+}
+
+function sellItem(id) {
+  const item = ITEMS.find(i => i.id === id);
+  if (!state.inventory[id] || state.inventory[id] < 1) return;
+  state.cash += item.sell;
+  state.totalSells++;
+  state.totalProfit += item.sell;
+  state.inventory[id]--;
+  if (state.inventory[id] === 0) delete state.inventory[id];
+  addLog(`Sold ${item.emoji} ${item.name} for ${fmt(item.sell)}`, 'gain');
+  showToast(`💵 Sold for ${fmt(item.sell)}!`);
+  updateUI();
+}
+
+function doTrade(tradeId) {
+  const trade = TRADES.find(t => t.id === tradeId);
+  const fromItem = ITEMS.find(i => i.id === trade.from);
+  const toItem   = ITEMS.find(i => i.id === trade.to);
+  const lv = getLevel();
+  if (trade.level > lv.lv) { showToast('🔒 Level too low!'); return; }
+  const have = state.inventory[trade.from] || 0;
+  if (have < trade.fromQty) { showToast(`❌ Need ${trade.fromQty}x ${fromItem.name}!`); return; }
+  state.inventory[trade.from] -= trade.fromQty;
+  if (state.inventory[trade.from] === 0) delete state.inventory[trade.from];
+  state.inventory[trade.to] = (state.inventory[trade.to] || 0) + trade.toQty;
+  state.totalTrades++;
+  const gainVal = toItem.sell * trade.toQty;
+  const lostVal = fromItem.sell * trade.fromQty;
+  state.totalProfit += (gainVal - lostVal);
+  addLog(`Trade: ${trade.fromQty}x ${fromItem.emoji} → ${trade.toQty}x ${toItem.emoji} (${trade.name})`, 'trade');
+  showToast(`🔄 ${trade.name} complete!`);
+  updateUI();
+}
+
+// ======= RENDER =======
+function updateUI() {
+  const nw = getNetWorth();
+  const lv = getLevel();
+  const prevLv = parseInt(document.getElementById('level-display').textContent);
+
+  document.getElementById('cash-display').textContent = fmt(state.cash);
+  document.getElementById('net-display').textContent = fmt(nw);
+  document.getElementById('level-display').textContent = lv.lv;
+  document.getElementById('trades-display').textContent = state.totalTrades;
+  document.getElementById('level-label').textContent = lv.name;
+  document.getElementById('level-next').textContent = lv.max === Infinity ? '🏆 MAX' : `Next: ${fmt(lv.max)}`;
+  document.getElementById('level-fill').style.width = getLevelProgress() + '%';
+
+  if (lv.lv > prevLv) {
+    addLog(`⬆️ Level Up! You are now: ${lv.name}`, 'level');
+    showToast(`⬆️ Level Up! ${lv.name}`);
+  }
+
+  // Pulse cash
+  const cd = document.getElementById('cash-display');
+  cd.classList.remove('bump');
+  void cd.offsetWidth;
+  cd.classList.add('bump');
+
+  renderMarket();
+  renderInventory();
+  renderTrades();
+  renderStats();
+}
+
+function renderMarket() {
+  const lv = getLevel();
+  const grid = document.getElementById('market-grid');
+  grid.innerHTML = ITEMS.map(item => {
+    const locked = item.level > lv.lv;
+    const canAfford = state.cash >= item.buy;
+    const owned = (state.inventory[item.id] || 0) > 0;
+    return `
+    <div class="market-card${locked ? ' locked' : ''}${owned ? ' owned' : ''}" onclick="${!locked ? `buyItem('${item.id}')` : ''}">
+      ${owned ? `<div class="owned-badge">Owned ×${state.inventory[item.id]}</div>` : ''}
+      <div class="card-emoji">${item.emoji}</div>
+      <div class="card-name">${item.name}</div>
+      <div class="card-desc">${item.desc}</div>
+      <div class="card-price${(!locked && canAfford) ? ' can-afford' : ''}">💵 ${fmt(item.buy)}</div>
+      <div class="card-sell-price">Sells for ${fmt(item.sell)}</div>
+      ${locked ? `<div class="locked-label">🔒 Unlock at Level ${item.level}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderInventory() {
+  const grid = document.getElementById('inv-grid');
+  const entries = Object.entries(state.inventory).filter(([,q]) => q > 0);
+  if (entries.length === 0) {
+    grid.innerHTML = '<div class="empty-state">Your inventory is empty.<br>Buy something from the Market!</div>';
+    return;
+  }
+  grid.innerHTML = entries.map(([id, qty]) => {
+    const item = ITEMS.find(i => i.id === id);
+    return `
+    <div class="inv-card">
+      <div class="inv-top">
+        <div class="inv-emoji">${item.emoji}</div>
+        <div>
+          <div class="inv-name">${item.name}</div>
+          <div class="inv-qty">×${qty} &nbsp;·&nbsp; ${fmt(item.sell * qty)}</div>
+        </div>
+      </div>
+      <div class="inv-actions">
+        <button class="btn-sell" onclick="sellItem('${id}')">Sell 1</button>
+        <button class="btn-trade" onclick="showTab('trades')">Trade</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderTrades() {
+  const lv = getLevel();
+  const list = document.getElementById('trade-list');
+  list.innerHTML = TRADES.map(trade => {
+    const fromItem = ITEMS.find(i => i.id === trade.from);
+    const toItem   = ITEMS.find(i => i.id === trade.to);
+    const locked = trade.level > lv.lv;
+    const have = state.inventory[trade.from] || 0;
+    const canDo = !locked && have >= trade.fromQty;
+    const gainVal = (toItem.sell * trade.toQty) - (fromItem.sell * trade.fromQty);
+    return `
+    <div class="trade-card${locked ? ' locked' : ''}" onclick="${canDo ? `doTrade('${trade.id}')` : ''}">
+      <div class="trade-from" title="${fromItem.name} ×${trade.fromQty}">${fromItem.emoji}</div>
+      <div style="font-size:0.65rem; color:var(--muted)">×${trade.fromQty}</div>
+      <div class="trade-arrow">→</div>
+      <div class="trade-to" title="${toItem.name} ×${trade.toQty}">${toItem.emoji}</div>
+      <div style="font-size:0.65rem; color:var(--muted)">×${trade.toQty}</div>
+      <div class="trade-details">
+        <div class="trade-name">${trade.name}</div>
+        <div class="trade-desc">${trade.desc}</div>
+        <div style="font-size:0.62rem; color:${have >= trade.fromQty && !locked ? 'var(--green)' : 'var(--red)'}; margin-top:3px">
+          ${locked ? `🔒 Level ${trade.level}` : `Have ${have}/${trade.fromQty} ${fromItem.name}`}
+        </div>
+      </div>
+      <div class="trade-profit">${gainVal >= 0 ? '+' : ''}${fmt(gainVal)}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderStats() {
+  const nw = getNetWorth();
+  const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
+  const mm = String(Math.floor(elapsed / 60)).padStart(2,'0');
+  const ss = String(elapsed % 60).padStart(2,'0');
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-box"><div class="stat-val">${fmt(nw)}</div><div class="stat-lbl">Net Worth</div></div>
+    <div class="stat-box"><div class="stat-val">${fmt(state.cash)}</div><div class="stat-lbl">Cash</div></div>
+    <div class="stat-box"><div class="stat-val">${state.totalTrades}</div><div class="stat-lbl">Trades</div></div>
+    <div class="stat-box"><div class="stat-val">${state.totalBuys}</div><div class="stat-lbl">Purchases</div></div>
+    <div class="stat-box"><div class="stat-val">${state.totalSells}</div><div class="stat-lbl">Sales</div></div>
+    <div class="stat-box"><div class="stat-val">${getTotalItems()}</div><div class="stat-lbl">Items Held</div></div>
+    <div class="stat-box"><div class="stat-val">${fmt(state.totalProfit)}</div><div class="stat-lbl">Total Profit</div></div>
+    <div class="stat-box"><div class="stat-val">${mm}:${ss}</div><div class="stat-lbl">Play Time</div></div>
+  `;
+
+  const statSnap = { netWorth: nw, totalTrades: state.totalTrades, totalItems: getTotalItems() };
+  document.getElementById('milestones').innerHTML = MILESTONES.map(m => {
+    const done = m.check(statSnap);
+    return `
+    <div class="milestone${done ? ' done' : ''}">
+      <div class="milestone-icon">${m.emoji}</div>
+      <div class="milestone-text">
+        <div class="milestone-title">${m.title}</div>
+        <div class="milestone-sub">${m.sub}</div>
+      </div>
+      ${done ? '<div class="milestone-check">✅</div>' : '<div style="color:var(--muted)">—</div>'}
+    </div>`;
+  }).join('');
+}
+
+function renderLog() {
+  document.getElementById('log-box').innerHTML = logEntries.map(e =>
+    `<div class="log-entry"><span class="log-time">${e.time}</span><span class="log-msg ${e.type}">${e.msg}</span></div>`
+  ).join('');
+}
+
+// ======= TABS =======
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const names = ['market','inventory','trades','stats'];
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.panel').forEach(p => {
+    p.classList.toggle('active', p.id === 'panel-' + name);
+  });
+  if (name === 'stats') renderStats();
+}
+
+// ======= TUTORIAL =======
+const TUT_STEPS = [
+  {
+    badge: 'Move 1 of 2',
+    title: 'Buy Your First Item',
+    body: 'You start with <strong>$5.00</strong>. Click the <strong>🪙 Quarter</strong> card in the Market to buy it. Everyone starts here!',
+    arrow: '👇',
+    targetQuery: '.market-card:first-child',
+    btnLabel: 'Got it!',
+  },
+  {
+    badge: 'Move 2 of 2',
+    title: 'Sell It for Cash',
+    body: 'Nice! Your Quarter is in your <strong>Inventory</strong>. Click <strong>Go to Inventory</strong> below, then hit <strong>Sell 1</strong> to cash it out.',
+    arrow: '👆',
+    targetQuery: null,
+    tabTarget: 'inventory',
+    btnLabel: 'Go to Inventory →',
+  },
+  {
+    badge: '✅ Tutorial Complete',
+    title: "You're a Trader Now!",
+    body: 'Keep buying items, selling for profit, and using <strong>Trade Routes</strong> to upgrade into more valuable goods. Grow from a quarter to a <strong>Luxury Yacht ⛵</strong>!',
+    arrow: '🌳',
+    targetQuery: null,
+    btnLabel: "Let's go!",
+  },
+];
+
+let tutStep = 0;
+let tutActive = true;
+
+function tutShow(stepIdx) {
+  if (stepIdx >= TUT_STEPS.length) { tutSkip(); return; }
+  const step = TUT_STEPS[stepIdx];
+
+  document.getElementById('tut-badge').textContent = step.badge;
+  document.getElementById('tut-title').textContent = step.title;
+  document.getElementById('tut-body').innerHTML = step.body;
+  document.getElementById('tut-arrow').textContent = step.arrow;
+  document.getElementById('tut-next-btn').textContent = step.btnLabel || 'Got it!';
+
+  const box       = document.getElementById('tut-box');
+  const hole      = document.getElementById('tut-hole');
+  const backdrop  = document.getElementById('tut-backdrop');
+  const connector = document.getElementById('tut-connector');
+
+  backdrop.classList.remove('hidden');
+  box.classList.remove('hidden');
+
+  const target = step.targetQuery ? document.querySelector(step.targetQuery) : null;
+
+  if (target) {
+    const r = target.getBoundingClientRect();
+    const pad = 8;
+    hole.style.left   = (r.left - pad) + 'px';
+    hole.style.top    = (r.top  - pad) + 'px';
+    hole.style.width  = (r.width  + pad * 2) + 'px';
+    hole.style.height = (r.height + pad * 2) + 'px';
+    hole.classList.remove('hidden');
+
+    // Position box below target (or above if no room)
+    const boxW = 300;
+    const margin = 16;
+    let bx = r.left + r.width / 2 - boxW / 2;
+    let by = r.bottom + pad + margin;
+    if (by + 240 > window.innerHeight - 16) by = r.top - pad - margin - 240;
+    bx = Math.max(10, Math.min(bx, window.innerWidth - boxW - 10));
+    box.style.left  = bx + 'px';
+    box.style.top   = by + 'px';
+    box.style.width = boxW + 'px';
+
+    // Connector line
+    const cx = r.left + r.width / 2;
+    const lineTop = Math.min(r.bottom + pad, by + (by > r.bottom ? 0 : 240));
+    const lineBot = Math.max(r.bottom + pad, by);
+    connector.style.left   = (cx - 1) + 'px';
+    connector.style.top    = lineTop + 'px';
+    connector.style.height = Math.abs(lineBot - lineTop) + 'px';
+    connector.classList.remove('hidden');
+  } else {
+    hole.classList.add('hidden');
+    connector.classList.add('hidden');
+    const boxW = 310;
+    box.style.left  = (window.innerWidth  / 2 - boxW / 2) + 'px';
+    box.style.top   = (window.innerHeight / 2 - 150) + 'px';
+    box.style.width = boxW + 'px';
+  }
+}
+
+function tutNext() {
+  const step = TUT_STEPS[tutStep];
+  if (step && step.tabTarget) showTab(step.tabTarget);
+  tutStep++;
+  if (tutStep >= TUT_STEPS.length) { tutSkip(); return; }
+  setTimeout(() => tutShow(tutStep), 300);
+}
+
+function tutSkip() {
+  tutActive = false;
+  ['tut-backdrop', 'tut-hole', 'tut-box', 'tut-connector'].forEach(id =>
+    document.getElementById(id).classList.add('hidden')
+  );
+}
+
+// Auto-advance tutorial on buy (step 0 → 1) and sell (step 1 → 2)
+const _origBuyItem = buyItem;
+buyItem = function(id) {
+  _origBuyItem(id);
+  if (tutActive && tutStep === 0) setTimeout(() => { tutStep = 1; tutShow(1); }, 500);
+};
+const _origSellItem = sellItem;
+sellItem = function(id) {
+  _origSellItem(id);
+  if (tutActive && tutStep === 1) setTimeout(() => { tutStep = 2; tutShow(2); }, 400);
+};
+
+// ======= INIT =======
+updateUI();
+addLog('💡 Tip: Buy items from the Market, then Sell or Trade them for profit!');
+
+// Start tutorial after a short delay so the market renders
+setTimeout(() => {
+  tutShow(0);
+}, 600);
+
+// Stats refresh every 10s
+setInterval(() => {
+  if (document.getElementById('panel-stats').classList.contains('active')) renderStats();
+}, 10000);
+
+</script>
+</body>
+</html>

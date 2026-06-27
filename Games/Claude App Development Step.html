@@ -1,0 +1,413 @@
+import { useState } from "react";
+
+const objectives = [
+  {
+    id: 1,
+    phase: "Foundation",
+    emoji: "🏗️",
+    color: "#FF6B35",
+    bg: "#FFF3EE",
+    border: "#FFDDD0",
+    duration: "Weeks 1–3",
+    goal: "Understand core iOS development & financial literacy concepts",
+    items: [
+      {
+        id: "1a",
+        objective: "Set up Xcode, Swift environment, and run a Hello World app",
+        bloom: "Apply",
+        priority: "Must",
+      },
+      {
+        id: "1b",
+        objective: "Explain the 5 pillars of personal finance: budgeting, saving, investing, debt, and insurance",
+        bloom: "Understand",
+        priority: "Must",
+      },
+      {
+        id: "1c",
+        objective: "Design a simple SwiftUI view that displays a financial tip of the day",
+        bloom: "Create",
+        priority: "Must",
+      },
+      {
+        id: "1d",
+        objective: "Identify target user personas and their financial pain points",
+        bloom: "Analyze",
+        priority: "Should",
+      },
+    ],
+  },
+  {
+    id: 2,
+    phase: "Core App Build",
+    emoji: "⚙️",
+    color: "#6C63FF",
+    bg: "#F3F2FF",
+    border: "#DDD9FF",
+    duration: "Weeks 4–8",
+    goal: "Build the interactive learning engine and gamification system",
+    items: [
+      {
+        id: "2a",
+        objective: "Build a quiz engine in Swift that tracks scores and streaks",
+        bloom: "Create",
+        priority: "Must",
+      },
+      {
+        id: "2b",
+        objective: "Implement a badge and rewards system using local data persistence",
+        bloom: "Apply",
+        priority: "Must",
+      },
+      {
+        id: "2c",
+        objective: "Create animated progress charts showing savings goals vs. actuals",
+        bloom: "Create",
+        priority: "Must",
+      },
+      {
+        id: "2d",
+        objective: "Evaluate gamification mechanics (XP, levels, streaks) and select the most motivating model",
+        bloom: "Evaluate",
+        priority: "Should",
+      },
+      {
+        id: "2e",
+        objective: "Build a budget simulator that shows cause-and-effect of spending decisions",
+        bloom: "Create",
+        priority: "Must",
+      },
+    ],
+  },
+  {
+    id: 3,
+    phase: "Content & UX",
+    emoji: "🎨",
+    color: "#00C9A7",
+    bg: "#EDFDF9",
+    border: "#C0F5EB",
+    duration: "Weeks 9–11",
+    goal: "Design engaging, accessible financial education content",
+    items: [
+      {
+        id: "3a",
+        objective: "Write 20+ bite-sized financial lessons under 60 seconds each",
+        bloom: "Create",
+        priority: "Must",
+      },
+      {
+        id: "3b",
+        objective: "Apply UX principles to reduce cognitive load for financial concepts",
+        bloom: "Apply",
+        priority: "Must",
+      },
+      {
+        id: "3c",
+        objective: "Design onboarding flow that sets personalized savings or debt goals",
+        bloom: "Create",
+        priority: "Must",
+      },
+      {
+        id: "3d",
+        objective: "Test content comprehension with at least 5 real users and iterate",
+        bloom: "Evaluate",
+        priority: "Should",
+      },
+    ],
+  },
+  {
+    id: 4,
+    phase: "Launch & Growth",
+    emoji: "🚀",
+    color: "#F7B731",
+    bg: "#FFFBEF",
+    border: "#FFE9A0",
+    duration: "Weeks 12–14",
+    goal: "Ship, measure, and grow a real user base",
+    items: [
+      {
+        id: "4a",
+        objective: "Submit app to App Store following Apple's review guidelines",
+        bloom: "Apply",
+        priority: "Must",
+      },
+      {
+        id: "4b",
+        objective: "Implement basic analytics to track lesson completion and drop-off rates",
+        bloom: "Analyze",
+        priority: "Must",
+      },
+      {
+        id: "4c",
+        objective: "Create a referral or social sharing feature to drive organic growth",
+        bloom: "Create",
+        priority: "Should",
+      },
+      {
+        id: "4d",
+        objective: "Analyze user retention data at Day 1, Day 7, and Day 30",
+        bloom: "Analyze",
+        priority: "Should",
+      },
+    ],
+  },
+];
+
+const bloomColors = {
+  Understand: { bg: "#EEF2FF", text: "#4F46E5" },
+  Apply: { bg: "#F0FDF4", text: "#15803D" },
+  Analyze: { bg: "#FFF7ED", text: "#C2410C" },
+  Evaluate: { bg: "#FDF4FF", text: "#9333EA" },
+  Create: { bg: "#FFF1F2", text: "#BE123C" },
+};
+
+const priorityStyle = {
+  Must: { bg: "#FEF2F2", text: "#DC2626", dot: "#DC2626" },
+  Should: { bg: "#FFFBEB", text: "#D97706", dot: "#D97706" },
+};
+
+export default function App() {
+  const [checked, setChecked] = useState({});
+  const [activePhase, setActivePhase] = useState(null);
+
+  const toggleCheck = (id) =>
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+
+  const total = objectives.flatMap((o) => o.items).length;
+  const done = Object.values(checked).filter(Boolean).length;
+  const pct = Math.round((done / total) * 100);
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "linear-gradient(135deg, #0F0C29 0%, #302B63 50%, #24243e 100%)",
+      fontFamily: "'Georgia', serif",
+      padding: "40px 20px",
+    }}>
+      {/* Header */}
+      <div style={{ maxWidth: 780, margin: "0 auto" }}>
+        <div style={{
+          textAlign: "center",
+          marginBottom: 40,
+        }}>
+          <div style={{
+            display: "inline-block",
+            background: "linear-gradient(90deg, #FF6B35, #F7B731)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            fontSize: 13,
+            fontFamily: "monospace",
+            letterSpacing: 4,
+            textTransform: "uppercase",
+            marginBottom: 12,
+          }}>iOS App Learning Roadmap</div>
+          <h1 style={{
+            color: "#FFFFFF",
+            fontSize: "clamp(26px, 5vw, 40px)",
+            fontWeight: 700,
+            margin: "0 0 8px",
+            lineHeight: 1.2,
+          }}>💰 FinLearn: Your App Blueprint</h1>
+          <p style={{ color: "#A89FD4", fontSize: 15, margin: 0 }}>
+            Financial literacy education · iOS · Gamified · 14-week roadmap
+          </p>
+        </div>
+
+        {/* Progress Bar */}
+        <div style={{
+          background: "rgba(255,255,255,0.07)",
+          borderRadius: 16,
+          padding: "20px 28px",
+          marginBottom: 32,
+          border: "1px solid rgba(255,255,255,0.1)",
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <span style={{ color: "#E2DEFF", fontFamily: "monospace", fontSize: 13 }}>Overall Progress</span>
+            <span style={{ color: "#F7B731", fontWeight: 700, fontSize: 18, fontFamily: "monospace" }}>{pct}%</span>
+          </div>
+          <div style={{ background: "rgba(255,255,255,0.1)", borderRadius: 99, height: 10, overflow: "hidden" }}>
+            <div style={{
+              height: "100%",
+              borderRadius: 99,
+              background: "linear-gradient(90deg, #FF6B35, #F7B731)",
+              width: `${pct}%`,
+              transition: "width 0.4s ease",
+            }} />
+          </div>
+          <div style={{ color: "#A89FD4", fontSize: 12, marginTop: 8, fontFamily: "monospace" }}>
+            {done} of {total} objectives completed
+          </div>
+        </div>
+
+        {/* Phase Cards */}
+        {objectives.map((phase) => {
+          const phaseDone = phase.items.filter((i) => checked[i.id]).length;
+          const phaseTotal = phase.items.length;
+          const isOpen = activePhase === phase.id;
+
+          return (
+            <div key={phase.id} style={{
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 18,
+              marginBottom: 20,
+              overflow: "hidden",
+              transition: "all 0.3s ease",
+            }}>
+              {/* Phase Header */}
+              <div
+                onClick={() => setActivePhase(isOpen ? null : phase.id)}
+                style={{
+                  padding: "22px 28px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 16,
+                  background: isOpen ? "rgba(255,255,255,0.05)" : "transparent",
+                  transition: "background 0.2s",
+                }}
+              >
+                <div style={{
+                  fontSize: 28,
+                  width: 52,
+                  height: 52,
+                  borderRadius: 14,
+                  background: phase.bg,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}>
+                  {phase.emoji}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <span style={{ color: "#FFFFFF", fontWeight: 700, fontSize: 17 }}>
+                      Phase {phase.id}: {phase.phase}
+                    </span>
+                    <span style={{
+                      background: "rgba(255,255,255,0.1)",
+                      color: "#C4BBFF",
+                      fontSize: 11,
+                      fontFamily: "monospace",
+                      padding: "2px 10px",
+                      borderRadius: 99,
+                    }}>{phase.duration}</span>
+                  </div>
+                  <p style={{ color: "#9B8FCC", fontSize: 13, margin: "4px 0 0", lineHeight: 1.4 }}>
+                    {phase.goal}
+                  </p>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ color: phase.color, fontWeight: 700, fontSize: 16, fontFamily: "monospace" }}>
+                    {phaseDone}/{phaseTotal}
+                  </div>
+                  <div style={{ color: "#6C63FF", fontSize: 18, marginTop: 2 }}>
+                    {isOpen ? "▲" : "▼"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Objectives List */}
+              {isOpen && (
+                <div style={{ padding: "4px 28px 24px" }}>
+                  {phase.items.map((item) => {
+                    const isChecked = !!checked[item.id];
+                    const bloom = bloomColors[item.bloom];
+                    const pri = priorityStyle[item.priority];
+
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => toggleCheck(item.id)}
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 14,
+                          padding: "14px 16px",
+                          marginBottom: 8,
+                          borderRadius: 12,
+                          cursor: "pointer",
+                          background: isChecked ? "rgba(0,201,167,0.07)" : "rgba(255,255,255,0.03)",
+                          border: isChecked ? "1px solid rgba(0,201,167,0.25)" : "1px solid rgba(255,255,255,0.06)",
+                          transition: "all 0.2s",
+                        }}
+                      >
+                        {/* Checkbox */}
+                        <div style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: 6,
+                          border: isChecked ? "none" : "2px solid rgba(255,255,255,0.2)",
+                          background: isChecked ? "#00C9A7" : "transparent",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          marginTop: 1,
+                          transition: "all 0.2s",
+                        }}>
+                          {isChecked && <span style={{ color: "#fff", fontSize: 13, fontWeight: 700 }}>✓</span>}
+                        </div>
+
+                        {/* Text */}
+                        <div style={{ flex: 1 }}>
+                          <p style={{
+                            color: isChecked ? "#6EECD8" : "#E2DEFF",
+                            fontSize: 14,
+                            margin: "0 0 8px",
+                            lineHeight: 1.5,
+                            textDecoration: isChecked ? "line-through" : "none",
+                            opacity: isChecked ? 0.7 : 1,
+                          }}>
+                            {item.objective}
+                          </p>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <span style={{
+                              background: bloom.bg,
+                              color: bloom.text,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              padding: "2px 9px",
+                              borderRadius: 99,
+                              fontFamily: "monospace",
+                            }}>
+                              🧠 {item.bloom}
+                            </span>
+                            <span style={{
+                              background: pri.bg,
+                              color: pri.text,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              padding: "2px 9px",
+                              borderRadius: 99,
+                              fontFamily: "monospace",
+                            }}>
+                              <span style={{ color: pri.dot }}>●</span> {item.priority} Have
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Footer */}
+        <div style={{
+          textAlign: "center",
+          marginTop: 32,
+          color: "#5A527A",
+          fontSize: 12,
+          fontFamily: "monospace",
+          letterSpacing: 1,
+        }}>
+          Click any phase to expand · Check off objectives as you go
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Isles of Venture: Hex Network Tycoon</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #111827;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #f3f4f6;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #game-wrapper {
+            display: flex;
+            gap: 20px;
+            background-color: #1f2937;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            border: 1px solid #374151;
+        }
+
+        #canvas-container {
+            border-radius: 12px;
+            overflow: hidden;
+            border: 4px solid #111827;
+            background-color: #1e3a8a;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #sidebar {
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+            justify-content: space-between;
+        }
+
+        .header-title {
+            margin: 0 0 10px 0;
+            font-size: 1.3rem;
+            text-align: center;
+            color: #f59e0b;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 2px dashed #4b5563;
+            padding-bottom: 8px;
+        }
+
+        .resource-box {
+            background: #111827;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.15rem;
+            font-weight: bold;
+            border-left: 5px solid #fbbf24;
+        }
+
+        .section-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: #9ca3af;
+            margin: 10px 0 4px 0;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
+        .shop-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .btn {
+            background: #059669;
+            color: white;
+            border: none;
+            padding: 10px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.15s ease;
+            font-size: 0.85rem;
+        }
+
+        .btn:hover { background: #10b981; transform: translateY(-1px); }
+        .btn:disabled { background: #4b5563; color: #9ca3af; cursor: not-allowed; transform: none; }
+
+        .btn-road { background: #4b5563; } .btn-road:hover { background: #6b7280; }
+        .btn-rail { background: #2563eb; } .btn-rail:hover { background: #3b82f6; }
+        .btn-hub { background: #b45309; }  .btn-hub:hover { background: #d97706; }
+        .btn-fleet { background: #6d28d9; } .btn-fleet:hover { background: #7c3aed; }
+
+        .active-mode {
+            outline: 3px solid #fbbf24 !important;
+            box-shadow: 0 0 8px #fbbf24;
+        }
+
+        .guide {
+            background: #111827;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            color: #d1d5db;
+            line-height: 1.4;
+            border: 1px solid #374151;
+        }
+
+        .fleet-status {
+            font-size: 0.8rem;
+            color: #e5e7eb;
+            background: #111827;
+            padding: 8px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+    <div id="canvas-container">
+        <canvas id="realmCanvas" width="600" height="600"></canvas>
+    </div>
+
+    <div id="sidebar">
+        <div>
+            <h2 class="header-title">⬢ Hex Logistics Tycoon</h2>
+            
+            <div class="resource-box">
+                <span>Treasury:</span>
+                <span id="gold-amount" style="color: #fbbf24;">40 G 🪙</span>
+            </div>
+
+            <div class="section-label">Civil & Land Management</div>
+            <div class="shop-menu">
+                <button class="btn btn-hub" id="btn-hub" onclick="buyCityHub()">
+                    <span>🏛️ Build Outpost Hex</span> <span id="cost-hub">60 G</span>
+                </button>
+            </div>
+
+            <div class="section-label">Hex Grid Networks (Walk to Lay)</div>
+            <div class="shop-menu">
+                <button class="btn btn-road" id="btn-road" onclick="setDrawMode('road')">
+                    <span id="text-road">⬢ Lay Hex Paved Road</span> <span>Free</span>
+                </button>
+                <button class="btn btn-rail" id="btn-rail" onclick="setDrawMode('rail')">
+                    <span id="text-rail">⬢ Lay Hex Rail Track</span> <span>Free</span>
+                </button>
+            </div>
+
+            <div class="section-label">Rolling Stock Fleet</div>
+            <div class="shop-menu">
+                <button class="btn btn-fleet" id="btn-buy-truck" onclick="buyTruck()">
+                    <span>🚚 Haul Truck</span> <span id="cost-truck">30 G</span>
+                </button>
+                <button class="btn btn-fleet" id="btn-buy-engine" onclick="buyTrainEngine()">
+                    <span>🚂 Heavy Rail Locomotive</span> <span id="cost-engine">50 G</span>
+                </button>
+                <button class="btn btn-fleet" id="btn-buy-cargo" onclick="buyCargoCar()">
+                    <span>📦 Heavy Freight Car</span> <span id="cost-cargo">20 G</span>
+                </button>
+            </div>
+        </div>
+
+        <div>
+            <div class="section-label">Network Infrastructure Stats</div>
+            <div class="fleet-status">
+                🚚 Active Road Trucks: <span id="count-trucks" style="color:#a78bfa">0</span><br>
+                🚂 Detailed Slow Engines: <span id="count-trains" style="color:#60a5fa">0</span><br>
+                📦 Total Coupled Cargo Cars: <span id="count-cars" style="color:#34d399">0</span>
+            </div>
+
+            <div class="guide">
+                <strong>Hex Grid Logistics Rules:</strong><br>
+                • Move with <b>WASD / Arrows</b>.<br>
+                • Toggle a Hex tool, then walk onto grass to pave a road or lay track. Roads/rail you build automatically link up with the network.<br>
+                • Build Outposts, then connect them with road or rail to start hauling cargo for gold.<br>
+                • <b>Trains crawl realistically</b> along the rail network, delivering multi-tiered rewards with every car attached!
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById("realmCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // ---------------------------------------------------------------------
+    // HEX COORDINATE MATH (flat-top orientation, axial q/r)
+    // This matches drawHexagon's vertex angles (0°,60°,120°...) which point
+    // a vertex left/right -- i.e. flat-top hexes with flat edges top/bottom.
+    // Using the matching flat-top axial<->pixel conversion guarantees the
+    // grid tiles perfectly with no gaps and no overlaps.
+    // ---------------------------------------------------------------------
+    const hexRadius = 24;
+    const ORIGIN_X = 300;
+    const ORIGIN_Y = 300;
+
+    function hexToPixel(q, r) {
+        let x = hexRadius * (3 / 2 * q);
+        let y = hexRadius * (Math.sqrt(3) / 2 * q + Math.sqrt(3) * r);
+        return { x: x + ORIGIN_X, y: y + ORIGIN_Y };
+    }
+
+    function cubeRound(x, y, z) {
+        let rx = Math.round(x), ry = Math.round(y), rz = Math.round(z);
+        let x_diff = Math.abs(rx - x), y_diff = Math.abs(ry - y), z_diff = Math.abs(rz - z);
+        if (x_diff > y_diff && x_diff > z_diff) rx = -ry - rz;
+        else if (y_diff > z_diff) ry = -rx - rz;
+        else rz = -rx - ry;
+        return { q: rx, r: rz };
+    }
+
+    function pixelToHex(worldX, worldY) {
+        let x = worldX - ORIGIN_X;
+        let y = worldY - ORIGIN_Y;
+        let q = (2 / 3 * x) / hexRadius;
+        let r = (-1 / 3 * x + Math.sqrt(3) / 3 * y) / hexRadius;
+        return cubeRound(q, -q - r, r);
+    }
+
+    function hexDistance(a, b) {
+        return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
+    }
+
+    function hexNeighbors(q, r) {
+        const dirs = [[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
+        return dirs.map(([dq, dr]) => ({ q: q + dq, r: r + dr }));
+    }
+
+    // Checks whether painting (q,r) as `surfaceType` would close a solid
+    // triangle of three mutually-adjacent hexes of that same type. Real
+    // roads and rail lines are linear paths, not filled clusters, so this
+    // blocks placements that would weld three touching hexes into a clump.
+    function wouldFormTriangle(q, r, surfaceType) {
+        let neighbors = hexNeighbors(q, r);
+        let sameTypeNeighbors = neighbors.filter(n => {
+            let t = gridMap[`${n.q},${n.r}`];
+            return t && t.type === surfaceType;
+        });
+        for (let i = 0; i < sameTypeNeighbors.length; i++) {
+            for (let j = i + 1; j < sameTypeNeighbors.length; j++) {
+                if (hexDistance(sameTypeNeighbors[i], sameTypeNeighbors[j]) === 1) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // Financial balances
+    let gold = 40;
+    let hubCost = 60;
+    let truckCost = 30;
+    let engineCost = 50;
+    let cargoCost = 20;
+
+    let currentDrawMode = null;
+
+    // Map Databases (Key = "q,r")
+    let gridMap = {};
+    let citiesList = [];     // {x,y,name,q,r}
+    let railPathNodes = [];  // ordered {x,y} chain used for train traversal
+
+    const player = { x: 300, y: 300, radius: 8, speed: 3, facing: 'right' };
+    let goldSpawns = [];
+    let trucks = [];
+    let trains = [];
+
+    const inputKeys = {};
+    window.addEventListener("keydown", e => inputKeys[e.key.toLowerCase()] = true);
+    window.addEventListener("keyup", e => inputKeys[e.key.toLowerCase()] = false);
+
+    // Map radius in hex rings -- a fully filled hexagon of this radius has
+    // no gaps because every (q,r) with |q|,|r|,|q+r| <= mapRadius is created.
+    const mapRadius = 5;
+
+    function inBounds(q, r) {
+        return Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r)) <= mapRadius;
+    }
+
+    // Map Setup Initialization
+    function initMap() {
+        // Completely fill every hex cell within the radius -- guarantees a
+        // gap-free tiled grid (every neighbor of every land tile exists).
+        for (let q = -mapRadius; q <= mapRadius; q++) {
+            for (let r = -mapRadius; r <= mapRadius; r++) {
+                if (!inBounds(q, r)) continue;
+                let key = `${q},${r}`;
+                let pos = hexToPixel(q, r);
+                gridMap[key] = { q, r, x: pos.x, y: pos.y, type: 'grass' };
+            }
+        }
+
+        gridMap["0,0"].type = 'hub';
+        citiesList.push({ x: gridMap["0,0"].x, y: gridMap["0,0"].y, name: "Capital City", q: 0, r: 0 });
+    }
+
+    function spawnGold() {
+        let keys = Object.keys(gridMap);
+        let attempts = 0;
+        while (goldSpawns.length < 4 && attempts < 200) {
+            attempts++;
+            let randKey = keys[Math.floor(Math.random() * keys.length)];
+            let tile = gridMap[randKey];
+            if (tile && (tile.type === 'grass' || tile.type === 'road')) {
+                if (!goldSpawns.some(g => g.key === randKey)) {
+                    goldSpawns.push({ x: tile.x, y: tile.y, key: randKey, radius: 6 });
+                }
+            }
+        }
+    }
+
+    function setDrawMode(mode) {
+        currentDrawMode = (currentDrawMode === mode) ? null : mode;
+        updateUI();
+    }
+
+    // Pick the farthest-out grass tile from the existing network to place a
+    // new outpost, biased toward tiles that are adjacent to an existing
+    // road/rail/hub so new hubs land near (and get connected to) the network.
+    function pickHubSite() {
+        let candidates = Object.values(gridMap).filter(t => t.type === 'grass');
+        if (candidates.length === 0) return null;
+
+        // Prefer grass tiles that touch an existing road, rail, or hub --
+        // this keeps growth connected to what's already been built.
+        let adjacentToNetwork = candidates.filter(t => {
+            return hexNeighbors(t.q, t.r).some(n => {
+                let nt = gridMap[`${n.q},${n.r}`];
+                return nt && (nt.type === 'road' || nt.type === 'rail' || nt.type === 'hub');
+            });
+        });
+
+        let pool = adjacentToNetwork.length > 0 ? adjacentToNetwork : candidates;
+
+        // Among the pool, favor ones farther from the capital for a sense
+        // of expansion, weighted randomly so it's not always the single
+        // farthest tile.
+        pool.sort((a, b) => hexDistance({q:0,r:0}, b) - hexDistance({q:0,r:0}, a));
+        let topSlice = pool.slice(0, Math.max(1, Math.ceil(pool.length * 0.4)));
+        return topSlice[Math.floor(Math.random() * topSlice.length)];
+    }
+
+    // Lay a straight line of road tiles connecting a new hub back to the
+    // nearest existing road/hub tile, so every outpost is reachable.
+    function autoConnect(targetTile, surfaceType) {
+        // Find nearest tile of network type (hub/road/rail matching) using
+        // simple hex line interpolation toward the capital hub.
+        let from = { q: 0, r: 0 };
+        let to = { q: targetTile.q, r: targetTile.r };
+        let dist = hexDistance(from, to);
+        if (dist === 0) return;
+
+        for (let i = 1; i <= dist; i++) {
+            let t = i / dist;
+            // cube lerp + round for a straight hex line
+            let lq = from.q + (to.q - from.q) * t;
+            let lr = from.r + (to.r - from.r) * t;
+            let rounded = cubeRound(lq, -lq - lr, lr);
+            let key = `${rounded.q},${rounded.r}`;
+            let tile = gridMap[key];
+            if (tile && tile.type === 'grass' && !wouldFormTriangle(tile.q, tile.r, surfaceType)) {
+                tile.type = surfaceType;
+            }
+        }
+    }
+
+    function buyCityHub() {
+        if (gold < hubCost) return;
+        let site = pickHubSite();
+        if (!site) return;
+
+        gold -= hubCost;
+        site.type = 'hub';
+        citiesList.push({ x: site.x, y: site.y, name: "Outpost Hub", q: site.q, r: site.r });
+
+        // Auto-pave a road connection so the new outpost is reachable --
+        // satisfies "roads need to connect the cities."
+        autoConnect(site, 'road');
+
+        hubCost = Math.floor(hubCost * 1.5);
+        rebuildRailPath();
+        updateUI();
+    }
+
+    function buyTruck() {
+        if (gold >= truckCost && citiesList.length > 1) {
+            gold -= truckCost;
+            trucks.push({ x: citiesList[0].x, y: citiesList[0].y, target: 1, speed: 1.3, facing: 1 });
+            updateUI();
+        }
+    }
+
+    function buyTrainEngine() {
+        if (gold >= engineCost) {
+            gold -= engineCost;
+            // distTraveled: real pixel distance along the rail path (not an
+            // array index) -- lets the train glide smoothly and accelerate.
+            // curSpeed ramps toward cruiseSpeed and eases off near the ends.
+            trains.push({
+                distTraveled: 0,
+                curSpeed: 0,
+                cruiseSpeed: 0.9,
+                accel: 0.025,
+                direction: 1,
+                cargoCount: 0,
+                wheelAngle: 0,
+                facing: 1
+            });
+            updateUI();
+        }
+    }
+
+    function buyCargoCar() {
+        if (gold >= cargoCost && trains.length > 0) {
+            gold -= cargoCost;
+            trains[trains.length - 1].cargoCount++;
+            updateUI();
+        }
+    }
+
+    // Rebuilds railPathNodes into a proper traveling order: starting from
+    // whichever laid rail tile is closest to the capital hub, repeatedly
+    // hop to the nearest not-yet-visited rail tile. This produces a real
+    // connected path to walk along instead of an arbitrary x+y sort, which
+    // could jumble unrelated track segments together.
+    let railCumLengths = [];
+
+    function rebuildRailPath() {
+        let railTileList = Object.values(gridMap).filter(t => t.type === 'rail');
+        if (railTileList.length === 0) { railPathNodes = []; railCumLengths = []; return; }
+
+        let railLookup = {};
+        railTileList.forEach(t => { railLookup[`${t.q},${t.r}`] = t; });
+
+        // Walk the actual rail-tile adjacency graph (only stepping between
+        // hexes that physically touch), starting from whichever rail tile
+        // is nearest the capital. This is graph-correct -- unlike sorting
+        // by raw distance, it can't "jump" across a gap between two
+        // disconnected rail segments, and at a branch point it always
+        // continues along a real edge rather than guessing.
+        let capital = gridMap["0,0"];
+        let startTile = railTileList.slice().sort(
+            (a, b) => hexDistance(capital, a) - hexDistance(capital, b)
+        )[0];
+
+        let visited = new Set();
+        let ordered = [];
+        let heading = null;
+
+        function visit(tile) {
+            visited.add(`${tile.q},${tile.r}`);
+            ordered.push(tile);
+        }
+
+        visit(startTile);
+
+        // Greedily walk to an unvisited rail-adjacent neighbor. At a
+        // branch (more than one unvisited neighbor), prefer the one that
+        // continues the current heading, so the main line stays straight
+        // and only detours onto the branch if that's the only option left.
+        let current = startTile;
+        while (true) {
+            let neighborTiles = hexNeighbors(current.q, current.r)
+                .map(n => railLookup[`${n.q},${n.r}`])
+                .filter(t => t && !visited.has(`${t.q},${t.r}`));
+
+            if (neighborTiles.length === 0) break;
+
+            let next;
+            if (neighborTiles.length === 1 || !heading) {
+                next = neighborTiles[0];
+            } else {
+                let bestScore = -Infinity;
+                next = neighborTiles[0];
+                for (let cand of neighborTiles) {
+                    let dx = cand.x - current.x, dy = cand.y - current.y;
+                    let mag = Math.hypot(dx, dy) || 1;
+                    let score = (dx / mag) * heading.x + (dy / mag) * heading.y;
+                    if (score > bestScore) { bestScore = score; next = cand; }
+                }
+            }
+
+            let dx = next.x - current.x, dy = next.y - current.y;
+            let mag = Math.hypot(dx, dy) || 1;
+            heading = { x: dx / mag, y: dy / mag };
+            visit(next);
+            current = next;
+        }
+
+        // Any rail tiles not reached by the walk (a disconnected segment,
+        // or a branch that was skipped because its junction was already
+        // visited from the other direction) are appended in nearest-first
+        // order so they still render and animate, even though they sit on
+        // a spur the single-line walk couldn't fully absorb.
+        let leftover = railTileList.filter(t => !visited.has(`${t.q},${t.r}`));
+        leftover.sort((a, b) => hexDistance(ordered[ordered.length - 1], a) - hexDistance(ordered[ordered.length - 1], b));
+        leftover.forEach(t => ordered.push(t));
+
+        railPathNodes = ordered.map(t => ({ x: t.x, y: t.y, q: t.q, r: t.r }));
+
+        // Precompute cumulative distance along the path so trains can move
+        // by real pixel-distance instead of jumping by array index.
+        railCumLengths = [0];
+        for (let i = 1; i < railPathNodes.length; i++) {
+            let d = Math.hypot(
+                railPathNodes[i].x - railPathNodes[i - 1].x,
+                railPathNodes[i].y - railPathNodes[i - 1].y
+            );
+            railCumLengths.push(railCumLengths[i - 1] + d);
+        }
+    }
+
+    // Returns {x, y, angle} for a given distance traveled along the rail
+    // path, smoothly interpolating between nodes (not snapping between
+    // whole tiles), so the train glides continuously along the track.
+    function railPointAtDistance(dist) {
+        if (railPathNodes.length === 0) return null;
+        if (railPathNodes.length === 1) {
+            let p = railPathNodes[0];
+            return { x: p.x, y: p.y, angle: 0 };
+        }
+        let total = railCumLengths[railCumLengths.length - 1];
+        dist = Math.max(0, Math.min(total, dist));
+
+        let lo = 0, hi = railCumLengths.length - 1;
+        while (lo < hi) {
+            let mid = (lo + hi) >> 1;
+            if (railCumLengths[mid] < dist) lo = mid + 1; else hi = mid;
+        }
+        let segEnd = lo;
+        let segStart = Math.max(0, segEnd - 1);
+        let segLen = railCumLengths[segEnd] - railCumLengths[segStart];
+        let t = segLen === 0 ? 0 : (dist - railCumLengths[segStart]) / segLen;
+        let a = railPathNodes[segStart], b = railPathNodes[segEnd];
+        let x = a.x + (b.x - a.x) * t;
+        let y = a.y + (b.y - a.y) * t;
+        let angle = Math.atan2(b.y - a.y, b.x - a.x);
+        return { x, y, angle };
+    }
+
+    function updateUI() {
+        document.getElementById("gold-amount").innerText = gold + " G";
+        document.getElementById("cost-hub").innerText = hubCost + " G";
+        document.getElementById("cost-truck").innerText = truckCost + " G";
+        document.getElementById("cost-engine").innerText = engineCost + " G";
+        document.getElementById("cost-cargo").innerText = cargoCost + " G";
+
+        document.getElementById("btn-road").className = "btn btn-road " + (currentDrawMode === 'road' ? 'active-mode' : '');
+        document.getElementById("btn-rail").className = "btn btn-rail " + (currentDrawMode === 'rail' ? 'active-mode' : '');
+
+        document.getElementById("btn-hub").disabled = gold < hubCost;
+        document.getElementById("btn-buy-truck").disabled = (gold < truckCost || citiesList.length < 2);
+        document.getElementById("btn-buy-engine").disabled = gold < engineCost;
+        document.getElementById("btn-buy-cargo").disabled = (gold < cargoCost || trains.length === 0);
+
+        document.getElementById("count-trucks").innerText = trucks.length;
+        document.getElementById("count-trains").innerText = trains.length;
+        document.getElementById("count-cars").innerText = trains.reduce((a, b) => a + b.cargoCount, 0);
+    }
+
+    function updateMechanics() {
+        let mx = 0, my = 0;
+        if (inputKeys["arrowup"] || inputKeys["w"]) my -= player.speed;
+        if (inputKeys["arrowdown"] || inputKeys["s"]) my += player.speed;
+        if (inputKeys["arrowleft"] || inputKeys["a"]) { mx -= player.speed; player.facing = 'left'; }
+        if (inputKeys["arrowright"] || inputKeys["d"]) { mx += player.speed; player.facing = 'right'; }
+
+        let nX = player.x + mx;
+        let nY = player.y + my;
+
+        let hexCoord = pixelToHex(nX, nY);
+        let key = `${hexCoord.q},${hexCoord.r}`;
+        let currentTile = gridMap[key];
+
+        // Process infrastructure placement -- only ever paints onto an
+        // EXISTING grass tile (the grid is fully pre-filled, so this just
+        // changes tile type rather than creating new disconnected cells).
+        // Placement is blocked if it would weld three same-type hexes into
+        // a solid triangle -- roads and rail should stay linear paths.
+        if (currentTile && currentTile.type === 'grass' && currentDrawMode) {
+            if (!wouldFormTriangle(currentTile.q, currentTile.r, currentDrawMode)) {
+                currentTile.type = currentDrawMode;
+                if (currentDrawMode === 'rail') {
+                    rebuildRailPath();
+                }
+            }
+        }
+
+        if (currentTile) {
+            player.x = Math.max(15, Math.min(canvas.width - 15, nX));
+            player.y = Math.max(15, Math.min(canvas.height - 15, nY));
+        }
+
+        // Gold collections
+        for (let i = goldSpawns.length - 1; i >= 0; i--) {
+            if (Math.hypot(player.x - goldSpawns[i].x, player.y - goldSpawns[i].y) < player.radius + 10) {
+                goldSpawns.splice(i, 1);
+                gold += 8;
+                updateUI();
+            }
+        }
+
+        // Move Trucks along the straight line between hub cities (works for
+        // any two connected hubs since roads are auto-paved between them).
+        trucks.forEach(t => {
+            let dest = citiesList[t.target];
+            let angle = Math.atan2(dest.y - t.y, dest.x - t.x);
+            t.facing = Math.cos(angle) >= 0 ? 1 : -1;
+            t.x += Math.cos(angle) * t.speed;
+            t.y += Math.sin(angle) * t.speed;
+            if (Math.hypot(t.x - dest.x, t.y - dest.y) < 12) {
+                gold += 4;
+                t.target = (t.target + 1) % citiesList.length;
+                updateUI();
+            }
+        });
+
+        // Move Trains by real pixel-distance along the rail path, easing
+        // speed up from a stop and back down near each end of the line --
+        // this is what makes the motion read as an actual train with mass,
+        // instead of a token sliding at constant speed.
+        if (railPathNodes.length > 1) {
+            let totalRailLength = railCumLengths[railCumLengths.length - 1];
+            const SLOWDOWN_ZONE = 50; // px from either end where the train eases off
+
+            trains.forEach(train => {
+                let distToEnd = train.direction === 1
+                    ? (totalRailLength - train.distTraveled)
+                    : train.distTraveled;
+
+                let targetSpeed = train.cruiseSpeed;
+                if (distToEnd < SLOWDOWN_ZONE) {
+                    targetSpeed = train.cruiseSpeed * Math.max(0.12, distToEnd / SLOWDOWN_ZONE);
+                }
+
+                if (train.curSpeed < targetSpeed) {
+                    train.curSpeed = Math.min(targetSpeed, train.curSpeed + train.accel);
+                } else if (train.curSpeed > targetSpeed) {
+                    train.curSpeed = Math.max(targetSpeed, train.curSpeed - train.accel * 1.6);
+                }
+
+                train.distTraveled += train.curSpeed * train.direction;
+
+                if (train.distTraveled >= totalRailLength) {
+                    train.distTraveled = totalRailLength;
+                    train.direction = -1;
+                    gold += 10 + (train.cargoCount * 6);
+                    updateUI();
+                } else if (train.distTraveled <= 0) {
+                    train.distTraveled = 0;
+                    train.direction = 1;
+                    gold += 10 + (train.cargoCount * 6);
+                    updateUI();
+                }
+
+                // Wheel rotation is driven directly by distance traveled
+                // (circumference of the driving wheel, radius 3.2px) so the
+                // spin always matches actual motion and never desyncs.
+                const wheelCircumference = 2 * Math.PI * 3.2;
+                train.wheelAngle += (train.curSpeed * train.direction / wheelCircumference) * 2 * Math.PI;
+
+                let sample = railPointAtDistance(train.distTraveled);
+                if (sample) {
+                    train.x = sample.x;
+                    train.y = sample.y;
+                    // facing flips with direction of travel along the path's
+                    // local tangent, not just left/right of the whole map
+                    let aheadSample = railPointAtDistance(train.distTraveled + 0.5 * train.direction);
+                    if (aheadSample) {
+                        train.facing = (aheadSample.x - sample.x) * train.direction >= 0 ? 1 : -1;
+                        if (Math.abs(aheadSample.x - sample.x) < 0.01) {
+                            // near-vertical track segment -- keep prior facing
+                        }
+                    }
+                }
+            });
+        }
+
+        spawnGold();
+    }
+
+    // Hex Shape Drawing Function
+    function drawHexagon(x, y, radius, fillColor, strokeColor) {
+        ctx.fillStyle = fillColor;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            let angle = (Math.PI / 3) * i;
+            ctx.lineTo(x + radius * Math.cos(angle), y + radius * Math.sin(angle));
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    // -----------------------------------------------------------------
+    // VEHICLE SPRITES
+    //
+    // Design decision: this is a top-down hex board (every other element --
+    // tiles, hubs, flags, gold -- renders top-down). A literal side-view
+    // vehicle would face the camera at a right angle to the board and look
+    // broken whenever it travels vertically. Instead, vehicles are drawn in
+    // a "lifted profile" style: a top-down footprint with strong side-on
+    // detailing (visible wheels, window bands, coupling rods, shading)
+    // rotated to face the direction of travel. This reads as a detailed,
+    // recognizable side-profile vehicle while staying physically consistent
+    // with the top-down board -- the same trick isometric tycoon games use.
+    // -----------------------------------------------------------------
+
+    function drawTruck(t) {
+        ctx.save();
+        ctx.translate(t.x, t.y);
+        ctx.scale(t.facing, 1);
+
+        // soft contact shadow
+        ctx.fillStyle = "rgba(0,0,0,0.25)";
+        ctx.beginPath();
+        ctx.ellipse(0, 7, 11, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // wheels (dark rubber + hubcap)
+        ctx.fillStyle = "#1f2937";
+        ctx.fillRect(-7, 5, 5, 5);
+        ctx.fillRect(3, 5, 5, 5);
+        ctx.fillStyle = "#6b7280";
+        ctx.fillRect(-6, 6, 3, 3);
+        ctx.fillRect(4, 6, 3, 3);
+
+        // cargo bed (rear box)
+        ctx.fillStyle = "#5b21b6";
+        ctx.fillRect(-9, -4, 10, 9);
+        ctx.strokeStyle = "#7c3aed";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-8, -3, 8, 7);
+        // bed ridge lines
+        ctx.strokeStyle = "#4c1d95";
+        ctx.beginPath();
+        ctx.moveTo(-9, -1); ctx.lineTo(1, -1);
+        ctx.moveTo(-9, 2); ctx.lineTo(1, 2);
+        ctx.stroke();
+
+        // cab (front, slightly raised)
+        ctx.fillStyle = "#7c3aed";
+        ctx.fillRect(1, -6, 7, 11);
+        // windshield
+        ctx.fillStyle = "#bfdbfe";
+        ctx.fillRect(3, -5, 4, 4);
+        // headlight
+        ctx.fillStyle = "#fde68a";
+        ctx.beginPath();
+        ctx.arc(8, 3, 1.4, 0, Math.PI * 2);
+        ctx.fill();
+        // chassis line
+        ctx.strokeStyle = "#3b0764";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-9, 5); ctx.lineTo(8, 5);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    function drawTrainEngine(pos, facing, wheelAngle) {
+        ctx.save();
+        ctx.translate(pos.x, pos.y);
+        ctx.scale(facing, 1);
+
+        // contact shadow
+        ctx.fillStyle = "rgba(0,0,0,0.3)";
+        ctx.beginPath();
+        ctx.ellipse(0, 8, 13, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // driving wheels (large, with a rotating spoke so motion reads as
+        // actual rolling rather than a sliding token)
+        ctx.fillStyle = "#111827";
+        [-7, -1, 5].forEach(wx => {
+            ctx.beginPath();
+            ctx.arc(wx, 6, 3.2, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        // rotating spoke + rim highlight per wheel
+        [-7, -1, 5].forEach(wx => {
+            ctx.strokeStyle = "#f59e0b";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(wx, 6, 1.6, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.save();
+            ctx.translate(wx, 6);
+            ctx.rotate(wheelAngle || 0);
+            ctx.strokeStyle = "#fbbf24";
+            ctx.lineWidth = 1.1;
+            ctx.beginPath();
+            ctx.moveTo(-2.9, 0); ctx.lineTo(2.9, 0);
+            ctx.moveTo(0, -2.9); ctx.lineTo(0, 2.9);
+            ctx.stroke();
+            ctx.restore();
+        });
+        // coupling rod linking the wheels, offset by wheel phase so it
+        // visibly drives back and forth like a real connecting rod
+        let rodOffset = Math.sin(wheelAngle || 0) * 1.4;
+        ctx.strokeStyle = "#9ca3af";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-7, 6 + rodOffset); ctx.lineTo(5, 6 + rodOffset);
+        ctx.stroke();
+
+        // main boiler body (long crimson barrel)
+        ctx.fillStyle = "#dc2626";
+        ctx.fillRect(-9, -6, 16, 10);
+        ctx.strokeStyle = "#7f1d1d";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-9, -6, 16, 10);
+        // boiler bands
+        ctx.strokeStyle = "#991b1b";
+        [-4, 0, 4].forEach(bx => {
+            ctx.beginPath();
+            ctx.moveTo(bx, -6); ctx.lineTo(bx, 4);
+            ctx.stroke();
+        });
+
+        // cow-catcher / front nose
+        ctx.fillStyle = "#991b1b";
+        ctx.beginPath();
+        ctx.moveTo(7, -4); ctx.lineTo(11, 0); ctx.lineTo(7, 4);
+        ctx.closePath();
+        ctx.fill();
+
+        // driver cabin (rear block, taller)
+        ctx.fillStyle = "#7f1d1d";
+        ctx.fillRect(-11, -9, 6, 13);
+        ctx.fillStyle = "#fde68a";
+        ctx.fillRect(-9, -7, 3, 3); // cab window
+
+        // brass smokestack
+        ctx.fillStyle = "#f59e0b";
+        ctx.fillRect(-2, -11, 4, 6);
+        ctx.beginPath();
+        ctx.ellipse(0, -11, 3, 1.6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // headlamp on the nose
+        ctx.fillStyle = "#fef3c7";
+        ctx.beginPath();
+        ctx.arc(9, -2, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // soft puff of smoke that rises and fades, timed off wheelAngle so
+        // it stays in sync without needing separate state per train
+        let puffPhase = ((wheelAngle || 0) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+        let puffCount = 3;
+        for (let i = 0; i < puffCount; i++) {
+            let p = (puffPhase / (Math.PI * 2) + i / puffCount) % 1;
+            let py = -11 - p * 14;
+            let px = (i - 1) * 2.5;
+            let alpha = 0.35 * (1 - p);
+            let r = 1.5 + p * 3;
+            ctx.fillStyle = `rgba(209,213,219,${alpha.toFixed(2)})`;
+            ctx.beginPath();
+            ctx.arc(px, py, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
+    function drawCargoCar(pos, facing, wheelAngle) {
+        ctx.save();
+        ctx.translate(pos.x, pos.y);
+        ctx.scale(facing, 1);
+
+        ctx.fillStyle = "rgba(0,0,0,0.3)";
+        ctx.beginPath();
+        ctx.ellipse(0, 7, 10, 2.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // wheels, with a small rotating spoke mark so they read as rolling
+        [-5, 4].forEach(wx => {
+            ctx.fillStyle = "#111827";
+            ctx.beginPath(); ctx.arc(wx, 5, 2.6, 0, Math.PI * 2); ctx.fill();
+            ctx.save();
+            ctx.translate(wx, 5);
+            ctx.rotate(wheelAngle || 0);
+            ctx.strokeStyle = "#4b5563";
+            ctx.lineWidth = 0.9;
+            ctx.beginPath();
+            ctx.moveTo(-2.3, 0); ctx.lineTo(2.3, 0);
+            ctx.stroke();
+            ctx.restore();
+        });
+
+        // freight container body
+        ctx.fillStyle = "#059669";
+        ctx.fillRect(-8, -6, 16, 11);
+        ctx.strokeStyle = "#022c22";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-8, -6, 16, 11);
+
+        // corrugated panel lines
+        ctx.strokeStyle = "#10b981";
+        for (let lx = -6; lx <= 6; lx += 3) {
+            ctx.beginPath();
+            ctx.moveTo(lx, -5); ctx.lineTo(lx, 4);
+            ctx.stroke();
+        }
+        // top rail cap
+        ctx.fillStyle = "#34d399";
+        ctx.fillRect(-8, -6, 16, 2);
+
+        ctx.restore();
+    }
+
+    function drawCharacter(p) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        const dir = p.facing === 'left' ? -1 : 1;
+        ctx.scale(dir, 1);
+
+        ctx.fillStyle = "rgba(0,0,0,0.25)";
+        ctx.beginPath();
+        ctx.ellipse(0, 7, 7, 2.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // legs
+        ctx.fillStyle = "#4c1d95";
+        ctx.fillRect(-3, 2, 2.5, 6);
+        ctx.fillRect(1, 2, 2.5, 6);
+
+        // body/torso
+        ctx.fillStyle = "#6d28d9";
+        ctx.beginPath();
+        ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // little cap brim to show facing direction
+        ctx.fillStyle = "#f59e0b";
+        ctx.beginPath();
+        ctx.ellipse(2, -3, 4, 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    function drawGraphics() {
+        // Ocean Blue Ground Background
+        ctx.fillStyle = "#1e3a8a";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Render Hex Grid Layer map assets
+        Object.keys(gridMap).forEach(key => {
+            let cell = gridMap[key];
+            let color = "#10b981"; // default grass green
+            let stroke = "#047857";
+
+            if (cell.type === 'road') { color = "#4b5563"; stroke = "#1f2937"; }
+            else if (cell.type === 'rail') { color = "#065f46"; stroke = "#022c22"; }
+            else if (cell.type === 'hub') { color = "#d97706"; stroke = "#78350f"; }
+
+            drawHexagon(cell.x, cell.y, hexRadius - 1, color, stroke);
+
+            if (cell.type === 'rail') {
+                ctx.fillStyle = "#78350f";
+                ctx.fillRect(cell.x - 8, cell.y - 2, 16, 4);
+                ctx.fillStyle = "#9ca3af";
+                ctx.fillRect(cell.x - 8, cell.y - 4, 16, 2);
+                ctx.fillRect(cell.x - 8, cell.y + 2, 16, 2);
+            } else if (cell.type === 'road') {
+                ctx.strokeStyle = "#fbbf24";
+                ctx.setLineDash([3, 3]);
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(cell.x - 9, cell.y);
+                ctx.lineTo(cell.x + 9, cell.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        });
+
+        // Render Trucks
+        trucks.forEach(t => drawTruck(t));
+
+        // Render Trains (engine + linked cargo cars). Cargo cars trail the
+        // engine at a FIXED pixel distance along the track (not a fixed
+        // array-index offset), so spacing stays consistent and realistic
+        // through curves instead of bunching up or stretching apart.
+        const CAR_SPACING = 16; // px between each coupled car/engine
+        if (railPathNodes.length > 1) {
+            trains.forEach(train => {
+                let sample = railPointAtDistance(train.distTraveled);
+                if (!sample) return;
+
+                for (let c = train.cargoCount; c >= 1; c--) {
+                    let trailingDist = train.distTraveled - (c * CAR_SPACING) * train.direction;
+                    let cSample = railPointAtDistance(trailingDist);
+                    let aheadDist = train.distTraveled - ((c - 1) * CAR_SPACING) * train.direction;
+                    let aheadSample = railPointAtDistance(aheadDist) || sample;
+                    if (cSample) {
+                        ctx.strokeStyle = "#374151";
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(aheadSample.x, aheadSample.y);
+                        ctx.lineTo(cSample.x, cSample.y);
+                        ctx.stroke();
+                        drawCargoCar(cSample, train.facing || 1, train.wheelAngle || 0);
+                    }
+                }
+
+                drawTrainEngine(sample, train.facing || 1, train.wheelAngle || 0);
+            });
+        }
+
+        // Render Outpost structural Hub flags
+        citiesList.forEach((c, idx) => {
+            if (idx > 0) {
+                ctx.fillStyle = "#ffffff"; ctx.fillRect(c.x - 2, c.y - 12, 4, 16);
+                ctx.fillStyle = "#ef4444"; ctx.beginPath(); ctx.moveTo(c.x + 2, c.y - 12); ctx.lineTo(c.x + 12, c.y - 8); ctx.lineTo(c.x + 2, c.y - 4); ctx.fill();
+            }
+        });
+
+        // Collectible items gold bullion sparkles
+        goldSpawns.forEach(g => {
+            ctx.fillStyle = "#fbbf24"; ctx.beginPath(); ctx.arc(g.x, g.y, g.radius, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(g.x - 1, g.y - 1, 2, 0, Math.PI * 2); ctx.fill();
+        });
+
+        // Draw Player Character token
+        drawCharacter(player);
+    }
+
+    function mainEngineLoop() {
+        updateMechanics();
+        drawGraphics();
+        requestAnimationFrame(mainEngineLoop);
+    }
+
+    // Ignite Application Core
+    initMap();
+    updateUI();
+    mainEngineLoop();
+</script>
+
+</body>
+</html>

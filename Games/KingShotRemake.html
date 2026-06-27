@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Isles of Venture: Hex Network Tycoon</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #111827;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #f3f4f6;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #game-wrapper {
+            display: flex;
+            gap: 20px;
+            background-color: #1f2937;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            border: 1px solid #374151;
+        }
+
+        #canvas-container {
+            border-radius: 12px;
+            overflow: hidden;
+            border: 4px solid #111827;
+            background-color: #1e3a8a;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #sidebar {
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+            justify-content: space-between;
+        }
+
+        .header-title {
+            margin: 0 0 10px 0;
+            font-size: 1.3rem;
+            text-align: center;
+            color: #f59e0b;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 2px dashed #4b5563;
+            padding-bottom: 8px;
+        }
+
+        .resource-box {
+            background: #111827;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.15rem;
+            font-weight: bold;
+            border-left: 5px solid #fbbf24;
+        }
+
+        .section-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: #9ca3af;
+            margin: 10px 0 4px 0;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
+        .shop-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .btn {
+            background: #059669;
+            color: white;
+            border: none;
+            padding: 10px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.15s ease;
+            font-size: 0.85rem;
+        }
+
+        .btn:hover { background: #10b981; transform: translateY(-1px); }
+        .btn:disabled { background: #4b5563; color: #9ca3af; cursor: not-allowed; transform: none; }
+
+        .btn-road { background: #4b5563; } .btn-road:hover { background: #6b7280; }
+        .btn-rail { background: #2563eb; } .btn-rail:hover { background: #3b82f6; }
+        .btn-hub { background: #b45309; }  .btn-hub:hover { background: #d97706; }
+        .btn-fleet { background: #6d28d9; } .btn-fleet:hover { background: #7c3aed; }
+
+        .active-mode {
+            outline: 3px solid #fbbf24 !important;
+            box-shadow: 0 0 8px #fbbf24;
+        }
+
+        .guide {
+            background: #111827;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            color: #d1d5db;
+            line-height: 1.4;
+            border: 1px solid #374151;
+        }
+
+        .fleet-status {
+            font-size: 0.8rem;
+            color: #e5e7eb;
+            background: #111827;
+            padding: 8px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+    <div id="canvas-container">
+        <canvas id="realmCanvas" width="600" height="600"></canvas>
+    </div>
+
+    <div id="sidebar">
+        <div>
+            <h2 class="header-title">⬢ Hex Logistics Tycoon</h2>
+            
+            <div class="resource-box">
+                <span>Treasury:</span>
+                <span id="gold-amount" style="color: #fbbf24;">40 G 🪙</span>
+            </div>
+
+            <div class="section-label">Civil & Land Management</div>
+            <div class="shop-menu">
+                <button class="btn btn-hub" id="btn-hub" onclick="buyCityHub()">
+                    <span>🏛️ Build Outpost Hex</span> <span id="cost-hub">60 G</span>
+                </button>
+            </div>
+
+            <div class="section-label">Hex Grid Networks (Walk to Lay)</div>
+            <div class="shop-menu">
+                <button class="btn btn-road" id="btn-road" onclick="setDrawMode('road')">
+                    <span id="text-road">⬢ Lay Hex Paved Road</span> <span>Free</span>
+                </button>
+                <button class="btn btn-rail" id="btn-rail" onclick="setDrawMode('rail')">
+                    <span id="text-rail">⬢ Lay Hex Rail Track</span> <span>Free</span>
+                </button>
+            </div>
+
+            <div class="section-label">Rolling Stock Fleet</div>
+            <div class="shop-menu">
+                <button class="btn btn-fleet" id="btn-buy-truck" onclick="buyTruck()">
+                    <span>🚚 Haul Truck</span> <span id="cost-truck">30 G</span>
+                </button>
+                <button class="btn btn-fleet" id="btn-buy-engine" onclick="buyTrainEngine()">
+                    <span>🚂 Heavy Rail Locomotive</span> <span id="cost-engine">50 G</span>
+                </button>
+                <button class="btn btn-fleet" id="btn-buy-cargo" onclick="buyCargoCar()">
+                    <span>📦 Heavy Freight Car</span> <span id="cost-cargo">20 G</span>
+                </button>
+            </div>
+        </div>
+
+        <div>
+            <div class="section-label">Network Infrastructure Stats</div>
+            <div class="fleet-status">
+                🚚 Active Road Trucks: <span id="count-trucks" style="color:#a78bfa">0</span><br>
+                🚂 Detailed Slow Engines: <span id="count-trains" style="color:#60a5fa">0</span><br>
+                📦 Total Coupled Cargo Cars: <span id="count-cars" style="color:#34d399">0</span>
+            </div>
+
+            <div class="guide">
+                <strong>Hex Grid Logistics Rules:</strong><br>
+                • Move with <b>WASD / Arrows</b>.<br>
+                • Toggle a Hex tool. Moving onto an empty water tile will format it into a usable hexagon network node.<br>
+                • <b>Trains crawl realistically</b> along paths, delivering multi-tiered rewards with every car attached!
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById("realmCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Hex Coordinate Configuration Math
+    const hexRadius = 24;
+    const hexHeight = hexRadius * 2;
+    const hexWidth = Math.sqrt(3) * hexRadius;
+    const horizDist = hexWidth;
+    const vertDist = hexHeight * 0.75;
+
+    // Financial balances
+    let gold = 40;
+    let hubCost = 60;
+    let truckCost = 30;
+    let engineCost = 50;
+    let cargoCost = 20;
+
+    let currentDrawMode = null;
+
+    // Map Databases (Key = "q,r")
+    let gridMap = {};
+    let citiesList = [];
+    let railPathNodes = []; // Array of {x,y} positions for orderly train traversal
+
+    const player = { x: 300, y: 300, radius: 8, speed: 3 };
+    let goldSpawns = [];
+    let trucks = [];
+    let trains = [];
+
+    const inputKeys = {};
+    window.addEventListener("keydown", e => inputKeys[e.key.toLowerCase()] = true);
+    window.addEventListener("keyup", e => inputKeys[e.key.toLowerCase()] = false);
+
+    // Convert pixel coordinate back into a specific hex grid ring key
+    function pixelToHex(x, y) {
+        let q = (Math.sqrt(3)/3 * x - 1/3 * y) / hexRadius;
+        let r = (2/3 * y) / hexRadius;
+        return cubeToAxial(cubeRound({x: q, y: -q-r, z: r}));
+    }
+
+    function cubeToAxial(cube) { return { q: cube.q, r: cube.r }; }
+
+    function cubeRound(cube) {
+        let rx = Math.round(cube.x);
+        let ry = Math.round(cube.y);
+        let rz = Math.round(cube.z);
+
+        let x_diff = Math.abs(rx - cube.x);
+        let y_diff = Math.abs(ry - cube.y);
+        let z_diff = Math.abs(rz - cube.z);
+
+        if (x_diff > y_diff && x_diff > z_diff) rx = -ry-rz;
+        else if (y_diff > z_diff) ry = -rx-rz;
+        else rz = -rx-ry;
+
+        return { q: rx, r: rz };
+    }
+
+    function hexToPixel(q, r) {
+        let x = hexRadius * (Math.sqrt(3) * q + Math.sqrt(3)/2 * r);
+        let y = hexRadius * (3/2 * r);
+        return { x: x, y: y };
+    }
+
+    // Map Setup Initialization
+    function initMap() {
+        // Base land structure center block
+        for(let q = -3; q <= 3; q++) {
+            for(let r = -3; r <= 3; r++) {
+                if (Math.abs(q + r) <= 3) {
+                    let key = `${q},${r}`;
+                    let pos = hexToPixel(q, r);
+                    gridMap[key] = { q: q, r: r, x: pos.x + 300, y: pos.y + 300, type: 'grass' };
+                }
+            }
+        }
+        citiesList.push({ x: 300, y: 300, name: "Capital City" });
+        gridMap["0,0"].type = 'hub';
+    }
+
+    function spawnGold() {
+        let keys = Object.keys(gridMap);
+        while (goldSpawns.length < 4) {
+            let randKey = keys[Math.floor(Math.random() * keys.length)];
+            let tile = gridMap[randKey];
+            if (tile && (tile.type === 'grass' || tile.type === 'road')) {
+                // Confirm it doesn't already have gold
+                if (!goldSpawns.some(g => g.key === randKey)) {
+                    goldSpawns.push({ x: tile.x, y: tile.y, key: randKey, radius: 6 });
+                }
+            }
+        }
+    }
+
+    function setDrawMode(mode) {
+        currentDrawMode = (currentDrawMode === mode) ? null : mode;
+        updateUI();
+    }
+
+    function buyCityHub() {
+        if (gold >= hubCost) {
+            gold -= hubCost;
+            // Place out along a random outer radius trajectory
+            let q = Math.floor(Math.random() * 6 - 3);
+            let r = (q > 0) ? -3 : 3;
+            let key = `${q},${r}`;
+            let pos = hexToPixel(q, r);
+            
+            gridMap[key] = { q: q, r: r, x: pos.x + 300, y: pos.y + 300, type: 'hub' };
+            citiesList.push({ x: pos.x + 300, y: pos.y + 300, name: "Outpost Hub" });
+            hubCost = Math.floor(hubCost * 1.5);
+            updateUI();
+        }
+    }
+
+    function buyTruck() {
+        if (gold >= truckCost && citiesList.length > 1) {
+            gold -= truckCost;
+            trucks.push({ x: citiesList[0].x, y: citiesList[0].y, target: 1, speed: 1.2 });
+            updateUI();
+        }
+    }
+
+    function buyTrainEngine() {
+        if (gold >= engineCost) {
+            gold -= engineCost;
+            // Train engine travels slowly (speed increments are small)
+            trains.push({ pathIndex: 0, speed: 0.15, direction: 1, cargoCount: 0 });
+            updateUI();
+        }
+    }
+
+    function buyCargoCar() {
+        if (gold >= cargoCost && trains.length > 0) {
+            gold -= cargoCost;
+            trains[trains.length - 1].cargoCount++;
+            updateUI();
+        }
+    }
+
+    function updateUI() {
+        document.getElementById("gold-amount").innerText = gold + " G";
+        document.getElementById("cost-hub").innerText = hubCost + " G";
+        document.getElementById("cost-truck").innerText = truckCost + " G";
+        document.getElementById("cost-engine").innerText = engineCost + " G";
+        document.getElementById("cost-cargo").innerText = cargoCost + " G";
+
+        document.getElementById("btn-road").className = "btn btn-road " + (currentDrawMode === 'road' ? 'active-mode' : '');
+        document.getElementById("btn-rail").className = "btn btn-rail " + (currentDrawMode === 'rail' ? 'active-mode' : '');
+
+        document.getElementById("btn-hub").disabled = gold < hubCost;
+        document.getElementById("btn-buy-truck").disabled = (gold < truckCost || citiesList.length < 2);
+        document.getElementById("btn-buy-engine").disabled = gold < engineCost;
+        document.getElementById("btn-buy-cargo").disabled = (gold < cargoCost || trains.length === 0);
+
+        document.getElementById("count-trucks").innerText = trucks.length;
+        document.getElementById("count-trains").innerText = trains.length;
+        document.getElementById("count-cars").innerText = trains.reduce((a, b) => a + b.cargoCount, 0);
+    }
+
+    function updateMechanics() {
+        let mx = 0, my = 0;
+        if (inputKeys["arrowup"] || inputKeys["w"]) my -= player.speed;
+        if (inputKeys["arrowdown"] || inputKeys["s"]) my += player.speed;
+        if (inputKeys["arrowleft"] || inputKeys["a"]) mx -= player.speed;
+        if (inputKeys["arrowright"] || inputKeys["d"]) mx += player.speed;
+
+        let nX = player.x + mx;
+        let nY = player.y + my;
+
+        // Trace hex cell standing on
+        let hexCoord = pixelToHex(nX - 300, nY - 300);
+        let key = `${hexCoord.q},${hexCoord.r}`;
+        let currentTile = gridMap[key];
+
+        // Process infrastructure placement context
+        if (!currentTile && currentDrawMode) {
+            let pos = hexToPixel(hexCoord.q, hexCoord.r);
+            let worldX = pos.x + 300;
+            let worldY = pos.y + 300;
+
+            if (worldX > 20 && worldX < 580 && worldY > 20 && worldY < 580) {
+                gridMap[key] = { q: hexCoord.q, r: hexCoord.r, x: worldX, y: worldY, type: currentDrawMode };
+                if (currentDrawMode === 'rail') {
+                    railPathNodes.push({ x: worldX, y: worldY });
+                }
+                currentTile = gridMap[key];
+            }
+        }
+
+        // Keep player confined to configured map nodes 
+        if (currentTile || Math.hypot(nX - 300, nY - 300) < 60) {
+            player.x = Math.max(15, Math.min(canvas.width - 15, nX));
+            player.y = Math.max(15, Math.min(canvas.height - 15, nY));
+        }
+
+        // Gold collections
+        for(let i = goldSpawns.length - 1; i >= 0; i--) {
+            if (Math.hypot(player.x - goldSpawns[i].x, player.y - goldSpawns[i].y) < player.radius + 10) {
+                goldSpawns.splice(i, 1);
+                gold += 8;
+                updateUI();
+            }
+        }
+
+        // Move Trucks
+        trucks.forEach(t => {
+            let dest = citiesList[t.target];
+            let angle = Math.atan2(dest.y - t.y, dest.x - t.x);
+            t.x += Math.cos(angle) * t.speed;
+            t.y += Math.sin(angle) * t.speed;
+            if (Math.hypot(t.x - dest.x, t.y - dest.y) < 12) {
+                gold += 4;
+                t.target = (t.target + 1) % citiesList.length;
+                updateUI();
+            }
+        });
+
+        // Move Trains Carefully & Slowly along the Hexagonal Rail Path Array
+        if (railPathNodes.length > 1) {
+            trains.forEach(train => {
+                train.pathIndex += train.speed * train.direction;
+                
+                // Route limits verification
+                if (train.pathIndex >= railPathNodes.length - 1) {
+                    train.direction = -1;
+                    train.pathIndex = railPathNodes.length - 1;
+                    gold += 10 + (train.cargoCount * 6);
+                    updateUI();
+                } else if (train.pathIndex <= 0) {
+                    train.direction = 1;
+                    train.pathIndex = 0;
+                    gold += 10 + (train.cargoCount * 6);
+                    updateUI();
+                }
+            });
+        }
+
+        spawnGold();
+    }
+
+    // Hex Shape Drawing Function
+    function drawHexagon(x, y, radius, fillColor, strokeColor) {
+        ctx.fillStyle = fillColor;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            let angle = (Math.PI / 3) * i;
+            ctx.lineTo(x + radius * Math.cos(angle), y + radius * Math.sin(angle));
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    function drawGraphics() {
+        // Ocean Blue Ground Background
+        ctx.fillStyle = "#1e3a8a";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Render Hex Grid Layer map assets
+        Object.keys(gridMap).forEach(key => {
+            let cell = gridMap[key];
+            let color = "#10b981"; // default grass green
+            let stroke = "#047857";
+
+            if (cell.type === 'road') { color = "#4b5563"; stroke = "#1f2937"; }
+            else if (cell.type === 'rail') { color = "#065f46"; stroke = "#022c22"; }
+            else if (cell.type === 'hub') { color = "#d97706"; stroke = "#78350f"; }
+
+            drawHexagon(cell.x, cell.y, hexRadius - 1, color, stroke);
+
+            // Draw micro architectural rail tie accents within standard tracks
+            if (cell.type === 'rail') {
+                ctx.fillStyle = "#78350f";
+                ctx.fillRect(cell.x - 8, cell.y - 2, 16, 4);
+                ctx.fillStyle = "#9ca3af";
+                ctx.fillRect(cell.x - 8, cell.y - 4, 16, 2);
+                ctx.fillRect(cell.x - 8, cell.y + 2, 16, 2);
+            }
+        });
+
+        // Render Trucks
+        trucks.forEach(t => {
+            ctx.fillStyle = "#a78bfa";
+            ctx.fillRect(t.x - 6, t.y - 4, 12, 8);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(t.x + 2, t.y - 3, 3, 6); // Windshield detail
+        });
+
+        // Render Highly Detailed Trains (Locomotive components + Cargo)
+        if (railPathNodes.length > 1) {
+            trains.forEach(train => {
+                let index = Math.floor(train.pathIndex);
+                let pos = railPathNodes[index];
+                if (!pos) return;
+
+                // 1. Draw Linked Follower Cargo Cars
+                for (let c = 1; c <= train.cargoCount; c++) {
+                    let trailingIndex = index - (c * 2) * train.direction;
+                    // Clamp safely inside rail limit arrays
+                    trailingIndex = Math.max(0, Math.min(railPathNodes.length - 1, trailingIndex));
+                    let cPos = railPathNodes[trailingIndex];
+                    
+                    if (cPos) {
+                        // Draw Cargo Coupling connector chain link
+                        ctx.strokeStyle = "#374151"; ctx.lineWidth = 3;
+                        ctx.beginPath(); ctx.moveTo(pos.x, pos.y); ctx.lineTo(cPos.x, cPos.y); ctx.stroke();
+
+                        // Detailed Cargo Container Box
+                        ctx.fillStyle = "#059669"; // Emerald box
+                        ctx.fillRect(cPos.x - 7, cPos.y - 5, 14, 10);
+                        ctx.strokeStyle = "#10b981"; ctx.lineWidth = 1;
+                        ctx.strokeRect(cPos.x - 5, cPos.y - 4, 10, 8); // Corrugated texture accent
+                    }
+                }
+
+                // 2. Draw Highly Detailed Slow Locomotive Engine Body
+                ctx.save();
+                ctx.translate(pos.x, pos.y);
+
+                // Heavy Cast-Iron Wheel Rim Base
+                ctx.fillStyle = "#111827";
+                ctx.fillRect(-9, 5, 18, 3);
+                ctx.fillRect(-9, -8, 18, 3);
+
+                // Main Boiler/Engine Cab
+                ctx.fillStyle = "#dc2626"; // Crimson Engine Boiler
+                ctx.fillRect(-10, -5, 16, 10);
+                
+                // Driver Cabin structure block overlay
+                ctx.fillStyle = "#991b1b"; 
+                ctx.fillRect(-10, -6, 6, 12);
+
+                // Golden Brass Steam Smokestack piston
+                ctx.fillStyle = "#f59e0b";
+                ctx.beginPath(); ctx.arc(3, 0, 3, 0, Math.PI*2); ctx.fill();
+
+                ctx.restore();
+            });
+        }
+
+        // Render Outpost structural Hub flags
+        citiesList.forEach((c, idx) => {
+            if(idx > 0) {
+                ctx.fillStyle = "#ffffff"; ctx.fillRect(c.x - 2, c.y - 12, 4, 16);
+                ctx.fillStyle = "#ef4444"; ctx.beginPath(); ctx.moveTo(c.x + 2, c.y - 12); ctx.lineTo(c.x + 12, c.y - 8); ctx.lineTo(c.x + 2, c.y - 4); ctx.fill();
+            }
+        });
+
+        // Collectible items gold bullion sparkles
+        goldSpawns.forEach(g => {
+            ctx.fillStyle = "#fbbf24"; ctx.beginPath(); ctx.arc(g.x, g.y, g.radius, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(g.x - 1, g.y - 1, 2, 0, Math.PI * 2); ctx.fill();
+        });
+
+        // Draw Player Character token
+        ctx.fillStyle = "#6d28d9"; ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    function mainEngineLoop() {
+        updateMechanics();
+        drawGraphics();
+        requestAnimationFrame(mainEngineLoop);
+    }
+
+    // Ignite Application Core
+    initMap();
+    updateUI();
+    mainEngineLoop();
+</script>
+
+</body>
+</html>

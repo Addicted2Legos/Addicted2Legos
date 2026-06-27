@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Train Defense - Level 1</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #222;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #ui-layer {
+            margin-bottom: 10px;
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            gap: 40px;
+        }
+
+        canvas {
+            background-color: #4a5d4e; /* Grassy green */
+            border: 4px solid #333;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border-radius: 8px;
+        }
+
+        .screen {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.85);
+            border: 2px solid #ffcc00;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            display: none;
+        }
+
+        .screen h2 {
+            margin-top: 0;
+            color: #ffcc00;
+            font-size: 32px;
+        }
+
+        button {
+            background: #ffcc00;
+            color: #111;
+            border: none;
+            padding: 12px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background 0.2s;
+            margin-top: 15px;
+        }
+
+        button:hover {
+            background: #ffe066;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div>Level: <span id="level-txt">1 (Tutorial Run)</span></div>
+        <div>Cargo Health: <span id="health-txt" style="color: #4caf50;">100%</span></div>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
+
+    <div id="win-screen" class="screen">
+        <h2>Level Complete!</h2>
+        <p>The cargo arrived safely at the station.</p>
+        <p><em>Ready for Level 2? Next, the bandits attack...</em></p>
+        <button onclick="nextLevelMock()">Advance to Level 2</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game State
+        let cargoHealth = 100;
+        let gameActive = true;
+
+        // Track Path Definitions (Using simple Bezier curve points)
+        const track = {
+            start: { x: 50, y: 100 },
+            cp1: { x: 400, y: 50 },
+            cp2: { x: 400, y: 450 },
+            end: { x: 750, y: 400 }
+        };
+
+        // Train Definition
+        const train = {
+            progress: 0,       // 0 to 1 along the track
+            speed: 0.0015,     // How fast it moves along the path percentually
+            size: 25,          // Size of train cars
+            spacing: 0.04      // Distance between engine and cargo car
+        };
+
+        // Stations
+        const startStation = { x: 50, y: 100, radius: 30 };
+        const endStation = { x: 750, y: 400, radius: 30 };
+
+        // Math Helper: Get XY coordinate along a Cubic Bezier Curve
+        function getBezierPoint(t, p0, p1, p2, p3) {
+            const cx = 3 * (p1.x - p0.x);
+            const bx = 3 * (p2.x - p1.x) - cx;
+            const ax = p3.x - p0.x - cx - bx;
+
+            const cy = 3 * (p1.y - p0.y);
+            const by = 3 * (p2.y - p1.y) - cy;
+            const ay = p3.y - p0.y - cy - by;
+
+            const x = (ax * Math.pow(t, 3)) + (bx * Math.pow(t, 2)) + (cx * t) + p0.x;
+            const y = (ay * Math.pow(t, 3)) + (by * Math.pow(t, 2)) + (cy * t) + p0.y;
+
+            return { x, y };
+        }
+
+        // Draw the environment and tracks
+        function drawTracks() {
+            // Draw Stations
+            ctx.fillStyle = '#777';
+            ctx.beginPath(); ctx.arc(startStation.x, startStation.y, startStation.radius, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(endStation.x, endStation.y, endStation.radius, 0, Math.PI * 2); ctx.fill();
+            
+            // Station Labels
+            ctx.fillStyle = '#fff';
+            ctx.font = '12px Arial';
+            ctx.fillText("START", startStation.x - 18, startStation.y + 4);
+            ctx.fillText("END", endStation.x - 12, endStation.y + 4);
+
+            // Draw Rails
+            ctx.strokeStyle = '#3e2723'; // Wooden tie color
+            ctx.lineWidth = 12;
+            ctx.beginPath();
+            ctx.moveTo(track.start.x, track.start.y);
+            ctx.bezierCurveTo(track.cp1.x, track.cp1.y, track.cp2.x, track.cp2.y, track.end.x, track.end.y);
+            ctx.stroke();
+
+            // Inner rails
+            ctx.strokeStyle = '#b0bec5'; // Steel color
+            ctx.lineWidth = 4;
+            ctx.stroke();
+        }
+
+        // Update Game Data
+        function update() {
+            if (!gameActive) return;
+
+            // Progress the train forward
+            train.progress += train.speed;
+
+            // Check Win Condition
+            if (train.progress >= 1.0) {
+                train.progress = 1.0;
+                gameActive = false;
+                document.getElementById('win-screen').style.display = 'block';
+            }
+        }
+
+        // Render Graphics
+        function draw() {
+            // Clear Screen
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw the tracks
+            drawTracks();
+
+            // Calculate Train Head Position
+            let headPos = getBezierPoint(train.progress, track.start, track.cp1, track.cp2, track.end);
+            
+            // Calculate Cargo Car Position (Follows slightly behind)
+            let cargoProgress = Math.max(0, train.progress - train.spacing);
+            let cargoPos = getBezierPoint(cargoProgress, track.start, track.cp1, track.cp2, track.end);
+
+            // Draw Cargo Car (Blue Box)
+            ctx.fillStyle = '#0288d1';
+            ctx.fillRect(cargoPos.x - train.size/2, cargoPos.y - train.size/2, train.size, train.size);
+            // Draw Cargo Load inside
+            ctx.fillStyle = '#ffb300';
+            ctx.fillRect(cargoPos.x - 6, cargoPos.y - 6, 12, 12);
+
+            // Draw Locomotive Engine (Red Box)
+            ctx.fillStyle = '#d32f2f';
+            ctx.fillRect(headPos.x - train.size/2, headPos.y - train.size/2, train.size, train.size);
+            // Engine grill detail
+            ctx.fillStyle = '#111';
+            ctx.fillRect(headPos.x + 4, headPos.y - 4, 6, 8); 
+        }
+
+        // The Game Loop Engine
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // Placeholder alert for demo continuity
+        function nextLevelMock() {
+            alert("This is where you paste the Level 2 prompt into Claude to add the Robbers!");
+        }
+
+        // Start the game loop
+        loop();
+    </script>
+</body>
+</html>

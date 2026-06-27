@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Azure Ascent - Level 1</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0a1128;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 30px rgba(0, 128, 255, 0.5);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        canvas {
+            background: linear-gradient(to top, #002244, #007fff);
+            display: block;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            font-weight: bold;
+            font-size: 18px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .hud-element {
+            background: rgba(0, 34, 68, 0.7);
+            padding: 8px 15px;
+            border-radius: 20px;
+            border: 2px solid #00ffff;
+        }
+
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.6);
+            padding: 10px 20px;
+            border-radius: 10px;
+            pointer-events: none;
+            text-align: center;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="ui-layer">
+        <div class="hud-element" style="color: #00ffff;">Coins: <span id="coin-count">0</span></div>
+        <div class="hud-element" style="color: #ff007f;">Goal: Reach the Top!</div>
+    </div>
+    <div id="instructions">
+        <strong>Left Click & Hold</strong> on a platform to Hook | <strong>A / D</strong> to Swing
+    </div>
+    <canvas id="gameCanvas" width="480" height="720"></canvas>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Game State / Economy Variables
+let coins = 0;
+const coinCountEl = document.getElementById('coin-count');
+
+// Physics configuration
+const gravity = 0.4;
+const friction = 0.98;
+
+// Player Object
+const player = {
+    x: 240,
+    y: 680,
+    vx: 0,
+    vy: 0,
+    radius: 12,
+    color: #00ffff, // Bright neon cyan/azure
+    speed: 0.5
+};
+
+// Grappling Hook Object
+const hook = {
+    x: 0,
+    y: 0,
+    active: false,
+    targetPlatform: null,
+    length: 0
+};
+
+// Level design: Platforms to hook onto
+// Level 1: A vertical progression
+const platforms = [
+    { x: 240, y: 550, radius: 25, color: '#007fff', hasCoin: true },
+    { x: 120, y: 420, radius: 25, color: '#0055ff', hasCoin: true },
+    { x: 360, y: 300, radius: 25, color: '#007fff', hasCoin: true },
+    { x: 200, y: 150, radius: 30, color: '#00ffff', isGoal: true } // The Golden/Azure Gate
+];
+
+// Controls
+const keys = { a: false, d: false };
+
+window.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() === 'a') keys.a = true;
+    if (e.key.toLowerCase() === 'd') keys.d = true;
+});
+
+window.addEventListener('keyup', (e) => {
+    if (e.key.toLowerCase() === 'a') keys.a = false;
+    if (e.key.toLowerCase() === 'd') keys.d = false;
+});
+
+// Mouse input for grapple
+canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Check if clicked near a platform
+    platforms.forEach(p => {
+        const dist = Math.hypot(mouseX - p.x, mouseY - p.y);
+        if (dist < p.radius + 20) { // Generous click box
+            hook.active = true;
+            hook.x = p.x;
+            hook.y = p.y;
+            hook.length = Math.hypot(player.x - p.x, player.y - p.y);
+        }
+    });
+});
+
+window.addEventListener('mouseup', () => {
+    hook.active = false;
+});
+
+// Reset function if player falls
+function resetPlayer() {
+    player.x = 240;
+    player.y = 680;
+    player.vx = 0;
+    player.vy = 0;
+    hook.active = false;
+}
+
+// Main Game Loop
+function update() {
+    // 1. Physics & Movement
+    if (!hook.active) {
+        // Normal gravity physics
+        player.vy += gravity;
+        player.vx *= friction;
+        
+        // Ground collision (bottom of screen)
+        if (player.y + player.radius >= canvas.height) {
+            player.y = canvas.height - player.radius;
+            player.vy = 0;
+            player.vx *= 0.8; // More friction on ground
+        }
+        
+        // Air movement controls
+        if (keys.a) player.vx -= player.speed;
+        if (keys.d) player.vx += player.speed;
+    } else {
+        // Grapple physics (Pendulum simulation)
+        player.vy += gravity; // Gravity still applies
+        
+        // Dynamic swing boost
+        if (keys.a) player.vx -= player.speed * 0.4;
+        if (keys.d) player.vx += player.speed * 0.4;
+
+        player.vx *= 0.995; // Less air resistance when swinging
+
+        // Constraint player to rope length
+        let dx = player.x - hook.x;
+        let dy = player.y - hook.y;
+        let currentDist = Math.hypot(dx, dy);
+
+        if (currentDist > hook.length) {
+            // Bring player back to circumference
+            let angle = Math.atan2(dy, dx);
+            player.x = hook.x + Math.cos(angle) * hook.length;
+            player.y = hook.y + Math.sin(angle) * hook.length;
+
+            // Constrain velocity vector
+            let velProj = player.vx * Math.cos(angle) + player.vy * Math.sin(angle);
+            player.vx -= velProj * Math.cos(angle);
+            player.vy -= velProj * Math.sin(angle);
+        }
+    }
+
+    // Apply velocities
+    player.x += player.vx;
+    player.y += player.vy;
+
+    // Screen boundaries (walls)
+    if (player.x - player.radius < 0) { player.x = player.radius; player.vx *= -0.5; }
+    if (player.x + player.radius > canvas.width) { player.x = canvas.width - player.radius; player.vx *= -0.5; }
+
+    // If player falls drastically past bottom while moving fast, reset safely
+    if (player.y > canvas.height + 50) resetPlayer();
+
+    // 2. Collision with Collectibles & Goals
+    platforms.forEach(p => {
+        let dist = Math.hypot(player.x - p.x, player.y - p.y);
+        
+        // Grab coins
+        if (p.hasCoin && dist < p.radius + player.radius) {
+            p.hasCoin = false;
+            coins += 10;
+            coinCountEl.innerText = coins;
+        }
+        
+        // Win Condition (Reach top platform)
+        if (p.isGoal && dist < p.radius + player.radius) {
+            alert(`Level Complete! You earned ${coins} coins. Ready for Level 2 shop upgrades?`);
+            coins += 50; // Win bonus
+            coinCountEl.innerText = coins;
+            resetPlayer();
+            // Reset coins on map
+            platforms.forEach(plat => { if(!plat.isGoal) plat.hasCoin = true; });
+        }
+    });
+
+    // 3. Render Graphics
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw Platforms/Anchors
+    platforms.forEach(p => {
+        // Outer glowing ring
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius + 5, 0, Math.PI * 2);
+        ctx.strokeStyle = p.isGoal ? '#ffff00' : '#00ffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Core Platform
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+
+        // Draw Coin if available
+        if (p.hasCoin) {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y - p.radius - 15, 8, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffcc00';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.stroke();
+        }
+    });
+
+    // Draw Grapple Line
+    if (hook.active) {
+        ctx.beginPath();
+        ctx.moveTo(player.x, player.y);
+        ctx.lineTo(hook.x, hook.y);
+        ctx.strokeStyle = '#00ffff';
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#00ffff';
+        ctx.stroke();
+        ctx.shadowBlur = 0; // reset glow
+    }
+
+    // Draw Player (The Grappling Guy)
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+    ctx.fillStyle = player.color;
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Eye direction detail
+    ctx.beginPath();
+    ctx.arc(player.x + (player.vx > 0 ? 4 : -4), player.y - 3, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#0a1128';
+    ctx.fill();
+
+    requestAnimationFrame(update);
+}
+
+// Start Game
+update();
+</script>
+
+</body>
+</html>

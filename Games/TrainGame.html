@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rail Defender – Level 3</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:#111820;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden;}
+  canvas{border:2px solid #2a3a2a;border-radius:6px;display:block;cursor:crosshair;}
+  #hud{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;gap:14px;pointer-events:none;}
+  .stat{background:rgba(0,0,0,0.7);border:1px solid #2a4a2a;border-radius:8px;padding:8px 14px;color:#eee;font-size:13px;display:flex;flex-direction:column;gap:4px;min-width:96px;}
+  .stat-label{color:#7bc47b;font-size:10px;text-transform:uppercase;letter-spacing:1px;}
+  .stat-value{font-size:17px;font-weight:600;color:#cff;}
+  #hbar-wrap{width:100%;height:7px;background:#333;border-radius:4px;overflow:hidden;}
+  #hbar{height:100%;width:100%;background:#4fc;border-radius:4px;transition:background .3s;}
+  #hint{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);color:#445;font-size:11px;pointer-events:none;letter-spacing:.5px;white-space:nowrap;}
+  #overlay{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(5,10,5,.92);}
+  #overlay h1{font-size:42px;margin-bottom:10px;letter-spacing:3px;}
+  #overlay p{color:#aac;font-size:15px;margin-bottom:28px;}
+  #overlay .btns{display:flex;gap:16px;}
+  #overlay button{border:none;border-radius:8px;padding:12px 32px;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:1px;transition:transform .1s;}
+  #overlay button:hover{transform:scale(1.06);}
+  #btn-retry{background:#e74c3c;color:#fff;}
+  #btn-next{background:#4fc;color:#0a1a0a;}
+  #lvl-badge{position:absolute;top:14px;left:16px;color:#3a5a3a;font-size:11px;font-weight:700;letter-spacing:1px;pointer-events:none;}
+  #blockage-prompt{position:absolute;display:none;flex-direction:column;align-items:center;gap:6px;pointer-events:none;}
+  #blockage-prompt .label{color:#f39c12;font-size:13px;font-weight:700;letter-spacing:1px;text-shadow:0 0 8px #000;}
+  #blockage-prompt .pbar-wrap{width:120px;height:8px;background:#333;border-radius:4px;overflow:hidden;}
+  #blockage-prompt .pbar{height:100%;width:0%;background:#f39c12;border-radius:4px;transition:width .05s;}
+</style>
+</head>
+<body>
+<div id="lvl-badge">LEVEL 3 — THE BROKEN TRACKS</div>
+<div id="hud">
+  <div class="stat">
+    <span class="stat-label">Cargo Health</span>
+    <div id="hbar-wrap"><div id="hbar"></div></div>
+    <span class="stat-value" id="hpct">100%</span>
+  </div>
+  <div class="stat"><span class="stat-label">Progress</span><span class="stat-value" id="ppct">0%</span></div>
+  <div class="stat"><span class="stat-label">Speed</span><span class="stat-value" id="spd">0</span></div>
+  <div class="stat"><span class="stat-label">Bandits</span><span class="stat-value" id="bcount">0</span></div>
+</div>
+<canvas id="c"></canvas>
+<div id="blockage-prompt">
+  <div class="label" id="bp-label">CLICK TO CLEAR! (5)</div>
+  <div class="pbar-wrap"><div class="pbar" id="bp-bar"></div></div>
+</div>
+<div id="hint">↑ Accelerate &nbsp;|&nbsp; ↓ Brake &nbsp;|&nbsp; Click boulder to clear track &nbsp;|&nbsp; Turret auto-fires</div>
+<div id="overlay">
+  <h1 id="otitle"></h1>
+  <p id="omsg"></p>
+  <div class="btns">
+    <button id="btn-retry">↺ Retry</button>
+    <button id="btn-next" style="display:none">Next Level →</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const W=900, H=560;
+canvas.width=W; canvas.height=H;
+
+// ── Track (Catmull-Rom) ──────────────────────────────────────────────────────
+const RAW_PTS=[
+  {x:40,y:280},{x:140,y:280},{x:240,y:230},{x:340,y:180},
+  {x:440,y:200},{x:520,y:280},{x:600,y:360},{x:700,y:380},
+  {x:800,y:330},{x:870,y:280},{x:920,y:280}
+];
+function cr(p0,p1,p2,p3,t){
+  const t2=t*t,t3=t2*t;
+  return{
+    x:.5*((2*p1.x)+(-p0.x+p2.x)*t+(2*p0.x-5*p1.x+4*p2.x-p3.x)*t2+(-p0.x+3*p1.x-3*p2.x+p3.x)*t3),
+    y:.5*((2*p1.y)+(-p0.y+p2.y)*t+(2*p0.y-5*p1.y+4*p2.y-p3.y)*t2+(-p0.y+3*p1.y-3*p2.y+p3.y)*t3)
+  };
+}
+function buildTrack(pts,steps){
+  const out=[];
+  for(let i=0;i<pts.length-1;i++){
+    const p0=pts[Math.max(0,i-1)],p1=pts[i],p2=pts[i+1],p3=pts[Math.min(pts.length-1,i+2)];
+    for(let s=0;s<steps;s++) out.push(cr(p0,p1,p2,p3,s/steps));
+  }
+  out.push(pts[pts.length-1]);
+  return out;
+}
+const TRACK=buildTrack(RAW_PTS,60);
+const DISTS=[0];
+for(let i=1;i<TRACK.length;i++){
+  const dx=TRACK[i].x-TRACK[i-1].x,dy=TRACK[i].y-TRACK[i-1].y;
+  DISTS.push(DISTS[i-1]+Math.sqrt(dx*dx+dy*dy));
+}
+const TOTAL=DISTS[DISTS.length-1];
+function posAtDist(d){
+  d=Math.max(0,Math.min(d,TOTAL));
+  let lo=0,hi=TRACK.length-1;
+  while(lo<hi-1){const m=(lo+hi)>>1;if(DISTS[m]<=d)lo=m;else hi=m;}
+  const seg=DISTS[hi]-DISTS[lo]||1,t=(d-DISTS[lo])/seg;
+  return{
+    x:TRACK[lo].x+t*(TRACK[hi].x-TRACK[lo].x),
+    y:TRACK[lo].y+t*(TRACK[hi].y-TRACK[lo].y),
+    angle:Math.atan2(TRACK[hi].y-TRACK[lo].y,TRACK[hi].x-TRACK[lo].x)
+  };
+}
+
+// ── Constants ────────────────────────────────────────────────────────────────
+const CAR_GAP         = 48;
+const MAX_SPEED       = 130;
+const ACCEL           = 60;
+const BRAKE_FORCE     = 100;
+const DRAG            = 18;
+const STOP_DIST       = 70;          // px ahead of boulder train brakes to halt
+
+// Boulder lives at 50% of track
+const BOULDER_DIST    = TOTAL * 0.50;
+const BOULDER_CLICKS  = 5;
+const BOULDER_RADIUS  = 22;
+
+// Outpost (L2 bandits, earlier)
+const OUTPOST_DIST    = TOTAL * 0.28;
+
+// Bandit constants
+const BANDIT_AGGRO    = 190;
+const BANDIT_SPEED    = 52;
+const BANDIT_DMG      = 5;           // %/s
+const BANDIT_TOUCH    = 18;
+const TURRET_RANGE    = 160;
+const TURRET_CD       = 0.52;
+const BULLET_SPD      = 290;
+const BULLET_DMG      = 34;
+
+// ── State ────────────────────────────────────────────────────────────────────
+let dist,speed,health,gameState,lastTime;
+let bandits,bullets,particles;
+let turretAngle,turretCD;
+let boulderClicks,boulderCleared;
+let trainForceStopped;       // true while boulder is blocking
+let boulderShakeT;           // shake animation timer after click
+let ambushSpawned;           // only spawn ambush once
+let clickFlashes;            // visual feedback rings on boulder
+
+const OUTPOST_POS  = posAtDist(OUTPOST_DIST);
+const BOULDER_POS  = posAtDist(BOULDER_DIST);
+
+function initState(){
+  dist=0; speed=0; health=100; gameState='running'; lastTime=null;
+  turretAngle=0; turretCD=0;
+  bandits=[]; bullets=[]; particles=[]; clickFlashes=[];
+  boulderClicks=0; boulderCleared=false; trainForceStopped=false;
+  boulderShakeT=0; ambushSpawned=false;
+
+  // L2 outpost bandits (3 riders)
+  spawnBanditGroup(OUTPOST_POS.x, OUTPOST_POS.y+36, 3, 'outpost');
+}
+initState();
+
+function spawnBanditGroup(cx, cy, n, tag){
+  for(let i=0;i<n;i++){
+    const a = (i/n)*Math.PI*2;
+    bandits.push({
+      x:cx+Math.cos(a)*36, y:cy+Math.sin(a)*36,
+      hp:100, maxHp:100, active:true, angle:0,
+      touching:false, wobble:i*1.2, tag
+    });
+  }
+}
+
+// ── Input ────────────────────────────────────────────────────────────────────
+const keys={};
+window.addEventListener('keydown',e=>{keys[e.key]=true;if(['ArrowUp','ArrowDown'].includes(e.key))e.preventDefault();});
+window.addEventListener('keyup',  e=>{keys[e.key]=false;});
+
+// Canvas click → boulder repair
+canvas.addEventListener('click', e=>{
+  if(gameState!=='running'||boulderCleared) return;
+  if(!trainForceStopped) return; // only clickable once train is stopped
+
+  const rect=canvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  // Scale mouse to canvas coords
+  const scaleX=W/rect.width, scaleY=H/rect.height;
+  const cx=mx*scaleX, cy=my*scaleY;
+
+  const dx=cx-BOULDER_POS.x, dy=cy-BOULDER_POS.y;
+  if(Math.sqrt(dx*dx+dy*dy)<BOULDER_RADIUS+14){
+    boulderClicks++;
+    boulderShakeT=0.18;
+    clickFlashes.push({x:cx,y:cy,life:1});
+    spawnParticles(BOULDER_POS.x,BOULDER_POS.y,'#a0825a',6);
+    updateBoulderUI();
+    if(boulderClicks>=BOULDER_CLICKS){
+      clearBoulder();
+    }
+  }
+});
+
+function updateBoulderUI(){
+  const pct=Math.min(100,(boulderClicks/BOULDER_CLICKS)*100);
+  document.getElementById('bp-bar').style.width=pct+'%';
+  document.getElementById('bp-label').textContent=
+    `CLICK TO CLEAR! (${BOULDER_CLICKS-boulderClicks} left)`;
+}
+
+function clearBoulder(){
+  boulderCleared=true;
+  trainForceStopped=false;
+  document.getElementById('blockage-prompt').style.display='none';
+  spawnParticles(BOULDER_POS.x,BOULDER_POS.y,'#f39c12',20);
+  spawnParticles(BOULDER_POS.x,BOULDER_POS.y,'#888',14);
+}
+
+// ── Particles ────────────────────────────────────────────────────────────────
+function spawnParticles(x,y,color,n){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2,s=25+Math.random()*70;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,color});
+  }
+}
+
+// ── Update ───────────────────────────────────────────────────────────────────
+function update(dt){
+  if(gameState!=='running') return;
+
+  // ── Boulder approach logic ──
+  const headPos=posAtDist(dist);
+  const bDx=BOULDER_POS.x-headPos.x, bDy=BOULDER_POS.y-headPos.y;
+  const distToBoulder=Math.sqrt(bDx*bDx+bDy*bDy);
+
+  if(!boulderCleared){
+    // How far along track until boulder?
+    const trackDistRemaining = BOULDER_DIST - dist;
+    if(trackDistRemaining > 0 && trackDistRemaining < STOP_DIST + 80){
+      // Slow down as we approach
+      const targetSpeed = Math.max(0, (trackDistRemaining - STOP_DIST) * 1.5);
+      speed = Math.min(speed, targetSpeed);
+    }
+    if(trackDistRemaining<=STOP_DIST && trackDistRemaining>0){
+      speed=0;
+      trainForceStopped=true;
+    }
+    if(dist>=BOULDER_DIST) dist=BOULDER_DIST-STOP_DIST; // hard clamp
+  }
+
+  // Normal player speed controls (overridden above near boulder)
+  const nearBoulder = !boulderCleared && (BOULDER_DIST - dist) < STOP_DIST+80;
+  if(!nearBoulder){
+    if(keys['ArrowUp']  ||keys['w']) speed=Math.min(speed+ACCEL*dt,MAX_SPEED);
+    if(keys['ArrowDown']||keys['s']) speed=Math.max(speed-BRAKE_FORCE*dt,0);
+    if(!keys['ArrowUp']&&!keys['w']) speed=Math.max(0,speed-DRAG*dt);
+  }
+  dist+=speed*dt;
+
+  // ── Boulder prompt position (floating above boulder) ──
+  if(trainForceStopped && !boulderCleared){
+    const prompt=document.getElementById('blockage-prompt');
+    const rect=canvas.getBoundingClientRect();
+    const scaleX=rect.width/W, scaleY=rect.height/H;
+    prompt.style.display='flex';
+    prompt.style.left=(rect.left+BOULDER_POS.x*scaleX-60)+'px';
+    prompt.style.top =(rect.top +(BOULDER_POS.y-60)*scaleY)+'px';
+
+    // Spawn ambush wave once when stopped
+    if(!ambushSpawned){
+      ambushSpawned=true;
+      // Left side ambush
+      spawnBanditGroup(80, 180, 2, 'ambush');
+      // Right side ambush
+      spawnBanditGroup(820, 400, 2, 'ambush');
+      // One from bottom
+      spawnBanditGroup(450, 500, 1, 'ambush');
+    }
+  }
+
+  // Shake timer
+  if(boulderShakeT>0) boulderShakeT=Math.max(0,boulderShakeT-dt);
+
+  // Click flash decay
+  for(const f of clickFlashes) f.life-=dt*4;
+  clickFlashes=clickFlashes.filter(f=>f.life>0);
+
+  // ── Cargo car position ──
+  const carPos=posAtDist(Math.max(0,dist-CAR_GAP));
+
+  // ── Bandits ──
+  turretCD=Math.max(0,turretCD-dt);
+  for(const b of bandits){
+    if(!b.active) continue;
+    b.wobble+=dt;
+    const dx=carPos.x-b.x,dy=carPos.y-b.y;
+    const d=Math.sqrt(dx*dx+dy*dy);
+    if(d<BANDIT_AGGRO){
+      b.angle=Math.atan2(dy,dx);
+      b.x+=Math.cos(b.angle)*BANDIT_SPEED*dt;
+      b.y+=Math.sin(b.angle)*BANDIT_SPEED*dt;
+    }
+    b.touching=d<BANDIT_TOUCH;
+    if(b.touching) health=Math.max(0,health-BANDIT_DMG*dt);
+  }
+
+  // ── Turret ──
+  let nearest=null,nearD=Infinity;
+  for(const b of bandits){
+    if(!b.active) continue;
+    const dx=b.x-carPos.x,dy=b.y-carPos.y,d=Math.sqrt(dx*dx+dy*dy);
+    if(d<TURRET_RANGE&&d<nearD){nearest=b;nearD=d;}
+  }
+  if(nearest){
+    turretAngle=Math.atan2(nearest.y-carPos.y,nearest.x-carPos.x);
+    if(turretCD<=0){
+      turretCD=TURRET_CD;
+      bullets.push({
+        x:carPos.x+Math.cos(turretAngle)*14,
+        y:carPos.y+Math.sin(turretAngle)*14,
+        vx:Math.cos(turretAngle)*BULLET_SPD,
+        vy:Math.sin(turretAngle)*BULLET_SPD,
+        life:1
+      });
+    }
+  }
+
+  // ── Bullets ──
+  for(const bul of bullets){
+    bul.x+=bul.vx*dt; bul.y+=bul.vy*dt; bul.life-=dt*.9;
+    for(const b of bandits){
+      if(!b.active) continue;
+      const dx=b.x-bul.x,dy=b.y-bul.y;
+      if(Math.sqrt(dx*dx+dy*dy)<12){
+        b.hp-=BULLET_DMG; bul.life=0;
+        spawnParticles(b.x,b.y,'#f80',5);
+        if(b.hp<=0){b.active=false;spawnParticles(b.x,b.y,'#e44',12);}
+        break;
+      }
+    }
+  }
+  bullets=bullets.filter(b=>b.life>0);
+
+  // ── Particles ──
+  for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.88;p.vy*=.88;p.life-=dt*1.8;}
+  particles=particles.filter(p=>p.life>0);
+
+  // ── Win / lose ──
+  if(health<=0){health=0;gameState='gameover';showOverlay('gameover');}
+  if(dist>=TOTAL){dist=TOTAL;gameState='complete';showOverlay('complete');}
+
+  updateHUD();
+}
+
+// ── HUD ──────────────────────────────────────────────────────────────────────
+function updateHUD(){
+  const h=Math.round(health);
+  document.getElementById('hpct').textContent=h+'%';
+  document.getElementById('hbar').style.width=h+'%';
+  document.getElementById('hbar').style.background=h>60?'#4fc':h>30?'#f39c12':'#e74c3c';
+  document.getElementById('ppct').textContent=Math.min(100,Math.round(dist/TOTAL*100))+'%';
+  document.getElementById('spd').textContent=Math.round(speed);
+  document.getElementById('bcount').textContent=bandits.filter(b=>b.active).length;
+}
+
+function showOverlay(type){
+  const ov=document.getElementById('overlay');
+  ov.style.display='flex';
+  document.getElementById('blockage-prompt').style.display='none';
+  const title=document.getElementById('otitle');
+  const msg=document.getElementById('omsg');
+  const btnN=document.getElementById('btn-next');
+  const btnR=document.getElementById('btn-retry');
+  if(type==='complete'){
+    title.textContent='LEVEL COMPLETE!';title.style.color='#4fc';
+    msg.textContent=`Tracks cleared! Cargo delivered with ${Math.round(health)}% health.`;
+    btnN.style.display='inline-block'; btnR.style.display='inline-block';
+  } else {
+    title.textContent='GAME OVER';title.style.color='#e74c3c';
+    msg.textContent='The cargo was lost. Hold the line next time!';
+    btnN.style.display='none'; btnR.style.display='inline-block';
+  }
+}
+
+// ── Draw helpers ─────────────────────────────────────────────────────────────
+function drawGround(){
+  ctx.fillStyle='#1e3320';ctx.fillRect(0,0,W,H);
+  const patches=[{x:80,y:80,r:60},{x:300,y:420,r:80},{x:550,y:100,r:70},
+    {x:750,y:440,r:65},{x:820,y:150,r:50},{x:160,y:370,r:55},{x:450,y:320,r:45},{x:650,y:250,r:40}];
+  for(const p of patches){ctx.fillStyle='#1a2e1c';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();}
+  const trees=[{x:60,y:120},{x:90,y:430},{x:200,y:80},{x:200,y:470},{x:380,y:90},
+    {x:390,y:460},{x:500,y:450},{x:620,y:80},{x:620,y:460},{x:740,y:100},{x:760,y:450},{x:850,y:120},{x:860,y:430}];
+  for(const t of trees){
+    ctx.fillStyle='#14250f';ctx.beginPath();ctx.arc(t.x,t.y,14,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#1f3a18';ctx.beginPath();ctx.arc(t.x-2,t.y-2,12,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#2a5020';ctx.beginPath();ctx.arc(t.x-3,t.y-3,8,0,Math.PI*2);ctx.fill();
+  }
+}
+
+function drawTrack(){
+  // Ballast
+  ctx.lineWidth=20;ctx.strokeStyle='#3a3530';ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.beginPath();ctx.moveTo(TRACK[0].x,TRACK[0].y);
+  for(let i=1;i<TRACK.length;i++) ctx.lineTo(TRACK[i].x,TRACK[i].y);
+  ctx.stroke();
+
+  // Ties
+  for(let d=0;d<TOTAL;d+=14){
+    const pos=posAtDist(d),nx=-Math.sin(pos.angle),ny=Math.cos(pos.angle);
+    // If boulder is blocking, draw broken ties near it
+    const nearBoulder=!boulderCleared&&Math.abs(d-BOULDER_DIST)<26;
+    ctx.strokeStyle=nearBoulder?'#7a3a1a':'#5c4a2a';
+    ctx.lineWidth=nearBoulder?2:3;
+    if(nearBoulder){ctx.setLineDash([3,3]);}
+    ctx.beginPath();ctx.moveTo(pos.x+nx*9,pos.y+ny*9);ctx.lineTo(pos.x-nx*9,pos.y-ny*9);ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Rails — broken gap near boulder when not cleared
+  for(const off of [-5,5]){
+    ctx.lineWidth=2.5;ctx.strokeStyle='#aaa';
+    if(!boulderCleared){
+      // Rail segment before boulder
+      ctx.beginPath();
+      for(let i=0;i<TRACK.length;i++){
+        if(DISTS[i]>BOULDER_DIST-28) break;
+        const pos=posAtDist(DISTS[i]),nx=-Math.sin(pos.angle)*off,ny=Math.cos(pos.angle)*off;
+        if(i===0) ctx.moveTo(pos.x+nx,pos.y+ny); else ctx.lineTo(pos.x+nx,pos.y+ny);
+      }
+      ctx.stroke();
+      // Rail segment after boulder
+      ctx.strokeStyle='#888';
+      ctx.beginPath();
+      let started=false;
+      for(let i=0;i<TRACK.length;i++){
+        if(DISTS[i]<BOULDER_DIST+28) continue;
+        const pos=posAtDist(DISTS[i]),nx=-Math.sin(pos.angle)*off,ny=Math.cos(pos.angle)*off;
+        if(!started){ctx.moveTo(pos.x+nx,pos.y+ny);started=true;} else ctx.lineTo(pos.x+nx,pos.y+ny);
+      }
+      ctx.stroke();
+    } else {
+      ctx.strokeStyle='#aaa';
+      ctx.beginPath();
+      for(let i=0;i<TRACK.length;i++){
+        const pos=posAtDist(DISTS[i]),nx=-Math.sin(pos.angle)*off,ny=Math.cos(pos.angle)*off;
+        if(i===0) ctx.moveTo(pos.x+nx,pos.y+ny); else ctx.lineTo(pos.x+nx,pos.y+ny);
+      }
+      ctx.stroke();
+    }
+  }
+}
+
+function drawStation(d,label){
+  const pos=posAtDist(d),nx=-Math.sin(pos.angle),ny=Math.cos(pos.angle);
+  ctx.save();ctx.translate(pos.x+nx*28,pos.y+ny*28);ctx.rotate(pos.angle);
+  ctx.fillStyle='#445566';ctx.fillRect(-30,-12,60,24);
+  ctx.strokeStyle='#6688aa';ctx.lineWidth=1.5;ctx.strokeRect(-30,-12,60,24);
+  ctx.fillStyle='rgba(0,0,0,.25)';ctx.fillRect(-28,-10,56,20);
+  ctx.fillStyle='#3a4a5a';ctx.fillRect(-14,-9,28,18);
+  ctx.restore();
+  ctx.fillStyle='#9cf';ctx.font='bold 11px monospace';ctx.textAlign='center';
+  ctx.fillText(label,pos.x+nx*28,pos.y+ny*28-18);
+}
+
+function drawOutpost(){
+  const p=OUTPOST_POS;
+  ctx.strokeStyle='#7a5a30';ctx.lineWidth=3;ctx.setLineDash([6,5]);
+  ctx.beginPath();ctx.arc(p.x,p.y+35,44,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+  ctx.strokeStyle='#5a4020';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(p.x+8,p.y+12);ctx.lineTo(p.x+8,p.y+45);ctx.stroke();
+  ctx.fillStyle='#c0392b';
+  ctx.beginPath();ctx.moveTo(p.x+8,p.y+12);ctx.lineTo(p.x+24,p.y+18);ctx.lineTo(p.x+8,p.y+26);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#e67e22';ctx.beginPath();ctx.arc(p.x-8,p.y+40,5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#e74c3c';ctx.beginPath();ctx.arc(p.x-8,p.y+38,3,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#c0392b';ctx.font='bold 10px monospace';ctx.textAlign='center';
+  ctx.fillText('OUTPOST',p.x,p.y+10);
+}
+
+function drawBoulder(){
+  if(boulderCleared) return;
+  const p=BOULDER_POS;
+  let sx=0,sy=0;
+  if(boulderShakeT>0){
+    const mag=(boulderShakeT/0.18)*4;
+    sx=(Math.random()-.5)*mag; sy=(Math.random()-.5)*mag;
+  }
+  ctx.save();ctx.translate(p.x+sx,p.y+sy);
+
+  // Warning glow ring (pulse) when train is stopped
+  if(trainForceStopped){
+    const pulse=0.5+0.5*Math.sin(Date.now()/220);
+    ctx.strokeStyle=`rgba(243,156,18,${0.25+pulse*0.35})`;
+    ctx.lineWidth=3+pulse*3;
+    ctx.beginPath();ctx.arc(0,0,BOULDER_RADIUS+10+pulse*6,0,Math.PI*2);ctx.stroke();
+  }
+
+  // Click progress arc
+  if(boulderClicks>0&&!boulderCleared){
+    ctx.strokeStyle='#f39c12';ctx.lineWidth=4;
+    ctx.beginPath();
+    ctx.arc(0,0,BOULDER_RADIUS+8,-Math.PI/2,(Math.PI*2*(boulderClicks/BOULDER_CLICKS))-Math.PI/2);
+    ctx.stroke();
+  }
+
+  // Boulder body — irregular polygon (top-down rock)
+  ctx.fillStyle='#6b6055';
+  ctx.beginPath();
+  const verts=[[0,-22],[14,-16],[22,-4],[20,10],[10,20],[-6,22],[-18,14],[-22,2],[-18,-12],[-8,-20]];
+  ctx.moveTo(verts[0][0],verts[0][1]);
+  for(let i=1;i<verts.length;i++) ctx.lineTo(verts[i][0],verts[i][1]);
+  ctx.closePath();ctx.fill();
+
+  // Shading face
+  ctx.fillStyle='#807060';
+  ctx.beginPath();
+  ctx.moveTo(0,-18);ctx.lineTo(12,-10);ctx.lineTo(16,4);ctx.lineTo(4,14);ctx.lineTo(-8,10);ctx.lineTo(-14,-4);
+  ctx.closePath();ctx.fill();
+
+  // Cracks
+  ctx.strokeStyle='#4a3e34';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(-4,-10);ctx.lineTo(4,2);ctx.lineTo(-2,12);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(8,-6);ctx.lineTo(14,6);ctx.stroke();
+
+  // Highlight
+  ctx.fillStyle='rgba(255,255,255,0.12)';
+  ctx.beginPath();ctx.ellipse(-6,-8,8,5,-0.5,0,Math.PI*2);ctx.fill();
+
+  // Danger X label
+  ctx.fillStyle='#e74c3c';ctx.font='bold 11px monospace';ctx.textAlign='center';
+  ctx.fillText('✕ BOULDER',0,BOULDER_RADIUS+22);
+
+  ctx.restore();
+
+  // Click flash rings
+  for(const f of clickFlashes){
+    ctx.strokeStyle=`rgba(243,156,18,${f.life})`;
+    ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(f.x,f.y,(1-f.life)*30+4,0,Math.PI*2);ctx.stroke();
+  }
+}
+
+function drawWarningSign(){
+  if(boulderCleared) return;
+  // Warning sign on track 80px before boulder
+  const warnPos=posAtDist(BOULDER_DIST-80);
+  const nx=-Math.sin(warnPos.angle),ny=Math.cos(warnPos.angle);
+  ctx.save();ctx.translate(warnPos.x+nx*18,warnPos.y+ny*18);
+  ctx.fillStyle='#f39c12';
+  ctx.beginPath();ctx.moveTo(0,-10);ctx.lineTo(9,5);ctx.lineTo(-9,5);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#1a1a1a';ctx.font='bold 8px sans-serif';ctx.textAlign='center';
+  ctx.fillText('!',0,4);
+  ctx.restore();
+}
+
+function drawWheelset(cx,cy,angle,offsets,color){
+  ctx.save();ctx.translate(cx,cy);ctx.rotate(angle);
+  for(const ox of offsets) for(const s of[-1,1]){
+    ctx.fillStyle='#1a1a1a';ctx.beginPath();ctx.ellipse(ox,s*10,5,3.5,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=color;ctx.lineWidth=1;ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawEngine(pos){
+  ctx.save();ctx.translate(pos.x,pos.y);ctx.rotate(pos.angle);
+  ctx.fillStyle='rgba(0,0,0,.3)';ctx.fillRect(-22+3,-12+3,44,24);
+  ctx.fillStyle='#b02020';ctx.fillRect(-22,-12,44,24);
+  ctx.fillStyle='#7a1515';ctx.fillRect(-22,-12,18,24);
+  ctx.fillStyle='#d42828';
+  ctx.beginPath();ctx.moveTo(22,-10);ctx.lineTo(34,0);ctx.lineTo(22,10);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#ffe066';ctx.beginPath();ctx.arc(30,0,3.5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#e8c000';ctx.fillRect(-4,-12,6,24);
+  ctx.fillStyle='#222';ctx.beginPath();ctx.arc(10,0,4,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#555';ctx.beginPath();ctx.arc(10,0,2,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+  drawWheelset(pos.x,pos.y,pos.angle,[-12,12],'#b02020');
+}
+
+function drawCargo(pos){
+  const hc=health>60?'#2a8a40':health>30?'#c07a10':'#b02020';
+  ctx.save();ctx.translate(pos.x,pos.y);ctx.rotate(pos.angle);
+  ctx.fillStyle='rgba(0,0,0,.3)';ctx.fillRect(-20+3,-11+3,40,22);
+  ctx.fillStyle=hc;ctx.fillRect(-20,-11,40,22);
+  ctx.fillStyle='rgba(0,0,0,.2)';ctx.fillRect(-18,-9,36,18);
+  ctx.strokeStyle='rgba(255,255,255,.15)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(0,-9);ctx.lineTo(0,9);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(18,0);ctx.stroke();
+  ctx.fillStyle='#555';ctx.fillRect(19,-2,5,4);ctx.fillRect(-24,-2,5,4);
+  ctx.restore();
+  drawWheelset(pos.x,pos.y,pos.angle,[-10,10],hc);
+}
+
+function drawTurret(carPos){
+  ctx.save();ctx.translate(carPos.x,carPos.y);
+  ctx.fillStyle='#444';ctx.beginPath();ctx.arc(0,0,8,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#888';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.rotate(turretAngle);
+  ctx.fillStyle='#aaa';ctx.fillRect(0,-2.5,16,5);
+  ctx.fillStyle='#888';ctx.beginPath();ctx.arc(0,0,5,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+  ctx.save();ctx.translate(carPos.x,carPos.y);
+  ctx.strokeStyle='rgba(100,200,100,.1)';ctx.lineWidth=1;ctx.setLineDash([4,6]);
+  ctx.beginPath();ctx.arc(0,0,TURRET_RANGE,0,Math.PI*2);ctx.stroke();
+  ctx.setLineDash([]);ctx.restore();
+}
+
+function drawCargoHPBar(carPos){
+  ctx.save();ctx.translate(carPos.x,carPos.y);ctx.rotate(carPos.angle);
+  ctx.fillStyle='#222';ctx.fillRect(-17,-22,34,4);
+  const hc=health>60?'#2ecc71':health>30?'#f39c12':'#e74c3c';
+  ctx.fillStyle=hc;ctx.fillRect(-17,-22,34*(health/100),4);
+  ctx.restore();
+}
+
+function drawCoupling(a,b){
+  ctx.strokeStyle='#666';ctx.lineWidth=2.5;ctx.setLineDash([4,3]);
+  ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawBandit(b){
+  if(!b.active) return;
+  ctx.save();ctx.translate(b.x,b.y);
+  ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(2,2,10,7,0,0,Math.PI*2);ctx.fill();
+  ctx.rotate(b.angle+Math.PI/2);
+  ctx.fillStyle=b.touching?'#c0392b':'#8B4513';ctx.fillRect(-6,-10,12,20);
+  ctx.fillStyle='#6B2F0A';ctx.beginPath();ctx.ellipse(0,-12,5,6,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#1a1a1a';ctx.beginPath();ctx.ellipse(0,-14,4,3,0,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+  const bw=22,bh=3;
+  ctx.fillStyle='#222';ctx.fillRect(b.x-bw/2,b.y-22,bw,bh);
+  const hf=b.hp/b.maxHp;
+  ctx.fillStyle=hf>.6?'#2ecc71':hf>.3?'#f39c12':'#e74c3c';
+  ctx.fillRect(b.x-bw/2,b.y-22,bw*hf,bh);
+}
+
+function drawBullet(bul){
+  ctx.fillStyle='#ffe050';ctx.beginPath();ctx.arc(bul.x,bul.y,3,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='rgba(255,220,50,.4)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(bul.x,bul.y);ctx.lineTo(bul.x-bul.vx*.04,bul.y-bul.vy*.04);ctx.stroke();
+}
+
+function drawParticles(){
+  for(const p of particles){
+    ctx.globalAlpha=Math.max(0,p.life);
+    ctx.fillStyle=p.color;
+    ctx.beginPath();ctx.arc(p.x,p.y,3,0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+
+// ── Stopped indicator on train ───────────────────────────────────────────────
+function drawStopIndicator(headPos){
+  if(!trainForceStopped||boulderCleared) return;
+  ctx.save();ctx.translate(headPos.x,headPos.y-30);
+  ctx.fillStyle='#e74c3c';
+  ctx.beginPath();ctx.arc(0,0,9,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+  ctx.fillText('!',0,4);
+  ctx.restore();
+}
+
+// ── Main draw ────────────────────────────────────────────────────────────────
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  drawGround();
+  drawTrack();
+  drawOutpost();
+  drawWarningSign();
+  drawBoulder();
+  drawStation(0,'START');
+  drawStation(TOTAL,'END');
+
+  const headPos=posAtDist(dist);
+  const carPos =posAtDist(Math.max(0,dist-CAR_GAP));
+
+  drawCoupling(headPos,carPos);
+  drawCargo(carPos);
+  drawCargoHPBar(carPos);
+  drawTurret(carPos);
+  drawEngine(headPos);
+  drawStopIndicator(headPos);
+
+  for(const b of bandits) drawBandit(b);
+  for(const bul of bullets) drawBullet(bul);
+  drawParticles();
+}
+
+// ── Loop ─────────────────────────────────────────────────────────────────────
+function loop(ts){
+  if(!lastTime) lastTime=ts;
+  const dt=Math.min((ts-lastTime)/1000,.05);
+  lastTime=ts;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+document.getElementById('btn-retry').addEventListener('click',()=>{
+  document.getElementById('overlay').style.display='none';
+  initState();
+});
+document.getElementById('btn-next').addEventListener('click',()=>{
+  document.getElementById('overlay').style.display='none';
+  alert('Level 4 coming soon! 🚂💨');
+});
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
