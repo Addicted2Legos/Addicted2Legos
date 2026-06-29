@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifeSync // Adulting & Home Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        :root {
+            --bg-primary: #0b0f19;
+            --bg-surface: #151c2c;
+            --bg-card: #1e293b;
+            --accent-primary: #6366f1;
+            --accent-success: #10b981;
+            --accent-warning: #f59e0b;
+            --accent-danger: #ef4444;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            padding-bottom: 80px; /* Space for bottom nav */
+            font-size: 14px;
+        }
+
+        /* Header Style */
+        header {
+            background-color: var(--bg-surface);
+            padding: 20px 16px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        header h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        header h1 span {
+            color: var(--accent-primary);
+        }
+
+        .profile-badge {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-primary), #a855f7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        /* Tab System */
+        .tab-container {
+            display: flex;
+            background-color: var(--bg-surface);
+            margin: 16px;
+            padding: 4px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .tab-btn {
+            flex: 1;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 10px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .tab-btn.active {
+            background-color: var(--accent-primary);
+            color: var(--text-main);
+        }
+
+        /* View Layouts */
+        .view-content {
+            padding: 0 16px;
+        }
+
+        .view-section {
+            display: none;
+        }
+
+        .view-section.active {
+            display: block;
+        }
+
+        /* Section Headings */
+        .section-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 20px 0 12px 0;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Grid Framework for quick metrics */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .metric-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .metric-card .label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .metric-card .value {
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        .metric-card .subtext {
+            font-size: 0.75rem;
+            margin-top: 4px;
+        }
+
+        /* List Cards */
+        .item-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .item-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .item-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .icon-wrapper {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background-color: rgba(99, 102, 241, 0.1);
+            color: var(--accent-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-wrapper.warning {
+            background-color: rgba(245, 158, 11, 0.1);
+            color: var(--accent-warning);
+        }
+
+        .icon-wrapper.success {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: var(--accent-success);
+        }
+
+        .icon-wrapper.danger {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: var(--accent-danger);
+        }
+
+        .item-details .title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 2px;
+        }
+
+        .item-details .subtitle {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .item-right {
+            text-align: right;
+        }
+
+        .item-right .value {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .item-right .status-tag {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 20px;
+            background-color: var(--border-color);
+            color: var(--text-muted);
+            font-weight: 500;
+            display: inline-block;
+            margin-top: 4px;
+        }
+
+        .status-tag.urgent {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: var(--accent-danger);
+        }
+
+        /* Bottom Sticky Navigation */
+        nav.bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0 calc(10px + env(safe-area-inset-bottom, 0px));
+            z-index: 100;
+        }
+
+        .nav-item {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            width: 25%;
+        }
+
+        .nav-item.active {
+            color: var(--accent-primary);
+        }
+
+        /* Floating Action Button */
+        .fab {
+            position: fixed;
+            bottom: 85px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: var(--accent-primary);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 90;
+        }
+
+        .tip-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 18px;
+            padding: 18px 20px;
+            margin-bottom: 16px;
+        }
+
+        .tip-card h2 {
+            margin: 0 0 10px;
+            font-size: 0.95rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--accent-primary);
+        }
+
+        .tip-card p {
+            margin: 0 0 14px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .tip-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            gap: 10px;
+        }
+
+        .tip-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            padding: 12px 14px;
+        }
+
+        .tip-dot {
+            width: 10px;
+            height: 10px;
+            margin-top: 6px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            flex-shrink: 0;
+        }
+
+        .tip-item strong {
+            display: block;
+            font-size: 0.92rem;
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1><i data-lucide="layers"></i>Life<span>Sync</span></h1>
+        <div class="profile-badge">JD</div>
+    </header>
+
+    <div class="tab-container">
+        <button class="tab-btn active" onclick="switchView('adult-life')">
+            <i data-lucide="user"></i>Adult Life
+        </button>
+        <button class="tab-btn" onclick="switchView('home-maintenance')">
+            <i data-lucide="home"></i>Home Profile
+        </button>
+    </div>
+
+    <main class="view-content">
+
+        <section id="adult-life" class="view-section active">
+
+            <div class="tip-card">
+                <h2>Tip of the Day</h2>
+                <p>Keep your routine on track with quick reminders for the most important upcoming tasks.</p>
+                <ul class="tip-list" id="tipList">
+                    <li class="tip-item">
+                        <div class="tip-dot"></div>
+                        <div>
+                            <strong>Passport Renewal</strong>
+                            Renew before October to avoid travel delays.
+                        </div>
+                    </li>
+                    <li class="tip-item">
+                        <div class="tip-dot"></div>
+                        <div>
+                            <strong>Car Service</strong>
+                            Schedule oil change and tire rotation this week.
+                        </div>
+                    </li>
+                    <li class="tip-item">
+                        <div class="tip-dot"></div>
+                        <div>
+                            <strong>Insurance Review</strong>
+                            Check your policies before August renewal.
+                        </div>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <span class="label">Credit Score</span>
+                    <span class="value" style="color: var(--accent-success);">768</span>
+                    <span class="subtext" style="color: var(--text-muted);">Updated 3d ago</span>
+                </div>
+                <div class="metric-card">
+                    <span class="label">June Budget</span>
+                    <span class="value">$1,240</span>
+                    <span class="subtext" style="color: var(--accent-warning);">$340 remaining</span>
+                </div>
+            </div>
+
+            <h2 class="section-title">Critical Timelines</h2>
+            <div class="item-list">
+                <div class="item-card">
+                    <div class="item-left">
+                        <div class="icon-wrapper danger"><i data-lucide="file-text"></i></div>
+                        <div class="item-details">
+                            <div class="title">Passport Expiration</div>
+                            <div class="subtitle">John's Passport</div>
+                        </div>
+                    </div>
+                    <div class="item-right">
+                        <div class="value">Expires Oct '26</div>
+                        <div class="status-tag urgent">4 mos left</div>
+                    </div>
+                </div>
+
+                <div class="item-card">
+                    <div class="item-left">
+                        <div class="icon-wrapper warning"><i data-lucide="car"></i></div>
+                        <div class="item-details">
+                            <div class="title">Car Maintenance</div>
+                            <div class="subtitle">SUV Oil & Tire Rotation</div>
+                        </div>
+                    </div>
+                    <div class="item-right">
+                        <div class="value">Overdue</div>
+                        <div class="status-tag urgent">By 450 mi</div>
+                    </div>
+                </div>
+
+                <div class="item-card">
+                    <div class="item-left">
+                        <div class="icon-wrapper success"><i data-lucide="shield-check"></i></div>
+                        <div class="item-details">
+                            <div class="title">Auto & Home Insurance</div>
+                            <div class="subtitle">Progressive Premium</div>
+                        </div>
+                    </div>
+                    <div class="item-right">
+                        <div class="value">$185/mo</div>
+                        <div class="status-tag">Renews Aug 12</div>
+                    </div>
+                </div>
+            </div>
+
+            <h2 class="section-title">Finances & Subs</h2>
+            <div class="item-list">
+                <div class="item-card">
+                    <div class="item-left">
+                        <div class="icon-wrapper"><i data-lucide="credit-card"></i></div>
+                        <div class="item-details">
+                            <div class="title">Upcoming Bills</div>
+                            <div class="subtitle">Rocky Mountain Power</div>
+                        </div>
+                    </div>
+                    <div class="item-right">
+                        <div class="value">$142.50</div>
+                        <div class="status-tag">Auto-pay July 1</div>
+                    </div>
+                </div>
+
+                <div class="item-card">
+                    <div class="item-left">
+                        <div class="icon-wrapper"><i data-lucide="refresh-cw"></i></div>
+                        <div class="item-details">
+                            <div class="title">Active Subscriptions</div>
+                            <div class="subtitle">Streaming & Software (8 total)</div>
+                        </div>
+                    </div>
+                    <div class="item-right">
+                        <div class="value">$84.90/mo</div>
+                        <div class="status-tag">Next: July 5</div>
+                    </div>
+                </div>
+
+                <div class="item-card">
+                    <div class="item-left">
+                        <div class="icon-wrapper success"><i data-lucide="calculator"></i></div>
+                        <div class="item-details">
+                            <div class="title">Quarterly Estimates</div>
+                            <div class="subtitle">Q2 Federal / State</div>
+                        </div>
+                    </div>
+                    <div class="item-right">
+                        <div class="value">Paid</div>
+                        <div class="status-tag" style="color: var(--accent-success);">Clear</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <section id="home-maintenance" class="view-section">
+            
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <span class="label">Filter Health</span>
+                    <span class="value" style="color: var(--accent-warning);">22%</span>
+                    <span class="subtext">Change in 12 days</span>
+                </div>
+                <div class="metric-card">
+                    <span class="label">Open Warranties</span>
+                    <span class="value">3 Active</span>
+                    <span class="subtext">Dishwasher, HVAC, Fridge</span>
+                </div>
+            </div>
+
+            <h2 class="section-title">Maintenance Feed</h2>
+            <div class="item-list">
+                <div class="item-card">
+                    <div class="item-left">
+                        <div class="icon-wrapper warning"><i data-lucide="wind"></i></div>
+                        <div class="item-details">
+                            <div class="title">Furnace Air Filters</div>
+                            <div class="subtitle">Size: 20x25x1 (Merv 11)</div>
+                        </div>
+                    </div>
+                    <div class="item-right">
+                        <div class="value">Due Soon</div>
+                        <div class="status-tag">July 10</div>
+                    </div>
+                </div>
+
+                <div class="item-card">
+                    <div class="item-left">
+                        <div class="icon-wrapper danger"><i data-lucide="droplet"></i></div>
+                        <div class="item-details">
+                            <div class="title">Water Heater Flush</div>
+                            <div class="subtitle">Annual sediment drain</div>
+                        </div>
+                    </div>
+                    <div class="item-right">
+                        <div class="value">Overdue</div>
+                        <div class="status-tag urgent">Should do now</div>
+                    </div>
+                </div>
+
+                <div class="item-card">
+                    <div class="item-left">
+                        <div class="icon-wrapper"><i data-lucide="wrench"></i></div>
+                        <div class="item-details">
+                            <div class="title">Roof & Gutter Check</div>
+                            <div class="subtitle">Post-spring cleanup</div>
+                        </div>
+                    </div>
+                    <div class="item-right">
+                        <div class="value">Scheduled</div>
+                        <div class="status-tag">Oct '26</div>
+                    </div>
+                </div>
+            </div>
+
+            <h2 class="section-title">Digital House DNA</h2>
+            <div class="item-list">
+                <div class="item-card">
+                    <div class="item-left">
+                        <div class="icon-wrapper" style="color: #a855f7; background: rgba(168, 85, 247, 0.1);"><i data-lucide="paint-bucket"></i></div>
+                        <div class="item-details">
+                            <div class="title">Paint Swatches & Swatches</div>
+                            <div class="subtitle">Living Rm: Repose Gray (SW 7015)</div>
+                        </div>
+                    </div>
+                    <div class="item-right">
+                        <div class="status-tag">3 Records</div>
+                    </div>
+                </div>
+
+                <div class="item-card">
+                    <div class="item-left">
+                        <div class="icon-wrapper" style="color: var(--accent-success); background: rgba(16, 185, 129, 0.1);"><i data-lucide="users"></i></div>
+                        <div class="item-details">
+                            <div class="title">Verified Contractors</div>
+                            <div class="subtitle">Apex Electrical, NextGen Plumbing</div>
+                        </div>
+                    </div>
+                    <div class="item-right">
+                        <div class="status-tag">5 Contacts</div>
+                    </div>
+                </div>
+
+                <div class="item-card">
+                    <div class="item-left">
+                        <div class="icon-wrapper"><i data-lucide="clipboard-list"></i></div>
+                        <div class="item-details">
+                            <div class="title">Appliance Manuals & Docs</div>
+                            <div class="subtitle">Kitchen & Laundry specs</div>
+                        </div>
+                    </div>
+                    <div class="item-right">
+                        <div class="status-tag">4 Files</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <button class="fab">
+        <i data-lucide="plus" style="width: 28px; height: 28px;"></i>
+    </button>
+
+    <nav class="bottom-nav">
+        <button class="nav-item active" id="nav-dash" onclick="switchView('adult-life')">
+            <i data-lucide="layout-dashboard"></i>
+            Dashboard
+        </button>
+        <button class="nav-item" id="nav-docs">
+            <i data-lucide="folder-open"></i>
+            Vault
+        </button>
+        <button class="nav-item" id="nav-calendar">
+            <i data-lucide="calendar"></i>
+            Schedule
+        </button>
+        <button class="nav-item" id="nav-settings">
+            <i data-lucide="sliders"></i>
+            Settings
+        </button>
+    </nav>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Single page responsive tab navigation handler
+        function switchView(viewId) {
+            // Hide all layout views
+            document.querySelectorAll('.view-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Remove active classes from top context toggle buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Set chosen context state active
+            document.getElementById(viewId).classList.add('active');
+            
+            // Align style context indicators
+            if (viewId === 'adult-life') {
+                document.querySelectorAll('.tab-btn')[0].classList.add('active');
+                document.getElementById('nav-dash').classList.add('active');
+            } else {
+                document.querySelectorAll('.tab-btn')[1].classList.add('active');
+            }
+        }
+    </script>
+</body>
+</html>

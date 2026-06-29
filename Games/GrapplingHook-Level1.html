@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cloudreach Tower</title>
+<style>
+  :root{
+    --sky-deep:#0a2647;
+    --sky-mid:#15486e;
+    --sky-light:#3aa6d8;
+    --crystal:#9be8ff;
+    --crystal-glow:#d6f7ff;
+    --hero-orange:#ff8c42;
+    --hero-orange-dark:#e0701f;
+    --gold:#ffd54f;
+    --gold-dark:#c79a1e;
+    --danger:#ff5252;
+    --ground:#3f8b3f;
+    --ground-dark:#2a5f2a;
+    --panel-bg:rgba(8,28,48,0.72);
+    --panel-border:#6fd6ff;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; width:100%; height:100%; overflow:hidden;
+    background:var(--sky-deep);
+    font-family:'Trebuchet MS','Segoe UI',sans-serif;
+    user-select:none;
+  }
+  #game-wrap{
+    position:relative; width:100%; height:100vh; min-height:480px;
+    display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(ellipse at 50% 0%, var(--sky-light) 0%, var(--sky-mid) 45%, var(--sky-deep) 100%);
+  }
+  canvas{
+    display:block;
+    width:100%; height:100%;
+    cursor:crosshair;
+    image-rendering:pixelated;
+  }
+  .hud{
+    position:absolute; top:14px; left:14px;
+    color:#fff;
+    text-shadow:0 2px 4px rgba(0,0,0,0.6);
+    pointer-events:none;
+    z-index:5;
+  }
+  .hud .row{
+    display:flex; align-items:center; gap:8px;
+    background:var(--panel-bg);
+    border:2px solid var(--panel-border);
+    border-radius:10px;
+    padding:5px 12px;
+    margin-bottom:6px;
+    font-weight:bold;
+    font-size:15px;
+    box-shadow:0 0 10px rgba(111,214,255,0.35);
+    width:fit-content;
+  }
+  .hud .label{ letter-spacing:0.5px; font-size:12px; opacity:0.85;}
+  .hearts span{ margin-right:2px; }
+  .gold-val{ color:var(--gold); }
+  .level-banner{
+    position:absolute; bottom:10px; left:14px;
+    color:#fff; font-weight:bold; font-size:14px;
+    background:var(--panel-bg);
+    border:2px solid var(--panel-border);
+    border-radius:8px;
+    padding:5px 14px;
+    text-shadow:0 2px 4px rgba(0,0,0,0.6);
+    z-index:5;
+  }
+  .goal-banner{
+    position:absolute; top:14px; right:14px;
+    color:#fff; text-align:center;
+    background:var(--panel-bg);
+    border:2px solid var(--gold);
+    border-radius:10px;
+    padding:8px 16px;
+    text-shadow:0 2px 4px rgba(0,0,0,0.6);
+    font-weight:bold; font-size:13px;
+    z-index:5;
+    box-shadow:0 0 12px rgba(255,213,79,0.35);
+  }
+  .center-msg{
+    position:absolute; top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    color:#fff; text-align:center;
+    background:var(--panel-bg);
+    border:3px solid var(--panel-border);
+    border-radius:16px;
+    padding:24px 36px;
+    font-size:20px; font-weight:bold;
+    box-shadow:0 0 30px rgba(111,214,255,0.5);
+    z-index:10;
+    display:none;
+  }
+  .center-msg button{
+    margin-top:14px;
+    display:block;
+    width:100%;
+    background:linear-gradient(180deg,var(--hero-orange),var(--hero-orange-dark));
+    border:2px solid #fff;
+    color:#fff; font-weight:bold; font-size:16px;
+    padding:10px 20px; border-radius:8px;
+    cursor:pointer;
+  }
+  .center-msg button:hover{ filter:brightness(1.1); }
+  .center-msg button#next-level-btn{
+    background:linear-gradient(180deg,#6fd6ff,#2a8fc7);
+  }
+  .hint{
+    position:absolute; bottom:10px; right:14px;
+    color:#cfeeff; font-size:12px;
+    background:var(--panel-bg);
+    border:1px solid var(--panel-border);
+    border-radius:8px;
+    padding:5px 12px;
+    z-index:5;
+  }
+</style>
+</head>
+<body>
+<div id="game-wrap">
+  <canvas id="game"></canvas>
+
+  <div class="hud">
+    <div class="row hearts" id="hud-lives">LIVES: <span>❤️</span><span>❤️</span><span>❤️</span></div>
+    <div class="row"><span class="label">SCORE</span>&nbsp;<span id="hud-score">0</span></div>
+    <div class="row"><span class="label">GOLD</span>&nbsp;<span class="gold-val" id="hud-gold">0</span>G</div>
+  </div>
+
+  <div class="goal-banner">⭐ THE STARSHARD ⭐<br><span id="hud-dist">120m</span></div>
+
+  <div class="level-banner">Level 1: Cloudreach Tower</div>
+  <div class="hint">Click &amp; hold near a crystal to grapple · Release to swing · Space/R to restart</div>
+
+  <div class="center-msg" id="msg-box">
+    <div id="msg-text">You Win!</div>
+    <button id="msg-btn">Play Again</button>
+    <button id="next-level-btn" style="display:none; margin-top:8px;">Next Level →</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const wrap = document.getElementById('game-wrap');
+
+  let W=0,H=0,DPR=1;
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio||1, 2);
+    W = wrap.clientWidth; H = wrap.clientHeight;
+    canvas.width = W*DPR; canvas.height = H*DPR;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  window.addEventListener('resize', resize);
+
+  // ---------- World setup ----------
+  // World coordinates: y=0 is ground level (world bottom), y increases upward.
+  // We'll define world height in "meters" matching the reference HUD (e.g., 150m tower)
+  const WORLD_W = 900;     // virtual width
+  const GROUND_Y = 0;      // ground at y=0 in world space
+  const GOAL_Y = 380;      // top platform height for level 1 (two-platform layout)
+  let cameraY = 0;         // camera offset (world y of bottom of viewport)
+
+  function worldToScreen(x,y){
+    // scale world to canvas width, keep aspect via viewport height
+    const scale = W / WORLD_W;
+    const sx = x*scale;
+    const sy = H - (y - cameraY)*scale;
+    return [sx, sy, scale];
+  }
+
+  // ---------- Entities ----------
+  // Platforms: {x, y, w, h, color}
+  // Level 1 is intentionally simple: ground -> platform 1 -> platform 2 (goal).
+  // Just two climbable platforms, per the brief.
+  const platforms = [
+    {x:0,   y:-40, w:WORLD_W, h:60, color:'ground'},   // ground floor
+    {x:90,  y:160, w:340, h:26, color:'ice'},           // platform 1 (wide & low - forgiving for level 1)
+    {x:430, y:380, w:320, h:30, color:'goal'},          // platform 2 / goal
+  ];
+  // Grapple anchor crystals (floating crystal nodes you can hook onto).
+  // Positioned so a held grapple (which reels you toward the anchor) swings
+  // you up and over each gap onto the next platform with generous timing.
+  const anchors = [
+    {x:230, y:250, r:18},  // between ground and platform 1
+    {x:430, y:480, r:18},  // between platform 1 and platform 2 (goal)
+  ];
+
+  // Gold coins scattered along the climb
+  let coins = [
+    {x:180, y:200, r:9, taken:false},
+    {x:290, y:220, r:9, taken:false},
+    {x:380, y:340, r:9, taken:false},
+    {x:480, y:420, r:9, taken:false},
+  ];
+
+  // Hazard spikes (visual only threat for level 1 - sits harmlessly in the gap below)
+  const hazards = [
+    {x:340, y:-10, w:60, h:40},
+  ];
+
+  // ---------- Player ----------
+  const player = {
+    x: 90, y: 20, vx:0, vy:0,
+    w: 22, h: 30,
+    onGround:true,
+    grappling:false,
+    anchor:null,
+    ropeLen:0,
+    aimAngle: -1.2,
+    facing:1,
+    alive:true,
+  };
+
+  const GRAV = 1400;          // px/s^2 world units
+  const MOVE_ACCEL = 900;
+  const MAX_VX = 260;
+  const ROPE_REEL_SPEED = 220; // px/sec the rope shortens while grapple is held
+  const MIN_ROPE_LEN = 50;
+  const AIR_DRAG = 0.999;
+  const GROUND_FRICTION = 0.86;
+  const GRAPPLE_RANGE = 340;
+
+  let score = 3450 - 3450; // we'll start fresh narratively but keep HUD style; start at 0 for real progression
+  score = 0;
+  let gold = 0;
+  let lives = 3;
+  let gameWon=false, gameLost=false;
+
+  const keys = {};
+  window.addEventListener('keydown', e=>{
+    keys[e.code]=true;
+    if(e.code==='Space') e.preventDefault();
+    if((e.code==='Space'||e.code==='KeyR') ) {
+      if(gameWon||gameLost) restart();
+    }
+  });
+  window.addEventListener('keyup', e=>{ keys[e.code]=false; });
+
+  let mouse = {x:0,y:0,down:false};
+  function clientToWorld(cx,cy){
+    const rect = canvas.getBoundingClientRect();
+    const scale = W / WORLD_W;
+    const localX = cx - rect.left;
+    const localY = cy - rect.top;
+    const wx = localX/scale;
+    const worldY = (H - localY)/scale + cameraY;
+    return [wx, worldY];
+  }
+  canvas.addEventListener('mousemove', e=>{
+    const [wx,wy] = clientToWorld(e.clientX,e.clientY);
+    mouse.x=wx; mouse.y=wy;
+  });
+  canvas.addEventListener('mousedown', e=>{
+    mouse.down=true;
+    tryGrapple();
+  });
+  window.addEventListener('mouseup', e=>{ mouse.down=false; releaseGrapple(); });
+
+  // touch support
+  canvas.addEventListener('touchstart', e=>{
+    const t=e.touches[0];
+    const [wx,wy]=clientToWorld(t.clientX,t.clientY);
+    mouse.x=wx; mouse.y=wy; mouse.down=true;
+    tryGrapple();
+    e.preventDefault();
+  }, {passive:false});
+  canvas.addEventListener('touchmove', e=>{
+    const t=e.touches[0];
+    const [wx,wy]=clientToWorld(t.clientX,t.clientY);
+    mouse.x=wx; mouse.y=wy;
+    e.preventDefault();
+  }, {passive:false});
+  canvas.addEventListener('touchend', e=>{ mouse.down=false; releaseGrapple(); });
+
+  function dist(x1,y1,x2,y2){ return Math.hypot(x2-x1,y2-y1); }
+
+  function findNearestAnchorInRange(px,py, aimx,aimy){
+    let best=null, bestScore=-Infinity;
+    for(const a of anchors){
+      const d = dist(px,py,a.x,a.y);
+      if(d>GRAPPLE_RANGE) continue;
+      // prefer anchors roughly in the direction the player is aiming
+      const dirToAnchor = Math.atan2(a.y-py, a.x-px);
+      const dirAim = Math.atan2(aimy-py, aimx-px);
+      let diff = Math.abs(dirToAnchor-dirAim);
+      if(diff>Math.PI) diff = 2*Math.PI-diff;
+      const s = -diff*2.0 - d*0.002;
+      if(s>bestScore){ bestScore=s; best=a; }
+    }
+    return best;
+  }
+
+  function tryGrapple(){
+    if(!player.alive || gameWon) return;
+    const a = findNearestAnchorInRange(player.x,player.y, mouse.x, mouse.y);
+    if(a){
+      player.grappling=true;
+      player.anchor=a;
+      player.ropeLen = dist(player.x,player.y,a.x,a.y);
+      player.onGround=false;
+    }
+  }
+  function releaseGrapple(){
+    player.grappling=false;
+    player.anchor=null;
+  }
+
+  function restart(){
+    player.x=90; player.y=20; player.vx=0; player.vy=0;
+    player.grappling=false; player.anchor=null; player.alive=true;
+    coins.forEach(c=>c.taken=false);
+    score=0; gold=0; lives=3;
+    gameWon=false; gameLost=false;
+    document.getElementById('msg-box').style.display='none';
+    document.getElementById('next-level-btn').style.display='none';
+  }
+  document.getElementById('msg-btn').addEventListener('click', restart);
+
+  function rectsOverlap(ax,ay,aw,ah, bx,by,bw,bh){
+    return ax < bx+bw && ax+aw > bx && ay < by+bh && ay+ah > by;
+  }
+
+  function update(dt){
+    if(gameWon||gameLost) return;
+    if(!player.alive) return;
+
+    // track previous feet-y (before this frame's vertical movement) for swept collision
+    const prevFeetY = player.y - player.vy*dt;
+
+    // horizontal input (works while grappling too, for steering swing)
+    let accel = 0;
+    if(keys['ArrowLeft']||keys['KeyA']) { accel -= MOVE_ACCEL; player.facing=-1; }
+    if(keys['ArrowRight']||keys['KeyD']) { accel += MOVE_ACCEL; player.facing=1; }
+    if(accel===0 && !player.grappling){
+      // idle: face toward the cursor so the grapple arm reads naturally
+      player.facing = (mouse.x >= player.x) ? 1 : -1;
+    }
+
+    if(player.grappling && player.anchor){
+      // Pendulum swing physics, with active reel-in so players can climb height
+      // (a fixed-length pendulum alone can never rise above its starting height)
+      const a = player.anchor;
+      player.vy -= GRAV*dt;
+      player.vx += accel*dt*0.6;
+
+      // integrate
+      player.x += player.vx*dt;
+      player.y += player.vy*dt;
+
+      // reel the rope in while held, down to a minimum length, converting swing into height
+      player.ropeLen = Math.max(player.ropeLen - ROPE_REEL_SPEED*dt, MIN_ROPE_LEN);
+
+      // constrain to rope length (keep on circle around anchor)
+      let dx = player.x-a.x, dy=player.y-a.y;
+      let d = Math.hypot(dx,dy);
+      if(d>0){
+        const nx=dx/d, ny=dy/d;
+        const correctedX = a.x + nx*player.ropeLen;
+        const correctedY = a.y + ny*player.ropeLen;
+        player.x = correctedX;
+        player.y = correctedY;
+        // recompute velocity tangential approx: project vel onto tangent
+        const tx = -ny, ty = nx;
+        const vt = player.vx*tx + player.vy*ty;
+        player.vx = tx*vt;
+        player.vy = ty*vt;
+      }
+    } else {
+      // free movement (ground or air)
+      player.vx += accel*dt;
+
+      // jump (apply BEFORE gravity so it isn't undone by this frame's collision pass)
+      if((keys['ArrowUp']||keys['KeyW']||keys['Space']) && player.onGround){
+        player.vy = 560;
+        player.onGround=false;
+      } else {
+        player.vy -= GRAV*dt;
+      }
+
+      player.vx *= player.onGround ? GROUND_FRICTION : AIR_DRAG;
+      player.vx = Math.max(-MAX_VX, Math.min(MAX_VX, player.vx));
+
+      player.x += player.vx*dt;
+      player.y += player.vy*dt;
+    }
+
+    // world bounds
+    if(player.x<10) { player.x=10; player.vx=Math.abs(player.vx)*0.3; }
+    if(player.x>WORLD_W-10) { player.x=WORLD_W-10; player.vx=-Math.abs(player.vx)*0.3; }
+
+    // platform collision: resolve vertical (land/ceiling) using swept feet-y,
+    // only resolve horizontal push-out when the player was already beside (not above/below) the platform
+    player.onGround=false;
+    for(const p of platforms){
+      const px=player.x-player.w/2, py=player.y;
+      if(!rectsOverlap(px,py,player.w,player.h, p.x,p.y,p.w,p.h)) continue;
+
+      const topY = p.y+p.h;
+      const wasAtOrAboveTop = prevFeetY >= topY - 0.5;
+      const wasAtOrBelowBottom = (prevFeetY+player.h) <= p.y + 0.5;
+
+      if(player.vy<=0 && wasAtOrAboveTop){
+        // landing on top - this also catches a swinging player landing on a platform
+        player.y = topY;
+        player.vy=0;
+        player.onGround=true;
+        player.grappling=false; // touching ground releases grapple naturally
+        player.anchor=null;
+      } else if(player.grappling){
+        // While swinging, don't apply rigid underside/side collision - it fights
+        // the rope constraint and can freeze the swing dead. Just let the rope
+        // carry the player through; only landing on top (above) stops them.
+        continue;
+      } else if(player.vy>0 && wasAtOrBelowBottom){
+        // rising into the underside from below (free flight only)
+        player.y = p.y - player.h;
+        player.vy = Math.min(player.vy, 0);
+      } else if(!wasAtOrAboveTop && !wasAtOrBelowBottom){
+        // side collision - gentle push out (free flight only)
+        if(player.x < p.x+p.w/2){ player.x = p.x-player.w/2-1; player.vx=Math.min(player.vx,0);}
+        else { player.x = p.x+p.w+player.w/2+1; player.vx=Math.max(player.vx,0);}
+      }
+    }
+
+    // hazards
+    for(const hz of hazards){
+      const px=player.x-player.w/2, py=player.y;
+      if(rectsOverlap(px,py,player.w,player.h, hz.x,hz.y,hz.w,hz.h)){
+        loseLife();
+      }
+    }
+
+    // fell off world (too low)
+    if(player.y < -120){
+      loseLife();
+    }
+
+    // coins
+    for(const c of coins){
+      if(c.taken) continue;
+      if(dist(player.x,player.y+player.h/2, c.x,c.y) < c.r+18){
+        c.taken=true;
+        gold += 25;
+        score += 50;
+      }
+    }
+
+    // goal check
+    const goalPlat = platforms[platforms.length-1];
+    if(player.y+player.h >= goalPlat.y+goalPlat.h-4 &&
+       player.x > goalPlat.x+30 && player.x < goalPlat.x+goalPlat.w-30 &&
+       player.y < goalPlat.y+goalPlat.h+60){
+      winGame();
+    }
+
+    // camera follow (smooth, keep player roughly in lower-middle third)
+    const targetCamY = Math.max(0, player.y - H*0.34/(W/WORLD_W));
+    cameraY += (targetCamY-cameraY)*Math.min(1, dt*4);
+
+    updateHUD();
+  }
+
+  function loseLife(){
+    if(!player.alive) return;
+    lives -= 1;
+    player.alive=false;
+    setTimeout(()=>{
+      if(lives<=0){
+        loseGame();
+      } else {
+        player.x=90; player.y=20; player.vx=0; player.vy=0;
+        player.grappling=false; player.anchor=null;
+        player.alive=true;
+      }
+    }, 500);
+  }
+
+  function winGame(){
+    gameWon=true;
+    score += 500;
+    const box=document.getElementById('msg-box');
+    document.getElementById('msg-text').innerHTML = '⭐ You reached The Starshard! ⭐<br><span style="font-size:14px;opacity:0.85;">Score: '+score+' &nbsp; Gold: '+gold+'G</span>';
+    box.style.display='block';
+    const nextBtn = document.getElementById('next-level-btn');
+    nextBtn.style.display='block';
+    nextBtn.onclick = () => {
+      window.location.href = 'GrapplingHook-Level2.html?score='+score+'&gold='+gold;
+    };
+  }
+  function loseGame(){
+    gameLost=true;
+    const box=document.getElementById('msg-box');
+    document.getElementById('msg-text').innerHTML = '💔 Out of Lives<br><span style="font-size:14px;opacity:0.85;">Score: '+score+' &nbsp; Gold: '+gold+'G</span>';
+    box.style.display='block';
+    document.getElementById('next-level-btn').style.display='none';
+  }
+
+  function updateHUD(){
+    document.getElementById('hud-score').textContent = score;
+    document.getElementById('hud-gold').textContent = gold;
+    const heartsEl = document.getElementById('hud-lives');
+    let h='LIVES: ';
+    for(let i=0;i<3;i++){ h += (i<lives? '❤️':'🖤'); }
+    heartsEl.innerHTML = h;
+    const remaining = Math.max(0, Math.round((GOAL_Y - player.y)/4));
+    document.getElementById('hud-dist').textContent = remaining+'m';
+  }
+
+  // ---------- Rendering ----------
+  function drawBackground(){
+    // layered cloud bands + drifting islands for parallax depth
+    const scale = W/WORLD_W;
+    ctx.fillStyle = '#163a5c';
+    ctx.fillRect(0,0,W,H);
+
+    // vertical light beams (subtle)
+    const grad = ctx.createLinearGradient(0,0,0,H);
+    grad.addColorStop(0,'rgba(180,235,255,0.10)');
+    grad.addColorStop(1,'rgba(10,30,60,0.0)');
+    ctx.fillStyle=grad;
+    ctx.fillRect(0,0,W,H);
+
+    // floating background islands (static decorative, parallax with cameraY*0.3)
+    const islands = [
+      {x:80,y:80,s:1}, {x:WORLD_W-120,y:420,s:1.3}, {x:160,y:560,s:0.8}, {x:WORLD_W-80,y:680,s:1.1}
+    ];
+    for(const isl of islands){
+      const [sx,sy] = worldToScreen(isl.x, isl.y - cameraY*0.0); // keep simple
+      const sxp = isl.x*scale, syp = H-(isl.y-cameraY*0.5)*scale;
+      ctx.save();
+      ctx.translate(sxp,syp);
+      ctx.scale(isl.s,isl.s);
+      ctx.fillStyle='#2f6f8f';
+      ctx.beginPath();
+      ctx.ellipse(0,0,46,16,0,0,Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle='#3f8b3f';
+      ctx.beginPath();
+      ctx.ellipse(0,-6,40,12,0,0,Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function roundRect(x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+
+  function drawPlatform(p){
+    const scale=W/WORLD_W;
+    const sx=p.x*scale, sw=p.w*scale, sh=p.h*scale;
+    const sy=H-(p.y-cameraY)*scale - sh;
+
+    if(p.color==='ground'){
+      ctx.fillStyle='#2a5f2a';
+      ctx.fillRect(sx,sy,sw,sh);
+      ctx.fillStyle='#3f8b3f';
+      ctx.fillRect(sx,sy,sw,sh*0.45);
+      // little grass tufts
+      ctx.strokeStyle='#1f4d1f';
+      ctx.lineWidth=2;
+    } else if(p.color==='goal'){
+      ctx.fillStyle='#1b5a82';
+      roundRect(sx,sy,sw,sh,8*scale/2);
+      ctx.fill();
+      ctx.strokeStyle='#ffd54f';
+      ctx.lineWidth=3;
+      roundRect(sx,sy,sw,sh,8*scale/2);
+      ctx.stroke();
+      // crystal studs
+      for(let i=0;i<4;i++){
+        const cx = sx+sw*(0.15+i*0.23);
+        drawCrystalStud(cx, sy-2*scale, 9*scale);
+      }
+    } else {
+      // ice platform
+      ctx.fillStyle='#1d567e';
+      roundRect(sx,sy,sw,sh,6*scale);
+      ctx.fill();
+      ctx.strokeStyle='#9be8ff';
+      ctx.lineWidth=2;
+      roundRect(sx,sy,sw,sh,6*scale);
+      ctx.stroke();
+      // segment ticks
+      const segs = Math.max(2,Math.round(p.w/60));
+      for(let i=1;i<segs;i++){
+        const x = sx + (sw/segs)*i;
+        ctx.strokeStyle='rgba(155,232,255,0.4)';
+        ctx.beginPath();
+        ctx.moveTo(x, sy+2);
+        ctx.lineTo(x, sy+sh-2);
+        ctx.stroke();
+      }
+      for(let i=0;i<segs;i++){
+        const x = sx + (sw/segs)*(i+0.5);
+        drawCrystalStud(x, sy-2*scale, 7*scale);
+      }
+    }
+  }
+
+  function drawCrystalStud(x,y,size){
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.fillStyle='#bdf3ff';
+    ctx.beginPath();
+    ctx.moveTo(0,-size);
+    ctx.lineTo(size*0.55,0);
+    ctx.lineTo(0,size*0.3);
+    ctx.lineTo(-size*0.55,0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle='#ffffff';
+    ctx.lineWidth=1;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawAnchor(a, t){
+    const scale=W/WORLD_W;
+    const sx=a.x*scale, sy=H-(a.y-cameraY)*scale;
+    const pulse = 0.85+0.15*Math.sin(t*3 + a.x);
+    const r = a.r*scale*pulse;
+
+    // glow
+    const inRange = dist(player.x,player.y,a.x,a.y) <= GRAPPLE_RANGE;
+    ctx.save();
+    ctx.shadowColor = inRange? '#9be8ff':'rgba(155,232,255,0.4)';
+    ctx.shadowBlur = inRange? 22:10;
+    ctx.translate(sx,sy);
+    ctx.rotate(Math.PI/4);
+    const g = ctx.createLinearGradient(-r,-r,r,r);
+    g.addColorStop(0,'#e8feff');
+    g.addColorStop(1,'#5fc9ec');
+    ctx.fillStyle=g;
+    roundRect(-r,-r,r*2,r*2, r*0.3);
+    ctx.fill();
+    ctx.strokeStyle='#ffffff';
+    ctx.lineWidth=1.5;
+    roundRect(-r,-r,r*2,r*2, r*0.3);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawCoin(c,t){
+    if(c.taken) return;
+    const scale=W/WORLD_W;
+    const sx=c.x*scale, sy=H-(c.y-cameraY)*scale;
+    const bob = Math.sin(t*3+c.x)*3*scale;
+    ctx.save();
+    ctx.translate(sx, sy+bob);
+    ctx.shadowColor='#ffd54f';
+    ctx.shadowBlur=14;
+    const grad = ctx.createRadialGradient(-3,-3,1,0,0,c.r*scale);
+    grad.addColorStop(0,'#fff3c4');
+    grad.addColorStop(1,'#ffb300');
+    ctx.fillStyle=grad;
+    ctx.beginPath();
+    ctx.arc(0,0,c.r*scale,0,Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle='#c79a1e';
+    ctx.lineWidth=1.5;
+    ctx.stroke();
+    ctx.fillStyle='#c79a1e';
+    ctx.font = (c.r*scale*1.1)+'px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('0',0,1);
+    ctx.restore();
+  }
+
+  function drawHazard(hz){
+    const scale=W/WORLD_W;
+    const sx=hz.x*scale, sy=H-(hz.y-cameraY)*scale - hz.h*scale;
+    const sw=hz.w*scale, sh=hz.h*scale;
+    const n = Math.max(2,Math.round(hz.w/20));
+    ctx.fillStyle='#ff5252';
+    for(let i=0;i<n;i++){
+      const x0 = sx + (sw/n)*i;
+      ctx.beginPath();
+      ctx.moveTo(x0, sy+sh);
+      ctx.lineTo(x0+sw/n/2, sy);
+      ctx.lineTo(x0+sw/n, sy+sh);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  function drawGoalShard(t){
+    const goalPlat = platforms[platforms.length-1];
+    const scale=W/WORLD_W;
+    const cx = (goalPlat.x+goalPlat.w/2)*scale;
+    const cy = H-(goalPlat.y+goalPlat.h+60-cameraY)*scale;
+    const bob = Math.sin(t*2)*4*scale;
+    const r = 22*scale;
+    ctx.save();
+    ctx.translate(cx, cy+bob);
+    ctx.shadowColor='#9be8ff';
+    ctx.shadowBlur=30;
+    ctx.rotate(t*0.6);
+    const g = ctx.createLinearGradient(-r,-r,r,r);
+    g.addColorStop(0,'#ffffff');
+    g.addColorStop(0.5,'#9be8ff');
+    g.addColorStop(1,'#3a8fd0');
+    ctx.fillStyle=g;
+    ctx.beginPath();
+    ctx.moveTo(0,-r);
+    ctx.lineTo(r*0.6,0);
+    ctx.lineTo(0,r);
+    ctx.lineTo(-r*0.6,0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle='#fff';
+    ctx.lineWidth=2;
+    ctx.stroke();
+    ctx.restore();
+
+    // little orbit stars
+    for(let i=0;i<3;i++){
+      const ang = t*1.5 + i*(Math.PI*2/3);
+      const ox = cx + Math.cos(ang)*r*1.8;
+      const oy = cy+bob + Math.sin(ang)*r*1.8;
+      ctx.save();
+      ctx.translate(ox,oy);
+      ctx.fillStyle='#ffd54f';
+      drawStar(0,0,5,r*0.18,r*0.08);
+      ctx.restore();
+    }
+  }
+
+  function drawStar(cx,cy,points,outerR,innerR){
+    ctx.beginPath();
+    for(let i=0;i<points*2;i++){
+      const r = i%2===0? outerR:innerR;
+      const ang = Math.PI*i/points - Math.PI/2;
+      const x = cx+Math.cos(ang)*r, y=cy+Math.sin(ang)*r;
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawRope(){
+    if(player.grappling && player.anchor){
+      const scale=W/WORLD_W;
+      const [px,py] = [player.x*scale, H-(player.y+player.h*0.3-cameraY)*scale];
+      const [ax,ay] = [player.anchor.x*scale, H-(player.anchor.y-cameraY)*scale];
+      ctx.save();
+      ctx.strokeStyle='#cfeeff';
+      ctx.lineWidth=2.5;
+      ctx.shadowColor='#9be8ff';
+      ctx.shadowBlur=6;
+      ctx.beginPath();
+      ctx.moveTo(px,py);
+      ctx.lineTo(ax,ay);
+      ctx.stroke();
+      ctx.restore();
+    } else if(mouse.down===false){
+      // show aim line preview when hovering near range, subtle
+    }
+  }
+
+  function drawAimPreview(){
+    if(player.grappling) return;
+    const a = findNearestAnchorInRange(player.x,player.y, mouse.x, mouse.y);
+    if(a){
+      const scale=W/WORLD_W;
+      const px=player.x*scale, py=H-(player.y+player.h*0.3-cameraY)*scale;
+      const ax=a.x*scale, ay=H-(a.y-cameraY)*scale;
+      ctx.save();
+      ctx.strokeStyle='rgba(255,255,255,0.35)';
+      ctx.setLineDash([6,6]);
+      ctx.lineWidth=2;
+      ctx.beginPath();
+      ctx.moveTo(px,py);
+      ctx.lineTo(ax,ay);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  function drawPlayer(t){
+    const scale=W/WORLD_W;
+    const sx=player.x*scale;
+    const sy=H-(player.y-cameraY)*scale;
+    const pw=player.w*scale, ph=player.h*scale;
+    const flicker = !player.alive ? (Math.sin(t*30)>0?0.2:1) : 1;
+
+    ctx.save();
+    ctx.globalAlpha = flicker;
+    ctx.translate(sx, sy-ph);
+    if(player.facing<0) ctx.scale(-1,1);
+
+    // legs
+    ctx.fillStyle = '#3a3a3a';
+    ctx.fillRect(-pw*0.32, ph*0.72, pw*0.28, ph*0.3);
+    ctx.fillRect(pw*0.05, ph*0.72, pw*0.28, ph*0.3);
+
+    // body (jumpsuit)
+    ctx.fillStyle = '#ff8c42';
+    roundRect(-pw*0.42, ph*0.18, pw*0.84, ph*0.58, pw*0.18);
+    ctx.fill();
+
+    // backpack strap
+    ctx.fillStyle='#e0701f';
+    ctx.fillRect(-pw*0.5, ph*0.22, pw*0.18, ph*0.42);
+
+    // head
+    ctx.fillStyle = '#ffcf9e';
+    ctx.beginPath();
+    ctx.arc(0, ph*0.05, pw*0.36, 0, Math.PI*2);
+    ctx.fill();
+
+    // hard hat
+    ctx.fillStyle = '#ffd54f';
+    ctx.beginPath();
+    ctx.arc(0, ph*-0.06, pw*0.4, Math.PI, Math.PI*2);
+    ctx.fill();
+    ctx.fillRect(-pw*0.4, ph*-0.06, pw*0.8, ph*0.07);
+
+    // headlamp
+    ctx.fillStyle='#fff7d6';
+    ctx.beginPath();
+    ctx.arc(pw*0.2, ph*-0.02, pw*0.08,0,Math.PI*2);
+    ctx.fill();
+
+    // grapple gun arm: aim at the active anchor while grappling, else at the cursor.
+    // Note: canvas is already mirrored via ctx.scale(-1,1) when facing left,
+    // so all coordinates below are in "facing-right" local space — we must
+    // un-mirror the target's world-space dx by the same facing factor.
+    const targetWX = (player.grappling && player.anchor) ? player.anchor.x : mouse.x;
+    const targetWY = (player.grappling && player.anchor) ? player.anchor.y : mouse.y;
+    const dxWorld = (targetWX - player.x) * player.facing; // un-mirror x
+    const dyWorld = targetWY - player.y;                   // world y is up-positive
+    const armAngle = Math.atan2(-dyWorld, dxWorld);         // canvas y is down-positive
+
+    ctx.save();
+    ctx.translate(pw*0.15, ph*0.35);
+    ctx.rotate(armAngle);
+    ctx.fillStyle='#444';
+    ctx.fillRect(0,-pw*0.07, pw*0.55, pw*0.14);
+    ctx.fillStyle='#222';
+    ctx.fillRect(pw*0.45,-pw*0.1, pw*0.18, pw*0.2);
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  let t0 = performance.now();
+  let last = t0;
+  function loop(now){
+    const dt = Math.min(0.032,(now-last)/1000);
+    last = now;
+    const t = (now-t0)/1000;
+
+    update(dt);
+
+    ctx.clearRect(0,0,W,H);
+    drawBackground();
+
+    for(const p of platforms) drawPlatform(p);
+    for(const hz of hazards) drawHazard(hz);
+    for(const a of anchors) drawAnchor(a,t);
+    for(const c of coins) drawCoin(c,t);
+    drawGoalShard(t);
+    drawAimPreview();
+    drawRope();
+    drawPlayer(t);
+
+    requestAnimationFrame(loop);
+  }
+
+  resize();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
