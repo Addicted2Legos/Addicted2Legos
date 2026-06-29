@@ -3,8 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Hub</title>
+    <title>Click Lasers</title>
     <style>
+        :root {
+            --accent: #00e5ff;
+            --accent-strong: #00c7e6;
+            --accent-dark: #0097b8;
+            --accent-soft: rgba(0, 229, 255, 0.12);
+            --accent-soft-2: rgba(0, 229, 255, 0.08);
+            --accent-hover: rgba(0, 229, 255, 0.35);
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
@@ -12,17 +21,143 @@
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%);
+            padding: 24px;
+            background-color: #030712;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'%3E%3Crect width='220' height='220' fill='%23040b1b'/%3E%3Cg fill='%23ffffff'%3E%3Ccircle cx='28' cy='24' r='1.4'/%3E%3Ccircle cx='86' cy='56' r='1.1'/%3E%3Ccircle cx='152' cy='20' r='1.4'/%3E%3Ccircle cx='190' cy='72' r='1.1'/%3E%3Ccircle cx='44' cy='118' r='1.2'/%3E%3Ccircle cx='126' cy='100' r='1.1'/%3E%3Ccircle cx='170' cy='134' r='1.4'/%3E%3Ccircle cx='80' cy='164' r='1.2'/%3E%3Ccircle cx='138' cy='182' r='1.1'/%3E%3Ccircle cx='210' cy='166' r='1.1'/%3E%3Ccircle cx='22' cy='194' r='1.1'/%3E%3Ccircle cx='116' cy='40' r='0.7'/%3E%3Ccircle cx='180' cy='112' r='0.8'/%3E%3Ccircle cx='58' cy='74' r='0.7'/%3E%3Ccircle cx='144' cy='154' r='0.8'/%3E%3Ccircle cx='102' cy='206' r='0.8'/%3E%3Ccircle cx='196' cy='196' r='0.7'/%3E%3C/g%3E%3Cg fill='%23dbeafe' opacity='0.75'%3E%3Ccircle cx='56' cy='28' r='0.5'/%3E%3Ccircle cx='98' cy='140' r='0.5'/%3E%3Ccircle cx='176' cy='88' r='0.5'/%3E%3Ccircle cx='124' cy='214' r='0.5'/%3E%3Ccircle cx='28' cy='152' r='0.5'/%3E%3C/g%3E%3C/svg%3E");
+            background-repeat: repeat;
+            background-size: 220px 220px;
         }
+
         .container {
+            position: relative;
             width: 100%;
             max-width: 500px;
             padding: 35px;
-            background: white;
+            background: rgba(255, 255, 255, 0.96);
             border-radius: 16px;
-            box-shadow: 0 10px 25px rgba(0, 188, 212, 0.15);
-            border-top: 8px solid #00bcd4;
+            box-shadow: 0 10px 25px rgba(2, 6, 23, 0.35);
+            border-top: 8px solid var(--accent);
+            overflow: hidden;
+            backdrop-filter: blur(8px);
         }
+
+        .container > h1,
+        .container > ul,
+        .container > .easter-egg {
+            position: relative;
+            z-index: 1;
+        }
+
+        .background-shapes {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .shape {
+            position: absolute;
+            opacity: 0.45;
+            filter: blur(0.4px);
+        }
+
+        .shape-1 {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: var(--accent-soft);
+            top: 12px;
+            left: 18px;
+        }
+
+        .shape-2 {
+            width: 46px;
+            height: 46px;
+            background: var(--accent-soft);
+            border-radius: 14px;
+            top: 34px;
+            right: 38px;
+            transform: rotate(20deg);
+        }
+
+        .shape-3 {
+            width: 0;
+            height: 0;
+            border-left: 18px solid transparent;
+            border-right: 18px solid transparent;
+            border-bottom: 32px solid rgba(0, 188, 212, 0.08);
+            top: 110px;
+            left: 28px;
+        }
+
+        .shape-4 {
+            width: 90px;
+            height: 90px;
+            border: 2px solid var(--accent-soft-2);
+            border-radius: 50%;
+            top: 140px;
+            right: 20px;
+        }
+
+        .shape-5 {
+            width: 58px;
+            height: 58px;
+            background: var(--accent-soft);
+            border-radius: 16px;
+            bottom: 90px;
+            left: 24px;
+            transform: rotate(35deg);
+        }
+
+        .shape-6 {
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-bottom: 36px solid rgba(0, 188, 212, 0.08);
+            bottom: 58px;
+            right: 46px;
+            transform: rotate(-10deg);
+        }
+
+        .shape-7 {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--accent-soft);
+            bottom: 44px;
+            left: 120px;
+        }
+
+        .shape-8 {
+            width: 22px;
+            height: 22px;
+            border-radius: 4px;
+            background: var(--accent-soft);
+            top: 190px;
+            left: 160px;
+            transform: rotate(25deg);
+        }
+
+        .shape-9 {
+            width: 48px;
+            height: 48px;
+            border: 2px solid var(--accent-soft-2);
+            border-radius: 10px;
+            right: 90px;
+            bottom: 140px;
+            transform: rotate(25deg);
+        }
+
+        .shape-10 {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent-soft);
+            top: 240px;
+            right: 150px;
+        }
+
         h1 {
             text-align: center;
             color: #006064;
@@ -31,45 +166,66 @@
             font-size: 28px;
             letter-spacing: -0.5px;
         }
+
         ul {
             list-style-type: none;
             padding: 0;
             margin: 0;
         }
+
         li {
             margin-bottom: 12px;
         }
+
         a {
             display: block;
             padding: 14px 18px;
-            color: #004d40;
+            color: #003f82;
             background-color: #f1fbfd;
             text-decoration: none;
             border-radius: 8px;
             font-weight: 600;
-            border-left: 4px solid #00acc1;
+            border-left: 4px solid var(--accent-strong);
             transition: all 0.25s ease;
         }
+
         a:hover {
-            background-color: #00bcd4;
+            background-color: var(--accent);
             color: #fff;
-            border-left-color: #00838f;
+            border-left-color: var(--accent-dark);
             transform: translateX(8px);
-            box-shadow: 0 4px 12px rgba(0, 188, 212, 0.3);
+            box-shadow: 0 4px 12px rgba(0, 229, 255, 0.3);
         }
     </style>
 </head>
 <body>
 
     <div class="container">
+        <div class="background-shapes" aria-hidden="true">
+            <div class="shape shape-1"></div>
+            <div class="shape shape-2"></div>
+            <div class="shape shape-3"></div>
+            <div class="shape shape-4"></div>
+            <div class="shape shape-5"></div>
+            <div class="shape shape-6"></div>
+            <div class="shape shape-7"></div>
+            <div class="shape shape-8"></div>
+            <div class="shape shape-9"></div>
+            <div class="shape shape-10"></div>
+        </div>
+
         <h1>Project Directory</h1>
         <ul>
+            <li><a href="Buff_Man.html">Buff Man</a></li>
             <li><a href="Claude%20App%20Development%20Step.html">Claude App Development Step</a></li>
-            <li><a href="cpr_game.html">CPR Game</a></li>
+            <!-- <li><a href="cpr_game.html">CPR Game</a></li> -->
+            <li><a href="Click_Lasers.html">Click Lasers</a></li>
             <li><a href="forest_adventure.html">Forest Adventure</a></li>
             <li><a href="forest_adventure%202.html">Forest Adventure 2</a></li>
+            <li><a href="GrownUpStuff.html">Grown Up Stuff</a></li>
             <li><a href="gemini-code-1782476766064.html">Gemini Code 1</a></li>
             <li><a href="gemini-code-1782477775606.html">Gemini Code 2</a></li>
+            <li><a href="GrapplingHook-Level1.html">Grappling Hook</a></li>
             <li><a href="hex-network-tycoon.html">Hex Network Tycoon</a></li>
             <li><a href="iron-horizons-continental-express.html">Iron Horizons: Continental Express</a></li>
             <li><a href="KingShotRemake.html">King Shot Remake</a></li>
