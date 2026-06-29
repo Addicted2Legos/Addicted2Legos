@@ -266,8 +266,9 @@
         // Input Listeners
         window.addEventListener('mousedown', (e) => fireLaser(e));
         window.addEventListener('touchstart', (e) => {
+            if (gameState !== 'PLAYING') return;
             fireLaser(e);
-            e.preventDefault(); // Prevents double firing & zooming on mobile
+            e.preventDefault(); // prevents button click
         }, { passive: false });
 
 
