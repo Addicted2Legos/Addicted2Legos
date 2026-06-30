@@ -80,12 +80,25 @@
             box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
             transition: all 0.2s ease;
             text-transform: uppercase;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
-        .btn:active {
-            transform: scale(0.95);
-            background: #00ffff;
-            color: #080810;
-            box-shadow: 0 0 30px #00ffff;
+
+        .btn:hover,
+        .btn:focus {
+            text-decoration: none;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: url('Click_Lasers_Background.png') center/cover no-repeat;
+            opacity: 0.25;
+            pointer-events: none;
+            z-index: -1;
         }
     </style>
 </head>
@@ -106,6 +119,7 @@
         <h1>GAME OVER</h1>
         <p id="final-score">Final Score: 0</p>
         <button class="btn" onclick="restartGame()">Play Again</button>
+        <button class="btn" onclick="mainMenu()">Main Menu</button>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -293,6 +307,10 @@
             gameOverScreen.style.display = 'none';
             gameState = 'PLAYING';
             resetData();
+        }
+
+        function mainMenu() {
+            window.location.href = 'index.html';
         }
 
         function resetData() {

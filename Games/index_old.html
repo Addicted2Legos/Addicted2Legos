@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Click Lasers</title>
+    <style>
+        :root {
+            --accent: #00e5ff;
+            --accent-strong: #00c7e6;
+            --accent-dark: #0097b8;
+            --accent-soft: rgba(0, 229, 255, 0.12);
+            --accent-soft-2: rgba(0, 229, 255, 0.08);
+            --accent-hover: rgba(0, 229, 255, 0.35);
+        }
+
+body {
+            position: relative;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 24px;
+            background: url('Images/Click_Lasers_Logo.png') center/cover repeat fixed;
+            background-image: url('Images/Click_Lasers_Background.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        .container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            padding: 90px 35px 35px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(2, 6, 23, 0.35);
+            border-top: 8px solid var(--accent);
+            overflow: hidden;
+            backdrop-filter: blur(8px);
+        }
+
+        .container > h1,
+        .container > ul,
+        .container > .easter-egg {
+            position: relative;
+            z-index: 1;
+        }
+
+        .background-shapes {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .shape {
+            position: absolute;
+            opacity: 0.45;
+            filter: blur(0.4px);
+        }
+
+        .shape-1 {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: var(--accent-soft);
+            top: 12px;
+            left: 18px;
+        }
+
+        .shape-2 {
+            width: 46px;
+            height: 46px;
+            background: var(--accent-soft);
+            border-radius: 14px;
+            top: 34px;
+            right: 38px;
+            transform: rotate(20deg);
+        }
+
+        .shape-3 {
+            width: 0;
+            height: 0;
+            border-left: 18px solid transparent;
+            border-right: 18px solid transparent;
+            border-bottom: 32px solid rgba(0, 188, 212, 0.08);
+            top: 110px;
+            left: 28px;
+        }
+
+        .shape-4 {
+            width: 90px;
+            height: 90px;
+            border: 2px solid var(--accent-soft-2);
+            border-radius: 50%;
+            top: 140px;
+            right: 20px;
+        }
+
+        .shape-5 {
+            width: 58px;
+            height: 58px;
+            background: var(--accent-soft);
+            border-radius: 16px;
+            bottom: 90px;
+            left: 24px;
+            transform: rotate(35deg);
+        }
+
+        .shape-6 {
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-bottom: 36px solid rgba(0, 188, 212, 0.08);
+            bottom: 58px;
+            right: 46px;
+            transform: rotate(-10deg);
+        }
+
+        .shape-7 {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--accent-soft);
+            bottom: 44px;
+            left: 120px;
+        }
+
+        .shape-8 {
+            width: 22px;
+            height: 22px;
+            border-radius: 4px;
+            background: var(--accent-soft);
+            top: 190px;
+            left: 160px;
+            transform: rotate(25deg);
+        }
+
+        .shape-9 {
+            width: 48px;
+            height: 48px;
+            border: 2px solid var(--accent-soft-2);
+            border-radius: 10px;
+            right: 90px;
+            bottom: 140px;
+            transform: rotate(25deg);
+        }
+
+        .shape-10 {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent-soft);
+            top: 240px;
+            right: 150px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #006064;
+            margin-top: 0;
+            margin-bottom: 25px;
+            font-size: 28px;
+            letter-spacing: -0.5px;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        li {
+            margin-bottom: 12px;
+        }
+
+        a {
+            display: block;
+            padding: 14px 18px;
+            color: #003f82;
+            background-color: #f1fbfd;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            border-left: 4px solid var(--accent-strong);
+            transition: all 0.25s ease;
+        }
+
+        a:hover {
+            background-color: var(--accent);
+            color: #fff;
+            border-left-color: var(--accent-dark);
+            transform: translateX(8px);
+            box-shadow: 0 4px 12px rgba(0, 229, 255, 0.3);
+        }
+
+        .logo {
+            position: fixed;
+            top: 24px;
+            left: 24px;
+            max-width: 160px;
+            width: auto;
+            height: auto;
+            z-index: 999;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <img class="logo" src="Click_Lasers_Logo.png" alt="Click Lasers Logo">
+        <div class="background-shapes" aria-hidden="true">
+            <div class="shape shape-1"></div>
+            <div class="shape shape-2"></div>
+            <div class="shape shape-3"></div>
+            <div class="shape shape-4"></div>
+            <div class="shape shape-5"></div>
+            <div class="shape shape-6"></div>
+            <div class="shape shape-7"></div>
+            <div class="shape shape-8"></div>
+            <div class="shape shape-9"></div>
+            <div class="shape shape-10"></div>
+        </div>
+
+        <h1>Project Directory</h1>
+        <ul>
+            <li><a href="Buff_Man.html">Buff Man</a></li>
+            <li><a href="Claude%20App%20Development%20Step.html">Claude App Development Step</a></li>
+            <!-- <li><a href="cpr_game.html">CPR Game</a></li> -->
+            <li><a href="Click_Lasers.html">Click Lasers</a></li>
+            <li><a href="forest_adventure.html">Forest Adventure</a></li>
+            <li><a href="forest_adventure%202.html">Forest Adventure 2</a></li>
+            <li><a href="GrownUpStuff.html">Grown Up Stuff</a></li>
+            <li><a href="gemini-code-1782476766064.html">Gemini Code 1</a></li>
+            <li><a href="gemini-code-1782477775606.html">Gemini Code 2</a></li>
+            <li><a href="GrapplingHook-Level1.html">Grappling Hook</a></li>
+            <li><a href="hex-network-tycoon.html">Hex Network Tycoon</a></li>
+            <li><a href="iron-horizons-continental-express.html">Iron Horizons: Continental Express</a></li>
+            <li><a href="KingShotRemake.html">King Shot Remake</a></li>
+            <li><a href="money-tree.html">Money Tree</a></li>
+            <li><a href="Train%20from%20Gemin.html">Train from Gemin</a></li>
+            <li><a href="TrainGame.html">Train Game</a></li>
+        </ul>
+    </div>
+
+</body>
+</html>
