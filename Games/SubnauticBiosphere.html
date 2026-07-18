@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Sideview Neon Aquarium</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #050515;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            padding: 20px;
+        }
+
+        .aquarium-container {
+            position: relative;
+            width: 100%;
+            max-width: 1000px;
+            background: linear-gradient(180deg, #0d1b2a 0%, #1b263b 50%, #08101f 100%);
+            border: 4px solid #00f2fe;
+            border-radius: 16px;
+            box-shadow: 0 0 30px rgba(0, 242, 254, 0.3), inset 0 0 50px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+            margin-bottom: 25px;
+        }
+
+        /* Glass Reflection Overlay */
+        .aquarium-container::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%, rgba(255,255,255,0.05) 100%);
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 550px;
+            cursor: crosshair;
+        }
+
+        .controls-panel {
+            background: rgba(13, 27, 42, 0.85);
+            border: 2px solid #3f37c9;
+            border-radius: 12px;
+            padding: 20px 30px;
+            width: 100%;
+            max-width: 1000px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        .controls-title {
+            font-size: 1.2rem;
+            color: #4cc9f0;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(76, 201, 240, 0.5);
+            text-align: center;
+        }
+
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 0.85rem;
+            color: #b5e2fa;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: #1b263b;
+            border-radius: 3px;
+            outline: none;
+            transition: 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #f72585;
+            cursor: pointer;
+            box-shadow: 0 0 8px #f72585;
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .value-display {
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: #f72585;
+            min-width: 24px;
+            text-align: right;
+            font-weight: bold;
+        }
+
+        .instructions {
+            text-align: center;
+            margin-top: 12px;
+            font-size: 0.85rem;
+            color: #a2a2d0;
+            font-style: italic;
+        }
+
+        .shark-button {
+            margin-top: 2px;
+            margin-bottom: 20px;
+            padding: 10px 16px;
+            border: 1px solid #4cc9f0;
+            border-radius: 999px;
+            background: rgba(76, 201, 240, 0.15);
+            color: #eaf8ff;
+            cursor: pointer;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            box-shadow: 0 0 12px rgba(76, 201, 240, 0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="aquarium-container">
+        <canvas id="aquariumCanvas"></canvas>
+    </div>
+
+    <div class="controls-panel">
+        <button class="shark-button" id="sharkButton">Shark</button>
+        <div class="control-grid">
+            <div class="control-group">
+                <label for="fishCount">Fish Population</label>
+                <div class="slider-container">
+                    <input type="range" id="fishCount" min="5" max="40" value="15">
+                    <span class="value-display" id="fishCountVal">15</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <label for="fishSpeed">Swim Speed</label>
+                <div class="slider-container">
+                    <input type="range" id="fishSpeed" min="1" max="5" step="0.5" value="2.5">
+                    <span class="value-display" id="fishSpeedVal">2.5</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <label for="glowIntensity">Glow Intensity</label>
+                <div class="slider-container">
+                    <input type="range" id="glowIntensity" min="0" max="20" value="12">
+                    <span class="value-display" id="glowIntensityVal">12</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <label for="bubbleFreq">Bubble Streams</label>
+                <div class="slider-container">
+                    <input type="range" id="bubbleFreq" min="0" max="10" value="5">
+                    <span class="value-display" id="bubbleFreqVal">5</span>
+                </div>
+            </div>
+        </div>
+        <div class="instructions">💡 Click inside the aquarium to drop glowing food pellets for the fish!</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('aquariumCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Resize configuration
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = 550;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Control DOM elements
+        const fishCountInput = document.getElementById('fishCount');
+        const fishSpeedInput = document.getElementById('fishSpeed');
+        const glowIntensityInput = document.getElementById('glowIntensity');
+        const bubbleFreqInput = document.getElementById('bubbleFreq');
+
+        const fishCountVal = document.getElementById('fishCountVal');
+        const fishSpeedVal = document.getElementById('fishSpeedVal');
+        const glowIntensityVal = document.getElementById('glowIntensityVal');
+        const bubbleFreqVal = document.getElementById('bubbleFreqVal');
+
+        // State parameters
+        let settings = {
+            fishCount: parseInt(fishCountInput.value),
+            maxSpeed: parseFloat(fishSpeedInput.value),
+            glow: parseInt(glowIntensityInput.value),
+            bubbles: parseInt(bubbleFreqInput.value)
+        };
+
+        // Update handlers
+        fishCountInput.addEventListener('input', (e) => {
+            settings.fishCount = parseInt(e.target.value);
+            fishCountVal.textContent = settings.fishCount;
+            adjustFishPopulation();
+        });
+        fishSpeedInput.addEventListener('input', (e) => {
+            settings.maxSpeed = parseFloat(e.target.value);
+            fishSpeedVal.textContent = settings.maxSpeed.toFixed(1);
+        });
+        glowIntensityInput.addEventListener('input', (e) => {
+            settings.glow = parseInt(e.target.value);
+            glowIntensityVal.textContent = settings.glow;
+        });
+        bubbleFreqInput.addEventListener('input', (e) => {
+            settings.bubbles = parseInt(e.target.value);
+            bubbleFreqVal.textContent = settings.bubbles;
+        });
+
+        // Neon Neon color choices
+        const neonColors = [
+            { body: '#f72585', accent: '#7209b7', glow: 'rgba(247, 37, 133, ' },
+            { body: '#4cc9f0', accent: '#4361ee', glow: 'rgba(76, 201, 240, ' },
+            { body: '#39ff14', accent: '#00b4d8', glow: 'rgba(57, 255, 20, ' },
+            { body: '#ff9e00', accent: '#ff6000', glow: 'rgba(255, 158, 0, ' },
+            { body: '#ff007f', accent: '#ff00ff', glow: 'rgba(255, 0, 127, ' }
+        ];
+
+        // Entities arrays
+        let fishes = [];
+        let bubbles = [];
+        let foods = [];
+        let plants = [];
+        let shark = null;
+        let sharkControls = {
+            left: false,
+            right: false,
+            up: false,
+            down: false
+        };
+
+        // Simple Vector Class
+        class Vector {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+            }
+            add(v) { this.x += v.x; this.y += v.y; }
+            sub(v) { return new Vector(this.x - v.x, this.y - v.y); }
+            mult(n) { this.x *= n; this.y *= n; }
+            mag() { return Math.sqrt(this.x * this.x + this.y * this.y); }
+            normalize() { let m = this.mag(); if (m !== 0) { this.x /= m; this.y /= m; } }
+            heading() { return Math.atan2(this.y, this.x); }
+        }
+
+        // Fish Class
+        class Fish {
+            constructor() {
+                this.pos = new Vector(Math.random() * canvas.width, Math.random() * (canvas.height - 150) + 50);
+                let angle = Math.random() * Math.PI * 2;
+                this.vel = new Vector(Math.cos(angle), Math.sin(angle));
+                this.vel.mult(Math.random() * settings.maxSpeed + 1);
+                this.size = Math.random() * 12 + 14;
+                this.colorScheme = neonColors[Math.floor(Math.random() * neonColors.length)];
+                this.tailWag = Math.random() * 100;
+                this.targetFood = null;
+            }
+
+            update() {
+                // Find nearest food if available
+                if (foods.length > 0) {
+                    let nearest = null;
+                    let minDist = Infinity;
+                    foods.forEach(food => {
+                        let d = Math.sqrt((food.x - this.pos.x)**2 + (food.y - this.pos.y)**2);
+                        if (d < minDist) {
+                            minDist = d;
+                            nearest = food;
+                        }
+                    });
+                    this.targetFood = nearest;
+                } else {
+                    this.targetFood = null;
+                }
+
+                // AI / Steering Behavior
+                if (this.targetFood) {
+                    let targetVec = new Vector(this.targetFood.x, this.targetFood.y);
+                    let desired = targetVec.sub(this.pos);
+                    desired.normalize();
+                    desired.mult(settings.maxSpeed);
+                    let steer = desired.sub(this.vel);
+                    steer.mult(0.05); // Lerp steering factor
+                    this.vel.add(steer);
+                    
+                    // Eat food detection
+                    if (minDist < 15) {
+                        let index = foods.indexOf(this.targetFood);
+                        if (index > -1) foods.splice(index, 1);
+                    }
+                } else {
+                    // Wander slightly
+                    this.vel.x += (Math.random() - 0.5) * 0.2;
+                    this.vel.y += (Math.random() - 0.5) * 0.1;
+                }
+
+                // Constrain velocity
+                let speed = this.vel.mag();
+                if (speed > settings.maxSpeed) {
+                    this.vel.normalize();
+                    this.vel.mult(settings.maxSpeed);
+                } else if (speed < 1) {
+                    this.vel.normalize();
+                    this.vel.mult(1);
+                }
+
+                this.pos.add(this.vel);
+                this.tailWag += this.vel.mag() * 0.15;
+
+                // Wall bouncing / bounds check
+                if (this.pos.x < -40) this.pos.x = canvas.width + 40;
+                if (this.pos.x > canvas.width + 40) this.pos.x = -40;
+                if (this.pos.y < 40) { this.pos.y = 40; this.vel.y *= -1; }
+                if (this.pos.y > canvas.height - 60) { this.pos.y = canvas.height - 60; this.vel.y *= -1; }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.pos.x, this.pos.y);
+                
+                let angle = this.vel.heading();
+                let facingRight = Math.cos(angle) > 0;
+                ctx.rotate(angle);
+
+                // Setup Glow Effect
+                if (settings.glow > 0) {
+                    ctx.shadowBlur = settings.glow;
+                    ctx.shadowColor = this.colorScheme.body;
+                }
+
+                // Draw Tail Fin
+                ctx.fillStyle = this.colorScheme.accent;
+                ctx.beginPath();
+                let tailSway = Math.sin(this.tailWag) * 8;
+                ctx.moveTo(-this.size, 0);
+                ctx.lineTo(-this.size - 12, -this.size / 1.5 + tailSway);
+                ctx.lineTo(-this.size - 10, tailSway);
+                ctx.lineTo(-this.size - 12, this.size / 1.5 + tailSway);
+                ctx.closePath();
+                ctx.fill();
+
+                // Draw Fish Body (Oval shape)
+                ctx.fillStyle = this.colorScheme.body;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, this.size, this.size / 1.8, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Draw Eye
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(this.size / 2, -this.size / 6, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(this.size / 2 + (facingRight ? 1 : -1), -this.size / 6, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Small Dorsal Fin
+                ctx.fillStyle = this.colorScheme.accent;
+                ctx.beginPath();
+                ctx.moveTo(-this.size/4, -this.size/2.2);
+                ctx.quadraticCurveTo(-this.size/2, -this.size, this.size/4, -this.size/2);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        class HammerheadShark {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * (canvas.height - 200) + 100;
+                this.speed = 1.5;
+                this.size = 1.2;
+            }
+
+            update() {
+                this.x -= this.speed;
+                if (this.x < -150) this.x = canvas.width + 150;
+                this.y += Math.sin(this.x * 0.01) * 0.5;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.scale(this.size, this.size);
+
+                ctx.strokeStyle = '#00f2fe';
+                ctx.fillStyle = 'rgba(0, 242, 254, 0.2)';
+                ctx.lineWidth = 3;
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#00f2fe';
+
+                ctx.beginPath();
+                ctx.moveTo(0, 20);
+                ctx.lineTo(10, 5);
+                ctx.lineTo(10, 35);
+                ctx.lineTo(0, 20);
+
+                ctx.quadraticCurveTo(-40, 10, -60, 20);
+                ctx.lineTo(-70, -5);
+                ctx.quadraticCurveTo(-75, -5, -75, 22);
+
+                ctx.quadraticCurveTo(-110, 25, -130, 20);
+                ctx.lineTo(-145, 5);
+                ctx.lineTo(-140, 25);
+                ctx.lineTo(-148, 40);
+
+                ctx.quadraticCurveTo(-110, 30, -75, 30);
+                ctx.lineTo(-70, 42);
+                ctx.lineTo(-65, 30);
+                ctx.quadraticCurveTo(-30, 35, 0, 20);
+
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+                ctx.lineWidth = 1.5;
+                ctx.shadowBlur = 0;
+                for (let i = 0; i < 4; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(-35 - (i * 4), 20);
+                    ctx.lineTo(-35 - (i * 4), 28);
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+        }
+
+        // Bubble Class
+        class Bubble {
+            constructor(isBottomGenerator = false) {
+                this.x = isBottomGenerator ? (Math.random() * canvas.width) : (Math.random() * canvas.width);
+                this.y = isBottomGenerator ? (canvas.height + 10) : (Math.random() * canvas.height);
+                this.radius = Math.random() * 4 + 1.5;
+                this.speed = Math.random() * 0.8 + 0.45;
+                this.wobbleSpeed = Math.random() * 0.05 + 0.02;
+                this.wobbleRange = Math.random() * 2 + 1;
+                this.angle = Math.random() * Math.PI;
+            }
+            update() {
+                this.y -= this.speed;
+                this.angle += this.wobbleSpeed;
+                this.x += Math.sin(this.angle) * 0.4;
+            }
+            draw() {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(76, 201, 240, 0.4)';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                
+                // Bubble Highlight Accent
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.beginPath();
+                ctx.arc(this.x - this.radius/3, this.y - this.radius/3, this.radius/5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // Decorative Sea Plant Anemone Class
+        class Plant {
+            constructor(x) {
+                this.x = x;
+                this.height = Math.random() * 80 + 70;
+                this.strands = Math.floor(Math.random() * 4) + 5;
+                this.swaySpeed = Math.random() * 0.02 + 0.01;
+                this.angle = Math.random() * 100;
+                this.color = ['#3a0ca3', '#7209b7', '#4cc9f0', '#39ff14', '#f72585'][Math.floor(Math.random() * 5)];
+            }
+            draw() {
+                ctx.save();
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 4;
+                ctx.lineCap = 'round';
+                if (settings.glow > 0) {
+                    ctx.shadowBlur = settings.glow / 1.5;
+                    ctx.shadowColor = this.color;
+                }
+                
+                this.angle += this.swaySpeed;
+                let sway = Math.sin(this.angle) * 15;
+
+                for (let i = 0; i < this.strands; i++) {
+                    let startX = this.x + (i * 6) - (this.strands * 3);
+                    ctx.beginPath();
+                    ctx.moveTo(startX, canvas.height);
+                    ctx.quadraticCurveTo(
+                        startX + sway * 0.5, canvas.height - this.height * 0.5,
+                        startX + sway, canvas.height - this.height
+                    );
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+        }
+
+        const sharkButton = document.getElementById('sharkButton');
+        sharkButton.addEventListener('click', () => {
+            if (!shark) {
+                shark = new HammerheadShark();
+            }
+        });
+
+        function handleKeyDown(event) {
+            if (event.key === 'ArrowLeft') sharkControls.left = true;
+            if (event.key === 'ArrowRight') sharkControls.right = true;
+            if (event.key === 'ArrowUp') sharkControls.up = true;
+            if (event.key === 'ArrowDown') sharkControls.down = true;
+            if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+                event.preventDefault();
+            }
+        }
+
+        function handleKeyUp(event) {
+            if (event.key === 'ArrowLeft') sharkControls.left = false;
+            if (event.key === 'ArrowRight') sharkControls.right = false;
+            if (event.key === 'ArrowUp') sharkControls.up = false;
+            if (event.key === 'ArrowDown') sharkControls.down = false;
+        }
+
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+
+        // Initialize entities
+        function initAquarium() {
+            adjustFishPopulation();
+            
+            // Generate ambient bubbles
+            for (let i = 0; i < 50; i++) {
+                bubbles.push(new Bubble());
+            }
+
+            // Generate Floor Sea Anemones
+            for (let x = 40; x < canvas.width; x += 70) {
+                plants.push(new Plant(x + (Math.random() * 20 - 10)));
+            }
+        }
+
+        function adjustFishPopulation() {
+            while (fishes.length < settings.fishCount) {
+                fishes.push(new Fish());
+            }
+            while (fishes.length > settings.fishCount) {
+                fishes.pop();
+            }
+        }
+
+        // Interaction Drop Food
+        canvas.addEventListener('click', (e) => {
+            e.preventDefault();
+        });
+
+        // Main Animation Engine Loop
+        function animate() {
+            // Draw background ambient underwater lighting gradient
+            let bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            bgGrad.addColorStop(0, '#0a1128');
+            bgGrad.addColorStop(0.5, '#001f54');
+            bgGrad.addColorStop(1, '#000814');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Dynamically generate new bottom bubbles based on slider configurations
+            if (Math.random() * 10 < settings.bubbles) {
+                bubbles.push(new Bubble(true));
+            }
+
+            // Update & Render Ambient Bubbles
+            for (let i = bubbles.length - 1; i >= 0; i--) {
+                bubbles[i].update();
+                bubbles[i].draw();
+                if (bubbles[i].y < -10) {
+                    bubbles.splice(i, 1);
+                }
+            }
+
+            // Render Plants / Anemones
+            plants.forEach(plant => plant.draw());
+
+            if (shark) {
+                shark.update();
+                shark.draw();
+            }
+
+            // Update & Render Dropped Food Pellets
+            ctx.save();
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = '#ffb703';
+            ctx.fillStyle = '#ffb703';
+            for (let i = foods.length - 1; i >= 0; i--) {
+                foods[i].y += foods[i].speed;
+                ctx.beginPath();
+                ctx.arc(foods[i].x, foods[i].y, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Remove food item if it hits the tank floor
+                if (foods[i].y > canvas.height - 10) {
+                    foods.splice(i, 1);
+                }
+            }
+            ctx.restore();
+
+            // Update & Render Fish Swimming
+            fishes.forEach(fish => {
+                fish.update();
+                fish.draw();
+            });
+
+            // Tank Floor Substrate Sand Bed
+            let sandGrad = ctx.createLinearGradient(0, canvas.height - 20, 0, canvas.height);
+            sandGrad.addColorStop(0, '#001d3d');
+            sandGrad.addColorStop(1, '#000814');
+            ctx.fillStyle = sandGrad;
+            ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+
+            requestAnimationFrame(animate);
+        }
+
+        // Fire it up
+        initAquarium();
+        animate();
+    </script>
+</body>
+</html>

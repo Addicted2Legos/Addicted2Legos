@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vector Strike</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at top, #14243f 0%, #060913 70%, #02040a 100%);
+      color: #f6f8ff;
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      cursor: crosshair;
+    }
+
+    .hud {
+      position: fixed;
+      left: 16px;
+      top: 16px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 10px;
+      background: rgba(7, 11, 20, 0.6);
+      backdrop-filter: blur(8px);
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      pointer-events: none;
+      line-height: 1.5;
+    }
+
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div class="hud" id="hud">Click a plane to select it<br/>Drag to draw a route<br/>Press T to take off, L to land</div>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const hud = document.getElementById('hud');
+
+    let width = 0;
+    let height = 0;
+
+    function resizeCanvas() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function normalizeAngle(angle) {
+      while (angle > Math.PI) angle -= Math.PI * 2;
+      while (angle < -Math.PI) angle += Math.PI * 2;
+      return angle;
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function getPointerPosition(event) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top
+      };
+    }
+
+    class Aircraft {
+      constructor(config) {
+        this.x = config.x;
+        this.y = config.y;
+        this.velocity = { x: config.vx, y: config.vy };
+        this.targetAngle = config.angle;
+        this.angle = config.angle;
+        this.maxSpeed = config.maxSpeed;
+        this.turnRate = config.turnRate;
+        this.pathTolerance = config.pathTolerance;
+        this.accel = config.accel;
+        this.driftScale = config.driftScale;
+        this.bank = 0;
+        this.name = config.name;
+        this.kind = config.kind;
+        this.selected = false;
+        this.path = [];
+        this.followPath = false;
+        this.particles = [];
+        this.pulseTime = 0;
+        this.fireCooldown = 0;
+        this.altitude = config.altitude ?? 0;
+        this.state = config.state ?? 'LANDED';
+        this.groundX = config.groundX ?? config.x;
+        this.groundY = config.groundY ?? config.y;
+        this.maxFuel = config.maxFuel ?? (this.kind === 'bomber' ? 280 : 200);
+        this.fuel = config.fuel ?? this.maxFuel;
+        this.fuelBurnRate = config.fuelBurnRate ?? (this.kind === 'bomber' ? 12 : 14);
+        this.fuelRegenRate = config.fuelRegenRate ?? (this.kind === 'bomber' ? 22 : 26);
+        this.maxAmmo = config.maxAmmo ?? (this.kind === 'interceptor' ? 12 : 0);
+        this.ammo = config.ammo ?? this.maxAmmo;
+        this.ammoRegenRate = config.ammoRegenRate ?? (this.kind === 'interceptor' ? 4 : 0);
+        this.crashed = false;
+        this.warningPulse = 0;
+      }
+
+      resetPath() {
+        this.path = [];
+        this.followPath = false;
+      }
+
+      spawnTrailParticle() {
+        const trailOffset = this.kind === 'bomber' ? 14 : 10;
+        const px = this.x - Math.cos(this.angle) * trailOffset;
+        const py = this.y - Math.sin(this.angle) * trailOffset;
+        const turnStrength = Math.abs(normalizeAngle(this.targetAngle - this.angle));
+        const life = this.kind === 'bomber' ? 0.8 + Math.random() * 0.5 : 0.45 + Math.random() * 0.25;
+        const particleCount = this.kind === 'bomber' ? 2 : 1;
+
+        for (let i = 0; i < particleCount; i += 1) {
+          this.particles.push({
+            x: px,
+            y: py,
+            vx: (-Math.cos(this.angle) * (this.kind === 'bomber' ? 70 : 45)) + (Math.random() - 0.5) * 24,
+            vy: (-Math.sin(this.angle) * (this.kind === 'bomber' ? 70 : 45)) + (Math.random() - 0.5) * 24,
+            life,
+            maxLife: life,
+            size: (this.kind === 'bomber' ? 1.8 : 1.2) + Math.random() * (this.kind === 'bomber' ? 2.4 : 1.2) + turnStrength * 1.2,
+            alpha: 0.55 + Math.random() * 0.2
+          });
+        }
+      }
+
+      updatePathFollowing(dt) {
+        if (!this.followPath || this.path.length === 0) return;
+
+        const waypoint = this.path[0];
+        const dx = waypoint.x - this.x;
+        const dy = waypoint.y - this.y;
+        const distance = Math.hypot(dx, dy);
+
+        if (distance <= this.pathTolerance) {
+          this.path.shift();
+          if (this.path.length === 0) {
+            this.followPath = false;
+          }
+          return;
+        }
+
+        const desiredAngle = Math.atan2(dy, dx);
+        const angleDelta = normalizeAngle(desiredAngle - this.angle);
+        const turnRadius = Math.max(70, this.maxSpeed / Math.max(this.turnRate, 0.01));
+        const needsWideTurn = distance < turnRadius * 1.25 && Math.abs(angleDelta) > 0.3;
+
+        if (needsWideTurn) {
+          const alongX = dx / Math.max(distance, 1);
+          const alongY = dy / Math.max(distance, 1);
+          const normalX = -alongY;
+          const normalY = alongX;
+          const offset = Math.sign(angleDelta) * Math.min(60, turnRadius * 0.45);
+          const targetX = waypoint.x + normalX * offset;
+          const targetY = waypoint.y + normalY * offset;
+          this.targetAngle = Math.atan2(targetY - this.y, targetX - this.x);
+        } else {
+          this.targetAngle = desiredAngle;
+        }
+      }
+
+      crash() {
+        if (this.crashed) return;
+        this.crashed = true;
+        this.state = 'CRASHED';
+        this.path = [];
+        this.followPath = false;
+        this.velocity.x = 0;
+        this.velocity.y = 0;
+        this.bank = 0;
+        this.fuel = 0;
+        if (typeof explosions !== 'undefined') {
+          explosions.push({
+            x: this.x,
+            y: this.y - this.altitude,
+            life: 1.1,
+            maxLife: 1.1,
+            size: 18,
+            color: this.kind === 'bomber' ? '#ffb36e' : '#ffd36b'
+          });
+        }
+      }
+
+      update(dt) {
+        if (this.crashed) return;
+
+        if (this.state === 'LANDED') {
+          this.x = this.groundX;
+          this.y = this.groundY;
+          this.velocity.x = 0;
+          this.velocity.y = 0;
+          this.bank = 0;
+          this.altitude = 0;
+          this.path = [];
+          this.followPath = false;
+          this.fuel = Math.min(this.maxFuel, this.fuel + this.fuelRegenRate * dt);
+          this.ammo = Math.min(this.maxAmmo, this.ammo + this.ammoRegenRate * dt);
+          return;
+        }
+
+        if (this.state === 'TAKEOFF') {
+          const maxTakeoffSpeed = this.maxSpeed;
+          const accel = this.kind === 'bomber' ? 220 : 320;
+          const forwardX = Math.cos(this.angle);
+          const forwardY = Math.sin(this.angle);
+          this.velocity.x += forwardX * accel * dt;
+          this.velocity.y += forwardY * accel * dt;
+
+          const speed = Math.hypot(this.velocity.x, this.velocity.y);
+          if (speed > maxTakeoffSpeed) {
+            const ratio = maxTakeoffSpeed / speed;
+            this.velocity.x *= ratio;
+            this.velocity.y *= ratio;
+          }
+
+          this.x += this.velocity.x * dt;
+          this.y += this.velocity.y * dt;
+
+          const targetAltitude = Math.min(100, this.altitude + 190 * dt);
+          this.altitude = targetAltitude;
+
+          if (this.altitude >= 100) {
+            this.state = 'CRUISE';
+            this.altitude = 100;
+            this.path = [];
+            this.followPath = false;
+          }
+          return;
+        }
+
+        if (this.state === 'LANDING') {
+          const runwayCenterX = width * 0.5;
+          const runwayCenterY = height - 78;
+          const landingTargetAngle = Math.atan2(runwayCenterY - this.y, runwayCenterX - this.x);
+          const angleDelta = normalizeAngle(landingTargetAngle - this.angle);
+          const maxTurnStep = this.turnRate * dt * 0.55;
+          const turnStep = clamp(angleDelta, -maxTurnStep, maxTurnStep);
+          this.angle += turnStep;
+
+          this.altitude = Math.max(0, this.altitude - 185 * dt);
+          const approachSpeed = Math.max(0, this.maxSpeed * 0.2 - this.altitude * 0.8);
+          const forwardX = Math.cos(this.angle);
+          const forwardY = Math.sin(this.angle);
+          this.velocity.x += forwardX * 120 * dt;
+          this.velocity.y += forwardY * 120 * dt;
+          this.velocity.x *= 0.985;
+          this.velocity.y *= 0.985;
+          const speed = Math.hypot(this.velocity.x, this.velocity.y);
+          if (speed > approachSpeed) {
+            const ratio = approachSpeed / speed;
+            this.velocity.x *= ratio;
+            this.velocity.y *= ratio;
+          }
+
+          this.x += this.velocity.x * dt;
+          this.y += this.velocity.y * dt;
+
+          if (this.altitude <= 0 && Math.abs(this.x - runwayCenterX) < 26) {
+            this.state = 'LANDED';
+            this.altitude = 0;
+            this.x = this.groundX;
+            this.y = this.groundY;
+            this.velocity.x = 0;
+            this.velocity.y = 0;
+            this.path = [];
+            this.followPath = false;
+            this.bank = 0;
+          }
+          return;
+        }
+
+        if (this.state === 'CRUISE') {
+          this.fuel = Math.max(0, this.fuel - this.fuelBurnRate * dt);
+          if (this.fuel <= 0 && this.state === 'CRUISE') {
+            this.crash();
+            return;
+          }
+        }
+
+        const keyboardControl = this.selected && this.state === 'CRUISE' &&
+          (keyboardInput.left || keyboardInput.right || keyboardInput.up || keyboardInput.down);
+
+        if (!keyboardControl) {
+          this.updatePathFollowing(dt);
+        }
+
+        const forwardX = Math.cos(this.angle);
+        const forwardY = Math.sin(this.angle);
+        const sideX = -forwardY;
+        const sideY = forwardX;
+
+        const angleDelta = normalizeAngle(this.targetAngle - this.angle);
+        const maxTurnStep = this.turnRate * dt * (keyboardControl ? 1.25 : 1);
+        const turnStep = clamp(angleDelta, -maxTurnStep, maxTurnStep);
+        this.angle += turnStep;
+
+        const turnStrength = Math.abs(turnStep) / Math.max(maxTurnStep, 0.0001);
+        const driftStrength = turnStrength * this.driftScale * dt;
+        const driftDirection = turnStep >= 0 ? 1 : -1;
+        this.bank = clamp(turnStrength * (turnStep >= 0 ? 1 : -1) * (this.kind === 'bomber' ? 0.22 : 0.14), -0.3, 0.3);
+        this.velocity.x += sideX * driftStrength * driftDirection;
+        this.velocity.y += sideY * driftStrength * driftDirection;
+
+        let accelScale = 1;
+        if (keyboardControl) {
+          if (keyboardInput.left) this.targetAngle = normalizeAngle(this.targetAngle - this.turnRate * dt * 1.5);
+          if (keyboardInput.right) this.targetAngle = normalizeAngle(this.targetAngle + this.turnRate * dt * 1.5);
+          accelScale = clamp(1 + (keyboardInput.up ? 0.35 : 0) - (keyboardInput.down ? 0.4 : 0), 0.2, 1.4);
+          if (keyboardInput.down) {
+            this.velocity.x *= 0.972;
+            this.velocity.y *= 0.972;
+          }
+        }
+
+        this.velocity.x += forwardX * this.accel * accelScale * dt;
+        this.velocity.y += forwardY * this.accel * accelScale * dt;
+
+        const speed = Math.hypot(this.velocity.x, this.velocity.y);
+        const maxSpeed = this.maxSpeed * (keyboardControl && keyboardInput.up ? 1.08 : 1);
+        if (speed > maxSpeed) {
+          const ratio = maxSpeed / speed;
+          this.velocity.x *= ratio;
+          this.velocity.y *= ratio;
+        }
+
+        const drag = 0.992;
+        this.velocity.x *= drag;
+        this.velocity.y *= drag;
+
+        this.x += this.velocity.x * dt;
+        this.y += this.velocity.y * dt;
+
+        if (Math.random() < (this.kind === 'bomber' ? 0.9 : 0.65)) {
+          this.spawnTrailParticle();
+        }
+
+        for (let i = this.particles.length - 1; i >= 0; i -= 1) {
+          const p = this.particles[i];
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.vx *= 0.96;
+          p.vy *= 0.96;
+          p.life -= dt;
+          if (p.life <= 0) {
+            this.particles.splice(i, 1);
+          }
+        }
+
+        if (this.x < -40) this.x = width + 40;
+        if (this.x > width + 40) this.x = -40;
+        if (this.y < -40) this.y = height + 40;
+        if (this.y > height + 40) this.y = -40;
+      }
+
+      drawTrails() {
+        if (this.particles.length === 0) return;
+        ctx.save();
+        for (const p of this.particles) {
+          const alpha = (p.life / p.maxLife) * p.alpha;
+          ctx.fillStyle = this.kind === 'bomber'
+            ? `rgba(210, 170, 120, ${alpha})`
+            : `rgba(170, 226, 255, ${alpha})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y - this.altitude, p.size * (p.life / p.maxLife), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      drawRadarPulse() {
+        if (!this.selected) return;
+        this.pulseTime += 0.016;
+        const radius = 24 + Math.sin(this.pulseTime * 4.5) * 8 + (this.pulseTime % 1) * 18;
+        ctx.save();
+        ctx.strokeStyle = this.kind === 'bomber' ? 'rgba(255, 194, 81, 0.9)' : 'rgba(85, 230, 255, 0.9)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y - this.altitude, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      drawPath() {
+        if (this.path.length < 2) return;
+
+        ctx.save();
+        ctx.strokeStyle = this.kind === 'bomber' ? 'rgba(255, 194, 81, 0.95)' : 'rgba(72, 214, 255, 0.95)';
+        ctx.lineWidth = this.kind === 'bomber' ? 2.6 : 2.2;
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = this.kind === 'bomber' ? 'rgba(255, 194, 81, 0.35)' : 'rgba(84, 221, 255, 0.4)';
+        ctx.setLineDash([8, 6]);
+        ctx.beginPath();
+        ctx.moveTo(this.path[0].x, this.path[0].y);
+        for (let i = 1; i < this.path.length; i += 1) {
+          ctx.lineTo(this.path[i].x, this.path[i].y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      draw() {
+        const altitudeRatio = clamp(this.altitude / 100, 0, 1);
+        const lowFuel = this.fuel / this.maxFuel < 0.25;
+        this.warningPulse += 0.025;
+        const warningFlash = 0.45 + 0.35 * Math.sin(this.warningPulse * 7);
+        const spriteScale = 0.7 + altitudeRatio * 0.3;
+        const shadowOffsetX = 18 + altitudeRatio * 24;
+        const shadowOffsetY = 10 + altitudeRatio * 10;
+        const shadowAlpha = 0.16 + altitudeRatio * 0.2;
+
+        ctx.save();
+        ctx.translate(this.x + shadowOffsetX, this.y - this.altitude + shadowOffsetY);
+        ctx.scale(1.3 + altitudeRatio * 0.15, 0.7 + altitudeRatio * 0.1);
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
+        ctx.shadowBlur = 20 + altitudeRatio * 10;
+        ctx.shadowColor = `rgba(0, 0, 0, ${shadowAlpha})`;
+        ctx.arc(0, 0, 16 + altitudeRatio * 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        if (lowFuel) {
+          ctx.save();
+          ctx.translate(this.x, this.y - this.altitude);
+          ctx.strokeStyle = `rgba(255, 90, 90, ${0.2 + warningFlash * 0.32})`;
+          ctx.lineWidth = 2.1;
+          ctx.beginPath();
+          ctx.arc(0, 0, 32 + warningFlash * 8, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        ctx.save();
+        ctx.translate(this.x, this.y - this.altitude);
+        ctx.rotate(this.angle);
+        ctx.scale(spriteScale, (1 - this.bank * 0.5) * spriteScale);
+
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = this.kind === 'bomber' ? 'rgba(255, 145, 60, 0.35)' : 'rgba(86, 196, 255, 0.4)';
+
+        if (this.kind === 'bomber') {
+          ctx.fillStyle = '#f8d5a8';
+          ctx.strokeStyle = '#ffaf4d';
+          ctx.lineWidth = 2.4;
+          ctx.beginPath();
+          ctx.moveTo(18, 0);
+          ctx.lineTo(6, -10);
+          ctx.lineTo(-2, -6);
+          ctx.lineTo(-14, -12);
+          ctx.lineTo(-8, 0);
+          ctx.lineTo(-14, 12);
+          ctx.lineTo(-2, 6);
+          ctx.lineTo(6, 10);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(-6, -14);
+          ctx.lineTo(-6, 14);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(-2, -18);
+          ctx.lineTo(10, -34);
+          ctx.moveTo(-2, 18);
+          ctx.lineTo(10, 34);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(-8, -10);
+          ctx.lineTo(-24, -20);
+          ctx.moveTo(-8, 10);
+          ctx.lineTo(-24, 20);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(12, 0, 8, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(20, 0);
+          ctx.lineTo(34, 0);
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = '#f5f7ff';
+          ctx.strokeStyle = '#7fdcff';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(16, 0);
+          ctx.lineTo(6, -8);
+          ctx.lineTo(-4, -6);
+          ctx.lineTo(-12, -10);
+          ctx.lineTo(-8, 0);
+          ctx.lineTo(-12, 10);
+          ctx.lineTo(-4, 6);
+          ctx.lineTo(6, 8);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(-4, -8);
+          ctx.lineTo(-4, 8);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(-2, -16);
+          ctx.lineTo(10, -28);
+          ctx.moveTo(-2, 16);
+          ctx.lineTo(10, 28);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(-8, -10);
+          ctx.lineTo(-22, -18);
+          ctx.moveTo(-8, 10);
+          ctx.lineTo(-22, 18);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(12, 0, 6, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(18, 0);
+          ctx.lineTo(30, 0);
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      }
+    }
+
+    const explosions = [];
+    const hangar = {
+      x: width * 0.16,
+      y: height * 0.74,
+      width: 170,
+      height: 100
+    };
+    const taxiPath = [
+      { x: hangar.x + 80, y: hangar.y + hangar.height - 8 },
+      { x: hangar.x + 80, y: height * 0.64 },
+      { x: width * 0.26, y: height * 0.64 },
+      { x: width * 0.26, y: height * 0.56 },
+      { x: width * 0.34, y: height * 0.56 },
+      { x: width * 0.34, y: height * 0.78 }
+    ];
+
+    const keyboardInput = {
+      left: false,
+      right: false,
+      up: false,
+      down: false
+    };
+
+    function handleKeyDown(event) {
+      const key = event.key.toLowerCase();
+      if (key === 'arrowleft') keyboardInput.left = true;
+      if (key === 'arrowright') keyboardInput.right = true;
+      if (key === 'arrowup') keyboardInput.up = true;
+      if (key === 'arrowdown') keyboardInput.down = true;
+      if (key === 't') {
+        handleTakeoff();
+      }
+      if (key === 'l') {
+        handleLand();
+      }
+      if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 't', 'l'].includes(key)) {
+        event.preventDefault();
+      }
+    }
+
+    function handleKeyUp(event) {
+      const key = event.key.toLowerCase();
+      if (key === 'arrowleft') keyboardInput.left = false;
+      if (key === 'arrowright') keyboardInput.right = false;
+      if (key === 'arrowup') keyboardInput.up = false;
+      if (key === 'arrowdown') keyboardInput.down = false;
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    const aircraft = [
+      new Aircraft({
+        name: 'Interceptor',
+        kind: 'interceptor',
+        x: hangar.x + 38,
+        y: hangar.y + 48,
+        groundX: hangar.x + 38,
+        groundY: hangar.y + 48,
+        state: 'LANDED',
+        vx: 220,
+        vy: 0,
+        angle: -Math.PI / 2,
+        maxSpeed: 360,
+        turnRate: 3.4,
+        pathTolerance: 18,
+        accel: 260,
+        driftScale: 16
+      }),
+      new Aircraft({
+        name: 'Bomber',
+        kind: 'bomber',
+        x: hangar.x + 112,
+        y: hangar.y + 48,
+        groundX: hangar.x + 112,
+        groundY: hangar.y + 48,
+        state: 'LANDED',
+        vx: 140,
+        vy: 0,
+        angle: -Math.PI / 2,
+        maxSpeed: 220,
+        turnRate: 1.4,
+        pathTolerance: 26,
+        accel: 180,
+        driftScale: 48
+      })
+    ];
+
+    const tracers = [];
+    let selectedAircraft = aircraft[0];
+    let gameOver = false;
+    let gameWon = false;
+    selectedAircraft.selected = true;
+
+    function handleTakeoff() {
+      if (!selectedAircraft || selectedAircraft.state !== 'LANDED') return;
+      if (selectedAircraft.fuel < selectedAircraft.maxFuel || selectedAircraft.ammo < selectedAircraft.maxAmmo) return;
+      selectedAircraft.state = 'TAKEOFF';
+      selectedAircraft.altitude = 0;
+      selectedAircraft.velocity.x = 0;
+      selectedAircraft.velocity.y = 0;
+      selectedAircraft.path = [];
+      selectedAircraft.followPath = false;
+    }
+
+    function handleLand() {
+      if (!selectedAircraft || !['CRUISE', 'CRASHED'].includes(selectedAircraft.state)) return;
+      const runwayCenterX = width * 0.5;
+      const runwayApproachY = height - 120;
+      const coneWidth = 220;
+      const coneHeight = 220;
+      const insideCone =
+        selectedAircraft.y - selectedAircraft.altitude < runwayApproachY + coneHeight &&
+        selectedAircraft.y - selectedAircraft.altitude > runwayApproachY - 80 &&
+        Math.abs(selectedAircraft.x - runwayCenterX) < coneWidth * 0.5;
+
+      if (!insideCone) return;
+
+      selectedAircraft.state = 'LANDING';
+      selectedAircraft.path = [];
+      selectedAircraft.followPath = false;
+      selectedAircraft.targetAngle = Math.PI / 2;
+    }
+
+    function updateHud() {
+      const selectedState = selectedAircraft ? selectedAircraft.state : 'None';
+      const fuelPercent = selectedAircraft ? Math.max(0, Math.round((selectedAircraft.fuel / selectedAircraft.maxFuel) * 100)) : 0;
+      const ammoText = selectedAircraft && selectedAircraft.maxAmmo > 0
+        ? `${Math.max(0, Math.round(selectedAircraft.ammo))}/${selectedAircraft.maxAmmo}`
+        : '—';
+      hud.innerHTML = `
+        <div>Selected State: ${selectedState}</div>
+        <div>Fuel: ${fuelPercent}%</div>
+        <div>Ammo: ${ammoText}</div>
+        <div>Controls: ← → turn, ↑ speed, ↓ slow</div>
+        <div>To land: press L near the runway approach</div>
+        ${selectedAircraft && selectedAircraft.fuel / selectedAircraft.maxFuel < 0.25 ? '<div style="color:#ff8a8a">Low Fuel</div>' : ''}
+        ${gameOver ? `<div style="color:#ff8a8a">${gameWon ? 'Victory' : 'Defeat'}</div>` : ''}
+      `;
+    }
+
+    function stopDrawingPath() {
+      if (!selectedAircraft) return;
+      if (!selectedAircraft.selected || selectedAircraft.state === 'LANDED') return;
+      if (selectedAircraft.path.length <= 1) {
+        selectedAircraft.resetPath();
+        return;
+      }
+      selectedAircraft.followPath = true;
+    }
+
+    canvas.addEventListener('pointerdown', (event) => {
+      const { x, y } = getPointerPosition(event);
+      let hitPlane = null;
+
+      for (const plane of aircraft) {
+        if (Math.hypot(x - plane.x, y - plane.y) < (plane.kind === 'bomber' ? 70 : 50)) {
+          hitPlane = plane;
+          break;
+        }
+      }
+
+      if (hitPlane) {
+        aircraft.forEach((plane) => {
+          plane.selected = false;
+        });
+        hitPlane.selected = true;
+        selectedAircraft = hitPlane;
+        if (selectedAircraft.state !== 'LANDED') {
+          selectedAircraft.path = [{ x, y }];
+          selectedAircraft.followPath = false;
+        } else {
+          selectedAircraft.path = [];
+          selectedAircraft.followPath = false;
+        }
+      } else if (selectedAircraft && selectedAircraft.state !== 'LANDED') {
+        selectedAircraft.targetAngle = Math.atan2(y - selectedAircraft.y, x - selectedAircraft.x);
+      }
+    });
+
+    canvas.addEventListener('pointermove', (event) => {
+      if (!selectedAircraft || !selectedAircraft.selected || selectedAircraft.followPath || selectedAircraft.state === 'LANDED') return;
+      const { x, y } = getPointerPosition(event);
+      const lastPoint = selectedAircraft.path[selectedAircraft.path.length - 1];
+      if (!lastPoint) {
+        selectedAircraft.path = [{ x, y }];
+        return;
+      }
+
+      const dx = x - lastPoint.x;
+      const dy = y - lastPoint.y;
+      if (Math.hypot(dx, dy) > 6) {
+        selectedAircraft.path.push({ x, y });
+      }
+    });
+
+    window.addEventListener('pointerup', stopDrawingPath);
+    window.addEventListener('pointercancel', stopDrawingPath);
+
+    function update(dt) {
+      if (gameOver) {
+        updateHud();
+        return;
+      }
+
+      for (let i = aircraft.length - 1; i >= 0; i -= 1) {
+        const plane = aircraft[i];
+        plane.fireCooldown = Math.max(0, plane.fireCooldown - dt);
+        plane.update(dt);
+        if (plane.crashed) {
+          aircraft.splice(i, 1);
+          if (selectedAircraft === plane) {
+            selectedAircraft = aircraft[0] || null;
+            if (selectedAircraft) {
+              selectedAircraft.selected = true;
+            }
+          }
+        }
+      }
+
+      for (let i = explosions.length - 1; i >= 0; i -= 1) {
+        const explosion = explosions[i];
+        explosion.life -= dt;
+        if (explosion.life <= 0) {
+          explosions.splice(i, 1);
+        }
+      }
+
+      for (let i = tracers.length - 1; i >= 0; i -= 1) {
+        const t = tracers[i];
+        t.x += t.vx * dt;
+        t.y += t.vy * dt;
+        t.life -= dt;
+        if (t.life <= 0) {
+          tracers.splice(i, 1);
+        }
+      }
+
+      updateHud();
+    }
+
+    function drawRunway(x, y, widthValue, heightValue, angle) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.fillStyle = '#3f3a3a';
+      ctx.fillRect(0, 0, widthValue, heightValue);
+      ctx.fillStyle = '#d8d7d0';
+      ctx.fillRect(12, 10, widthValue - 24, heightValue - 20);
+      ctx.fillStyle = '#3f3a3a';
+      ctx.fillRect(24, 18, widthValue - 48, heightValue - 36);
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(18, 12);
+      ctx.lineTo(widthValue - 18, 12);
+      ctx.moveTo(18, heightValue - 12);
+      ctx.lineTo(widthValue - 18, heightValue - 12);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+      ctx.setLineDash([10, 10]);
+      ctx.beginPath();
+      ctx.moveTo(60, heightValue * 0.5);
+      ctx.lineTo(widthValue - 60, heightValue * 0.5);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    function drawBackground() {
+      const sky = ctx.createLinearGradient(0, 0, 0, height);
+      sky.addColorStop(0, '#7bdc7f');
+      sky.addColorStop(0.55, '#4db15d');
+      sky.addColorStop(1, '#2d7a34');
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.save();
+      ctx.fillStyle = '#6db96b';
+      ctx.fillRect(0, height * 0.62, width, height * 0.38);
+      ctx.fillStyle = '#6aa85f';
+      ctx.fillRect(0, height * 0.68, width, height * 0.32);
+      ctx.restore();
+
+      ctx.save();
+      ctx.strokeStyle = 'rgba(120, 80, 40, 0.35)';
+      ctx.lineWidth = 12;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(taxiPath[0].x, taxiPath[0].y);
+      for (let i = 1; i < taxiPath.length; i += 1) {
+        ctx.lineTo(taxiPath[i].x, taxiPath[i].y);
+      }
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(232, 198, 123, 0.8)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(taxiPath[0].x, taxiPath[0].y);
+      for (let i = 1; i < taxiPath.length; i += 1) {
+        ctx.lineTo(taxiPath[i].x, taxiPath[i].y);
+      }
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      ctx.fillStyle = '#7f5c3f';
+      ctx.fillRect(hangar.x, hangar.y, hangar.width, hangar.height);
+      ctx.fillStyle = '#5b3c26';
+      ctx.fillRect(hangar.x + 18, hangar.y + 16, hangar.width - 36, hangar.height - 32);
+      ctx.fillStyle = '#8d6b45';
+      ctx.fillRect(hangar.x + 20, hangar.y + 18, hangar.width - 40, 10);
+      ctx.fillRect(hangar.x + 24, hangar.y + 72, hangar.width - 48, 8);
+      ctx.fillStyle = '#3d2b18';
+      ctx.fillRect(hangar.x + 30, hangar.y + 28, 28, hangar.height - 56);
+      ctx.fillRect(hangar.x + hangar.width - 58, hangar.y + 28, 28, hangar.height - 56);
+      ctx.restore();
+
+      ctx.save();
+      ctx.fillStyle = '#2d5a2f';
+      ctx.beginPath();
+      ctx.moveTo(0, height * 0.62);
+      ctx.lineTo(width * 0.2, height * 0.48);
+      ctx.lineTo(width * 0.35, height * 0.62);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(width * 0.55, height * 0.62);
+      ctx.lineTo(width * 0.72, height * 0.4);
+      ctx.lineTo(width * 0.88, height * 0.62);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.fillStyle = '#5c3d22';
+      ctx.beginPath();
+      ctx.moveTo(width * 0.5, height * 0.42);
+      ctx.lineTo(width * 0.44, height * 0.62);
+      ctx.lineTo(width * 0.56, height * 0.62);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#6d4a2a';
+      ctx.beginPath();
+      ctx.moveTo(width * 0.5, height * 0.34);
+      ctx.lineTo(width * 0.43, height * 0.62);
+      ctx.lineTo(width * 0.57, height * 0.62);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#7d5a35';
+      ctx.beginPath();
+      ctx.moveTo(width * 0.5, height * 0.28);
+      ctx.lineTo(width * 0.41, height * 0.62);
+      ctx.lineTo(width * 0.59, height * 0.62);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      for (let i = 0; i < 18; i += 1) {
+        const x = (i * 97) % width;
+        const y = height * 0.72 + ((i % 3) * 14);
+        ctx.fillStyle = i % 2 === 0 ? '#3f7a3c' : '#4b8e46';
+        ctx.fillRect(x, y, 20, 28);
+        ctx.fillStyle = '#2c5a2b';
+        ctx.fillRect(x + 4, y - 12, 12, 16);
+      }
+      ctx.restore();
+
+      drawRunway(width * 0.12, height * 0.82, 220, 58, -0.18);
+      drawRunway(width * 0.72, height * 0.14, 220, 58, 0.22);
+    }
+
+    function drawShadows() {
+      aircraft.forEach((plane) => {
+        if (plane.state === 'CRASHED') return;
+        const altitudeRatio = clamp(plane.altitude / 100, 0, 1);
+        const shadowOffsetX = 18 + altitudeRatio * 24;
+        const shadowOffsetY = 10 + altitudeRatio * 10;
+        const shadowAlpha = 0.16 + altitudeRatio * 0.2;
+        ctx.save();
+        ctx.translate(plane.x + shadowOffsetX, plane.y - plane.altitude + shadowOffsetY);
+        ctx.scale(1.3 + altitudeRatio * 0.15, 0.7 + altitudeRatio * 0.1);
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
+        ctx.shadowBlur = 20 + altitudeRatio * 10;
+        ctx.shadowColor = `rgba(0, 0, 0, ${shadowAlpha})`;
+        ctx.arc(0, 0, 16 + altitudeRatio * 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+    }
+
+    function drawPaths() {
+      aircraft.forEach((plane) => plane.drawPath());
+    }
+
+    function drawTrails() {
+      aircraft.forEach((plane) => plane.drawTrails());
+    }
+
+    function drawRadarPulses() {
+      aircraft.forEach((plane) => plane.drawRadarPulse());
+    }
+
+    function drawPlanes() {
+      aircraft.forEach((plane) => plane.draw());
+    }
+
+    function drawExplosions() {
+      ctx.save();
+      explosions.forEach((explosion) => {
+        const alpha = Math.max(0, explosion.life / explosion.maxLife);
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = '#ffd36b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(explosion.x, explosion.y, explosion.size * (1 - alpha) + 6, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
+
+    function drawTracers() {
+      ctx.save();
+      tracers.forEach((t) => {
+        const alpha = Math.max(0, t.life / t.maxLife);
+        ctx.strokeStyle = `rgba(255, 214, 107, ${alpha})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(t.x, t.y);
+        ctx.lineTo(t.x - t.vx * 0.01, t.y - t.vy * 0.01);
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
+
+    let lastTime = performance.now();
+
+    function tick(now) {
+      const dt = Math.min((now - lastTime) / 1000, 0.032);
+      lastTime = now;
+      update(dt);
+      drawBackground();
+      drawShadows();
+      drawTrails();
+      drawExplosions();
+      drawTracers();
+      drawPaths();
+      drawRadarPulses();
+      drawPlanes();
+      requestAnimationFrame(tick);
+    }
+
+    updateHud();
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>
