@@ -46,7 +46,7 @@
             padding: env(safe-area-inset-top, 16px) env(safe-area-inset-right, 16px) env(safe-area-inset-bottom, 16px) env(safe-area-inset-left, 16px);
         }
         .hud-panel {
-            background: rgba(0, 0, 0, 0.75);
+            background: rgba(0, 0, 0, 0.8);
             color: #fff;
             padding: 10px 16px;
             border-radius: 8px;
@@ -57,20 +57,64 @@
         .top-hud {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             width: 100%;
         }
+        .hud-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
         .hud-title {
-            font-size: 14px;
+            font-size: 13px;
             text-transform: uppercase;
             letter-spacing: 1px;
             color: #aaa;
         }
         .hud-value {
-            font-size: 20px;
+            font-size: 19px;
             font-weight: bold;
             color: #f1c40f;
         }
+        /* Tracker Styling */
+        #tracker-list {
+            margin-top: 8px;
+            font-size: 14px;
+            list-style: none;
+            color: #fff;
+        }
+        .tracker-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+            opacity: 0.6;
+            transition: opacity 0.3s ease;
+        }
+        .tracker-item.found {
+            color: #f1c40f;
+            opacity: 1;
+        }
+        .check-box {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #555;
+            border-radius: 4px;
+            margin-right: 8px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .tracker-item.found .check-box {
+            background-color: #f39c12;
+            border-color: #f1c40f;
+        }
+        .tracker-item.found .check-box::after {
+            content: "✓";
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
         /* Touch Controls Layer */
         #controls-layer {
             position: absolute;
@@ -144,13 +188,24 @@
     
     <div id="ui-layer">
         <div class="top-hud">
-            <div class="hud-panel">
-                <div class="hud-title">Exploration</div>
-                <div class="hud-value" id="progress-text">0%</div>
+            <div class="hud-group">
+                <div class="hud-panel">
+                    <div class="hud-title">Shift Exploration</div>
+                    <div class="hud-value" id="progress-text">0%</div>
+                </div>
+                <div class="hud-panel">
+                    <div class="hud-title">Current Sector</div>
+                    <div class="hud-value" id="sector-text">Loading...</div>
+                </div>
             </div>
+            <!-- Legend Tracker HUB -->
             <div class="hud-panel">
-                <div class="hud-title">Sector</div>
-                <div class="hud-value" id="sector-text">Loading...</div>
+                <div class="hud-title">Legends Checklist</div>
+                <ul id="tracker-list">
+                    <li class="tracker-item" id="find-stockton"><div class="check-box"></div><span class="name-label">???</span></li>
+                    <li class="tracker-item" id="find-malone"><div class="check-box"></div><span class="name-label">???</span></li>
+                    <li class="tracker-item" id="find-bailey"><div class="check-box"></div><span class="name-label">???</span></li>
+                </ul>
             </div>
         </div>
     </div>
@@ -162,9 +217,9 @@
     </div>
 
     <div id="win-screen">
-        <h1 style="color: #f1c40f; font-size: 32px; margin-bottom: 10px;">Inspection Complete!</h1>
-        <p>You fully secured and explored the arena construction site.</p>
-        <button class="win-btn" onclick="resetGame()">Inspect Again</button>
+        <h1 style="color: #f1c40f; font-size: 32px; margin-bottom: 10px;">Shift Complete!</h1>
+        <p>Arena secured, all historical figures located.</p>
+        <button class="win-btn" onclick="resetGame()">Start New Shift</button>
     </div>
 </div>
 
@@ -179,8 +234,13 @@
     const joystickZone = document.getElementById('joystick-zone');
     const joystickHandle = document.getElementById('joystick-handle');
     const controlsLayer = document.getElementById('controls-layer');
+    const trackerList = {
+        stockton: document.getElementById('find-stockton'),
+        malone: document.getElementById('find-malone'),
+        bailey: document.getElementById('find-bailey')
+    };
 
-    // Handle Resize for Mobile viewports
+    // Handle Resize
     let viewW, viewH;
     function resizeCanvas() {
         viewW = window.innerWidth;
@@ -202,6 +262,51 @@
     const exploredGrid = Array(MAP_ROWS).fill(null).map(() => Array(MAP_COLS).fill(false));
     let totalExplorableTiles = 0;
     let exploredTilesCount = 0;
+
+    // Pre-loading Real Player Headshots from Web 
+    const hiddenLegends = [
+        { 
+            name: 'stockton', 
+            fullName: 'J. Stockton', 
+            x: 29 * TILE_SIZE, 
+            y: 3 * TILE_SIZE, 
+            found: false, 
+            size: 45,
+            imgUrl: 'https://placehold.co/100x100/111827/f1c40f?text=Stockton', // Note: Replace with production images if needed
+            imgObj: null 
+        },
+        { 
+            name: 'malone', 
+            fullName: 'K. Malone', 
+            x: 3 * TILE_SIZE, 
+            y: 29 * TILE_SIZE, 
+            found: false, 
+            size: 45,
+            imgUrl: 'https://placehold.co/100x100/111827/f1c40f?text=Malone',
+            imgObj: null 
+        },
+        { 
+            name: 'bailey', 
+            fullName: 'T. Bailey', 
+            x: 16 * TILE_SIZE, 
+            y: 16 * TILE_SIZE, 
+            found: false, 
+            size: 45,
+            imgUrl: 'https://placehold.co/100x100/111827/f1c40f?text=Bailey',
+            imgObj: null 
+        }
+    ];
+
+    // Asynchronously buffer web graphics
+    function loadLegendImages() {
+        hiddenLegends.forEach(legend => {
+            const img = new Image();
+            img.src = legend.imgUrl;
+            img.onload = () => {
+                legend.imgObj = img;
+            };
+        });
+    }
 
     function buildArenaBlueprint() {
         totalExplorableTiles = 0;
@@ -253,13 +358,14 @@
         speed: 4,
         vx: 0,
         vy: 0,
-        angle: 0
+        angle: 0,
+        lightRange: 150, 
+        lightAngle: Math.PI / 4
     };
 
     // Camera Object
     const camera = {
-        x: 0,
-        y: 0,
+        x: 0, y: 0,
         update: function() {
             this.x = player.x - viewW / 2;
             this.y = player.y - viewH / 2;
@@ -274,16 +380,16 @@
     let touchVector = { x: 0, y: 0 };
     const maxJoystickRadius = 45;
 
-    // Desktop Keyboard State Tracking
+    // Desktop Keyboard State
     const keysPressed = {
         ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false,
-        w: false, s: false, a: false, d: false
+        w: false, s: false, a: false, d: false,
+        W: false, S: false, A: false, D: false
     };
 
-    // Touch Joystick Input Listeners
+    // Touch Controls
     controlsLayer.addEventListener('touchstart', (e) => {
         if (joystickPointerId !== null) return;
-        
         const touch = e.changedTouches[0];
         if (touch.clientX < viewW * 0.6) {
             joystickPointerId = touch.identifier;
@@ -296,18 +402,15 @@
 
     controlsLayer.addEventListener('touchmove', (e) => {
         if (joystickPointerId === null) return;
-        
         for (let touch of e.changedTouches) {
             if (touch.identifier === joystickPointerId) {
                 let dx = touch.clientX - joystickCenter.x;
                 let dy = touch.clientY - joystickCenter.y;
                 let distance = Math.hypot(dx, dy);
-
                 if (distance > maxJoystickRadius) {
                     dx = (dx / distance) * maxJoystickRadius;
                     dy = (dy / distance) * maxJoystickRadius;
                 }
-
                 joystickHandle.style.transform = `translate(${dx}px, ${dy}px)`;
                 touchVector.x = dx / maxJoystickRadius;
                 touchVector.y = dy / maxJoystickRadius;
@@ -319,92 +422,48 @@
         joystickPointerId = null;
         touchVector = { x: 0, y: 0 };
         joystickHandle.style.transform = 'translate(0px, 0px)';
-        joystickZone.style.left = '40px';
-        joystickZone.style.bottom = '40px';
+        joystickZone.style.left = '40px'; joystickZone.style.bottom = '40px';
     }
 
     controlsLayer.addEventListener('touchend', (e) => {
-        for (let touch of e.changedTouches) {
-            if (touch.identifier === joystickPointerId) resetJoystick();
-        }
+        for (let touch of e.changedTouches) { if (touch.identifier === joystickPointerId) resetJoystick(); }
     });
-    controlsLayer.addEventListener('touchcancel', (e) => {
-        for (let touch of e.changedTouches) {
-            if (touch.identifier === joystickPointerId) resetJoystick();
-        }
-    });
-
-    // Keyboard Input Listeners (For PC testing/play)
+    
+    // Keyboard Logic
     window.addEventListener('keydown', (e) => {
-        if (e.key in keysPressed) {
-            keysPressed[e.key] = true;
-            // Prevent browser window from scrolling with arrow keys
-            if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
-                e.preventDefault();
-            }
+        if (e.key in keysPressed) { 
+            keysPressed[e.key] = true; 
+            if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) e.preventDefault(); 
         }
     });
-
     window.addEventListener('keyup', (e) => {
-        if (e.key in keysPressed) {
-            keysPressed[e.key] = false;
-        }
+        if (e.key in keysPressed) keysPressed[e.key] = false;
     });
 
-    // Merge Touch Vector and Keyboard Input to determine dynamic final movement values
     function getCombinedMovementVector() {
-        // If a touchscreen user is actively using the joystick, let it override
-        if (joystickPointerId !== null) {
-            return touchVector;
-        }
-
-        // Calculate vector from keyboard state
-        let kx = 0;
-        let ky = 0;
-
+        if (joystickPointerId !== null) return touchVector;
+        
+        let kx = 0, ky = 0;
         if (keysPressed.ArrowLeft || keysPressed.a || keysPressed.A) kx -= 1;
         if (keysPressed.ArrowRight || keysPressed.d || keysPressed.D) kx += 1;
         if (keysPressed.ArrowUp || keysPressed.w || keysPressed.W) ky -= 1;
         if (keysPressed.ArrowDown || keysPressed.s || keysPressed.S) ky += 1;
-
-        // Normalize if moving diagonally so diagonal speed isn't overly fast
-        if (kx !== 0 && ky !== 0) {
-            const length = Math.hypot(kx, ky);
-            kx /= length;
-            ky /= length;
+        
+        if (kx !== 0 && ky !== 0) { 
+            const length = Math.hypot(kx, ky); 
+            kx /= length; 
+            ky /= length; 
         }
-
-        // Visually update the on-screen joystick handle to reflect keyboard input
+        
         if (kx !== 0 || ky !== 0) {
             joystickHandle.style.transform = `translate(${kx * (maxJoystickRadius - 5)}px, ${ky * (maxJoystickRadius - 5)}px)`;
         } else {
             joystickHandle.style.transform = 'translate(0px, 0px)';
         }
-
         return { x: kx, y: ky };
     }
 
-    // Sector Location Text Updates
-    function getSectorName(x, y) {
-        const col = Math.floor(x / TILE_SIZE);
-        const row = Math.floor(y / TILE_SIZE);
-        
-        if (col >= 10 && col <= 22 && row >= 11 && row <= 21) {
-            return "Basketball Court (Main Floor)";
-        } else if (row < 7) {
-            return "North Concourse Stands";
-        } else if (row > 24) {
-            return "South Concourse Seating";
-        } else if (col < 7) {
-            return "West Skybox Wing";
-        } else if (col > 24) {
-            return "East Team Locker Hall";
-        } else {
-            return "Inner Perimeter Hallway";
-        }
-    }
-
-    // Update Exploration State
+    // Process Space Sweeps & Hidden Targets Vector Collision
     function updateExploration() {
         const radiusInTiles = 3;
         const playerCol = Math.floor(player.x / TILE_SIZE);
@@ -414,39 +473,69 @@
             for (let c = playerCol - radiusInTiles; c <= playerCol + radiusInTiles; c++) {
                 if (r >= 0 && r < MAP_ROWS && c >= 0 && c < MAP_COLS) {
                     const dist = Math.hypot(r - playerRow, c - playerCol);
-                    if (dist <= radiusInTiles && gameMap[r][c] === 0 && !exploredGrid[r][c]) {
-                        exploredGrid[r][c] = true;
-                        exploredTilesCount++;
+                    if (dist <= radiusInTiles) {
+                        if (gameMap[r][c] === 0 && !exploredGrid[r][c]) {
+                            exploredGrid[r][c] = true;
+                            exploredTilesCount++;
+                        }
                     }
                 }
             }
         }
 
-        const percentage = Math.floor((exploredTilesCount / totalExplorableTiles) * 100);
-        progressText.innerText = `${percentage}%`;
-        sectorText.innerText = getSectorName(player.x, player.y);
+        // Raycasting sweep inside the moving flashlight cone matrix
+        hiddenLegends.forEach(legend => {
+            if (!legend.found) {
+                const dx = legend.x - player.x;
+                const dy = legend.y - player.y;
+                const dist = Math.hypot(dx, dy);
+                
+                if (dist < player.lightRange) {
+                    const angleToLegend = Math.atan2(dy, dx);
+                    let diff = angleToLegend - player.angle;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
 
-        if (percentage >= 100 && !winScreen.classList.contains('show')) {
+                    if (Math.abs(diff) < player.lightAngle) { 
+                        legend.found = true;
+                        const itemEl = trackerList[legend.name];
+                        itemEl.classList.add('found');
+                        itemEl.querySelector('.name-label').innerText = legend.fullName;
+                    }
+                }
+            }
+        });
+
+        const explorePercent = Math.floor((exploredTilesCount / totalExplorableTiles) * 100);
+        progressText.innerText = `${explorePercent}%`;
+        
+        let sectorName = "Inner Perimeter Hallway";
+        const col = Math.floor(player.x / TILE_SIZE); 
+        const row = Math.floor(player.y / TILE_SIZE);
+        if (col >= 10 && col <= 22 && row >= 11 && row <= 21) sectorName = "Basketball Court (Main Floor)";
+        else if (row < 7) sectorName = "North Concourse Stands";
+        else if (row > 24) sectorName = "South Concourse Seating";
+        sectorText.innerText = sectorName;
+
+        const allFound = hiddenLegends.every(l => l.found);
+        if (explorePercent >= 100 && allFound && !winScreen.classList.contains('show')) {
             winScreen.classList.add('show');
         }
     }
 
-    // Collision Check
     function checkWallCollisions(px, py) {
         const buffer = player.radius;
         const checkPoints = [
-            {x: px - buffer, y: py - buffer},
-            {x: px + buffer, y: py - buffer},
-            {x: px - buffer, y: py + buffer},
+            {x: px - buffer, y: py - buffer}, 
+            {x: px + buffer, y: py - buffer}, 
+            {x: px - buffer, y: py + buffer}, 
             {x: px + buffer, y: py + buffer}
         ];
-
         for (let pt of checkPoints) {
-            const tileX = Math.floor(pt.x / TILE_SIZE);
+            const tileX = Math.floor(pt.x / TILE_SIZE); 
             const tileY = Math.floor(pt.y / TILE_SIZE);
-
-            if (tileX >= 0 && tileX < MAP_COLS && tileY >= 0 && tileY < MAP_ROWS) {
-                if (gameMap[tileY][tileX] === 1) return true;
+            if (tileX >= 0 && tileX < MAP_COLS && tileY >= 0 && tileY < MAP_ROWS) { 
+                if (gameMap[tileY][tileX] === 1) return true; 
             }
         }
         return false;
@@ -454,142 +543,130 @@
 
     function resetGame() {
         winScreen.classList.remove('show');
+        hiddenLegends.forEach(l => { 
+            l.found = false; 
+            const itemEl = trackerList[l.name];
+            itemEl.classList.remove('found');
+            itemEl.querySelector('.name-label').innerText = "???";
+        });
         buildArenaBlueprint();
-        player.x = MAP_WIDTH / 2;
-        player.y = MAP_HEIGHT - 100;
+        player.x = MAP_WIDTH / 2; player.y = MAP_HEIGHT - 100;
+        player.angle = 0;
         updateExploration();
     }
 
-    // Engine Loops
     function update() {
         const moveVector = getCombinedMovementVector();
-        player.vx = moveVector.x * player.speed;
+        player.vx = moveVector.x * player.speed; 
         player.vy = moveVector.y * player.speed;
-
+        
         if (player.vx !== 0 || player.vy !== 0) {
             player.angle = Math.atan2(player.vy, player.vx);
-            
-            const nextX = player.x + player.vx;
-            if (!checkWallCollisions(nextX, player.y)) player.x = nextX;
-            
-            const nextY = player.y + player.vy;
-            if (!checkWallCollisions(player.x, nextY)) player.y = nextY;
-
+            if (!checkWallCollisions(player.x + player.vx, player.y)) player.x += player.vx;
+            if (!checkWallCollisions(player.x, player.y + player.vy)) player.y += player.vy;
             updateExploration();
         }
-
         camera.update();
     }
 
     function render() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
         ctx.save();
         ctx.translate(-camera.x, -camera.y);
 
-        const startCol = Math.max(0, Math.floor(camera.x / TILE_SIZE));
-        const endCol = Math.min(MAP_COLS, Math.ceil((camera.x + viewW) / TILE_SIZE));
-        const startRow = Math.max(0, Math.floor(camera.y / TILE_SIZE));
-        const endRow = Math.min(MAP_ROWS, Math.ceil((camera.y + viewH) / TILE_SIZE));
+        const sCol = Math.max(0, Math.floor(camera.x / TILE_SIZE)); 
+        const eCol = Math.min(MAP_COLS, Math.ceil((camera.x + viewW) / TILE_SIZE));
+        const sRow = Math.max(0, Math.floor(camera.y / TILE_SIZE)); 
+        const eRow = Math.min(MAP_ROWS, Math.ceil((camera.y + viewH) / TILE_SIZE));
 
-        for (let r = startRow; r < endRow; r++) {
-            for (let c = startCol; c < endCol; c++) {
-                const tx = c * TILE_SIZE;
+        // Arena Map Render Loop
+        for (let r = sRow; r < eRow; r++) {
+            for (let c = sCol; c < eCol; c++) {
+                const tx = c * TILE_SIZE; 
                 const ty = r * TILE_SIZE;
-
-                if ((r + c) % 2 === 0) {
-                    ctx.fillStyle = '#222';
-                } else {
-                    ctx.fillStyle = '#282828';
-                }
+                ctx.fillStyle = ((r + c) % 2 === 0) ? '#222' : '#282828';
                 ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE);
-
+                
                 if (gameMap[r][c] === 1) {
-                    ctx.fillStyle = '#555';
+                    ctx.fillStyle = '#555'; 
                     ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE);
-                    ctx.strokeStyle = '#e67e22';
-                    ctx.lineWidth = 3;
-                    ctx.beginPath();
-                    ctx.moveTo(tx, ty); ctx.lineTo(tx + TILE_SIZE, ty + TILE_SIZE);
-                    ctx.stroke();
+                    ctx.strokeStyle = '#e67e22'; 
+                    ctx.lineWidth = 3; 
+                    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx+TILE_SIZE, ty+TILE_SIZE); ctx.stroke();
                 }
-
-                if (!exploredGrid[r][c]) {
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-                    ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE);
+                if (!exploredGrid[r][c]) { 
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; 
+                    ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE); 
                 }
             }
         }
 
-        // Court Outline Blueprint layout
-        ctx.strokeStyle = 'rgba(52, 152, 219, 0.4)';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(10 * TILE_SIZE, 11 * TILE_SIZE, 12 * TILE_SIZE, 10 * TILE_SIZE);
-        ctx.beginPath();
-        ctx.arc(16 * TILE_SIZE, 16 * TILE_SIZE, 2 * TILE_SIZE, 0, Math.PI * 2);
-        ctx.moveTo(16 * TILE_SIZE, 11 * TILE_SIZE);
-        ctx.lineTo(16 * TILE_SIZE, 21 * TILE_SIZE);
-        ctx.stroke();
+        // Blueprint Layout Markings
+        ctx.strokeStyle = 'rgba(52, 152, 219, 0.4)'; 
+        ctx.lineWidth = 2; 
+        ctx.strokeRect(10*TILE_SIZE, 11*TILE_SIZE, 12*TILE_SIZE, 10*TILE_SIZE);
 
-        // Props
-        ctx.fillStyle = '#e67e22';
-        ctx.beginPath();
-        ctx.arc(400, 320, 10, 0, Math.PI*2);
-        ctx.arc(800, 750, 12, 0, Math.PI*2);
-        ctx.fill();
+        // Render Discovered Web Pictures onto Floor
+        hiddenLegends.forEach(legend => {
+            if (legend.found) {
+                ctx.save();
+                // Create clean circular photo frames
+                ctx.beginPath();
+                ctx.arc(legend.x, legend.y, legend.size / 2, 0, Math.PI * 2);
+                ctx.clip();
+                
+                if (legend.imgObj) {
+                    // Draw face portrait smoothly inside clipped viewport boundary
+                    ctx.drawImage(legend.imgObj, legend.x - legend.size / 2, legend.y - legend.size / 2, legend.size, legend.size);
+                } else {
+                    // Fallback block frame context while loading assets asynchronously
+                    ctx.fillStyle = '#333';
+                    ctx.fillRect(legend.x - legend.size / 2, legend.y - legend.size / 2, legend.size, legend.size);
+                }
+                ctx.restore();
 
-        // Guard Character
+                // Draw Gold framing border rings around discovered cards
+                ctx.strokeStyle = '#f1c40f';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(legend.x, legend.y, legend.size / 2, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        });
+
+        // Guard Base Coordinates Transformation
         ctx.save();
         ctx.translate(player.x, player.y);
         ctx.rotate(player.angle);
 
-        // Flashlight beam
-        const gradient = ctx.createRadialGradient(0, 0, player.radius, 60, 0, 120);
-        gradient.addColorStop(0, 'rgba(255, 255, 210, 0.4)');
+        // Flashlight Cone Field Matrix
+        const gradient = ctx.createRadialGradient(0, 0, player.radius, 50, 0, player.lightRange);
+        gradient.addColorStop(0, 'rgba(255, 255, 210, 0.45)'); 
         gradient.addColorStop(1, 'rgba(255, 255, 210, 0.0)');
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.arc(0, 0, 130, -Math.PI / 5, Math.PI / 5);
-        ctx.closePath();
-        ctx.fill();
+        ctx.fillStyle = gradient; 
+        ctx.beginPath(); ctx.moveTo(0, 0);
+        ctx.arc(0, 0, player.lightRange, -player.lightAngle, player.lightAngle); 
+        ctx.closePath(); ctx.fill();
 
-        // Base/Shoulders
-        ctx.fillStyle = '#1b3a4b';
-        ctx.beginPath();
-        ctx.arc(-2, 0, player.radius + 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Yellow Vest
-        ctx.fillStyle = '#f1c40f'; 
-        ctx.fillRect(-6, -player.radius, 10, player.radius * 2);
-        ctx.fillStyle = '#bdc3c7';
-        ctx.fillRect(-2, -player.radius, 2, 4);
-        ctx.fillRect(-2, player.radius - 4, 2, 4);
-
-        // White Hardhat Head
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(2, 0, player.radius - 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#eeeeee';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(2, 0, player.radius - 3, -Math.PI/2, Math.PI/2);
-        ctx.stroke();
+        // Safety Equipment Sprites Layer (Yellow Vest & Hardhat)
+        ctx.fillStyle = '#1b3a4b'; ctx.beginPath(); ctx.arc(-2, 0, player.radius + 2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#f1c40f'; ctx.fillRect(-6, -player.radius, 10, player.radius * 2);
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(2, 0, player.radius - 5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#eeeeee'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(2, 0, player.radius - 3, -Math.PI/2, Math.PI/2); ctx.stroke();
 
         ctx.restore();
         ctx.restore();
     }
 
-    function gameLoop() {
-        update();
-        render();
-        requestAnimationFrame(gameLoop);
+    function gameLoop() { 
+        update(); 
+        render(); 
+        requestAnimationFrame(gameLoop); 
     }
-
-    buildArenaBlueprint();
-    updateExploration();
+    
+    loadLegendImages();
+    buildArenaBlueprint(); 
+    updateExploration(); 
     gameLoop();
 </script>
 </body>
