@@ -185,25 +185,20 @@
     function resizeCanvas() {
         viewW = window.innerWidth;
         viewH = window.innerHeight;
-        // Keep a consistent logical aspect ratio or just fill the mobile viewport
         canvas.width = viewW;
         canvas.height = viewH;
     }
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    // Map Configuration (The Arena Layout)
-    // 0 = Walkable, 1 = Wall/Barrier, 2 = Court lines decoration
+    // Map Configuration
     const TILE_SIZE = 40;
     const MAP_COLS = 32;
     const MAP_ROWS = 32;
     const MAP_WIDTH = MAP_COLS * TILE_SIZE;
     const MAP_HEIGHT = MAP_ROWS * TILE_SIZE;
 
-    // Generate Map Blueprint
     const gameMap = Array(MAP_ROWS).fill(null).map(() => Array(MAP_COLS).fill(0));
-    
-    // Generate Fog of War / Exploration Grid
     const exploredGrid = Array(MAP_ROWS).fill(null).map(() => Array(MAP_COLS).fill(false));
     let totalExplorableTiles = 0;
     let exploredTilesCount = 0;
@@ -214,28 +209,23 @@
 
         for (let r = 0; r < MAP_ROWS; r++) {
             for (let c = 0; c < MAP_COLS; c++) {
-                // Outer boundary walls
                 if (r === 0 || r === MAP_ROWS - 1 || c === 0 || c === MAP_COLS - 1) {
                     gameMap[r][c] = 1;
                     continue;
                 }
                 
-                // Outer Concourse walls layout
                 if ((r === 6 || r === MAP_ROWS - 7) && (c > 4 && c < MAP_COLS - 5)) {
-                    if (c !== 15 && c !== 16) gameMap[r][c] = 1; // leave entrances open
+                    if (c !== 15 && c !== 16) gameMap[r][c] = 1;
                 }
                 if ((c === 6 || c === MAP_COLS - 7) && (r > 4 && r < MAP_ROWS - 5)) {
                     if (r !== 15 && r !== 16) gameMap[r][c] = 1;
                 }
 
-                // Inner Court scaffolding zones (Under Construction areas acting as walls/obstacles)
-                // Center court boundaries
                 const innerX = 10;
                 const innerY = 11;
                 const innerW = 12;
                 const innerH = 10;
                 
-                // Draw some construction barriers around parts of the court
                 if ((r === innerY || r === innerY + innerH) && (c >= innerX && c <= innerX + innerW)) {
                     if (c !== 15 && c !== 16) gameMap[r][c] = 1; 
                 }
@@ -243,12 +233,10 @@
                     if (r !== 15 && r !== 16) gameMap[r][c] = 1;
                 }
 
-                // Scattered construction supplies (single block obstacles)
                 if ((r === 3 && c === 4) || (r === 4 && c === 22) || (r === 25 && c === 9) || (r === 28 && c === 26)) {
                     gameMap[r][c] = 1;
                 }
 
-                // Count walkable tiles
                 if (gameMap[r][c] === 0) {
                     totalExplorableTiles++;
                     exploredGrid[r][c] = false;
@@ -275,29 +263,34 @@
         update: function() {
             this.x = player.x - viewW / 2;
             this.y = player.y - viewH / 2;
-            // Clamp camera to map boundaries
             this.x = Math.max(0, Math.min(this.x, MAP_WIDTH - viewW));
             this.y = Math.max(0, Math.min(this.y, MAP_HEIGHT - viewH));
         }
     };
 
-    // Joystick Math & Input Logic
+    // Input States
     let joystickPointerId = null;
     let joystickCenter = { x: 0, y: 0 };
-    let joystickVector = { x: 0, y: 0 };
+    let touchVector = { x: 0, y: 0 };
     const maxJoystickRadius = 45;
 
+    // Desktop Keyboard State Tracking
+    const keysPressed = {
+        ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false,
+        w: false, s: false, a: false, d: false
+    };
+
+    // Touch Joystick Input Listeners
     controlsLayer.addEventListener('touchstart', (e) => {
-        if (joystickPointerId !== null) return; // Only single touch for joystick
+        if (joystickPointerId !== null) return;
         
         const touch = e.changedTouches[0];
-        // Only trigger if touched the left side bottom quadrant generally
         if (touch.clientX < viewW * 0.6) {
             joystickPointerId = touch.identifier;
             joystickZone.style.left = `${touch.clientX - 60}px`;
             joystickZone.style.bottom = `${viewH - touch.clientY - 60}px`;
             joystickCenter = { x: touch.clientX, y: touch.clientY };
-            joystickVector = { x: 0, y: 0 };
+            touchVector = { x: 0, y: 0 };
         }
     });
 
@@ -313,42 +306,83 @@
                 if (distance > maxJoystickRadius) {
                     dx = (dx / distance) * maxJoystickRadius;
                     dy = (dy / distance) * maxJoystickRadius;
-                    distance = maxJoystickRadius;
                 }
 
                 joystickHandle.style.transform = `translate(${dx}px, ${dy}px)`;
-                
-                // Normalize values between -1 and 1
-                joystickVector.x = dx / maxJoystickRadius;
-                joystickVector.y = dy / maxJoystickRadius;
+                touchVector.x = dx / maxJoystickRadius;
+                touchVector.y = dy / maxJoystickRadius;
             }
         }
     });
 
     function resetJoystick() {
         joystickPointerId = null;
-        joystickVector = { x: 0, y: 0 };
+        touchVector = { x: 0, y: 0 };
         joystickHandle.style.transform = 'translate(0px, 0px)';
-        // Reset joystick back to standard position
         joystickZone.style.left = '40px';
         joystickZone.style.bottom = '40px';
     }
 
     controlsLayer.addEventListener('touchend', (e) => {
         for (let touch of e.changedTouches) {
-            if (touch.identifier === joystickPointerId) {
-                resetJoystick();
+            if (touch.identifier === joystickPointerId) resetJoystick();
+        }
+    });
+    controlsLayer.addEventListener('touchcancel', (e) => {
+        for (let touch of e.changedTouches) {
+            if (touch.identifier === joystickPointerId) resetJoystick();
+        }
+    });
+
+    // Keyboard Input Listeners (For PC testing/play)
+    window.addEventListener('keydown', (e) => {
+        if (e.key in keysPressed) {
+            keysPressed[e.key] = true;
+            // Prevent browser window from scrolling with arrow keys
+            if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+                e.preventDefault();
             }
         }
     });
 
-    controlsLayer.addEventListener('touchcancel', (e) => {
-        for (let touch of e.changedTouches) {
-            if (touch.identifier === joystickPointerId) {
-                resetJoystick();
-            }
+    window.addEventListener('keyup', (e) => {
+        if (e.key in keysPressed) {
+            keysPressed[e.key] = false;
         }
     });
+
+    // Merge Touch Vector and Keyboard Input to determine dynamic final movement values
+    function getCombinedMovementVector() {
+        // If a touchscreen user is actively using the joystick, let it override
+        if (joystickPointerId !== null) {
+            return touchVector;
+        }
+
+        // Calculate vector from keyboard state
+        let kx = 0;
+        let ky = 0;
+
+        if (keysPressed.ArrowLeft || keysPressed.a || keysPressed.A) kx -= 1;
+        if (keysPressed.ArrowRight || keysPressed.d || keysPressed.D) kx += 1;
+        if (keysPressed.ArrowUp || keysPressed.w || keysPressed.W) ky -= 1;
+        if (keysPressed.ArrowDown || keysPressed.s || keysPressed.S) ky += 1;
+
+        // Normalize if moving diagonally so diagonal speed isn't overly fast
+        if (kx !== 0 && ky !== 0) {
+            const length = Math.hypot(kx, ky);
+            kx /= length;
+            ky /= length;
+        }
+
+        // Visually update the on-screen joystick handle to reflect keyboard input
+        if (kx !== 0 || ky !== 0) {
+            joystickHandle.style.transform = `translate(${kx * (maxJoystickRadius - 5)}px, ${ky * (maxJoystickRadius - 5)}px)`;
+        } else {
+            joystickHandle.style.transform = 'translate(0px, 0px)';
+        }
+
+        return { x: kx, y: ky };
+    }
 
     // Sector Location Text Updates
     function getSectorName(x, y) {
@@ -372,7 +406,6 @@
 
     // Update Exploration State
     function updateExploration() {
-        // Clear fog in a circle around player
         const radiusInTiles = 3;
         const playerCol = Math.floor(player.x / TILE_SIZE);
         const playerRow = Math.floor(player.y / TILE_SIZE);
@@ -380,7 +413,6 @@
         for (let r = playerRow - radiusInTiles; r <= playerRow + radiusInTiles; r++) {
             for (let c = playerCol - radiusInTiles; c <= playerCol + radiusInTiles; c++) {
                 if (r >= 0 && r < MAP_ROWS && c >= 0 && c < MAP_COLS) {
-                    // Check true circle distance
                     const dist = Math.hypot(r - playerRow, c - playerCol);
                     if (dist <= radiusInTiles && gameMap[r][c] === 0 && !exploredGrid[r][c]) {
                         exploredGrid[r][c] = true;
@@ -399,15 +431,9 @@
         }
     }
 
-    // Circle / Axis Aligned Bounding Box Collision
+    // Collision Check
     function checkWallCollisions(px, py) {
-        let newX = px;
-        let newY = py;
-
-        // Pad the bounding box slightly around the player radius
         const buffer = player.radius;
-
-        // Check 4 diagonal corners around the player movement vector
         const checkPoints = [
             {x: px - buffer, y: py - buffer},
             {x: px + buffer, y: py - buffer},
@@ -420,9 +446,7 @@
             const tileY = Math.floor(pt.y / TILE_SIZE);
 
             if (tileX >= 0 && tileX < MAP_COLS && tileY >= 0 && tileY < MAP_ROWS) {
-                if (gameMap[tileY][tileX] === 1) {
-                    return true;
-                }
+                if (gameMap[tileY][tileX] === 1) return true;
             }
         }
         return false;
@@ -436,25 +460,20 @@
         updateExploration();
     }
 
-    // Engine Core Loops
+    // Engine Loops
     function update() {
-        player.vx = joystickVector.x * player.speed;
-        player.vy = joystickVector.y * player.speed;
+        const moveVector = getCombinedMovementVector();
+        player.vx = moveVector.x * player.speed;
+        player.vy = moveVector.y * player.speed;
 
         if (player.vx !== 0 || player.vy !== 0) {
             player.angle = Math.atan2(player.vy, player.vx);
             
-            // Try step X axis
             const nextX = player.x + player.vx;
-            if (!checkWallCollisions(nextX, player.y)) {
-                player.x = nextX;
-            }
+            if (!checkWallCollisions(nextX, player.y)) player.x = nextX;
             
-            // Try step Y axis
             const nextY = player.y + player.vy;
-            if (!checkWallCollisions(player.x, nextY)) {
-                player.y = nextY;
-            }
+            if (!checkWallCollisions(player.x, nextY)) player.y = nextY;
 
             updateExploration();
         }
@@ -466,10 +485,8 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
         ctx.save();
-        // Translate context relative to camera position
         ctx.translate(-camera.x, -camera.y);
 
-        // 1. Draw Base Floor Tiles & Layout
         const startCol = Math.max(0, Math.floor(camera.x / TILE_SIZE));
         const endCol = Math.min(MAP_COLS, Math.ceil((camera.x + viewW) / TILE_SIZE));
         const startRow = Math.max(0, Math.floor(camera.y / TILE_SIZE));
@@ -480,7 +497,6 @@
                 const tx = c * TILE_SIZE;
                 const ty = r * TILE_SIZE;
 
-                // Alternate floor patterns for construction grid look
                 if ((r + c) % 2 === 0) {
                     ctx.fillStyle = '#222';
                 } else {
@@ -488,11 +504,9 @@
                 }
                 ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE);
 
-                // Draw Structural / Obstacle Walls (Concrete & Cinder Blocks)
                 if (gameMap[r][c] === 1) {
                     ctx.fillStyle = '#555';
                     ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE);
-                    // Caution stripe textures on interior structural hazards
                     ctx.strokeStyle = '#e67e22';
                     ctx.lineWidth = 3;
                     ctx.beginPath();
@@ -500,7 +514,6 @@
                     ctx.stroke();
                 }
 
-                // Draw Fog of War overlay tint if not explored
                 if (!exploredGrid[r][c]) {
                     ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
                     ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE);
@@ -508,30 +521,29 @@
             }
         }
 
-        // 2. Draw Simulated Basketball Court Markings (Under Construction Blueprint aesthetic)
+        // Court Outline Blueprint layout
         ctx.strokeStyle = 'rgba(52, 152, 219, 0.4)';
         ctx.lineWidth = 2;
-        // Court Outline Center lines
         ctx.strokeRect(10 * TILE_SIZE, 11 * TILE_SIZE, 12 * TILE_SIZE, 10 * TILE_SIZE);
         ctx.beginPath();
-        ctx.arc(16 * TILE_SIZE, 16 * TILE_SIZE, 2 * TILE_SIZE, 0, Math.PI * 2); // Center circle
+        ctx.arc(16 * TILE_SIZE, 16 * TILE_SIZE, 2 * TILE_SIZE, 0, Math.PI * 2);
         ctx.moveTo(16 * TILE_SIZE, 11 * TILE_SIZE);
-        ctx.lineTo(16 * TILE_SIZE, 21 * TILE_SIZE); // half court line
+        ctx.lineTo(16 * TILE_SIZE, 21 * TILE_SIZE);
         ctx.stroke();
 
-        // 3. Render Construction Debris Props (Scaffolding, Barrels)
-        ctx.fillStyle = '#e67e22'; // Hazard orange barrels
+        // Props
+        ctx.fillStyle = '#e67e22';
         ctx.beginPath();
         ctx.arc(400, 320, 10, 0, Math.PI*2);
         ctx.arc(800, 750, 12, 0, Math.PI*2);
         ctx.fill();
 
-        // 4. Render Security Guard Character (Top Down View)
+        // Guard Character
         ctx.save();
         ctx.translate(player.x, player.y);
         ctx.rotate(player.angle);
 
-        // Flashlight beam (visual indicator)
+        // Flashlight beam
         const gradient = ctx.createRadialGradient(0, 0, player.radius, 60, 0, 120);
         gradient.addColorStop(0, 'rgba(255, 255, 210, 0.4)');
         gradient.addColorStop(1, 'rgba(255, 255, 210, 0.0)');
@@ -542,26 +554,24 @@
         ctx.closePath();
         ctx.fill();
 
-        // Shoulders / Arms
-        ctx.fillStyle = '#1b3a4b'; // Navy uniform base
+        // Base/Shoulders
+        ctx.fillStyle = '#1b3a4b';
         ctx.beginPath();
         ctx.arc(-2, 0, player.radius + 2, 0, Math.PI * 2);
         ctx.fill();
 
-        // Yellow High-Vis Safety Vest Overlay
+        // Yellow Vest
         ctx.fillStyle = '#f1c40f'; 
         ctx.fillRect(-6, -player.radius, 10, player.radius * 2);
-        // Reflective Silver stripes on vest
         ctx.fillStyle = '#bdc3c7';
         ctx.fillRect(-2, -player.radius, 2, 4);
         ctx.fillRect(-2, player.radius - 4, 2, 4);
 
-        // Head (White Hardhat)
+        // White Hardhat Head
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.arc(2, 0, player.radius - 5, 0, Math.PI * 2);
         ctx.fill();
-        // Hardhat Brim
         ctx.strokeStyle = '#eeeeee';
         ctx.lineWidth = 3;
         ctx.beginPath();
@@ -569,7 +579,6 @@
         ctx.stroke();
 
         ctx.restore();
-
         ctx.restore();
     }
 
@@ -579,11 +588,9 @@
         requestAnimationFrame(gameLoop);
     }
 
-    // Initialize & Boot
     buildArenaBlueprint();
     updateExploration();
     gameLoop();
-
 </script>
 </body>
 </html>
