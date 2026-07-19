@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ongoing Environment Sandbox</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Game Wrapper Container -->
+    <div id="gameContainer">
+        <!-- HUD Overlay for Real-time Feedback -->
+        <div id="hud">
+            <div class="hud-card">HP: <span id="playerHp">100</span></div>
+            <div class="hud-card">Controls: WASD + Mouse Click</div>
+        </div>
+
+        <!-- The main high-performance drawing layer -->
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <!-- Script bootstrapper loaded as an ES Module -->
+    <script type="module" src="./src/main.js"></script>
+    
+</body>
+</html>
