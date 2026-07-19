@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Face Popper</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #1a1a1a;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            font-family: sans-serif;
+        }
+
+        /* Container for the hanging nodes */
+        .string-container {
+            position: absolute;
+            top: 0;
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Let taps pass through to the screen */
+        }
+
+        /* Individual pendulum anchor point */
+        .pendulum {
+            position: relative;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transform-origin: top center;
+            transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        /* The actual hanging string line */
+        .string {
+            width: 2px;
+            background: linear-gradient(to bottom, #888, #444);
+            box-shadow: 0 0 2px rgba(0,0,0,0.5);
+            transition: height 0.3s ease;
+        }
+
+        /* The face element hanging at the end */
+        .face {
+            width: 70px;
+            height: 70px;
+            background-color: #ffd000;
+            border: 3px solid #333;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            pointer-events: auto; /* Re-enable pointer events just for the face */
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            position: relative;
+            transition: transform 0.1s ease, opacity 0.2s ease;
+            overflow: hidden;
+            padding: 0;
+        }
+
+        .face img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        /* Active click/tap effect for impact feel */
+        .face:active {
+            transform: scale(0.9);
+        }
+
+        /* Particle styling for the pop animation */
+        .particle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #ffd000;
+            pointer-events: none;
+            animation: explode 0.5s ease-out forwards;
+        }
+
+        @keyframes explode {
+            0% {
+                transform: translate(0, 0) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(var(--dx), var(--dy)) scale(0);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="string-container" id="stage"></div>
+
+    <script>
+        const stage = document.getElementById('stage');
+        
+        // Configuration for the 4 faces
+        const faceConfigs = [
+            { image: 'Images/SlapFace_Ari.png', length: 150 },
+            { image: 'Images/SlapFace_Jeff.png', length: 220 },
+            { image: 'Images/SlapFace_Nate.png', length: 180 },
+            { image: 'Images/SlapFace_Riley.png', length: 260 }
+        ];
+
+        // Generate the items dynamically
+        faceConfigs.forEach(config => {
+            let tapCount = 0;
+
+            const pendulum = document.createElement('div');
+            pendulum.className = 'pendulum';
+
+            const string = document.createElement('div');
+            string.className = 'string';
+            string.style.height = `${config.length}px`;
+
+            const face = document.createElement('div');
+            face.className = 'face';
+
+            const img = document.createElement('img');
+            img.src = config.image;
+            img.alt = 'Slap face';
+            face.appendChild(img);
+
+            // Handle tapping a specific face
+            face.addEventListener('pointerdown', (e) => {
+                e.stopPropagation(); // Stop screen-wide tap from triggering
+                
+                tapCount++;
+                
+                // Physics impulse: send it flying opposite of horizontal tap orientation
+                const forceX = (Math.random() - 0.5) * 120; 
+                const forceY = (Math.random() * -45) - 25; 
+                swingPendulum(pendulum, forceX);
+
+                // Check for pop condition
+                if (tapCount >= 5) {
+                    popFace(pendulum, face);
+                }
+            });
+
+            pendulum.appendChild(string);
+            pendulum.appendChild(face);
+            stage.appendChild(pendulum);
+        });
+
+        // Handle generic background taps (sends all un-popped faces into a chaotic swing)
+        document.body.addEventListener('pointerdown', () => {
+            const pendulums = document.querySelectorAll('.pendulum');
+            pendulums.forEach(p => {
+                const force = (Math.random() - 0.5) * 90;
+                swingPendulum(p, force);
+            });
+        });
+
+        // Function to handle the rotational physics animation
+        function swingPendulum(element, force) {
+            element.style.transform = `rotate(${force}deg)`;
+            
+            // Return to resting center position gradually
+            setTimeout(() => {
+                element.style.transform = 'rotate(0deg)';
+            }, 500);
+        }
+
+        // Particle generation explosion and node destruction
+        function popFace(parent, element) {
+            const rect = element.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            // Spawn confetti/pop fragments
+            for (let i = 0; i < 20; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                
+                // Match particle color palette roughly to the face design
+                particle.style.backgroundColor = '#ffd000';
+                particle.style.left = `${centerX}px`;
+                particle.style.top = `${centerY}px`;
+
+                // Calculate random explosion trajectories
+                const angle = Math.random() * Math.PI * 2;
+                const distance = Math.random() * 120 + 30;
+                const dx = Math.cos(angle) * distance;
+                const dy = Math.sin(angle) * distance;
+
+                particle.style.setProperty('--dx', `${dx}px`);
+                particle.style.setProperty('--dy', `${dy}px`);
+
+                document.body.appendChild(particle);
+
+                // Clean up node after particle finishes animating
+                particle.addEventListener('animationend', () => particle.remove());
+            }
+
+            // Instantly eliminate face visual, then remove the anchor tree node safely
+            element.style.opacity = '0';
+            element.style.pointerEvents = 'none';
+            setTimeout(() => {
+                parent.remove();
+            }, 300);
+        }
+    </script>
+</body>
+</html>
