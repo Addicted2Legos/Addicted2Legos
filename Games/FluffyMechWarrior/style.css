@@ -22,12 +22,19 @@ body {
     overflow: hidden;
 }
 
+/* Procedural Grass Texture styling */
 canvas {
-    background-color: #16161a;
-    display: block; /* Removes baseline spacing gaps */
+    background-color: #3f7a24;
+    background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.05) 2px, transparent 2px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 2px, transparent 2px),
+        radial-gradient(#529332 20%, transparent 20%),
+        radial-gradient(#34661c 20%, transparent 20%);
+    background-size: 64px 64px, 64px 64px, 8px 8px, 8px 8px;
+    background-position: 0 0, 0 0, 0 0, 4px 4px;
+    display: block;
 }
 
-/* Heads Up Display Overlay */
 #hud {
     position: absolute;
     top: 16px;
@@ -35,7 +42,7 @@ canvas {
     right: 16px;
     display: flex;
     justify-content: space-between;
-    pointer-events: none; /* Allows mouse clicks to pass right through to the canvas */
+    pointer-events: none;
     user-select: none;
 }
 
