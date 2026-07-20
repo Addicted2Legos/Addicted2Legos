@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Level 1 - Vintage Biplane Flight Simulator</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #111;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        /* UI Overlay Elements */
+        #hud {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            color: #e0d0b0;
+            font-family: monospace;
+            font-size: 14px;
+            background: rgba(30, 20, 10, 0.85);
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(212, 163, 89, 0.4);
+            pointer-events: none;
+            line-height: 1.5;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        #controlsHint {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            color: #d4a359;
+            font-family: monospace;
+            font-size: 12px;
+            background: rgba(30, 20, 10, 0.85);
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(212, 163, 89, 0.3);
+            pointer-events: none;
+            text-align: right;
+        }
+        /* Virtual Joystick Controls */
+        #joystickZone {
+            position: absolute;
+            bottom: 25px;
+            left: 25px;
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px solid rgba(212, 163, 89, 0.4);
+            touch-action: none;
+        }
+        #joystickKnob {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 50px;
+            height: 50px;
+            margin-top: -25px;
+            margin-left: -25px;
+            border-radius: 50%;
+            background: rgba(212, 163, 89, 0.6);
+            border: 2px solid #d4a359;
+            box-shadow: 0 0 10px rgba(212, 163, 89, 0.5);
+            pointer-events: none;
+        }
+        /* Throttle Control */
+        #throttleContainer {
+            position: absolute;
+            bottom: 25px;
+            right: 25px;
+            width: 50px;
+            height: 160px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px solid rgba(212, 163, 89, 0.4);
+            border-radius: 25px;
+            touch-action: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            padding: 5px;
+        }
+        #throttleBar {
+            width: 38px;
+            height: 0%;
+            background: linear-gradient(to top, #b83b1d, #d4a359);
+            border-radius: 19px;
+            pointer-events: none;
+            transition: height 0.05s linear;
+        }
+        #throttleLabel {
+            position: absolute;
+            top: -22px;
+            color: #d4a359;
+            font-size: 11px;
+            font-family: monospace;
+        }
+        #statusMessage {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff3333;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 26px;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px #ff0000;
+            display: none;
+            pointer-events: none;
+            text-align: center;
+            line-height: 1.4;
+        }
+        #restartBtn {
+            position: absolute;
+            top: 55%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 12px 24px;
+            background: #b83b1d;
+            color: #fff;
+            border: 2px solid #d4a359;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: none;
+            box-shadow: 0 0 15px rgba(0,0,0,0.7);
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud">
+        STAGE: 1 (Vintage Biplane)<br>
+        SPD: <span id="hudSpeed">0</span> kts<br>
+        ALT: <span id="hudAlt">0</span> ft<br>
+        THR: <span id="hudThrottle">0</span>%<br>
+        BANK: <span id="hudBank">0</span>°<br>
+        TRAILERS: <span id="hudTrailers">0</span>/3
+    </div>
+
+    <div id="controlsHint">
+        <b>KEYBOARD CONTROLS</b><br>
+        Arrow Keys: Pitch & Bank<br>
+        Shift / Space: Throttle Up/Down
+    </div>
+
+    <div id="statusMessage">STALL WARNING</div>
+    <button id="restartBtn" onclick="resetGame()">RESTART FLIGHT</button>
+
+    <!-- Joystick Left -->
+    <div id="joystickZone">
+        <div id="joystickKnob"></div>
+    </div>
+
+    <!-- Throttle Slider Right -->
+    <div id="throttleContainer">
+        <div id="throttleLabel">THR</div>
+        <div id="throttleBar"></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Map Terrain Features
+        let runway, barn, farmField, hill;
+        let trailers = [];
+
+        function initMap() {
+            const w = canvas.width;
+            const h = canvas.height;
+
+            runway = { x: w * 0.22, y: h * 0.75, width: 50, height: 260 };
+            farmField = { x: w * 0.65, y: h * 0.62, width: 220, height: 180 };
+            barn = { x: w * 0.56, y: h * 0.68, width: 45, height: 35 };
+            hill = { x: w * 0.50, y: h * 0.30, radius: 95 };
+
+            // 3 Airplane Trailers (Gliders) placed around the map
+            trailers = [
+                { x: w * 0.28, y: h * 0.45, altitude: 0, heading: 0.2, isAttached: false, bankAngle: 0 },
+                { x: w * 0.75, y: h * 0.35, altitude: 0, heading: -1.2, isAttached: false, bankAngle: 0 },
+                { x: w * 0.15, y: h * 0.25, altitude: 0, heading: 1.8, isAttached: false, bankAngle: 0 }
+            ];
+        }
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            initMap();
+        }
+        window.addEventListener('resize', resize);
+
+        // Biplane State
+        let plane = {};
+        let attachedTrailers = [];
+        let isDead = false;
+
+        function resetGame() {
+            plane = {
+                x: canvas.width * 0.22,
+                y: canvas.height * 0.86,
+                altitude: 0,
+                heading: 0,
+                speed: 0,
+                bankAngle: 0,
+                pitchAngle: 0,
+                throttle: 0.0,
+                
+                weight: 1400,
+                maxThrust: 220,
+                stallSpeed: 28,
+                dragCoeff: 0.022,
+                liftCoeff: 0.14,
+                isStalled: false
+            };
+            
+            attachedTrailers = [];
+            isDead = false;
+            initMap();
+
+            document.getElementById('statusMessage').style.display = 'none';
+            document.getElementById('restartBtn').style.display = 'none';
+        }
+
+        resize();
+        resetGame();
+
+        const input = { stickX: 0, stickY: 0 };
+
+        // --- Touch Control Handling ---
+        const joystickZone = document.getElementById('joystickZone');
+        const joystickKnob = document.getElementById('joystickKnob');
+        let joystickTouchId = null;
+        let joystickCenter = { x: 0, y: 0 };
+
+        joystickZone.addEventListener('touchstart', (e) => {
+            if (isDead) return;
+            const touch = e.changedTouches[0];
+            joystickTouchId = touch.identifier;
+            const rect = joystickZone.getBoundingClientRect();
+            joystickCenter = { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
+            updateJoystick(touch);
+        }, { passive: false });
+
+        window.addEventListener('touchmove', (e) => {
+            if (isDead) return;
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === joystickTouchId) {
+                    updateJoystick(e.changedTouches[i]);
+                }
+            }
+        }, { passive: false });
+
+        const resetJoystick = () => {
+            joystickTouchId = null;
+            if (!keysActive()) {
+                input.stickX = 0;
+                input.stickY = 0;
+            }
+            joystickKnob.style.transform = `translate(0px, 0px)`;
+        };
+
+        window.addEventListener('touchend', (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === joystickTouchId) resetJoystick();
+            }
+        });
+
+        function updateJoystick(touch) {
+            const maxRadius = 45;
+            let dx = touch.clientX - joystickCenter.x;
+            let dy = touch.clientY - joystickCenter.y;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist > maxRadius) {
+                dx = (dx / dist) * maxRadius;
+                dy = (dy / dist) * maxRadius;
+            }
+
+            joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+            input.stickX = dx / maxRadius;
+            input.stickY = dy / maxRadius;
+        }
+
+        // Throttle Control
+        const throttleContainer = document.getElementById('throttleContainer');
+        const throttleBar = document.getElementById('throttleBar');
+        
+        function handleThrottle(e) {
+            if (isDead) return;
+            const touch = e.touches ? e.touches[0] : e;
+            const rect = throttleContainer.getBoundingClientRect();
+            let val = 1 - ((touch.clientY - rect.top) / rect.height);
+            plane.throttle = Math.max(0, Math.min(1, val));
+            throttleBar.style.height = `${plane.throttle * 100}%`;
+        }
+
+        throttleContainer.addEventListener('touchstart', handleThrottle, { passive: false });
+        throttleContainer.addEventListener('touchmove', handleThrottle, { passive: false });
+
+        // --- Arrow Keys & Keyboard Controls ---
+        const keys = {};
+        window.addEventListener('keydown', e => {
+            keys[e.code] = true;
+            if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) {
+                e.preventDefault();
+            }
+        });
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        function keysActive() {
+            return keys['ArrowLeft'] || keys['ArrowRight'] || keys['ArrowUp'] || keys['ArrowDown'] || keys['KeyA'] || keys['KeyD'] || keys['KeyW'] || keys['KeyS'];
+        }
+
+        function processKeyboardInputs() {
+            if (isDead) return;
+
+            if (keys['ArrowLeft'] || keys['KeyA']) input.stickX = -1.0;
+            else if (keys['ArrowRight'] || keys['KeyD']) input.stickX = 1.0;
+            else if (!joystickTouchId) input.stickX = 0;
+
+            if (keys['ArrowUp'] || keys['KeyW']) input.stickY = -1.0;
+            else if (keys['ArrowDown'] || keys['KeyS']) input.stickY = 1.0;
+            else if (!joystickTouchId) input.stickY = 0;
+
+            if (keys['ShiftLeft'] || keys['ShiftRight'] || keys['KeyE']) {
+                plane.throttle = Math.min(1.0, plane.throttle + 0.012);
+            }
+            if (keys['Space'] || keys['KeyQ']) {
+                plane.throttle = Math.max(0.0, plane.throttle - 0.012);
+            }
+            
+            throttleBar.style.height = `${plane.throttle * 100}%`;
+        }
+
+        // --- Physics Engine ---
+        let lastTime = performance.now();
+
+        function updatePhysics(dt) {
+            if (isDead) return;
+
+            processKeyboardInputs();
+
+            // Bank and Pitch handling
+            const targetBank = input.stickX * 1.35;
+            const targetPitch = -input.stickY * 0.60;
+
+            plane.bankAngle += (targetBank - plane.bankAngle) * 8.0 * dt;
+            plane.pitchAngle += (targetPitch - plane.pitchAngle) * 6.5 * dt;
+
+            // Thrust & Air resistance
+            const density = Math.max(0.4, 1.0 - (plane.altitude / 20000));
+            const dynamicPressure = 0.5 * density * Math.pow(plane.speed, 2);
+
+            const thrustForce = plane.throttle * plane.maxThrust;
+            const trailerDrag = attachedTrailers.length * 0.005;
+            const dragForce = plane.speed > 0.1 
+                ? ((plane.dragCoeff + trailerDrag) * dynamicPressure) + (Math.abs(plane.bankAngle) * 2.5) 
+                : 0;
+
+            const netForce = thrustForce - dragForce;
+            const accel = netForce / (plane.weight / 32.2);
+
+            plane.speed += accel * dt;
+            plane.speed = Math.max(0, plane.speed);
+
+            // Lift Math
+            const liftForce = plane.liftCoeff * dynamicPressure * (1 + plane.pitchAngle);
+            const requiredLift = plane.weight / Math.max(0.2, Math.cos(plane.bankAngle));
+
+            const msgEl = document.getElementById('statusMessage');
+
+            if (plane.altitude <= 0) {
+                plane.altitude = 0;
+                plane.bankAngle = 0;
+                
+                if (plane.speed > 2) {
+                    plane.heading += input.stickX * 1.8 * dt;
+                }
+
+                if (plane.speed > plane.stallSpeed && plane.pitchAngle > 0.05) {
+                    plane.altitude += 15 * dt;
+                }
+                msgEl.style.display = 'none';
+            } else {
+                if (plane.speed < plane.stallSpeed) {
+                    plane.isStalled = true;
+                    plane.pitchAngle -= 0.5 * dt;
+                    plane.altitude -= 140 * dt;
+                    msgEl.innerText = "STALL WARNING";
+                    msgEl.style.display = 'block';
+                } else {
+                    plane.isStalled = false;
+                    msgEl.style.display = 'none';
+                    const vertVelocity = (liftForce - requiredLift) * 0.15 + (plane.pitchAngle * plane.speed * 0.95);
+                    plane.altitude += vertVelocity * dt;
+                }
+
+                // Turning Rate
+                const g = 32.2;
+                const turnRate = (g * Math.tan(plane.bankAngle) * 2.8) / Math.max(12, plane.speed * 1.6878);
+                plane.heading += turnRate * dt;
+            }
+
+            // Movement Translation
+            const speedFPS = plane.speed * 1.1;
+            plane.x += Math.sin(plane.heading) * speedFPS * dt * 2.0;
+            plane.y -= Math.cos(plane.heading) * speedFPS * dt * 2.0;
+
+            // Screen Edge Wrapping
+            if (plane.x < 0) plane.x = canvas.width;
+            if (plane.x > canvas.width) plane.x = 0;
+            if (plane.y < 0) plane.y = canvas.height;
+            if (plane.y > canvas.height) plane.y = 0;
+
+            // --- FIXED: Reliable Bungee Attachment Check ---
+            // Attachment point is either the main plane or the last trailer attached
+            const lastNode = attachedTrailers.length > 0 
+                ? attachedTrailers[attachedTrailers.length - 1] 
+                : plane;
+
+            // Checked whenever plane is moving at speed (off ground or low flyover)
+            if (plane.speed > 10) {
+                trailers.forEach(t => {
+                    if (!t.isAttached) {
+                        const dist = Math.hypot(lastNode.x - t.x, lastNode.y - t.y);
+                        // Increased pickup hit range to 120 pixels
+                        if (dist < 120) {
+                            t.isAttached = true;
+                            attachedTrailers.push(t);
+                        }
+                    }
+                });
+            }
+
+            // --- Bungee Spring Physics ---
+            let leadNode = plane;
+            attachedTrailers.forEach((t) => {
+                // Attach point on the tail of the leading craft
+                const leadTailDist = 30;
+                const leadTailX = leadNode.x - Math.sin(leadNode.heading) * leadTailDist;
+                const leadTailY = leadNode.y + Math.cos(leadNode.heading) * leadTailDist;
+
+                const dx = leadTailX - t.x;
+                const dy = leadTailY - t.y;
+                const dist = Math.hypot(dx, dy);
+
+                const desiredRopeLen = 45;
+
+                if (dist > desiredRopeLen) {
+                    const springForce = (dist - desiredRopeLen) * 11.0 * dt;
+                    t.x += (dx / dist) * springForce;
+                    t.y += (dy / dist) * springForce;
+                }
+
+                // Lift trailer altitude up to match leading plane
+                const targetAlt = Math.max(300, leadNode.altitude);
+                t.altitude += (targetAlt - t.altitude) * 5.0 * dt;
+
+                // Trailer rotation toward leader
+                const targetAngle = Math.atan2(dx, -dy);
+                let diff = targetAngle - t.heading;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                t.heading += diff * 8.5 * dt;
+                t.bankAngle = diff * 1.5;
+
+                leadNode = t;
+            });
+
+            // Hill Collision Check
+            const distToHill = Math.hypot(plane.x - hill.x, plane.y - hill.y);
+            if (distToHill < hill.radius && plane.altitude < 1200) {
+                isDead = true;
+                msgEl.innerText = "CRASHED INTO THE HILL!\nYOU DIED";
+                msgEl.style.display = 'block';
+                document.getElementById('restartBtn').style.display = 'block';
+            }
+
+            // HUD Readouts
+            document.getElementById('hudSpeed').innerText = Math.round(plane.speed);
+            document.getElementById('hudAlt').innerText = Math.round(plane.altitude);
+            document.getElementById('hudThrottle').innerText = Math.round(plane.throttle * 100);
+            document.getElementById('hudBank').innerText = Math.round(plane.bankAngle * (180 / Math.PI));
+            document.getElementById('hudTrailers').innerText = attachedTrailers.length;
+        }
+
+        // --- Render Engine ---
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Ground
+            ctx.fillStyle = "#3b5323";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Grid lines
+            ctx.strokeStyle = "rgba(212, 163, 89, 0.12)";
+            ctx.lineWidth = 1.5;
+            const gridSize = 80;
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+
+            // Farm Field
+            ctx.fillStyle = "#5c4018";
+            ctx.fillRect(farmField.x - farmField.width/2, farmField.y - farmField.height/2, farmField.width, farmField.height);
+            ctx.strokeStyle = "#8b6b32";
+            ctx.lineWidth = 3;
+            for (let i = -farmField.width/2 + 10; i < farmField.width/2; i += 16) {
+                ctx.beginPath();
+                ctx.moveTo(farmField.x + i, farmField.y - farmField.height/2);
+                ctx.lineTo(farmField.x + i, farmField.y + farmField.height/2);
+                ctx.stroke();
+            }
+
+            // Runway
+            ctx.fillStyle = "#6e5233";
+            ctx.fillRect(runway.x - runway.width/2, runway.y - runway.height/2, runway.width, runway.height);
+            ctx.fillStyle = "#d4c5b0";
+            for (let i = -runway.height/2 + 20; i < runway.height/2 - 20; i += 45) {
+                ctx.fillRect(runway.x - 2, runway.y + i, 4, 15);
+            }
+
+            // Barn
+            ctx.fillStyle = "#8b0000";
+            ctx.fillRect(barn.x - barn.width/2, barn.y - barn.height/2, barn.width, barn.height);
+            ctx.fillStyle = "#d4c5b0";
+            ctx.fillRect(barn.x - barn.width/2 + 4, barn.y - 2, barn.width - 8, 4);
+
+            // Hill
+            const hillGrad = ctx.createRadialGradient(hill.x, hill.y, 5, hill.x, hill.y, hill.radius);
+            hillGrad.addColorStop(0, "#7a9a3b");
+            hillGrad.addColorStop(0.6, "#4d6b22");
+            hillGrad.addColorStop(1, "#2d4212");
+
+            ctx.beginPath();
+            ctx.arc(hill.x, hill.y, hill.radius, 0, Math.PI * 2);
+            ctx.fillStyle = hillGrad;
+            ctx.fill();
+            ctx.strokeStyle = "#ff4444";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = "#ffaaaa";
+            ctx.font = "bold 12px monospace";
+            ctx.textAlign = "center";
+            ctx.fillText("DANGER: HILL", hill.x, hill.y + 4);
+
+            // Ground Unattached Trailers & Target Rings
+            trailers.forEach(t => {
+                if (!t.isAttached) {
+                    // Glowing target ring on ground for easy spotting
+                    ctx.beginPath();
+                    ctx.arc(t.x, t.y, 45, 0, Math.PI * 2);
+                    ctx.strokeStyle = "rgba(255, 204, 0, 0.4)";
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([6, 6]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    ctx.save();
+                    ctx.translate(t.x, t.y);
+                    ctx.rotate(t.heading);
+                    drawTrailerGlider(ctx, true);
+                    ctx.restore();
+                }
+            });
+
+            // Bungee Lines
+            let leadNode = plane;
+            attachedTrailers.forEach(t => {
+                const leadTailDist = 22 * (1 + leadNode.altitude / 1800);
+                const leadTailX = leadNode.x - Math.sin(leadNode.heading) * leadTailDist;
+                const leadTailY = leadNode.y + Math.cos(leadNode.heading) * leadTailDist;
+
+                const trailerNoseDist = 18 * (1 + t.altitude / 1800);
+                const trailerNoseX = t.x + Math.sin(t.heading) * trailerNoseDist;
+                const trailerNoseY = t.y - Math.cos(t.heading) * trailerNoseDist;
+
+                ctx.beginPath();
+                ctx.moveTo(leadTailX, leadTailY);
+                ctx.lineTo(trailerNoseX, trailerNoseY);
+                ctx.strokeStyle = "#ffcc00";
+                ctx.lineWidth = 3;
+                ctx.setLineDash([5, 3]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                leadNode = t;
+            });
+
+            // Flying Trailers & Shadows
+            attachedTrailers.forEach(t => {
+                const altScale = 1 + (t.altitude / 1800);
+                const shadowOffsetX = 8 + (t.altitude / 18);
+                const shadowOffsetY = 12 + (t.altitude / 14);
+                const shadowAlpha = Math.max(0.15, 0.45 - (t.altitude / 5000));
+
+                // Trailer Ground Shadow
+                ctx.save();
+                ctx.translate(t.x + shadowOffsetX, t.y + shadowOffsetY);
+                ctx.rotate(t.heading);
+                ctx.rotate(t.bankAngle * 0.3);
+                ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
+                drawTrailerGlider(ctx, false);
+                ctx.restore();
+
+                // Air Trailer
+                ctx.save();
+                ctx.translate(t.x, t.y);
+                ctx.rotate(t.heading);
+                ctx.scale(altScale, altScale);
+                ctx.rotate(t.bankAngle * 0.45);
+                drawTrailerGlider(ctx, true);
+                ctx.restore();
+            });
+
+            // Main Plane & Shadow
+            if (!isDead) {
+                const altScale = 1 + (plane.altitude / 1800);
+                const shadowOffsetX = 8 + (plane.altitude / 18);
+                const shadowOffsetY = 12 + (plane.altitude / 14);
+                const shadowAlpha = Math.max(0.15, 0.45 - (plane.altitude / 5000));
+
+                // Ground Shadow
+                ctx.save();
+                ctx.translate(plane.x + shadowOffsetX, plane.y + shadowOffsetY);
+                ctx.rotate(plane.heading);
+                ctx.rotate(plane.bankAngle * 0.3);
+                ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
+                drawVintageBiplane(ctx, false);
+                ctx.restore();
+
+                // Airplane Body
+                ctx.save();
+                ctx.translate(plane.x, plane.y);
+                ctx.rotate(plane.heading);
+                ctx.scale(altScale, altScale);
+                ctx.rotate(plane.bankAngle * 0.45);
+                drawVintageBiplane(ctx, true);
+                ctx.restore();
+            }
+        }
+
+        // --- Airplane Drawing ---
+        function drawVintageBiplane(ctx, isMainBody) {
+            ctx.beginPath();
+
+            const fuselageColor = isMainBody ? "#8b4513" : "transparent";
+            const wingColor = isMainBody ? "#d2b48c" : "transparent";
+            const detailColor = isMainBody ? "#b83b1d" : "transparent";
+
+            ctx.fillStyle = fuselageColor;
+            ctx.beginPath();
+            ctx.moveTo(0, -22);
+            ctx.lineTo(6, -8);
+            ctx.lineTo(4, 26);
+            ctx.lineTo(-4, 26);
+            ctx.lineTo(-6, -8);
+            ctx.closePath();
+            if (isMainBody) ctx.fill();
+
+            ctx.fillStyle = wingColor;
+            ctx.fillRect(-38, -12, 76, 12);
+            ctx.fillRect(-34, -4, 68, 10);
+
+            if (isMainBody) {
+                ctx.strokeStyle = "#4a2810";
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(-38, -12, 76, 12);
+                
+                ctx.fillStyle = detailColor;
+                ctx.beginPath();
+                ctx.arc(-30, -6, 4, 0, Math.PI * 2);
+                ctx.arc(30, -6, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = "#1a0d00";
+                ctx.beginPath();
+                ctx.ellipse(0, 2, 3, 5, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = detailColor;
+                ctx.beginPath();
+                ctx.moveTo(-14, 22);
+                ctx.lineTo(14, 22);
+                ctx.lineTo(0, 30);
+                ctx.closePath();
+                ctx.fill();
+
+                if (plane.speed > 5) {
+                    ctx.strokeStyle = "rgba(212, 163, 89, 0.7)";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.ellipse(0, -23, 14, 3, 0, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // --- Trailer Glider Drawing ---
+        function drawTrailerGlider(ctx, isMainBody) {
+            ctx.beginPath();
+
+            const fuselageColor = isMainBody ? "#2b5b84" : "transparent";
+            const wingColor = isMainBody ? "#e0e0e0" : "transparent";
+            const detailColor = isMainBody ? "#d4a359" : "transparent";
+
+            ctx.fillStyle = fuselageColor;
+            ctx.beginPath();
+            ctx.moveTo(0, -18);
+            ctx.lineTo(5, -6);
+            ctx.lineTo(3, 24);
+            ctx.lineTo(-3, 24);
+            ctx.lineTo(-5, -6);
+            ctx.closePath();
+            if (isMainBody) ctx.fill();
+
+            ctx.fillStyle = wingColor;
+            ctx.fillRect(-36, -8, 72, 10);
+
+            if (isMainBody) {
+                ctx.strokeStyle = "#1b3b54";
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(-36, -8, 72, 10);
+
+                ctx.fillStyle = detailColor;
+                ctx.beginPath();
+                ctx.arc(-32, -3, 3, 0, Math.PI * 2);
+                ctx.arc(32, -3, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = detailColor;
+                ctx.beginPath();
+                ctx.moveTo(-10, 18);
+                ctx.lineTo(10, 18);
+                ctx.lineTo(0, 26);
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+
+        // --- Main Engine Loop ---
+        function gameLoop(time) {
+            const dt = Math.min((time - lastTime) / 1000, 0.1);
+            lastTime = time;
+
+            updatePhysics(dt);
+            render();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
