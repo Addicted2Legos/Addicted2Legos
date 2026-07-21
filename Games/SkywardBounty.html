@@ -40,6 +40,11 @@
             line-height: 1.5;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
+        .score-highlight {
+            color: #00ffff;
+            font-weight: bold;
+            font-size: 16px;
+        }
         #controlsHint {
             position: absolute;
             top: 12px;
@@ -153,10 +158,9 @@
 
     <div id="hud">
         STAGE: 1 (Vintage Biplane)<br>
-        SPD: <span id="hudSpeed">0</span> kts<br>
-        ALT: <span id="hudAlt">0</span> ft<br>
-        THR: <span id="hudThrottle">0</span>%<br>
-        BANK: <span id="hudBank">0</span>°<br>
+        SCORE: <span id="hudScore" class="score-highlight">0</span> PTS<br>
+        SPD: <span id="hudSpeed">0</span> kts | ALT: <span id="hudAlt">0</span> ft<br>
+        THR: <span id="hudThrottle">0</span>% | BANK: <span id="hudBank">0</span>°<br>
         TRAILERS: <span id="hudTrailers">0</span>/3
     </div>
 
@@ -212,10 +216,40 @@
         }
         window.addEventListener('resize', resize);
 
-        // Biplane State
+        // Game & Biplane State
         let plane = {};
         let attachedTrailers = [];
         let isDead = false;
+        let score = 0;
+
+        // Collectibles State
+        let collectibles = [];
+        let floatingTexts = [];
+        let spawnTimer = 0;
+
+        function spawnCollectible() {
+            if (collectibles.length >= 30) return; // Cap maximum onscreen items
+
+            const margin = 60;
+            const x = margin + Math.random() * (canvas.width - margin * 2);
+            const y = margin + Math.random() * (canvas.height - margin * 2);
+
+            // Avoid spawning inside the hill
+            const distToHill = Math.hypot(x - hill.x, y - hill.y);
+            if (distToHill < hill.radius + 20) return;
+
+            // 75% chance for Contrail Crystal, 25% for Data Pod
+            const isPod = Math.random() < 0.25;
+
+            collectibles.push({
+                x: x,
+                y: y,
+                type: isPod ? 'pod' : 'crystal',
+                points: isPod ? 25 : 10,
+                pulse: Math.random() * Math.PI * 2,
+                minAlt: isPod ? 200 : 50
+            });
+        }
 
         function resetGame() {
             plane = {
@@ -237,9 +271,20 @@
             };
             
             attachedTrailers = [];
+            collectibles = [];
+            floatingTexts = [];
+            score = 0;
+            spawnTimer = 0;
             isDead = false;
+            
             initMap();
 
+            // Initial batch of collectibles
+            for (let i = 0; i < 5; i++) {
+                spawnCollectible();
+            }
+
+            document.getElementById('hudScore').innerText = score;
             document.getElementById('statusMessage').style.display = 'none';
             document.getElementById('restartBtn').style.display = 'none';
         }
@@ -320,7 +365,7 @@
         throttleContainer.addEventListener('touchstart', handleThrottle, { passive: false });
         throttleContainer.addEventListener('touchmove', handleThrottle, { passive: false });
 
-        // --- Arrow Keys & Keyboard Controls ---
+        // --- Keyboard Controls ---
         const keys = {};
         window.addEventListener('keydown', e => {
             keys[e.code] = true;
@@ -355,13 +400,20 @@
             throttleBar.style.height = `${plane.throttle * 100}%`;
         }
 
-        // --- Physics Engine ---
+        // --- Physics & Gameplay Loop ---
         let lastTime = performance.now();
 
         function updatePhysics(dt) {
             if (isDead) return;
 
             processKeyboardInputs();
+
+            // Spawning Mechanism: Exactly 1 item per second
+            spawnTimer += dt;
+            if (spawnTimer >= 1.0) {
+                spawnTimer -= 1.0;
+                spawnCollectible();
+            }
 
             // Bank and Pitch handling
             const targetBank = input.stickX * 1.35;
@@ -370,7 +422,7 @@
             plane.bankAngle += (targetBank - plane.bankAngle) * 8.0 * dt;
             plane.pitchAngle += (targetPitch - plane.pitchAngle) * 6.5 * dt;
 
-            // Thrust & Air resistance
+            // Thrust & Drag
             const density = Math.max(0.4, 1.0 - (plane.altitude / 20000));
             const dynamicPressure = 0.5 * density * Math.pow(plane.speed, 2);
 
@@ -386,7 +438,7 @@
             plane.speed += accel * dt;
             plane.speed = Math.max(0, plane.speed);
 
-            // Lift Math
+            // Lift
             const liftForce = plane.liftCoeff * dynamicPressure * (1 + plane.pitchAngle);
             const requiredLift = plane.weight / Math.max(0.2, Math.cos(plane.bankAngle));
 
@@ -424,29 +476,60 @@
                 plane.heading += turnRate * dt;
             }
 
-            // Movement Translation
+            // Position Translation
             const speedFPS = plane.speed * 1.1;
             plane.x += Math.sin(plane.heading) * speedFPS * dt * 2.0;
             plane.y -= Math.cos(plane.heading) * speedFPS * dt * 2.0;
 
-            // Screen Edge Wrapping
+            // Screen Wrapping
             if (plane.x < 0) plane.x = canvas.width;
             if (plane.x > canvas.width) plane.x = 0;
             if (plane.y < 0) plane.y = canvas.height;
             if (plane.y > canvas.height) plane.y = 0;
 
-            // --- FIXED: Reliable Bungee Attachment Check ---
-            // Attachment point is either the main plane or the last trailer attached
+            // --- Collectible Items Pickup Detection ---
+            for (let i = collectibles.length - 1; i >= 0; i--) {
+                const item = collectibles[i];
+                item.pulse += dt * 4.0; // Animate shine pulse
+
+                const dist = Math.hypot(plane.x - item.x, plane.y - item.y);
+                // Can collect if airborne or close overhead
+                if (dist < 48 && plane.altitude >= item.minAlt) {
+                    score += item.points;
+                    document.getElementById('hudScore').innerText = score;
+
+                    // Add floating visual popup
+                    floatingTexts.push({
+                        x: item.x,
+                        y: item.y,
+                        text: `+${item.points} PTS`,
+                        color: item.type === 'pod' ? '#ffcc00' : '#00ffff',
+                        alpha: 1.0,
+                        life: 1.0
+                    });
+
+                    collectibles.splice(i, 1);
+                }
+            }
+
+            // Update Floating Text Animations
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.y -= 25 * dt;
+                ft.life -= dt;
+                ft.alpha = Math.max(0, ft.life);
+                if (ft.life <= 0) floatingTexts.splice(i, 1);
+            }
+
+            // --- Trailer Bungee Pickup & Physics ---
             const lastNode = attachedTrailers.length > 0 
                 ? attachedTrailers[attachedTrailers.length - 1] 
                 : plane;
 
-            // Checked whenever plane is moving at speed (off ground or low flyover)
             if (plane.speed > 10) {
                 trailers.forEach(t => {
                     if (!t.isAttached) {
                         const dist = Math.hypot(lastNode.x - t.x, lastNode.y - t.y);
-                        // Increased pickup hit range to 120 pixels
                         if (dist < 120) {
                             t.isAttached = true;
                             attachedTrailers.push(t);
@@ -455,10 +538,8 @@
                 });
             }
 
-            // --- Bungee Spring Physics ---
             let leadNode = plane;
             attachedTrailers.forEach((t) => {
-                // Attach point on the tail of the leading craft
                 const leadTailDist = 30;
                 const leadTailX = leadNode.x - Math.sin(leadNode.heading) * leadTailDist;
                 const leadTailY = leadNode.y + Math.cos(leadNode.heading) * leadTailDist;
@@ -475,11 +556,9 @@
                     t.y += (dy / dist) * springForce;
                 }
 
-                // Lift trailer altitude up to match leading plane
                 const targetAlt = Math.max(300, leadNode.altitude);
                 t.altitude += (targetAlt - t.altitude) * 5.0 * dt;
 
-                // Trailer rotation toward leader
                 const targetAngle = Math.atan2(dx, -dy);
                 let diff = targetAngle - t.heading;
                 while (diff < -Math.PI) diff += Math.PI * 2;
@@ -571,10 +650,78 @@
             ctx.textAlign = "center";
             ctx.fillText("DANGER: HILL", hill.x, hill.y + 4);
 
-            // Ground Unattached Trailers & Target Rings
+            // --- Draw Collectibles ---
+            collectibles.forEach(item => {
+                const scale = 1 + Math.sin(item.pulse) * 0.15;
+                ctx.save();
+                ctx.translate(item.x, item.y);
+                ctx.scale(scale, scale);
+
+                if (item.type === 'crystal') {
+                    // Contrail Ice Crystal (Cyan Diamond)
+                    ctx.shadowColor = "#00ffff";
+                    ctx.shadowBlur = 12;
+
+                    ctx.fillStyle = "#e0ffff";
+                    ctx.strokeStyle = "#00ffff";
+                    ctx.lineWidth = 2;
+
+                    ctx.beginPath();
+                    ctx.moveTo(0, -12);
+                    ctx.lineTo(8, 0);
+                    ctx.lineTo(0, 12);
+                    ctx.lineTo(-8, 0);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Inner sparkle lines
+                    ctx.beginPath();
+                    ctx.moveTo(-8, 0); ctx.lineTo(8, 0);
+                    ctx.moveTo(0, -12); ctx.lineTo(0, 12);
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                } else {
+                    // Atmospheric Data Pod (Weather Balloon with Pod)
+                    ctx.shadowColor = "#ffcc00";
+                    ctx.shadowBlur = 10;
+
+                    // Balloon
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+                    ctx.beginPath();
+                    ctx.arc(0, -6, 9, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = "#d4a359";
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+
+                    // Tether String
+                    ctx.beginPath();
+                    ctx.moveTo(0, 3);
+                    ctx.lineTo(0, 9);
+                    ctx.strokeStyle = "#aaa";
+                    ctx.stroke();
+
+                    // Hardware Pod
+                    ctx.fillStyle = "#ffcc00";
+                    ctx.fillRect(-5, 9, 10, 6);
+
+                    // Red Blinking LED Light
+                    if (Math.sin(item.pulse * 2) > 0) {
+                        ctx.fillStyle = "#ff0000";
+                        ctx.beginPath();
+                        ctx.arc(0, 12, 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                ctx.restore();
+            });
+
+            // Ground Unattached Trailers
             trailers.forEach(t => {
                 if (!t.isAttached) {
-                    // Glowing target ring on ground for easy spotting
                     ctx.beginPath();
                     ctx.arc(t.x, t.y, 45, 0, Math.PI * 2);
                     ctx.strokeStyle = "rgba(255, 204, 0, 0.4)";
@@ -614,14 +761,13 @@
                 leadNode = t;
             });
 
-            // Flying Trailers & Shadows
+            // Flying Trailers
             attachedTrailers.forEach(t => {
                 const altScale = 1 + (t.altitude / 1800);
                 const shadowOffsetX = 8 + (t.altitude / 18);
                 const shadowOffsetY = 12 + (t.altitude / 14);
                 const shadowAlpha = Math.max(0.15, 0.45 - (t.altitude / 5000));
 
-                // Trailer Ground Shadow
                 ctx.save();
                 ctx.translate(t.x + shadowOffsetX, t.y + shadowOffsetY);
                 ctx.rotate(t.heading);
@@ -630,7 +776,6 @@
                 drawTrailerGlider(ctx, false);
                 ctx.restore();
 
-                // Air Trailer
                 ctx.save();
                 ctx.translate(t.x, t.y);
                 ctx.rotate(t.heading);
@@ -665,9 +810,22 @@
                 drawVintageBiplane(ctx, true);
                 ctx.restore();
             }
+
+            // Floating Text Popups
+            floatingTexts.forEach(ft => {
+                ctx.save();
+                ctx.font = "bold 15px monospace";
+                ctx.fillStyle = ft.color;
+                ctx.globalAlpha = ft.alpha;
+                ctx.textAlign = "center";
+                ctx.shadowColor = "#000";
+                ctx.shadowBlur = 4;
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.restore();
+            });
         }
 
-        // --- Airplane Drawing ---
+        // --- Airplane Rendering ---
         function drawVintageBiplane(ctx, isMainBody) {
             ctx.beginPath();
 
@@ -723,7 +881,7 @@
             }
         }
 
-        // --- Trailer Glider Drawing ---
+        // --- Trailer Glider Rendering ---
         function drawTrailerGlider(ctx, isMainBody) {
             ctx.beginPath();
 
@@ -765,7 +923,7 @@
             }
         }
 
-        // --- Main Engine Loop ---
+        // --- Main Game Loop ---
         function gameLoop(time) {
             const dt = Math.min((time - lastTime) / 1000, 0.1);
             lastTime = time;
