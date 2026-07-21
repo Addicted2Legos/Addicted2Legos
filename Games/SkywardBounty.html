@@ -492,13 +492,16 @@
                 const item = collectibles[i];
                 item.pulse += dt * 4.0; // Animate shine pulse
 
-                const dist = Math.hypot(plane.x - item.x, plane.y - item.y);
-                // Can collect if airborne or close overhead
-                if (dist < 48 && plane.altitude >= item.minAlt) {
+                const pickupRadius = 36;
+                const planeHitX = plane.x;
+                const planeHitY = plane.y;
+                const dist = Math.hypot(planeHitX - item.x, planeHitY - item.y);
+
+                // Collect when the plane flies close enough to an item.
+                if (dist < pickupRadius) {
                     score += item.points;
                     document.getElementById('hudScore').innerText = score;
 
-                    // Add floating visual popup
                     floatingTexts.push({
                         x: item.x,
                         y: item.y,
