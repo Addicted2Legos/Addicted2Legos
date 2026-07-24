@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dock Director - Fort Lauderdale Waterways</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+        body {
+            background-color: #111827;
+            color: #f3f4f6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            background-color: #1e3a8a;
+        }
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 16px;
+        }
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .card {
+            background: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px 16px;
+        }
+        .level-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #38bdf8;
+            margin-bottom: 2px;
+        }
+        .vessel-info {
+            font-size: 0.875rem;
+            color: #9ca3af;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-ok { background: #065f46; color: #34d399; }
+        .status-warn { background: #92400e; color: #fcd34d; }
+        .status-danger { background: #991b1b; color: #fca5a5; }
+
+        .controls-hint {
+            font-size: 0.8rem;
+            color: #9ca3af;
+            text-align: center;
+        }
+
+        /* Modal Overlay for Level Transitions */
+        .modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(3, 7, 18, 0.85);
+            backdrop-filter: blur(4px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+        .modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-card {
+            background: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 420px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        .modal h2 {
+            font-size: 1.75rem;
+            color: #f9fafb;
+            margin-bottom: 8px;
+        }
+        .modal p {
+            color: #9ca3af;
+            font-size: 0.95rem;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+        .btn {
+            background: #0284c7;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #0369a1;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas" width="900" height="650"></canvas>
+    
+    <div class="ui-overlay">
+        <div class="hud-top">
+            <div class="card">
+                <div class="level-title" id="hud-level">Level 1: Middle River Run</div>
+                <div class="vessel-info" id="hud-vessel">Vessel: 18ft Center Console Skiff</div>
+            </div>
+            <div class="card" style="text-align: right;">
+                <div id="hud-status" class="status-badge status-ok">Navigating</div>
+                <div class="vessel-info" style="margin-top: 4px;" id="hud-timer">Time: 0s</div>
+            </div>
+        </div>
+        <div class="controls-hint card" style="align-self: center;">
+            <strong>Controls:</strong> [W/Up] Throttle Up | [S/Down] Reverse | [A/D or Left/Right] Steer | [Space] Open Drawbridge
+        </div>
+    </div>
+
+    <div id="modal" class="modal active">
+        <div class="modal-card">
+            <h2 id="modal-title">Dock Director</h2>
+            <p id="modal-desc">Navigate Fort Lauderdale's intricate waterways. Dock your vessel safely in the designated green slip without colliding with seawalls or shallow bars.</p>
+            <button class="btn" id="modal-btn" onclick="startLevel()">Start Level 1</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * DOCK DIRECTOR - Fort Lauderdale Navigation Prototype
+ */
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// --- GAME STATE ---
+let currentLevelIdx = 0;
+let gameState = 'MENU'; // 'MENU', 'PLAYING', 'SUCCESS', 'FAILED'
+let levelStartTime = 0;
+let elapsedTime = 0;
+
+// --- INPUT TRACKING ---
+const keys = {
+    ArrowUp: false, KeyW: false,
+    ArrowDown: false, KeyS: false,
+    ArrowLeft: false, KeyA: false,
+    ArrowRight: false, KeyD: false,
+    Space: false
+};
+
+window.addEventListener('keydown', (e) => {
+    if (e.code in keys) keys[e.code] = true;
+    if (e.code === 'Space' && gameState === 'PLAYING') {
+        triggerDrawbridges();
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    if (e.code in keys) keys[e.code] = false;
+});
+
+// --- MAP & LEVEL DEFINITIONS ---
+// Map coordinates and elements represent landmasses, bridges, and docks.
+const levels = [
+    {
+        name: "Level 1: Middle River Run",
+        vesselName: "18ft Center Console Skiff",
+        vesselSpecs: { width: 14, length: 28, maxSpeed: 2.8, turnSpeed: 0.05, accel: 0.08, friction: 0.98 },
+        startPos: { x: 80, y: 570, angle: -Math.PI / 2 },
+        dock: { x: 780, y: 100, width: 36, height: 60, angle: 0 },
+        landmasses: [
+            // Residential canal fingers (South)
+            { x: 0, y: 450, w: 300, h: 200 },
+            { x: 380, y: 450, w: 520, h: 200 },
+            { x: 300, y: 550, w: 160, h: 100 },
+            // Middle Island barriers
+            { x: 150, y: 200, w: 450, h: 160 },
+            // North shore finger canals
+            { x: 0, y: 0, w: 900, h: 60 },
+            { x: 700, y: 60, w: 60, h: 250 },
+            { x: 840, y: 60, w: 60, h: 250 }
+        ],
+        bridges: [],
+        sandbars: [
+            { x: 200, y: 370, radius: 35 }
+        ]
+    },
+    {
+        name: "Level 2: Las Olas Isles & Drawbridge",
+        vesselName: "42ft Cabin Cruiser",
+        vesselSpecs: { width: 22, length: 50, maxSpeed: 2.0, turnSpeed: 0.035, accel: 0.04, friction: 0.97 },
+        startPos: { x: 80, y: 580, angle: -Math.PI / 2 },
+        dock: { x: 780, y: 70, width: 45, height: 80, angle: 0 },
+        landmasses: [
+            // Las Olas finger canals layout
+            { x: 0, y: 0, w: 900, h: 40 },
+            { x: 0, y: 400, w: 250, h: 250 },
+            { x: 350, y: 400, w: 550, h: 250 },
+            // Middle finger piers
+            { x: 150, y: 120, w: 400, h: 180 },
+            { x: 650, y: 120, w: 80, h: 280 }
+        ],
+        bridges: [
+            {
+                x: 250, y: 480, w: 100, h: 30,
+                isOpen: false, targetOpen: 0, openProgress: 0,
+                orientation: 'horizontal'
+            }
+        ],
+        sandbars: [
+            { x: 600, y: 480, radius: 45 }
+        ]
+    },
+    {
+        name: "Level 3: Intracoastal Superyacht Basin",
+        vesselName: "110ft Tri-Deck Superyacht",
+        vesselSpecs: { width: 32, length: 90, maxSpeed: 1.4, turnSpeed: 0.02, accel: 0.02, friction: 0.96 },
+        startPos: { x: 70, y: 320, angle: 0 },
+        dock: { x: 730, y: 480, width: 55, height: 120, angle: 0 },
+        landmasses: [
+            // Complex channel layout
+            { x: 0, y: 0, w: 900, h: 50 },
+            { x: 0, y: 50, w: 180, h: 200 },
+            { x: 0, y: 390, w: 180, h: 260 },
+            // Port Everglades turns & barrier islands
+            { x: 280, y: 150, w: 340, h: 340 },
+            { x: 700, y: 50, w: 200, h: 320 },
+            { x: 800, y: 450, w: 100, h: 200 }
+        ],
+        bridges: [
+            {
+                x: 180, y: 250, w: 100, h: 30,
+                isOpen: false, targetOpen: 0, openProgress: 0,
+                orientation: 'horizontal'
+            },
+            {
+                x: 620, y: 370, w: 80, h: 30,
+                isOpen: false, targetOpen: 0, openProgress: 0,
+                orientation: 'horizontal'
+            }
+        ],
+        sandbars: [
+            { x: 230, y: 550, radius: 55 },
+            { x: 660, y: 100, radius: 40 }
+        ]
+    }
+];
+
+// --- BOAT OBJECT ---
+class Boat {
+    constructor(x, y, angle, specs) {
+        this.x = x;
+        this.y = y;
+        this.angle = angle;
+        this.speed = 0;
+        this.specs = specs;
+    }
+
+    update() {
+        if (gameState !== 'PLAYING') return;
+
+        // Steering logic (more responsive when moving)
+        if (Math.abs(this.speed) > 0.1) {
+            const dir = this.speed > 0 ? 1 : -1;
+            if (keys.ArrowLeft || keys.KeyA) this.angle -= this.specs.turnSpeed * dir;
+            if (keys.ArrowRight || keys.KeyD) this.angle += this.specs.turnSpeed * dir;
+        }
+
+        // Throttle control
+        if (keys.ArrowUp || keys.KeyW) {
+            this.speed = Math.min(this.speed + this.specs.accel, this.specs.maxSpeed);
+        } else if (keys.ArrowDown || keys.KeyS) {
+            this.speed = Math.max(this.speed - this.specs.accel, -this.specs.maxSpeed * 0.5);
+        } else {
+            this.speed *= this.specs.friction;
+        }
+
+        // Apply movement vector
+        this.x += Math.cos(this.angle) * this.speed;
+        this.y += Math.sin(this.angle) * this.speed;
+    }
+
+    getBounds() {
+        // Return 4 corner points for collision checking
+        const cos = Math.cos(this.angle);
+        const sin = Math.sin(this.angle);
+        const hw = this.specs.width / 2;
+        const hl = this.specs.length / 2;
+
+        return [
+            { x: this.x + cos * hl - sin * hw, y: this.y + sin * hl + cos * hw },
+            { x: this.x + cos * hl + sin * hw, y: this.y + sin * hl - cos * hw },
+            { x: this.x - cos * hl + sin * hw, y: this.y - sin * hl - cos * hw },
+            { x: this.x - cos * hl - sin * hw, y: this.y - sin * hl + cos * hw }
+        ];
+    }
+
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+
+        // Wake effect behind boat
+        if (Math.abs(this.speed) > 0.5) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.beginPath();
+            ctx.moveTo(-this.specs.length / 2, -this.specs.width / 3);
+            ctx.lineTo(-this.specs.length / 2 - (this.speed * 8), -this.specs.width);
+            ctx.lineTo(-this.specs.length / 2 - (this.speed * 8), this.specs.width);
+            ctx.lineTo(-this.specs.length / 2, this.specs.width / 3);
+            ctx.fill();
+        }
+
+        // Vessel Hull
+        ctx.fillStyle = '#f8fafc';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 2;
+
+        ctx.beginPath();
+        // Pointy bow
+        ctx.moveTo(this.specs.length / 2, 0);
+        ctx.lineTo(this.specs.length / 4, -this.specs.width / 2);
+        ctx.lineTo(-this.specs.length / 2, -this.specs.width / 2);
+        ctx.lineTo(-this.specs.length / 2, this.specs.width / 2);
+        ctx.lineTo(this.specs.length / 4, this.specs.width / 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Cabin superstructure
+        ctx.fillStyle = '#0284c7';
+        ctx.fillRect(-this.specs.length / 4, -this.specs.width / 3, this.specs.length / 2, this.specs.width * 0.66);
+
+        ctx.restore();
+    }
+}
+
+// --- ACTIVE LEVEL VARS ---
+let currentLevel = levels[0];
+let playerBoat;
+
+function initLevel(index) {
+    currentLevelIdx = index;
+    currentLevel = levels[currentLevelIdx];
+    playerBoat = new Boat(
+        currentLevel.startPos.x,
+        currentLevel.startPos.y,
+        currentLevel.startPos.angle,
+        currentLevel.vesselSpecs
+    );
+
+    // Reset drawbridges
+    currentLevel.bridges.forEach(b => {
+        b.isOpen = false;
+        b.targetOpen = 0;
+        b.openProgress = 0;
+    });
+
+    // Update UI HUD
+    document.getElementById('hud-level').innerText = currentLevel.name;
+    document.getElementById('hud-vessel').innerText = `Vessel: ${currentLevel.vesselName}`;
+    updateStatus('Navigating', 'status-ok');
+}
+
+function startLevel() {
+    initLevel(currentLevelIdx);
+    gameState = 'PLAYING';
+    levelStartTime = Date.now();
+    document.getElementById('modal').classList.remove('active');
+}
+
+function triggerDrawbridges() {
+    currentLevel.bridges.forEach(b => {
+        b.targetOpen = b.targetOpen === 0 ? 1 : 0;
+    });
+}
+
+function updateStatus(text, className) {
+    const badge = document.getElementById('hud-status');
+    badge.innerText = text;
+    badge.className = `status-badge ${className}`;
+}
+
+// --- COLLISION DETECTORS ---
+function pointInRect(px, py, rx, ry, rw, rh) {
+    return px >= rx && px <= rx + rw && py >= ry && py <= ry + rh;
+}
+
+function checkCollisions() {
+    const corners = playerBoat.getBounds();
+
+    // 1. Screen boundaries
+    for (let p of corners) {
+        if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) {
+            handleCrash("Collided with coastal boundary!");
+            return;
+        }
+    }
+
+    // 2. Landmasses (Seawalls)
+    for (let land of currentLevel.landmasses) {
+        for (let p of corners) {
+            if (pointInRect(p.x, p.y, land.x, land.y, land.w, land.h)) {
+                handleCrash("Seawall impact!");
+                return;
+            }
+        }
+    }
+
+    // 3. Drawbridges (Closed sections act as barriers)
+    for (let b of currentLevel.bridges) {
+        // Gap opens in the middle as openProgress increases
+        const gap = b.w * b.openProgress;
+        const leftSpanW = (b.w - gap) / 2;
+        
+        for (let p of corners) {
+            // Check left leaf
+            if (pointInRect(p.x, p.y, b.x, b.y, leftSpanW, b.h) ||
+                // Check right leaf
+                pointInRect(p.x, p.y, b.x + b.w - leftSpanW, b.y, leftSpanW, b.h)) {
+                handleCrash("Bridge span collision! Open drawbridges with [SPACE].");
+                return;
+            }
+        }
+    }
+
+    // 4. Sandbars (Grounded warning/slowdown)
+    let grounded = false;
+    for (let sb of currentLevel.sandbars) {
+        const dx = playerBoat.x - sb.x;
+        const dy = playerBoat.y - sb.y;
+        if (Math.sqrt(dx * dx + dy * dy) < sb.radius) {
+            grounded = true;
+            break;
+        }
+    }
+
+    if (grounded) {
+        playerBoat.speed *= 0.85; // Drag down speed drastically
+        updateStatus('Grounded on Sandbar', 'status-warn');
+    } else if (gameState === 'PLAYING') {
+        updateStatus('Navigating', 'status-ok');
+    }
+
+    // 5. Docking Check
+    const d = currentLevel.dock;
+    const boatInDock = pointInRect(playerBoat.x, playerBoat.y, d.x, d.y, d.width, d.height);
+    
+    if (boatInDock && Math.abs(playerBoat.speed) < 0.3) {
+        handleWin();
+    }
+}
+
+function handleCrash(reason) {
+    gameState = 'FAILED';
+    updateStatus('Crashed', 'status-danger');
+    showModal('Vessel Damaged!', `${reason} Keep an eye on channel markers and clearance.`, 'Try Again', () => startLevel());
+}
+
+function handleWin() {
+    gameState = 'SUCCESS';
+    updateStatus('Docked', 'status-ok');
+    
+    if (currentLevelIdx < levels.length - 1) {
+        showModal('Successfully Docked!', `You navigated ${currentLevel.vesselName} safely into the marina.`, 'Next Level', () => {
+            currentLevelIdx++;
+            startLevel();
+        });
+    } else {
+        showModal('Master Navigator!', 'You have mastered all waterways from small skiffs up to mega yachts!', 'Play Again', () => {
+            currentLevelIdx = 0;
+            startLevel();
+        });
+    }
+}
+
+function showModal(title, desc, btnText, action) {
+    document.getElementById('modal-title').innerText = title;
+    document.getElementById('modal-desc').innerText = desc;
+    const btn = document.getElementById('modal-btn');
+    btn.innerText = btnText;
+    btn.onclick = action;
+    document.getElementById('modal').classList.add('active');
+}
+
+// --- RENDER & GAME LOOP ---
+function update() {
+    if (gameState === 'PLAYING') {
+        playerBoat.update();
+        checkCollisions();
+        elapsedTime = Math.floor((Date.now() - levelStartTime) / 1000);
+        document.getElementById('hud-timer').innerText = `Time: ${elapsedTime}s`;
+
+        // Smoothly animate drawbridges
+        currentLevel.bridges.forEach(b => {
+            if (b.openProgress < b.targetOpen) {
+                b.openProgress = Math.min(b.openProgress + 0.02, b.targetOpen);
+            } else if (b.openProgress > b.targetOpen) {
+                b.openProgress = Math.max(b.openProgress - 0.02, b.targetOpen);
+            }
+        });
+    }
+}
+
+function drawMap() {
+    // 1. Water background
+    ctx.fillStyle = '#0284c7';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 2. Sandbars / Shallows
+    ctx.fillStyle = '#cbd5e1';
+    currentLevel.sandbars.forEach(sb => {
+        ctx.beginPath();
+        ctx.arc(sb.x, sb.y, sb.radius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(253, 224, 71, 0.35)'; // Shallow water yellow-green
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(234, 179, 8, 0.5)';
+        ctx.stroke();
+    });
+
+    // 3. Landmasses & Seawalls
+    ctx.fillStyle = '#15803d'; // Tropical grass green
+    ctx.strokeStyle = '#475569'; // Concrete seawall
+    ctx.lineWidth = 4;
+
+    currentLevel.landmasses.forEach(l => {
+        ctx.fillRect(l.x, l.y, l.w, l.h);
+        ctx.strokeRect(l.x, l.y, l.w, l.h);
+    });
+
+    // 4. Drawbridges
+    currentLevel.bridges.forEach(b => {
+        // Road connection background
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(b.x, b.y, b.w, b.h);
+
+        // Leaves movement
+        const gap = b.w * b.openProgress;
+        const spanWidth = (b.w - gap) / 2;
+
+        ctx.fillStyle = '#64748b';
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 2;
+
+        // Left leaf span
+        ctx.fillRect(b.x, b.y, spanWidth, b.h);
+        ctx.strokeRect(b.x, b.y, spanWidth, b.h);
+
+        // Right leaf span
+        ctx.fillRect(b.x + b.w - spanWidth, b.y, spanWidth, b.h);
+        ctx.strokeRect(b.x + b.w - spanWidth, b.y, spanWidth, b.h);
+
+        // Bridge Prompt Text
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(b.openProgress > 0.8 ? "OPEN" : "PRESS SPACE", b.x + b.w / 2, b.y + b.h / 2 + 3);
+    });
+
+    // 5. Docking Slip Target
+    const d = currentLevel.dock;
+    ctx.fillStyle = 'rgba(34, 197, 94, 0.4)';
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([6, 6]);
+    ctx.fillRect(d.x, d.y, d.width, d.height);
+    ctx.strokeRect(d.x, d.y, d.width, d.height);
+    ctx.setLineDash([]); // Reset line dash
+
+    ctx.fillStyle = '#22c55e';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText("PARK HERE", d.x + d.width / 2, d.y + d.height / 2);
+
+    // 6. Channel Navigation Markers (Red Right Returning rules)
+    ctx.fillStyle = '#ef4444'; // Red nun marker
+    ctx.beginPath(); ctx.arc(120, 420, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#22c55e'; // Green can marker
+    ctx.beginPath(); ctx.arc(120, 460, 5, 0, Math.PI * 2); ctx.fill();
+}
+
+function loop() {
+    update();
+    drawMap();
+    if (playerBoat) playerBoat.draw();
+    requestAnimationFrame(loop);
+}
+
+// Initial setup
+initLevel(0);
+loop();
+</script>
+
+</body>
+</html>
