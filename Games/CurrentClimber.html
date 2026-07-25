@@ -2,28 +2,45 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Upriver Navigator - Expanded</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Upriver Navigator</title>
   <style>
-    body {
+    * {
+      box-sizing: border-box;
+      touch-action: none; /* Prevents touch scrolling on mobile */
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html, body {
       margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
       background: #111;
       color: #fff;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: 100vh;
     }
     #game-container {
       position: relative;
-      border: 4px solid #333;
-      border-radius: 8px;
-      overflow: hidden;
+      width: 100%;
+      max-width: 450px;
+      height: 100%;
+      max-height: 800px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      background: #1e5799;
     }
     canvas {
+      width: 100%;
+      flex-grow: 1;
       display: block;
-      background: #1e5799;
     }
     .hud {
       position: absolute;
@@ -34,48 +51,99 @@
       justify-content: space-between;
       pointer-events: none;
       font-weight: bold;
-      text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+      font-size: 18px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+      z-index: 5;
+    }
+    /* Touch Controls Overlay */
+    .controls-container {
+      width: 100%;
+      height: 120px;
+      background: #0d2847;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding: 10px;
+      gap: 10px;
+      z-index: 5;
+      border-top: 3px solid #333;
+    }
+    .touch-btn {
+      flex: 1;
+      height: 100%;
+      background: #2980b9;
+      color: white;
+      border: 2px solid #3498db;
+      border-radius: 12px;
+      font-size: 20px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      active-bg: #1c5980;
+    }
+    .touch-btn:active, .touch-btn.active {
+      background: #1f618d;
+      transform: scale(0.96);
+    }
+    .touch-btn.throttle {
+      background: #27ae60;
+      border-color: #2ecc71;
+    }
+    .touch-btn.throttle:active, .touch-btn.throttle.active {
+      background: #1e8449;
     }
     .shop-overlay {
       position: absolute;
       inset: 0;
-      background: rgba(0, 0, 0, 0.85);
+      background: rgba(0, 0, 0, 0.9);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       gap: 15px;
+      padding: 20px;
+      text-align: center;
+      z-index: 10;
     }
     .btn {
       background: #27ae60;
       color: white;
       border: none;
-      padding: 10px 20px;
-      border-radius: 5px;
-      font-size: 16px;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: bold;
       cursor: pointer;
-      transition: 0.2s;
+      width: 100%;
+      max-width: 280px;
     }
-    .btn:hover { background: #2ecc71; }
-    .btn:disabled { background: #555; cursor: not-allowed; }
+    .btn:disabled { background: #555; opacity: 0.6; }
   </style>
 </head>
 <body>
 
 <div id="game-container">
-  <canvas id="canvas" width="480" height="640"></canvas>
   <div class="hud">
     <div id="score-display">Distance: 0m</div>
     <div id="cash-display">Coins: $0</div>
   </div>
+
+  <canvas id="canvas"></canvas>
+
+  <!-- On-Screen Mobile Touch Controls -->
+  <div class="controls-container">
+    <div class="touch-btn" id="btn-left">◀ Steer</div>
+    <div class="touch-btn throttle" id="btn-throttle">▲ Gas</div>
+    <div class="touch-btn" id="btn-right">Steer ▶</div>
+  </div>
+
   <div id="shop" class="shop-overlay">
     <h1 id="shop-title">Upriver Navigator</h1>
-    <p id="shop-desc">Watch out for river rocks and don't turn sideways!</p>
-    <div>
-      <button class="btn" id="buy-motor">Upgrade Motor ($10)</button>
-      <button class="btn" id="buy-rudder">Upgrade Rudder ($10)</button>
-    </div>
-    <button class="btn" id="start-btn" style="margin-top: 15px; font-weight: bold;">Launch Boat</button>
+    <p id="shop-desc">Hold <b>GAS</b> to fight the current! Don't let your boat turn sideways or crash into rocks.</p>
+    <button class="btn" id="buy-motor">Upgrade Motor ($10)</button>
+    <button class="btn" id="buy-rudder">Upgrade Rudder ($10)</button>
+    <button class="btn" id="start-btn" style="margin-top: 15px; background: #e67e22;">Launch Boat</button>
   </div>
 </div>
 
@@ -83,30 +151,28 @@
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
+  function resizeCanvas() {
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+  }
+  window.addEventListener('resize', resizeCanvas);
+
   // --- Audio System ---
   let audioCtx = null;
-
   function initAudio() {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
   }
 
   function playPickupSound() {
     if (!audioCtx) return;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    
     osc.type = 'sine';
     osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
     osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.08);
-    
     gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
-    
     osc.connect(gain);
     gain.connect(audioCtx.destination);
     osc.start();
@@ -117,14 +183,11 @@
     if (!audioCtx) return;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(120, audioCtx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.4);
-    
     gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
-    
     osc.connect(gain);
     gain.connect(audioCtx.destination);
     osc.start();
@@ -139,20 +202,46 @@
   let playing = false;
 
   const boat = {
-    x: canvas.width / 2,
-    y: canvas.height - 100,
+    x: 0,
+    y: 0,
     angle: 0,
-    width: 20,
-    height: 40
+    width: 22,
+    height: 42
   };
 
   let currentSpeed = 2.0;
   let items = [];
   let obstacles = [];
-  let keys = {};
+  let inputState = { left: false, right: false, throttle: false };
 
-  window.addEventListener('keydown', e => keys[e.code] = true);
-  window.addEventListener('keyup', e => keys[e.code] = false);
+  // Keyboard
+  window.addEventListener('keydown', e => {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') inputState.left = true;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') inputState.right = true;
+    if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') inputState.throttle = true;
+  });
+  window.addEventListener('keyup', e => {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') inputState.left = false;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') inputState.right = false;
+    if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') inputState.throttle = false;
+  });
+
+  // Touch Handlers for On-Screen Buttons
+  function bindTouch(elementId, stateKey) {
+    const btn = document.getElementById(elementId);
+    const start = (e) => { e.preventDefault(); inputState[stateKey] = true; btn.classList.add('active'); };
+    const end = (e) => { e.preventDefault(); inputState[stateKey] = false; btn.classList.remove('active'); };
+    
+    btn.addEventListener('touchstart', start);
+    btn.addEventListener('touchend', end);
+    btn.addEventListener('mousedown', start);
+    btn.addEventListener('mouseup', end);
+    btn.addEventListener('mouseleave', end);
+  }
+
+  bindTouch('btn-left', 'left');
+  bindTouch('btn-right', 'right');
+  bindTouch('btn-throttle', 'throttle');
 
   document.getElementById('start-btn').addEventListener('click', startGame);
   document.getElementById('buy-motor').addEventListener('click', () => {
@@ -180,11 +269,12 @@
 
   function startGame() {
     initAudio();
+    resizeCanvas();
     boat.x = canvas.width / 2;
-    boat.y = canvas.height - 120;
+    boat.y = canvas.height - 150;
     boat.angle = 0;
     distance = 0;
-    currentSpeed = 2.0;
+    currentSpeed = 1.8; // Friendly starting current speed
     items = [];
     obstacles = [];
     playing = true;
@@ -195,29 +285,37 @@
   function gameLoop() {
     if (!playing) return;
 
-    // --- Steering & Movement ---
-    const turnSpeed = 0.03 + (rudderLevel * 0.005);
-    const motorPower = 1.2 + (motorLevel * 0.4);
+    // Steering
+    const turnSpeed = 0.035 + (rudderLevel * 0.006);
+    if (inputState.left) boat.angle -= turnSpeed;
+    if (inputState.right) boat.angle += turnSpeed;
 
-    if (keys['ArrowLeft'] || keys['KeyA']) boat.angle -= turnSpeed;
-    if (keys['ArrowRight'] || keys['KeyD']) boat.angle += turnSpeed;
+    // Upgraded Throttle Power: Level 1 provides sufficient speed over base river current (1.8)
+    let appliedPower = 0.8; // Idle drift force forward
+    if (inputState.throttle) {
+      appliedPower = 2.4 + (motorLevel * 0.6); // Strong push upstream
+    }
 
-    const forwardX = Math.sin(boat.angle) * motorPower;
-    const forwardY = -Math.cos(boat.angle) * motorPower;
-    const sidewaysDrag = Math.sin(boat.angle) * currentSpeed * 1.8;
+    const forwardX = Math.sin(boat.angle) * appliedPower;
+    const forwardY = -Math.cos(boat.angle) * appliedPower;
+    
+    // Sideways river drag kicks in harder if turned sideways
+    const sidewaysDrag = Math.sin(boat.angle) * currentSpeed * 1.6;
 
     boat.x += forwardX + sidewaysDrag;
     boat.y += forwardY + currentSpeed;
 
+    // Difficulty increases with distance
     distance += 0.1;
-    currentSpeed = 2.0 + (distance / 500);
+    currentSpeed = 1.8 + (distance / 600);
 
-    if (boat.y < 100) boat.y = 100;
+    // Keep boat in upper bounds
+    if (boat.y < 80) boat.y = 80;
 
     // --- Loss Conditions ---
-    if (Math.abs(boat.angle) > 1.1 || boat.y > canvas.height + 20) {
+    if (Math.abs(boat.angle) > 1.2 || boat.y > canvas.height + 30) {
       playCrashSound();
-      endGame("The current caught your beam and washed you down river!");
+      endGame("The current turned your boat sideways and washed you down!");
       return;
     }
 
@@ -227,24 +325,24 @@
       return;
     }
 
-    // --- Spawning ---
-    if (Math.random() < 0.03) {
-      items.push({ x: Math.random() * (canvas.width - 100) + 50, y: -20, radius: 8 });
+    // --- Spawns ---
+    if (Math.random() < 0.035) {
+      items.push({ x: Math.random() * (canvas.width - 100) + 50, y: -20, radius: 9 });
     }
 
-    if (Math.random() < 0.01 + (distance / 10000)) {
+    if (Math.random() < 0.008 + (distance / 12000)) {
       obstacles.push({ x: Math.random() * (canvas.width - 120) + 60, y: -30, radius: 12 + Math.random() * 8 });
     }
 
-    // --- Rendering ---
+    // --- Render ---
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // River banks
-    ctx.fillStyle = '#2d5a27';
-    ctx.fillRect(0, 0, 30, canvas.height);
-    ctx.fillRect(canvas.width - 30, 0, 30, canvas.height);
+    ctx.fillStyle = '#27ae60';
+    ctx.fillRect(0, 0, 25, canvas.height);
+    ctx.fillRect(canvas.width - 25, 0, 25, canvas.height);
 
-    // Collectible Coins
+    // Items (Coins)
     for (let i = items.length - 1; i >= 0; i--) {
       let item = items[i];
       item.y += currentSpeed;
@@ -270,9 +368,6 @@
       ctx.beginPath();
       ctx.arc(rock.x, rock.y, rock.radius, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = '#34495e';
-      ctx.lineWidth = 3;
-      ctx.stroke();
 
       if (rock.y > canvas.height + 50) {
         obstacles.splice(i, 1);
@@ -281,7 +376,7 @@
 
       if (Math.hypot(boat.x - rock.x, boat.y - rock.y) < rock.radius + 12) {
         playCrashSound();
-        endGame("You struck a rock and sank!");
+        endGame("You hit a rock!");
         return;
       }
     }
@@ -291,7 +386,7 @@
     ctx.translate(boat.x, boat.y);
     ctx.rotate(boat.angle);
 
-    ctx.fillStyle = '#8e44ad';
+    ctx.fillStyle = '#9b59b6';
     ctx.beginPath();
     ctx.moveTo(0, -boat.height / 2);
     ctx.lineTo(boat.width / 2, boat.height / 2);
@@ -299,7 +394,8 @@
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = '#333';
+    // Outboard Motor
+    ctx.fillStyle = '#2c3e50';
     ctx.fillRect(-4, boat.height / 2, 8, 8);
     ctx.restore();
 
@@ -312,11 +408,13 @@
   function endGame(reason) {
     playing = false;
     document.getElementById('shop-title').innerText = "Washed Out!";
-    document.getElementById('shop-desc').innerText = `${reason} Reached ${Math.floor(distance)}m.`;
+    document.getElementById('shop-desc').innerText = `${reason} Distance: ${Math.floor(distance)}m.`;
     document.getElementById('start-btn').innerText = "Try Again";
     updateShopUI();
     document.getElementById('shop').style.display = 'flex';
   }
+
+  resizeCanvas();
 </script>
 </body>
 </html>
