@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Upriver Navigator - Expanded</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    #game-container {
+      position: relative;
+      border: 4px solid #333;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      background: #1e5799;
+    }
+    .hud {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+      font-weight: bold;
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+    }
+    .shop-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+    }
+    .btn {
+      background: #27ae60;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .btn:hover { background: #2ecc71; }
+    .btn:disabled { background: #555; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+<div id="game-container">
+  <canvas id="canvas" width="480" height="640"></canvas>
+  <div class="hud">
+    <div id="score-display">Distance: 0m</div>
+    <div id="cash-display">Coins: $0</div>
+  </div>
+  <div id="shop" class="shop-overlay">
+    <h1 id="shop-title">Upriver Navigator</h1>
+    <p id="shop-desc">Watch out for river rocks and don't turn sideways!</p>
+    <div>
+      <button class="btn" id="buy-motor">Upgrade Motor ($10)</button>
+      <button class="btn" id="buy-rudder">Upgrade Rudder ($10)</button>
+    </div>
+    <button class="btn" id="start-btn" style="margin-top: 15px; font-weight: bold;">Launch Boat</button>
+  </div>
+</div>
+
+<script>
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  // --- Audio System ---
+  let audioCtx = null;
+
+  function initAudio() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+  }
+
+  function playPickupSound() {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.08);
+    
+    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.25);
+  }
+
+  function playCrashSound() {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.4);
+    
+    gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.4);
+  }
+
+  // --- Game State ---
+  let distance = 0;
+  let coins = 0;
+  let motorLevel = 1;
+  let rudderLevel = 1;
+  let playing = false;
+
+  const boat = {
+    x: canvas.width / 2,
+    y: canvas.height - 100,
+    angle: 0,
+    width: 20,
+    height: 40
+  };
+
+  let currentSpeed = 2.0;
+  let items = [];
+  let obstacles = [];
+  let keys = {};
+
+  window.addEventListener('keydown', e => keys[e.code] = true);
+  window.addEventListener('keyup', e => keys[e.code] = false);
+
+  document.getElementById('start-btn').addEventListener('click', startGame);
+  document.getElementById('buy-motor').addEventListener('click', () => {
+    if (coins >= motorLevel * 10) {
+      coins -= motorLevel * 10;
+      motorLevel++;
+      updateShopUI();
+    }
+  });
+  document.getElementById('buy-rudder').addEventListener('click', () => {
+    if (coins >= rudderLevel * 10) {
+      coins -= rudderLevel * 10;
+      rudderLevel++;
+      updateShopUI();
+    }
+  });
+
+  function updateShopUI() {
+    document.getElementById('cash-display').innerText = `Coins: $${coins}`;
+    document.getElementById('buy-motor').innerText = `Upgrade Motor Lvl ${motorLevel + 1} ($${motorLevel * 10})`;
+    document.getElementById('buy-rudder').innerText = `Upgrade Rudder Lvl ${rudderLevel + 1} ($${rudderLevel * 10})`;
+    document.getElementById('buy-motor').disabled = coins < motorLevel * 10;
+    document.getElementById('buy-rudder').disabled = coins < rudderLevel * 10;
+  }
+
+  function startGame() {
+    initAudio();
+    boat.x = canvas.width / 2;
+    boat.y = canvas.height - 120;
+    boat.angle = 0;
+    distance = 0;
+    currentSpeed = 2.0;
+    items = [];
+    obstacles = [];
+    playing = true;
+    document.getElementById('shop').style.display = 'none';
+    requestAnimationFrame(gameLoop);
+  }
+
+  function gameLoop() {
+    if (!playing) return;
+
+    // --- Steering & Movement ---
+    const turnSpeed = 0.03 + (rudderLevel * 0.005);
+    const motorPower = 1.2 + (motorLevel * 0.4);
+
+    if (keys['ArrowLeft'] || keys['KeyA']) boat.angle -= turnSpeed;
+    if (keys['ArrowRight'] || keys['KeyD']) boat.angle += turnSpeed;
+
+    const forwardX = Math.sin(boat.angle) * motorPower;
+    const forwardY = -Math.cos(boat.angle) * motorPower;
+    const sidewaysDrag = Math.sin(boat.angle) * currentSpeed * 1.8;
+
+    boat.x += forwardX + sidewaysDrag;
+    boat.y += forwardY + currentSpeed;
+
+    distance += 0.1;
+    currentSpeed = 2.0 + (distance / 500);
+
+    if (boat.y < 100) boat.y = 100;
+
+    // --- Loss Conditions ---
+    if (Math.abs(boat.angle) > 1.1 || boat.y > canvas.height + 20) {
+      playCrashSound();
+      endGame("The current caught your beam and washed you down river!");
+      return;
+    }
+
+    if (boat.x < 30 || boat.x > canvas.width - 30) {
+      playCrashSound();
+      endGame("You crashed into the river bank!");
+      return;
+    }
+
+    // --- Spawning ---
+    if (Math.random() < 0.03) {
+      items.push({ x: Math.random() * (canvas.width - 100) + 50, y: -20, radius: 8 });
+    }
+
+    if (Math.random() < 0.01 + (distance / 10000)) {
+      obstacles.push({ x: Math.random() * (canvas.width - 120) + 60, y: -30, radius: 12 + Math.random() * 8 });
+    }
+
+    // --- Rendering ---
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // River banks
+    ctx.fillStyle = '#2d5a27';
+    ctx.fillRect(0, 0, 30, canvas.height);
+    ctx.fillRect(canvas.width - 30, 0, 30, canvas.height);
+
+    // Collectible Coins
+    for (let i = items.length - 1; i >= 0; i--) {
+      let item = items[i];
+      item.y += currentSpeed;
+      
+      ctx.fillStyle = '#f1c40f';
+      ctx.beginPath();
+      ctx.arc(item.x, item.y, item.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (Math.hypot(boat.x - item.x, boat.y - item.y) < item.radius + 15) {
+        coins += 5;
+        playPickupSound();
+        items.splice(i, 1);
+      }
+    }
+
+    // Obstacles (Rocks)
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+      let rock = obstacles[i];
+      rock.y += currentSpeed;
+
+      ctx.fillStyle = '#7f8c8d';
+      ctx.beginPath();
+      ctx.arc(rock.x, rock.y, rock.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#34495e';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      if (rock.y > canvas.height + 50) {
+        obstacles.splice(i, 1);
+        continue;
+      }
+
+      if (Math.hypot(boat.x - rock.x, boat.y - rock.y) < rock.radius + 12) {
+        playCrashSound();
+        endGame("You struck a rock and sank!");
+        return;
+      }
+    }
+
+    // Player Boat
+    ctx.save();
+    ctx.translate(boat.x, boat.y);
+    ctx.rotate(boat.angle);
+
+    ctx.fillStyle = '#8e44ad';
+    ctx.beginPath();
+    ctx.moveTo(0, -boat.height / 2);
+    ctx.lineTo(boat.width / 2, boat.height / 2);
+    ctx.lineTo(-boat.width / 2, boat.height / 2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#333';
+    ctx.fillRect(-4, boat.height / 2, 8, 8);
+    ctx.restore();
+
+    document.getElementById('score-display').innerText = `Distance: ${Math.floor(distance)}m`;
+    document.getElementById('cash-display').innerText = `Coins: $${coins}`;
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  function endGame(reason) {
+    playing = false;
+    document.getElementById('shop-title').innerText = "Washed Out!";
+    document.getElementById('shop-desc').innerText = `${reason} Reached ${Math.floor(distance)}m.`;
+    document.getElementById('start-btn').innerText = "Try Again";
+    updateShopUI();
+    document.getElementById('shop').style.display = 'flex';
+  }
+</script>
+</body>
+</html>
