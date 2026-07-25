@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Physics Swarm - Level 1: The Acid Gap</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #0d1117;
+      color: #c9d1d9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    #game-container {
+      position: relative;
+      width: 800px;
+      height: 550px;
+      background: #161b22;
+      border: 2px solid #30363d;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border-radius: 6px;
+      cursor: crosshair;
+    }
+    .hud {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+    }
+    .hud-card {
+      background: rgba(22, 27, 34, 0.85);
+      border: 1px solid #30363d;
+      padding: 8px 14px;
+      border-radius: 6px;
+      backdrop-filter: blur(4px);
+    }
+    .hud-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #8b949e;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+    .hud-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: #58a6ff;
+    }
+    .bar-container {
+      width: 120px;
+      height: 8px;
+      background: #21262d;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .bar-fill {
+      height: 100%;
+      background: #238636;
+      width: 100%;
+      transition: width 0.1s ease;
+    }
+    #overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(13, 17, 23, 0.88);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      z-index: 10;
+    }
+    #overlay h1 {
+      font-size: 32px;
+      margin: 0 0 8px 0;
+    }
+    #overlay p {
+      color: #8b949e;
+      margin: 0 0 20px 0;
+      max-width: 400px;
+      text-align: center;
+      line-height: 1.4;
+    }
+    .btn {
+      background: #238636;
+      color: #ffffff;
+      border: none;
+      padding: 10px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    .btn:hover {
+      background: #2ea043;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="game-container">
+    <canvas id="canvas" width="800" height="550"></canvas>
+    
+    <!-- HUD Overlay -->
+    <div class="hud">
+      <div class="hud-card">
+        <div class="hud-title">Extraction Goal</div>
+        <div class="hud-value" id="goal-text">0 / 40</div>
+      </div>
+      <div class="hud-card">
+        <div class="hud-title">Cable Ink Supply</div>
+        <div class="hud-value" id="ink-text">100%</div>
+        <div class="bar-container">
+          <div class="bar-fill" id="ink-bar"></div>
+        </div>
+      </div>
+      <div class="hud-card">
+        <div class="hud-title">Active Horde</div>
+        <div class="hud-value" id="horde-text" style="color: #f0883e;">60</div>
+      </div>
+    </div>
+
+    <!-- State Screen Overlay -->
+    <div id="overlay">
+      <h1 id="modal-title">Level 1: The Acid Gap</h1>
+      <p id="modal-desc">Drag your mouse to draw dynamic elastic tension cables. Guide <b>40 viscous creatures</b> over the acid pit and into the collection funnel before running out of ink!</p>
+      <button class="btn" id="start-btn" onclick="startGame()">Start Extraction</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    // UI Elements
+    const overlay = document.getElementById("overlay");
+    const modalTitle = document.getElementById("modal-title");
+    const modalDesc = document.getElementById("modal-desc");
+    const startBtn = document.getElementById("start-btn");
+    const goalText = document.getElementById("goal-text");
+    const inkText = document.getElementById("ink-text");
+    const inkBar = document.getElementById("ink-bar");
+    const hordeText = document.getElementById("horde-text");
+
+    // Level Game State
+    let gameState = "MENU"; // "MENU", "PLAYING", "WON", "LOST"
+    const TARGET_SAVED = 40;
+    const TOTAL_CREATURES = 60;
+    let savedCount = 0;
+    let spawnedCount = 0;
+
+    // Ink Resource Budget
+    const MAX_INK = 450; // Max pixels of cable string length allowed
+    let usedInk = 0;
+
+    // Physics World Boundaries & Terrain
+    const terrain = [
+      // Left Spawner Platform
+      { x1: 0, y1: 160, x2: 240, y2: 180 },
+      { x1: 240, y1: 180, x2: 260, y2: 260 },
+      // Right Exit Platform
+      { x1: 540, y1: 340, x2: 800, y2: 340 },
+      { x1: 540, y1: 340, x2: 560, y2: 440 }
+    ];
+
+    // Hazards and Objectives
+    const acidPit = { x: 260, y: 520, w: 280, h: 30 };
+    const extractionPipe = { x: 700, y: 310, radius: 35 };
+
+    // Physics Particles (Creature Horde)
+    class Particle {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 1.5;
+        this.vy = Math.random() * 0.5;
+        this.radius = 6;
+        this.mass = 1;
+        this.isAlive = true;
+      }
+
+      update() {
+        if (!this.isAlive) return;
+
+        // Gravity
+        this.vy += 0.25;
+
+        // Drag
+        this.vx *= 0.98;
+        this.vy *= 0.98;
+
+        // Position Integration
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Terrain Collisions
+        terrain.forEach(wall => {
+          this.collideWithLine(wall.x1, wall.y1, wall.x2, wall.y2, 0.4);
+        });
+
+        // Check Acid Pit
+        if (
+          this.x > acidPit.x &&
+          this.x < acidPit.x + acidPit.w &&
+          this.y + this.radius >= acidPit.y
+        ) {
+          this.isAlive = false; // Destroyed by acid
+        }
+
+        // Check Goal
+        const dx = this.x - extractionPipe.x;
+        const dy = this.y - extractionPipe.y;
+        if (Math.sqrt(dx * dx + dy * dy) < extractionPipe.radius) {
+          this.isAlive = false;
+          savedCount++;
+          updateHUD();
+        }
+      }
+
+      collideWithLine(x1, y1, x2, y2, bounce = 0.3) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const u = ((this.x - x1) * dx + (this.y - y1) * dy) / (len * len);
+
+        if (u >= 0 && u <= 1) {
+          const ix = x1 + u * dx;
+          const iy = y1 + u * dy;
+          const dist = Math.sqrt((this.x - ix) ** 2 + (this.y - iy) ** 2);
+
+          if (dist < this.radius) {
+            const nx = -(y2 - y1) / len;
+            const ny = (x2 - x1) / len;
+
+            // Push out of terrain
+            this.x = ix + nx * this.radius;
+            this.y = iy + ny * this.radius;
+
+            // Reflect velocity
+            const dot = this.vx * nx + this.vy * ny;
+            this.vx -= (1 + bounce) * dot * nx;
+            this.vy -= (1 + bounce) * dot * ny;
+
+            // Apply friction along surface
+            this.vx *= 0.85;
+          }
+        }
+      }
+    }
+
+    // Dynamic Cable System (Elastic Cable Springs)
+    class Cable {
+      constructor(x1, y1, x2, y2) {
+        this.x1 = x1;
+        this.y1 = y1;
+        this.x2 = x2;
+        this.y2 = y2;
+        this.segments = 12;
+        this.nodes = [];
+        
+        const dx = (x2 - x1) / this.segments;
+        const dy = (y2 - y1) / this.segments;
+        this.length = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+
+        for (let i = 0; i <= this.segments; i++) {
+          this.nodes.push({
+            x: x1 + dx * i,
+            y: y1 + dy * i,
+            oldX: x1 + dx * i,
+            oldY: y1 + dy * i,
+            pinned: i === 0 || i === this.segments
+          });
+        }
+      }
+
+      update() {
+        // Verlet Integration & Gravity
+        for (let i = 0; i < this.nodes.length; i++) {
+          let n = this.nodes[i];
+          if (n.pinned) continue;
+
+          let vx = (n.x - n.oldX) * 0.95;
+          let vy = (n.y - n.oldY) * 0.95;
+
+          n.oldX = n.x;
+          n.oldY = n.y;
+
+          n.x += vx;
+          n.y += vy + 0.15; // Cable weight gravity
+        }
+
+        // Satisfy Spring Constraints (10 iterations for tightness)
+        const targetSegLen = this.length / this.segments;
+        for (let iter = 0; iter < 10; iter++) {
+          for (let i = 0; i < this.nodes.length - 1; i++) {
+            let n1 = this.nodes[i];
+            let n2 = this.nodes[i + 1];
+
+            let dx = n2.x - n1.x;
+            let dy = n2.y - n1.y;
+            let dist = Math.sqrt(dx * dx + dy * dy);
+            let diff = (dist - targetSegLen) / (dist || 1);
+
+            if (!n1.pinned) {
+              n1.x += dx * 0.5 * diff;
+              n1.y += dy * 0.5 * diff;
+            }
+            if (!n2.pinned) {
+              n2.x -= dx * 0.5 * diff;
+              n2.y -= dy * 0.5 * diff;
+            }
+          }
+        }
+      }
+
+      interactWithParticles(particles) {
+        for (let p of particles) {
+          if (!p.isAlive) continue;
+
+          for (let i = 0; i < this.nodes.length - 1; i++) {
+            let n1 = this.nodes[i];
+            let n2 = this.nodes[i + 1];
+
+            // Distance from particle to segment
+            let dx = n2.x - n1.x;
+            let dy = n2.y - n1.y;
+            let len = Math.sqrt(dx * dx + dy * dy);
+            let u = ((p.x - n1.x) * dx + (p.y - n1.y) * dy) / (len * len || 1);
+
+            if (u >= 0 && u <= 1) {
+              let ix = n1.x + u * dx;
+              let iy = n1.y + u * dy;
+              let dist = Math.sqrt((p.x - ix) ** 2 + (p.y - iy) ** 2);
+
+              if (dist < p.radius + 3) {
+                let nx = -(n2.y - n1.y) / len;
+                let ny = (n2.x - n1.x) / len;
+
+                // Push particle out of cable
+                p.x = ix + nx * (p.radius + 3);
+                p.y = iy + ny * (p.radius + 3);
+
+                // Transfer weight to cable nodes (Sagging effect!)
+                if (!n1.pinned) n1.y += 0.35;
+                if (!n2.pinned) n2.y += 0.35;
+
+                // Dampen particle velocity
+                p.vy *= 0.5;
+                p.vx *= 0.9;
+              }
+            }
+          }
+        }
+      }
+
+      draw() {
+        ctx.beginPath();
+        ctx.moveTo(this.nodes[0].x, this.nodes[0].y);
+        for (let i = 1; i < this.nodes.length; i++) {
+          ctx.lineTo(this.nodes[i].x, this.nodes[i].y);
+        }
+        ctx.strokeStyle = "#58a6ff";
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+        ctx.stroke();
+
+        // Draw Anchor Points
+        ctx.fillStyle = "#1f6feb";
+        ctx.beginPath();
+        ctx.arc(this.x1, this.y1, 5, 0, Math.PI * 2);
+        ctx.arc(this.x2, this.y2, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // World Collections
+    let particles = [];
+    let cables = [];
+
+    // Interaction Drawing State
+    let isDrawing = false;
+    let dragStart = { x: 0, y: 0 };
+    let currentMouse = { x: 0, y: 0 };
+
+    // Event Listeners
+    canvas.addEventListener("mousedown", (e) => {
+      if (gameState !== "PLAYING") return;
+      const rect = canvas.getBoundingClientRect();
+      dragStart.x = e.clientX - rect.left;
+      dragStart.y = e.clientY - rect.top;
+      currentMouse.x = dragStart.x;
+      currentMouse.y = dragStart.y;
+      isDrawing = true;
+    });
+
+    canvas.addEventListener("mousemove", (e) => {
+      if (!isDrawing) return;
+      const rect = canvas.getBoundingClientRect();
+      currentMouse.x = e.clientX - rect.left;
+      currentMouse.y = e.clientY - rect.top;
+    });
+
+    canvas.addEventListener("mouseup", () => {
+      if (!isDrawing) return;
+      isDrawing = false;
+
+      const dist = Math.sqrt(
+        (currentMouse.x - dragStart.x) ** 2 + (currentMouse.y - dragStart.y) ** 2
+      );
+
+      // Check ink budget constraints
+      if (dist > 15 && usedInk + dist <= MAX_INK) {
+        cables.push(new Cable(dragStart.x, dragStart.y, currentMouse.x, currentMouse.y));
+        usedInk += dist;
+        updateHUD();
+      }
+    });
+
+    // Spawner Loop
+    let spawnTimer = 0;
+    function handleSpawning() {
+      if (spawnedCount < TOTAL_CREATURES) {
+        spawnTimer++;
+        if (spawnTimer % 20 === 0) {
+          particles.push(new Particle(120, 100));
+          spawnedCount++;
+          updateHUD();
+        }
+      }
+    }
+
+    function updateHUD() {
+      goalText.innerText = `${savedCount} / ${TARGET_SAVED}`;
+      const remainingInkPercent = Math.max(0, Math.round(((MAX_INK - usedInk) / MAX_INK) * 100));
+      inkText.innerText = `${remainingInkPercent}%`;
+      inkBar.style.width = `${remainingInkPercent}%`;
+      
+      const remainingInWorld = particles.filter(p => p.isAlive).length;
+      const poolRemaining = TOTAL_CREATURES - spawnedCount;
+      hordeText.innerText = `${remainingInWorld + poolRemaining}`;
+
+      // Win / Loss Condition Checks
+      if (savedCount >= TARGET_SAVED && gameState === "PLAYING") {
+        endGame(true);
+      } else if (
+        savedCount + remainingInWorld + poolRemaining < TARGET_SAVED &&
+        gameState === "PLAYING"
+      ) {
+        endGame(false);
+      }
+    }
+
+    function startGame() {
+      gameState = "PLAYING";
+      savedCount = 0;
+      spawnedCount = 0;
+      usedInk = 0;
+      particles = [];
+      cables = [];
+      overlay.style.display = "none";
+      updateHUD();
+    }
+
+    function endGame(isWin) {
+      gameState = isWin ? "WON" : "LOST";
+      overlay.style.display = "flex";
+      if (isWin) {
+        modalTitle.innerText = "Level Complete!";
+        modalTitle.style.color = "#3fb950";
+        modalDesc.innerText = `Outstanding! You successfully routed ${savedCount} creatures safely into the extraction vessel!`;
+        startBtn.innerText = "Replay Level 1";
+      } else {
+        modalTitle.innerText = "Extraction Failed";
+        modalTitle.style.color = "#f85149";
+        modalDesc.innerText = `Too many creatures dissolved in the acid pit! You needed ${TARGET_SAVED} creatures, but only rescued ${savedCount}.`;
+        startBtn.innerText = "Try Again";
+      }
+    }
+
+    // Rendering Loop
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 1. Draw Static Terrain
+      ctx.strokeStyle = "#30363d";
+      ctx.lineWidth = 6;
+      ctx.lineCap = "round";
+      terrain.forEach(w => {
+        ctx.beginPath();
+        ctx.moveTo(w.x1, w.y1);
+        ctx.lineTo(w.x2, w.y2);
+        ctx.stroke();
+      });
+
+      // 2. Draw Acid Pit
+      ctx.fillStyle = "rgba(248, 81, 73, 0.25)";
+      ctx.fillRect(acidPit.x, acidPit.y, acidPit.w, acidPit.h);
+      ctx.fillStyle = "#f85149";
+      ctx.fillRect(acidPit.x, acidPit.y + 10, acidPit.w, acidPit.h - 10);
+
+      // Animated Acid Bubbles
+      ctx.fillStyle = "#ff7b72";
+      for (let i = 0; i < 5; i++) {
+        let bx = acidPit.x + (Math.sin(Date.now() * 0.003 + i) * 0.5 + 0.5) * acidPit.w;
+        let by = acidPit.y + 8 + Math.cos(Date.now() * 0.005 + i) * 3;
+        ctx.beginPath();
+        ctx.arc(bx, by, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 3. Draw Extraction Funnel Goal
+      ctx.fillStyle = "rgba(40, 167, 69, 0.2)";
+      ctx.strokeStyle = "#2ea043";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(extractionPipe.x, extractionPipe.y, extractionPipe.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "#3fb950";
+      ctx.font = "12px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("EXIT", extractionPipe.x, extractionPipe.y + 4);
+
+      // 4. Update & Draw Dynamic Cables
+      cables.forEach(c => {
+        if (gameState === "PLAYING") {
+          c.update();
+          c.interactWithParticles(particles);
+        }
+        c.draw();
+      });
+
+      // 5. Active Mouse Cable Preview
+      if (isDrawing) {
+        const dx = currentMouse.x - dragStart.x;
+        const dy = currentMouse.y - dragStart.y;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const valid = usedInk + len <= MAX_INK;
+
+        ctx.beginPath();
+        ctx.moveTo(dragStart.x, dragStart.y);
+        ctx.lineTo(currentMouse.x, currentMouse.y);
+        ctx.strokeStyle = valid ? "#38d430" : "#f85149";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 6]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // 6. Update & Draw Particles (Viscous Blob Creatures)
+      particles.forEach(p => {
+        if (!p.isAlive) return;
+        if (gameState === "PLAYING") p.update();
+
+        // Draw glowing blob particle
+        ctx.fillStyle = "#a5d6ff";
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#79c0ff";
+        ctx.beginPath();
+        ctx.arc(p.x - 1, p.y - 1, p.radius * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // 7. Update Spawner Logic
+      if (gameState === "PLAYING") {
+        handleSpawning();
+      }
+
+      requestAnimationFrame(render);
+    }
+
+    // Start Engine Loop
+    requestAnimationFrame(render);
+  </script>
+</body>
+</html>
+
+<!--
+Dynamic Physics & Environment Shaping
+Instead of giving individual creatures special roles (diggers, blockers), give the player raw tools to manipulate the environment in real time while the horde adapts dynamically.
+Fluid Dynamics & Terrain: The creatures are liquid or semi-viscous blobs (or small swarming bugs). The player carves tunnels, paints frictionless slides, builds pressure valves, or uses temperature (freezing path surfaces into ice, vaporizing steam obstacles) to steer the stream.
+Bridge & Cable Physics: Rather than static "build a bridge" commands, the player shoots dynamic tension lines, trampolines, or sticky webs that sag, stretch, or snap under the collective weight of the swarm.
+-->

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>The Echo Swarm - Mobile Prototype</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-user-select: none; user-select: none; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #050508; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #fff; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+        
+        #ui {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            pointer-events: none;
+            text-shadow: 0 0 8px rgba(0, 255, 200, 0.8);
+            z-index: 10;
+        }
+        h1 { font-size: 18px; letter-spacing: 1px; color: #00f3ff; margin-bottom: 4px; }
+        .stat { font-size: 13px; margin-bottom: 2px; color: #a5f3fc; }
+
+        /* Mobile Control Bar */
+        #mobile-bar {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            z-index: 20;
+        }
+
+        .btn {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            color: #38bdf8;
+            padding: 12px 16px;
+            border-radius: 24px;
+            font-size: 13px;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        .btn.active {
+            background: #0284c7;
+            color: #fff;
+            border-color: #38bdf8;
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
+        }
+
+        .btn-pulse {
+            background: rgba(245, 158, 11, 0.2);
+            border-color: #f59e0b;
+            color: #fbbf24;
+        }
+
+        .btn-pulse:active {
+            background: #f59e0b;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <h1>THE ECHO SWARM</h1>
+    <div class="stat">Swarm: <span id="swarm-count">30</span> | Glow: <span id="glow-radius">150</span>px</div>
+    <div class="stat">Switches Activated: <span id="switches-activated">0</span> / <span id="switches-total">3</span></div>
+</div>
+
+<div id="mobile-bar">
+    <button id="mode-lighthouse" class="btn active">Place Lighthouse</button>
+    <button id="mode-mirror" class="btn">Place Mirror</button>
+    <button id="btn-pulse" class="btn btn-pulse">Pulse</button>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let width = canvas.width = window.innerWidth;
+let height = canvas.height = window.innerHeight;
+
+window.addEventListener('resize', () => {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+});
+
+// Game state & mode setup
+let placeMode = 'lighthouse'; // 'lighthouse' or 'mirror'
+let pointer = { x: width / 2, y: height / 2, isDown: false };
+let pulse = { x: 0, y: 0, active: false, radius: 0, maxRadius: 200 };
+
+let lighthouses = [];
+let mirrors = [];
+let hazards = [];
+let switches = [];
+let spirits = [];
+
+const MAX_LIGHTHOUSES = 3;
+const MAX_MIRRORS = 4;
+
+// Audio FX
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSound(freq, duration, type = 'sine') {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+    } catch (e) {}
+}
+
+class Spirit {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 2;
+        this.vy = (Math.random() - 0.5) * 2;
+        this.alive = true;
+    }
+
+    update() {
+        if (!this.alive) return;
+
+        let targetX = pointer.x;
+        let targetY = pointer.y;
+        let highestAttraction = pointer.isDown ? 1.8 : 0.3;
+
+        // Attracted to lighthouses
+        lighthouses.forEach(lh => {
+            let dx = lh.x - this.x;
+            let dy = lh.y - this.y;
+            let dist = Math.hypot(dx, dy);
+            if (dist < 280) {
+                let weight = (1 - dist / 280) * 1.6;
+                if (weight > highestAttraction) {
+                    highestAttraction = weight;
+                    targetX = lh.x;
+                    targetY = lh.y;
+                }
+            }
+        });
+
+        // Attracted to active pulse
+        if (pulse.active) {
+            let dx = pulse.x - this.x;
+            let dy = pulse.y - this.y;
+            let dist = Math.hypot(dx, dy);
+            if (dist < pulse.radius) {
+                targetX = pulse.x;
+                targetY = pulse.y;
+                highestAttraction = 3.5;
+            }
+        }
+
+        let dx = targetX - this.x;
+        let dy = targetY - this.y;
+        let dist = Math.hypot(dx, dy);
+
+        if (dist > 5) {
+            this.vx += (dx / dist) * 0.16 * highestAttraction;
+            this.vy += (dy / dist) * 0.16 * highestAttraction;
+        }
+
+        this.vx *= 0.94;
+        this.vy *= 0.94;
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Hazard collision
+        hazards.forEach(h => {
+            if (h.active && Math.hypot(h.x - this.x, h.y - this.y) < h.radius) {
+                this.alive = false;
+                playSound(110, 0.25, 'sawtooth');
+            }
+        });
+    }
+
+    draw() {
+        if (!this.alive) return;
+        ctx.fillStyle = '#67e8f9';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function initLevel() {
+    spirits = [];
+    for (let i = 0; i < 30; i++) {
+        spirits.push(new Spirit(width / 2 + (Math.random() - 0.5) * 50, height / 2 + (Math.random() - 0.5) * 50));
+    }
+
+    hazards = [
+        { x: width * 0.25, y: height * 0.35, radius: 45, active: true },
+        { x: width * 0.75, y: height * 0.6, radius: 55, active: true },
+        { x: width * 0.5, y: height * 0.75, radius: 50, active: true }
+    ];
+
+    switches = [
+        { x: width * 0.2, y: height * 0.75, active: false, radius: 24 },
+        { x: width * 0.8, y: height * 0.25, active: false, radius: 24 },
+        { x: width * 0.5, y: height * 0.2, active: false, radius: 24 }
+    ];
+}
+
+// UI Buttons (Mobile Selector Bar)
+const lhBtn = document.getElementById('mode-lighthouse');
+const mirrorBtn = document.getElementById('mode-mirror');
+const pulseBtn = document.getElementById('btn-pulse');
+
+lhBtn.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    placeMode = 'lighthouse';
+    lhBtn.classList.add('active');
+    mirrorBtn.classList.remove('active');
+});
+
+mirrorBtn.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    placeMode = 'mirror';
+    mirrorBtn.classList.add('active');
+    lhBtn.classList.remove('active');
+});
+
+function triggerPulse() {
+    if (!pulse.active) {
+        pulse.active = true;
+        pulse.x = pointer.x;
+        pulse.y = pointer.y;
+        pulse.radius = 10;
+        playSound(587.33, 0.3);
+    }
+}
+
+pulseBtn.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    triggerPulse();
+});
+
+// Pointer Events for Touch / Mouse Unified Control
+window.addEventListener('pointerdown', e => {
+    if (e.target.tagName === 'BUTTON') return;
+    pointer.isDown = true;
+    pointer.x = e.clientX;
+    pointer.y = e.clientY;
+
+    if (placeMode === 'lighthouse') {
+        lighthouses.push({ x: e.clientX, y: e.clientY, angle: Math.random() * Math.PI * 2 });
+        if (lighthouses.length > MAX_LIGHTHOUSES) lighthouses.shift();
+        playSound(440, 0.1);
+    } else if (placeMode === 'mirror') {
+        mirrors.push({ x: e.clientX, y: e.clientY, angle: Math.PI / 4, length: 60 });
+        if (mirrors.length > MAX_MIRRORS) mirrors.shift();
+        playSound(330, 0.1);
+    }
+});
+
+window.addEventListener('pointermove', e => {
+    pointer.x = e.clientX;
+    pointer.y = e.clientY;
+});
+
+window.addEventListener('pointerup', () => { pointer.isDown = false; });
+window.addEventListener('pointercancel', () => { pointer.isDown = false; });
+
+// Raycasting for Light Beams
+function castLightBeams() {
+    lighthouses.forEach(lh => {
+        lh.angle += 0.006;
+        let dirX = Math.cos(lh.angle);
+        let dirY = Math.sin(lh.angle);
+
+        let currentX = lh.x;
+        let currentY = lh.y;
+
+        for (let step = 0; step < 1000; step += 6) {
+            currentX += dirX * 6;
+            currentY += dirY * 6;
+
+            hazards.forEach(h => {
+                if (h.active && Math.hypot(h.x - currentX, h.y - currentY) < h.radius) {
+                    h.active = false;
+                    playSound(750, 0.15, 'square');
+                }
+            });
+
+            switches.forEach(s => {
+                if (!s.active && Math.hypot(s.x - currentX, s.y - currentY) < s.radius) {
+                    s.active = true;
+                    playSound(1046.5, 0.4);
+                }
+            });
+
+            mirrors.forEach(m => {
+                if (Math.hypot(currentX - m.x, currentY - m.y) < m.length / 2) {
+                    let normalX = -Math.sin(m.angle);
+                    let normalY = Math.cos(m.angle);
+                    let dot = dirX * normalX + dirY * normalY;
+                    dirX = dirX - 2 * dot * normalX;
+                    dirY = dirY - 2 * dot * normalY;
+                }
+            });
+
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+            ctx.lineWidth = 3.5;
+            ctx.beginPath();
+            ctx.moveTo(currentX - dirX * 6, currentY - dirY * 6);
+            ctx.lineTo(currentX, currentY);
+            ctx.stroke();
+        }
+    });
+}
+
+function update() {
+    spirits = spirits.filter(s => s.alive);
+    spirits.forEach(s => s.update());
+
+    if (pulse.active) {
+        pulse.radius += 9;
+        if (pulse.radius > pulse.maxRadius) pulse.active = false;
+    }
+
+    mirrors.forEach(m => m.angle += 0.012);
+
+    document.getElementById('swarm-count').innerText = spirits.length;
+    document.getElementById('glow-radius').innerText = Math.floor(70 + spirits.length * 4);
+    document.getElementById('switches-activated').innerText = switches.filter(s => s.active).length;
+}
+
+function render() {
+    ctx.fillStyle = '#050508';
+    ctx.fillRect(0, 0, width, height);
+
+    if (spirits.length > 0) {
+        let avgX = spirits.reduce((acc, s) => acc + s.x, 0) / spirits.length;
+        let avgY = spirits.reduce((acc, s) => acc + s.y, 0) / spirits.length;
+        let glowRadius = 70 + spirits.length * 4;
+
+        let grad = ctx.createRadialGradient(avgX, avgY, 10, avgX, avgY, glowRadius);
+        grad.addColorStop(0, 'rgba(6, 182, 212, 0.28)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(avgX, avgY, glowRadius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    castLightBeams();
+
+    if (pulse.active) {
+        ctx.strokeStyle = `rgba(56, 189, 248, ${1 - pulse.radius / pulse.maxRadius})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(pulse.x, pulse.y, pulse.radius, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+
+    hazards.forEach(h => {
+        if (!h.active) return;
+        ctx.fillStyle = '#020617';
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, h.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+    });
+
+    switches.forEach(s => {
+        ctx.fillStyle = s.active ? '#22c55e' : '#475569';
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    lighthouses.forEach(lh => {
+        ctx.fillStyle = '#f59e0b';
+        ctx.beginPath();
+        ctx.arc(lh.x, lh.y, 11, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    mirrors.forEach(m => {
+        ctx.strokeStyle = '#f8fafc';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(m.x - Math.cos(m.angle) * (m.length / 2), m.y - Math.sin(m.angle) * (m.length / 2));
+        ctx.lineTo(m.x + Math.cos(m.angle) * (m.length / 2), m.y + Math.sin(m.angle) * (m.length / 2));
+        ctx.stroke();
+    });
+
+    spirits.forEach(s => s.draw());
+}
+
+function loop() {
+    update();
+    render();
+    requestAnimationFrame(loop);
+}
+
+initLevel();
+loop();
+</script>
+</body>
+</html>
+
+<!--
+Quick Prototype Concept Idea: "The Echo Swarm"
+The Pitch: You lead fragile light-spirits through an pitch-black cavern.
+The Threat: Darkness consumes them instantly, and the cave generates randomized hazards.
+Your Mechanic: You don't tell the spirits what to do; you place Lighthouses & Mirrors. Light sources pull the spirits toward them, while mirrors reflect beam networks that incinerate obstacles and light up safe paths. The horde's size increases the radius of their collective glow, creating a high-risk/high-reward tension: keep them clustered to stay lit, or spread them out to hit multiple switches.
+-->
