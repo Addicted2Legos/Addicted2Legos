@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Merry-Go-Round Mayhem with Eyes!</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-touch-callout: none; /* Disable long-press menus */
+      -webkit-user-select: none;   /* Disable text selection */
+      user-select: none;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden; /* Prevents rubber-band bounce on iOS */
+      background: #0f172a;
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      touch-action: manipulation; /* Removes 300ms tap delay */
+    }
+    #header {
+      padding-top: env(safe-area-inset-top, 20px);
+      margin-top: 10px;
+      text-align: center;
+      z-index: 10;
+      pointer-events: none;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(20px, 5vw, 28px);
+      color: #facc15;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    p {
+      margin: 5px 0 0 0;
+      font-size: clamp(14px, 3.5vw, 18px);
+      color: #94a3b8;
+    }
+    #game-wrapper {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    canvas {
+      display: block;
+      touch-action: none;
+    }
+    #win-screen {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(15, 23, 42, 0.98);
+      padding: 40px;
+      border-radius: 24px;
+      border: 4px solid #facc15;
+      text-align: center;
+      box-shadow: 0 0 50px rgba(250, 204, 21, 0.5);
+      z-index: 20;
+    }
+    button {
+      background: #e11d48;
+      color: white;
+      border: none;
+      padding: 16px 32px;
+      font-size: 20px;
+      font-weight: bold;
+      border-radius: 50px;
+      cursor: pointer;
+      margin-top: 20px;
+      box-shadow: 0 4px 15px rgba(225, 29, 72, 0.4);
+    }
+    button:active {
+      transform: scale(0.95);
+    }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1>Merry-Go-Round</h1>
+  <p>TAP FAST TO SPIN! | Kids Left: <span id="count" style="color: #38edf8; font-weight: bold;">20</span></p>
+</div>
+
+<div id="game-wrapper">
+  <canvas id="game"></canvas>
+  
+  <div id="win-screen">
+    <h2 style="font-size: 36px; color: #facc15; margin: 0 0 10px 0;">CLEARED!</h2>
+    <p style="color: #fff;">They all flew off!</p>
+    <button id="restart-btn">Play Again</button>
+  </div>
+</div>
+
+<script>
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const countEl = document.getElementById('count');
+  const winScreen = document.getElementById('win-screen');
+  const restartBtn = document.getElementById('restart-btn');
+
+  let size = 0;
+  let center = 0;
+  let radius = 0;
+
+  let angle = 0;
+  let angularVelocity = 0;
+  let kids = [];
+  let flyingKids = [];
+
+  const KID_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+
+  // Handle responsive sizing
+  function resize() {
+    const wrapper = document.getElementById('game-wrapper');
+    size = Math.min(wrapper.clientWidth, wrapper.clientHeight) * 0.95;
+    canvas.width = size;
+    canvas.height = size;
+    center = size / 2;
+    radius = size * 0.42;
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+
+  function initKids() {
+    kids = [];
+    flyingKids = [];
+    for (let i = 0; i < 20; i++) {
+      kids.push({
+        id: i,
+        rRatio: 0.2 + Math.random() * 0.7, // Position scaled
+        a: Math.random() * Math.PI * 2,
+        color: KID_COLORS[i % KID_COLORS.length],
+        grip: 0.08 + Math.random() * 0.12,
+        lookAngle: Math.PI / 2 // Default look angle relative to a tangential trajectory
+      });
+    }
+    countEl.textContent = kids.length;
+    winScreen.style.display = 'none';
+  }
+
+  // Draw a circle with eyes
+  function drawKidWithEyes(x, y, radius, color, rotationAngle, state = "on_platform") {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rotationAngle);
+
+    // Body
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = size * 0.005;
+    ctx.strokeStyle = '#ffffff';
+    ctx.stroke();
+
+    // Eyes
+    const eyeRadius = radius * 0.35;
+    const eyeOffset = radius * 0.4;
+    const pupilRadius = eyeRadius * 0.5;
+
+    // White Sclera
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    // Left eye relative to forward look vector
+    ctx.arc(-eyeOffset, -radius * 0.1, eyeRadius, 0, Math.PI * 2);
+    // Right eye relative to forward look vector
+    ctx.arc(eyeOffset, -radius * 0.1, eyeRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Black Pupils
+    ctx.fillStyle = "#000000";
+    ctx.beginPath();
+    
+    // Pupils face dynamic direction (e.g., tangential forward or back towards wheel)
+    const pX = 0;
+    const pY = -eyeRadius * 0.4; // Slightly forward relative to look direction
+
+    ctx.arc(-eyeOffset + pX, -radius * 0.1 + pY, pupilRadius, 0, Math.PI * 2);
+    ctx.arc(eyeOffset + pX, -radius * 0.1 + pY, pupilRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function handleTap(e) {
+    if(kids.length > 0) {
+      e.preventDefault(); 
+      angularVelocity += 0.04;
+    }
+  }
+
+  // Touch & Click Event Listeners
+  window.addEventListener('touchstart', handleTap, { passive: false });
+  window.addEventListener('mousedown', handleTap);
+
+  restartBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    angularVelocity = 0;
+    initKids();
+  });
+
+  function update() {
+    angle += angularVelocity;
+    angularVelocity *= 0.985; // Drag/friction
+
+    for (let i = kids.length - 1; i >= 0; i--) {
+      let k = kids[i];
+      let kRadius = k.rRatio * radius;
+      let currentSpeed = angularVelocity * kRadius;
+
+      if (angularVelocity > k.grip) {
+        let worldAngle = angle + k.a;
+        let x = center + Math.cos(worldAngle) * kRadius;
+        let y = center + Math.sin(worldAngle) * kRadius;
+
+        // Tangential velocity vector
+        let vx = -Math.sin(worldAngle) * currentSpeed;
+        let vy = Math.cos(worldAngle) * currentSpeed;
+
+        // Flying kids will face away initially, then pupils might look back
+        flyingKids.push({ x, y, vx, vy, color: k.color, rotation: worldAngle });
+        kids.splice(i, 1);
+        countEl.textContent = kids.length;
+
+        // Mobile haptic feedback
+        if (navigator.vibrate) { navigator.vibrate(40); }
+
+        if (kids.length === 0) { winScreen.style.display = 'block'; }
+      }
+    }
+
+    for (let i = flyingKids.length - 1; i >= 0; i--) {
+      let fk = flyingKids[i];
+      fk.x += fk.vx;
+      fk.y += fk.vy;
+      
+      // Rotate eyes so pupils look back at the center hub while body spins
+      fk.rotation += angularVelocity * 2; 
+
+      if (fk.x < -100 || fk.x > size + 100 || fk.y < -100 || fk.y > size + 100) {
+        flyingKids.splice(i, 1);
+      }
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, size, size);
+
+    // Platform Rendering (same as before)
+    ctx.save();
+    ctx.translate(center, center);
+    ctx.rotate(angle);
+
+    const wedges = 12;
+    const slice = (Math.PI * 2) / wedges;
+    for (let i = 0; i < wedges; i++) {
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, radius, i * slice, (i + 1) * slice);
+      ctx.fillStyle = (i % 2 === 0) ? '#38bdf8' : '#e0f2fe';
+      ctx.fill();
+    }
+
+    // Outer Edge
+    ctx.lineWidth = size * 0.02;
+    ctx.strokeStyle = '#e11d48';
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Kids on platform WITH eyes
+    const kidSize = size * 0.028;
+    kids.forEach(k => {
+      let kx = Math.cos(k.a) * (k.rRatio * radius);
+      let ky = Math.sin(k.a) * (k.rRatio * radius);
+      
+      // On platform, kids face outwards by default
+      const lookOutwardAngle = k.a + Math.PI / 2;
+      drawKidWithEyes(kx, ky, kidSize, k.color, lookOutwardAngle);
+    });
+
+    // Center Hub
+    ctx.fillStyle = '#facc15';
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+
+    // Draw Flying Kids WITH eyes (world space)
+    flyingKids.forEach(fk => {
+      // Rotation is dynamic (they are spinning as they fly)
+      drawKidWithEyes(fk.x, fk.y, kidSize, fk.color, fk.rotation + Math.PI);
+    });
+
+    update();
+    requestAnimationFrame(draw);
+  }
+
+  initKids();
+  draw();
+</script>
+
+</body>
+</html>
