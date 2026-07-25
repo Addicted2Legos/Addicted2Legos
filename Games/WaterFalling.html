@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Waterfall Splash & Rescue</title>
+    <title>Realistic Water Flow</title>
     <style>
         * {
             box-sizing: border-box;
@@ -17,7 +17,7 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #1a2f1a;
+            background-color: #0d1a10;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
         canvas {
@@ -27,313 +27,214 @@
         }
         #ui {
             position: absolute;
-            top: 15px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 20px;
-            background: rgba(0, 0, 0, 0.4);
-            padding: 10px 20px;
-            border-radius: 20px;
-            backdrop-filter: blur(5px);
-            color: white;
-            font-weight: bold;
-            font-size: 18px;
-            pointer-events: none;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        }
-        #instructions {
-            position: absolute;
-            bottom: 20px;
+            top: 20px;
             width: 100%;
             text-align: center;
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 14px;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 15px;
             pointer-events: none;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+            text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+            font-weight: 500;
         }
     </style>
 </head>
 <body>
 
-    <div id="ui">
-        <div>Ducks Rescued: <span id="score" style="color: #ffd700;">0</span></div>
-    </div>
-    
-    <div id="instructions">
-        Touch & drag across the water to bend the flow and push ducks to safety!
-    </div>
-
+    <div id="ui">Touch or drag anywhere to redirect the water flow</div>
     <canvas id="canvas"></canvas>
 
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        const scoreEl = document.getElementById('score');
 
         let width, height;
-        let score = 0;
+        let damTop, damBottom, damLeft, damWidth;
 
-        // Resize Canvas
         function resize() {
             width = canvas.width = window.innerWidth;
             height = canvas.height = window.innerHeight;
+            
+            damTop = height * 0.20;
+            damBottom = height * 0.75;
+            damWidth = Math.min(width * 0.85, 800);
+            damLeft = (width - damWidth) / 2;
         }
         window.addEventListener('resize', resize);
         resize();
 
-        // Touch / Mouse Tracking
-        const touches = [];
+        // Touch & Mouse Interaction handling
+        const activeTouches = [];
 
-        function updateTouches(e) {
+        function handlePointer(e) {
             e.preventDefault();
-            touches.length = 0;
+            activeTouches.length = 0;
             const rect = canvas.getBoundingClientRect();
-            for (let i = 0; i < e.touches.length; i++) {
-                touches.push({
-                    x: e.touches[i].clientX - rect.left,
-                    y: e.touches[i].clientY - rect.top,
-                    radius: 45 // Interaction radius
+
+            if (e.touches) {
+                for (let i = 0; i < e.touches.length; i++) {
+                    activeTouches.push({
+                        x: e.touches[i].clientX - rect.left,
+                        y: e.touches[i].clientY - rect.top
+                    });
+                }
+            } else if (isMouseDown) {
+                activeTouches.push({
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
                 });
             }
         }
 
-        // Event listeners for mobile + desktop fallback
-        canvas.addEventListener('touchstart', updateTouches, { passive: false });
-        canvas.addEventListener('touchmove', updateTouches, { passive: false });
-        canvas.addEventListener('touchend', updateTouches, { passive: false });
-        
         let isMouseDown = false;
-        canvas.addEventListener('mousedown', (e) => {
-            isMouseDown = true;
-            touches.length = 0;
-            touches.push({ x: e.clientX, y: e.clientY, radius: 45 });
-        });
-        canvas.addEventListener('mousemove', (e) => {
-            if (isMouseDown) {
-                touches.length = 0;
-                touches.push({ x: e.clientX, y: e.clientY, radius: 45 });
-            }
-        });
-        canvas.addEventListener('mouseup', () => { isMouseDown = false; touches.length = 0; });
+        canvas.addEventListener('touchstart', handlePointer, { passive: false });
+        canvas.addEventListener('touchmove', handlePointer, { passive: false });
+        canvas.addEventListener('touchend', handlePointer, { passive: false });
+        canvas.addEventListener('mousedown', (e) => { isMouseDown = true; handlePointer(e); });
+        canvas.addEventListener('mousemove', (e) => { if(isMouseDown) handlePointer(e); });
+        canvas.addEventListener('mouseup', () => { isMouseDown = false; activeTouches.length = 0; });
 
-        // Water Particle System
-        const particles = [];
-        const maxParticles = 600;
+        // Flow Stream Lines (Simulates solid fluid curtain)
+        const NUM_STREAMS = 120;
+        const streams = [];
 
-        class Particle {
-            constructor() {
-                this.reset();
-            }
-
-            reset() {
-                const damTop = height * 0.22;
-                const damWidth = width * 0.8;
-                const damLeft = (width - damWidth) / 2;
-
-                this.x = damLeft + Math.random() * damWidth;
-                this.y = damTop;
-                this.vx = (Math.random() - 0.5) * 0.5;
-                this.vy = 3 + Math.random() * 3;
-                this.size = 2 + Math.random() * 3;
-                this.alpha = 0.4 + Math.random() * 0.5;
-                this.color = Math.random() > 0.3 ? '#e0f7fa' : '#80deea';
-            }
-
-            update() {
-                // Natural gravity acceleration
-                this.vy += 0.15;
-                
-                // Position update
-                this.x += this.vx;
-                this.y += this.vy;
-
-                // Friction/Drag
-                this.vx *= 0.98;
-
-                // Touch Fluid Deflection Mechanics
-                for (let touch of touches) {
-                    let dx = this.x - touch.x;
-                    let dy = this.y - touch.y;
-                    let dist = Math.sqrt(dx * dx + dy * dy);
-
-                    if (dist < touch.radius) {
-                        let force = (1 - dist / touch.radius) * 8;
-                        let angle = Math.atan2(dy, dx);
-                        
-                        // Push water outward around finger
-                        this.vx += Math.cos(angle) * force;
-                        this.vy += Math.sin(angle) * force * 0.5;
-                    }
-                }
-
-                // Reset when hitting bottom basin
-                if (this.y > height * 0.85) {
-                    this.reset();
-                }
-            }
-
-            draw() {
-                ctx.fillStyle = this.color;
-                ctx.globalAlpha = this.alpha;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
-            }
+        for (let i = 0; i < NUM_STREAMS; i++) {
+            streams.push({
+                offsetRatio: i / NUM_STREAMS,
+                speed: 1.5 + Math.random() * 1.5,
+                phase: Math.random() * 100,
+                width: 1.5 + Math.random() * 2
+            });
         }
 
-        // Create initial particles
-        for (let i = 0; i < maxParticles; i++) {
-            let p = new Particle();
-            p.y = height * 0.22 + Math.random() * (height * 0.6); // Scatter initially
-            particles.push(p);
-        }
+        // Simulating continuous water movement offset
+        let flowOffset = 0;
 
-        // Floating Ducks Mini-Game
-        const ducks = [];
+        function drawBackground() {
+            // Dark forest background
+            ctx.fillStyle = '#111f15';
+            ctx.fillRect(0, 0, width, height);
 
-        class Duck {
-            constructor() {
-                this.reset();
-            }
-
-            reset() {
-                const damWidth = width * 0.7;
-                const damLeft = (width - damWidth) / 2;
-                this.x = damLeft + Math.random() * damWidth;
-                this.y = height * 0.18;
-                this.vx = 0;
-                this.vy = 1;
-                this.size = 18;
-                this.rescued = false;
-            }
-
-            update() {
-                this.vy += 0.05; // Light floating downward
-                this.x += this.vx;
-                this.y += this.vy;
-                this.vx *= 0.95;
-
-                // Interact with touch deflection
-                for (let touch of touches) {
-                    let dx = this.x - touch.x;
-                    let dy = this.y - touch.y;
-                    let dist = Math.sqrt(dx * dx + dy * dy);
-
-                    if (dist < touch.radius + 10) {
-                        let force = (1 - dist / (touch.radius + 10)) * 6;
-                        let angle = Math.atan2(dy, dx);
-                        this.vx += Math.cos(angle) * force;
-                        this.vy += Math.sin(angle) * force * 0.5;
-                    }
-                }
-
-                // Check goal conditions (reach bottom basin edge safely)
-                if (this.y > height * 0.75 && !this.rescued) {
-                    this.rescued = true;
-                    score += 1;
-                    scoreEl.innerText = score;
-                    setTimeout(() => this.reset(), 1000);
-                }
-
-                if (this.y > height) {
-                    this.reset();
-                }
-            }
-
-            draw() {
-                ctx.globalAlpha = 1;
-                ctx.font = `${this.size * 1.5}px serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('🦆', this.x, this.y);
-            }
-        }
-
-        // Spawn 3 ducks
-        for (let i = 0; i < 3; i++) {
-            let d = new Duck();
-            d.y -= i * 150; // Stagger spawn
-            ducks.push(d);
-        }
-
-        // Render Background (Concrete Dam & Surrounding River)
-        function drawEnvironment() {
-            const damTop = height * 0.22;
-            const damBottom = height * 0.75;
-            const damWidth = width * 0.8;
-            const damLeft = (width - damWidth) / 2;
-
-            // Top Quiet Reservoir
+            // Upper Quiet River Basin
             let topGrad = ctx.createLinearGradient(0, 0, 0, damTop);
-            topGrad.addColorStop(0, '#1b3b2b');
-            topGrad.addColorStop(1, '#2c5d46');
+            topGrad.addColorStop(0, '#0a1d13');
+            topGrad.addColorStop(1, '#1b3d2b');
             ctx.fillStyle = topGrad;
             ctx.fillRect(0, 0, width, damTop);
 
-            // Concrete Dam Wall Sides
-            ctx.fillStyle = '#4a4e51';
+            // Concrete Side Walls
+            ctx.fillStyle = '#2b2e30';
             ctx.fillRect(0, 0, damLeft, height);
             ctx.fillRect(damLeft + damWidth, 0, damLeft, height);
 
-            // Dam Wall Texture (Behind water)
+            // Concrete Weir Backwall (Dark behind falling water)
             let wallGrad = ctx.createLinearGradient(0, damTop, 0, damBottom);
-            wallGrad.addColorStop(0, '#33373a');
-            wallGrad.addColorStop(1, '#1e2022');
+            wallGrad.addColorStop(0, '#1a1c1d');
+            wallGrad.addColorStop(1, '#0e0f10');
             ctx.fillStyle = wallGrad;
             ctx.fillRect(damLeft, damTop, damWidth, damBottom - damTop);
 
-            // Concrete Spillway Edge
-            ctx.fillStyle = '#686d72';
-            ctx.fillRect(damLeft - 10, damTop - 8, damWidth + 20, 12);
-
-            // Bottom Pool / River
-            let poolGrad = ctx.createLinearGradient(0, damBottom, 0, height);
-            poolGrad.addColorStop(0, '#2b4d40');
-            poolGrad.addColorStop(1, '#11221c');
-            ctx.fillStyle = poolGrad;
-            ctx.fillRect(0, damBottom, width, height - damBottom);
+            // Top Spillway Edge
+            ctx.fillStyle = '#4f5458';
+            ctx.fillRect(damLeft - 5, damTop - 6, damWidth + 10, 8);
         }
 
-        // Render Touch Ripple Rings
-        function drawTouchEffects() {
-            for (let touch of touches) {
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-                ctx.lineWidth = 3;
+        function drawWaterSheet() {
+            flowOffset += 0.08;
+            
+            const numSteps = 40; // Vertical resolution for smooth bending
+            const stepHeight = (damBottom - damTop) / numSteps;
+
+            ctx.save();
+            
+            // Render the solid water sheet via dynamic vertical stream lines
+            for (let s = 0; s < NUM_STREAMS; s++) {
+                const stream = streams[s];
+                const baseX = damLeft + (stream.offsetRatio * damWidth);
+                
                 ctx.beginPath();
-                ctx.arc(touch.x, touch.y, touch.radius, 0, Math.PI * 2);
+                ctx.lineWidth = stream.width + (width > 600 ? 3 : 1.5);
+
+                // Natural water color gradient
+                let streamGrad = ctx.createLinearGradient(0, damTop, 0, damBottom);
+                streamGrad.addColorStop(0, 'rgba(215, 245, 250, 0.85)');
+                streamGrad.addColorStop(0.2, 'rgba(160, 220, 235, 0.65)');
+                streamGrad.addColorStop(0.8, 'rgba(180, 230, 242, 0.75)');
+                streamGrad.addColorStop(1, 'rgba(240, 253, 255, 0.9)');
+
+                ctx.strokeStyle = streamGrad;
+
+                let currentX = baseX;
+                let currentY = damTop;
+                ctx.moveTo(currentX, currentY);
+
+                for (let i = 1; i <= numSteps; i++) {
+                    let nextY = damTop + (i * stepHeight);
+                    let nextX = baseX;
+
+                    // Apply touch displacement (fluid bending)
+                    for (let touch of activeTouches) {
+                        let dx = nextX - touch.x;
+                        let dy = nextY - touch.y;
+                        let dist = Math.sqrt(dx * dx + dy * dy);
+                        let maxDist = 70; // Influence radius
+
+                        if (dist < maxDist) {
+                            let push = (1 - dist / maxDist) * 45;
+                            let direction = dx >= 0 ? 1 : -1;
+                            nextX += direction * push;
+                        }
+                    }
+
+                    // Add subtle fluid wave oscillation
+                    nextX += Math.sin(flowOffset * stream.speed + i * 0.3 + stream.phase) * 1.2;
+
+                    ctx.lineTo(nextX, nextY);
+                }
+
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        function drawFoamAndSplash() {
+            // Bottom Pool Water
+            let poolGrad = ctx.createLinearGradient(0, damBottom, 0, height);
+            poolGrad.addColorStop(0, '#153227');
+            poolGrad.addColorStop(1, '#091510');
+            ctx.fillStyle = poolGrad;
+            ctx.fillRect(0, damBottom, width, height - damBottom);
+
+            // Base Mist/Foam Layer (Dense continuous mist at bottom)
+            let mistGrad = ctx.createLinearGradient(0, damBottom - 20, 0, damBottom + 30);
+            mistGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+            mistGrad.addColorStop(0.5, 'rgba(235, 250, 252, 0.7)');
+            mistGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+            ctx.fillStyle = mistGrad;
+            ctx.fillRect(damLeft, damBottom - 25, damWidth, 55);
+
+            // Touch interaction highlight ring
+            for (let touch of activeTouches) {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(touch.x, touch.y, 40, 0, Math.PI * 2);
                 ctx.stroke();
 
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.fillStyle = 'rgba(200, 245, 255, 0.15)';
                 ctx.beginPath();
-                ctx.arc(touch.x, touch.y, touch.radius * 0.5, 0, Math.PI * 2);
+                ctx.arc(touch.x, touch.y, 35, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
 
-        // Main Animation Loop
         function animate() {
             ctx.clearRect(0, 0, width, height);
 
-            drawEnvironment();
-
-            // Update & Draw Water Particles
-            for (let p of particles) {
-                p.update();
-                p.draw();
-            }
-
-            // Update & Draw Game Entities
-            for (let d of ducks) {
-                d.update();
-                d.draw();
-            }
-
-            // Foreground Splash/Mist at the base
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-            ctx.fillRect(0, height * 0.72, width, 40);
-
-            drawTouchEffects();
+            drawBackground();
+            drawWaterSheet();
+            drawFoamAndSplash();
 
             requestAnimationFrame(animate);
         }
