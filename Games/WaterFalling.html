@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Waterfall Splash & Rescue</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #1a2f1a;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        #ui {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 10px 20px;
+            border-radius: 20px;
+            backdrop-filter: blur(5px);
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+            pointer-events: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+            pointer-events: none;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <div>Ducks Rescued: <span id="score" style="color: #ffd700;">0</span></div>
+    </div>
+    
+    <div id="instructions">
+        Touch & drag across the water to bend the flow and push ducks to safety!
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+
+        let width, height;
+        let score = 0;
+
+        // Resize Canvas
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Touch / Mouse Tracking
+        const touches = [];
+
+        function updateTouches(e) {
+            e.preventDefault();
+            touches.length = 0;
+            const rect = canvas.getBoundingClientRect();
+            for (let i = 0; i < e.touches.length; i++) {
+                touches.push({
+                    x: e.touches[i].clientX - rect.left,
+                    y: e.touches[i].clientY - rect.top,
+                    radius: 45 // Interaction radius
+                });
+            }
+        }
+
+        // Event listeners for mobile + desktop fallback
+        canvas.addEventListener('touchstart', updateTouches, { passive: false });
+        canvas.addEventListener('touchmove', updateTouches, { passive: false });
+        canvas.addEventListener('touchend', updateTouches, { passive: false });
+        
+        let isMouseDown = false;
+        canvas.addEventListener('mousedown', (e) => {
+            isMouseDown = true;
+            touches.length = 0;
+            touches.push({ x: e.clientX, y: e.clientY, radius: 45 });
+        });
+        canvas.addEventListener('mousemove', (e) => {
+            if (isMouseDown) {
+                touches.length = 0;
+                touches.push({ x: e.clientX, y: e.clientY, radius: 45 });
+            }
+        });
+        canvas.addEventListener('mouseup', () => { isMouseDown = false; touches.length = 0; });
+
+        // Water Particle System
+        const particles = [];
+        const maxParticles = 600;
+
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                const damTop = height * 0.22;
+                const damWidth = width * 0.8;
+                const damLeft = (width - damWidth) / 2;
+
+                this.x = damLeft + Math.random() * damWidth;
+                this.y = damTop;
+                this.vx = (Math.random() - 0.5) * 0.5;
+                this.vy = 3 + Math.random() * 3;
+                this.size = 2 + Math.random() * 3;
+                this.alpha = 0.4 + Math.random() * 0.5;
+                this.color = Math.random() > 0.3 ? '#e0f7fa' : '#80deea';
+            }
+
+            update() {
+                // Natural gravity acceleration
+                this.vy += 0.15;
+                
+                // Position update
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Friction/Drag
+                this.vx *= 0.98;
+
+                // Touch Fluid Deflection Mechanics
+                for (let touch of touches) {
+                    let dx = this.x - touch.x;
+                    let dy = this.y - touch.y;
+                    let dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < touch.radius) {
+                        let force = (1 - dist / touch.radius) * 8;
+                        let angle = Math.atan2(dy, dx);
+                        
+                        // Push water outward around finger
+                        this.vx += Math.cos(angle) * force;
+                        this.vy += Math.sin(angle) * force * 0.5;
+                    }
+                }
+
+                // Reset when hitting bottom basin
+                if (this.y > height * 0.85) {
+                    this.reset();
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = this.alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Create initial particles
+        for (let i = 0; i < maxParticles; i++) {
+            let p = new Particle();
+            p.y = height * 0.22 + Math.random() * (height * 0.6); // Scatter initially
+            particles.push(p);
+        }
+
+        // Floating Ducks Mini-Game
+        const ducks = [];
+
+        class Duck {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                const damWidth = width * 0.7;
+                const damLeft = (width - damWidth) / 2;
+                this.x = damLeft + Math.random() * damWidth;
+                this.y = height * 0.18;
+                this.vx = 0;
+                this.vy = 1;
+                this.size = 18;
+                this.rescued = false;
+            }
+
+            update() {
+                this.vy += 0.05; // Light floating downward
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vx *= 0.95;
+
+                // Interact with touch deflection
+                for (let touch of touches) {
+                    let dx = this.x - touch.x;
+                    let dy = this.y - touch.y;
+                    let dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < touch.radius + 10) {
+                        let force = (1 - dist / (touch.radius + 10)) * 6;
+                        let angle = Math.atan2(dy, dx);
+                        this.vx += Math.cos(angle) * force;
+                        this.vy += Math.sin(angle) * force * 0.5;
+                    }
+                }
+
+                // Check goal conditions (reach bottom basin edge safely)
+                if (this.y > height * 0.75 && !this.rescued) {
+                    this.rescued = true;
+                    score += 1;
+                    scoreEl.innerText = score;
+                    setTimeout(() => this.reset(), 1000);
+                }
+
+                if (this.y > height) {
+                    this.reset();
+                }
+            }
+
+            draw() {
+                ctx.globalAlpha = 1;
+                ctx.font = `${this.size * 1.5}px serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('🦆', this.x, this.y);
+            }
+        }
+
+        // Spawn 3 ducks
+        for (let i = 0; i < 3; i++) {
+            let d = new Duck();
+            d.y -= i * 150; // Stagger spawn
+            ducks.push(d);
+        }
+
+        // Render Background (Concrete Dam & Surrounding River)
+        function drawEnvironment() {
+            const damTop = height * 0.22;
+            const damBottom = height * 0.75;
+            const damWidth = width * 0.8;
+            const damLeft = (width - damWidth) / 2;
+
+            // Top Quiet Reservoir
+            let topGrad = ctx.createLinearGradient(0, 0, 0, damTop);
+            topGrad.addColorStop(0, '#1b3b2b');
+            topGrad.addColorStop(1, '#2c5d46');
+            ctx.fillStyle = topGrad;
+            ctx.fillRect(0, 0, width, damTop);
+
+            // Concrete Dam Wall Sides
+            ctx.fillStyle = '#4a4e51';
+            ctx.fillRect(0, 0, damLeft, height);
+            ctx.fillRect(damLeft + damWidth, 0, damLeft, height);
+
+            // Dam Wall Texture (Behind water)
+            let wallGrad = ctx.createLinearGradient(0, damTop, 0, damBottom);
+            wallGrad.addColorStop(0, '#33373a');
+            wallGrad.addColorStop(1, '#1e2022');
+            ctx.fillStyle = wallGrad;
+            ctx.fillRect(damLeft, damTop, damWidth, damBottom - damTop);
+
+            // Concrete Spillway Edge
+            ctx.fillStyle = '#686d72';
+            ctx.fillRect(damLeft - 10, damTop - 8, damWidth + 20, 12);
+
+            // Bottom Pool / River
+            let poolGrad = ctx.createLinearGradient(0, damBottom, 0, height);
+            poolGrad.addColorStop(0, '#2b4d40');
+            poolGrad.addColorStop(1, '#11221c');
+            ctx.fillStyle = poolGrad;
+            ctx.fillRect(0, damBottom, width, height - damBottom);
+        }
+
+        // Render Touch Ripple Rings
+        function drawTouchEffects() {
+            for (let touch of touches) {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(touch.x, touch.y, touch.radius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.beginPath();
+                ctx.arc(touch.x, touch.y, touch.radius * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Main Animation Loop
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+
+            drawEnvironment();
+
+            // Update & Draw Water Particles
+            for (let p of particles) {
+                p.update();
+                p.draw();
+            }
+
+            // Update & Draw Game Entities
+            for (let d of ducks) {
+                d.update();
+                d.draw();
+            }
+
+            // Foreground Splash/Mist at the base
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.fillRect(0, height * 0.72, width, 40);
+
+            drawTouchEffects();
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
