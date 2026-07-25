@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Realistic Waterfall Parting</title>
+    <title>Downward Waterfall Flow</title>
     <style>
         * {
             box-sizing: border-box;
@@ -17,7 +17,7 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #080f0b;
+            background-color: #050b07;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
         canvas {
@@ -40,7 +40,7 @@
 </head>
 <body>
 
-    <div id="ui">Touch the waterfall to block and split the water</div>
+    <div id="ui">Touch the waterfall to split the falling water</div>
     <canvas id="canvas"></canvas>
 
     <script>
@@ -62,7 +62,7 @@
         window.addEventListener('resize', resize);
         resize();
 
-        // Touch & Mouse Handling
+        // Pointer Tracking
         const activeTouches = [];
 
         function handlePointer(e) {
@@ -75,14 +75,14 @@
                     activeTouches.push({
                         x: e.touches[i].clientX - rect.left,
                         y: e.touches[i].clientY - rect.top,
-                        r: 35 // Finger obstacle radius
+                        r: 40 // Obstacle radius
                     });
                 }
             } else if (isMouseDown) {
                 activeTouches.push({
                     x: e.clientX - rect.left,
                     y: e.clientY - rect.top,
-                    r: 35
+                    r: 40
                 });
             }
         }
@@ -95,148 +95,180 @@
         canvas.addEventListener('mousemove', (e) => { if(isMouseDown) handlePointer(e); });
         canvas.addEventListener('mouseup', () => { isMouseDown = false; activeTouches.length = 0; });
 
-        // High density vertical stream lines
-        const NUM_STREAMS = 220;
-        const streams = [];
+        // Physics Water Strands
+        const NUM_PARTICLES = 500;
+        const particles = [];
 
-        for (let i = 0; i < NUM_STREAMS; i++) {
-            streams.push({
-                xRatio: i / (NUM_STREAMS - 1),
-                speed: 4 + Math.random() * 3,
-                width: 1.5 + Math.random() * 2,
-                alpha: 0.5 + Math.random() * 0.4
-            });
+        class WaterDroplet {
+            constructor() {
+                this.reset(true);
+            }
+
+            reset(randomY = false) {
+                this.x = damLeft + Math.random() * damWidth;
+                this.y = randomY ? damTop + Math.random() * (damBottom - damTop) : damTop;
+                this.vy = 8 + Math.random() * 6; // High downward velocity
+                this.vx = 0;
+                this.length = 15 + Math.random() * 25; // Vertical trailing line length
+                this.width = 1.5 + Math.random() * 2.5;
+                this.alpha = 0.4 + Math.random() * 0.5;
+            }
+
+            update() {
+                // Gravity acceleration (strictly DOWN)
+                this.vy += 0.3;
+                
+                // Position updates
+                let nextY = this.y + this.vy;
+                let nextX = this.x + this.vx;
+
+                // Air resistance / friction recovery
+                this.vx *= 0.85;
+
+                // Collision & Parting Logic around Finger
+                for (let touch of activeTouches) {
+                    let dx = nextX - touch.x;
+                    let dy = nextY - touch.y;
+                    
+                    // Direct touch collision
+                    let dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < touch.r + 5) {
+                        let side = dx >= 0 ? 1 : -1;
+                        if (dx === 0) side = Math.random() > 0.5 ? 1 : -1;
+                        
+                        // Push violently to the side
+                        this.vx = side * (8 + Math.random() * 4);
+                        nextX = touch.x + side * (touch.r + 6);
+                    }
+
+                    // Shadow / Wake Wedge UNDER the finger (downward wedge)
+                    if (nextY > touch.y && nextY < touch.y + 180) {
+                        let vertDist = nextY - touch.y;
+                        let wedgeWidth = touch.r + (vertDist * 0.35); // Expanding wake wedge down
+                        let distFromCenter = nextX - touch.x;
+
+                        if (Math.abs(distFromCenter) < wedgeWidth) {
+                            let side = distFromCenter >= 0 ? 1 : -1;
+                            nextX = touch.x + (side * wedgeWidth);
+                            this.vx = side * 3;
+                        }
+                    }
+                }
+
+                this.x = nextX;
+                this.y = nextY;
+
+                // Reset when hitting bottom basin
+                if (this.y >= damBottom) {
+                    this.reset(false);
+                }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.lineWidth = this.width;
+                
+                // Trail line pointing DOWN
+                let grad = ctx.createLinearGradient(this.x, this.y - this.length, this.x, this.y);
+                grad.addColorStop(0, `rgba(255, 255, 255, 0)`);
+                grad.addColorStop(0.7, `rgba(180, 235, 250, ${this.alpha})`);
+                grad.addColorStop(1, `rgba(255, 255, 255, ${this.alpha + 0.2})`);
+
+                ctx.strokeStyle = grad;
+                ctx.moveTo(this.x - (this.vx * 1.5), this.y - this.length);
+                ctx.lineTo(this.x, this.y);
+                ctx.stroke();
+            }
         }
 
-        let time = 0;
+        // Initialize particles
+        for (let i = 0; i < NUM_PARTICLES; i++) {
+            particles.push(new WaterDroplet());
+        }
 
-        function render() {
-            time += 0.05;
-            ctx.clearRect(0, 0, width, height);
-
-            // 1. ENVIRONMENT BACKGROUND
-            ctx.fillStyle = '#0a140d';
+        function drawEnvironment() {
+            // Dark Background
+            ctx.fillStyle = '#060f09';
             ctx.fillRect(0, 0, width, height);
 
             // Upper Pool
             let topGrad = ctx.createLinearGradient(0, 0, 0, damTop);
-            topGrad.addColorStop(0, '#0d261a');
-            topGrad.addColorStop(1, '#1b4d35');
+            topGrad.addColorStop(0, '#0a2116');
+            topGrad.addColorStop(1, '#184732');
             ctx.fillStyle = topGrad;
             ctx.fillRect(0, 0, width, damTop);
 
-            // Wall Background (Dark behind water)
+            // Back Wall (Dark behind falling sheet)
             let wallGrad = ctx.createLinearGradient(0, damTop, 0, damBottom);
-            wallGrad.addColorStop(0, '#151718');
-            wallGrad.addColorStop(1, '#08090a');
+            wallGrad.addColorStop(0, '#121415');
+            wallGrad.addColorStop(1, '#070809');
             ctx.fillStyle = wallGrad;
             ctx.fillRect(damLeft, damTop, damWidth, damBottom - damTop);
 
-            // Concrete Side Concrete Abutments
-            ctx.fillStyle = '#2b2d30';
+            // Concrete Abutments
+            ctx.fillStyle = '#26282a';
             ctx.fillRect(0, 0, damLeft, height);
             ctx.fillRect(damLeft + damWidth, 0, damLeft, height);
 
-            // Spillway Lip
-            ctx.fillStyle = '#51565a';
+            // Concrete Dam Lip
+            ctx.fillStyle = '#4d5256';
             ctx.fillRect(damLeft - 4, damTop - 5, damWidth + 8, 6);
+        }
 
-            // 2. WATERFALL CURTAIN WITH EXCLUSION/PARTING LOGIC
-            const steps = 60;
-            const dy = (damBottom - damTop) / steps;
-
-            for (let s = 0; s < NUM_STREAMS; s++) {
-                const stream = streams[s];
-                const originX = damLeft + (stream.xRatio * damWidth);
-
-                ctx.beginPath();
-                ctx.lineWidth = stream.width;
-                
-                // Realistic water gradient
-                let streamGrad = ctx.createLinearGradient(0, damTop, 0, damBottom);
-                streamGrad.addColorStop(0, `rgba(225, 250, 255, ${stream.alpha})`);
-                streamGrad.addColorStop(0.5, `rgba(165, 225, 240, ${stream.alpha * 0.7})`);
-                streamGrad.addColorStop(1, `rgba(240, 255, 255, ${stream.alpha})`);
-                ctx.strokeStyle = streamGrad;
-
-                let currX = originX;
-                let currY = damTop;
-                ctx.moveTo(currX, currY);
-
-                for (let i = 1; i <= steps; i++) {
-                    let nextY = damTop + (i * dy);
-                    let nextX = originX;
-
-                    // Calculate deflection for all active touch obstacles
-                    for (let touch of activeTouches) {
-                        // Only affect water at or below touch point
-                        if (nextY >= touch.y - touch.r) {
-                            let distX = nextX - touch.x;
-                            let distY = nextY - touch.y;
-
-                            // Shadow/Wedge region below finger where water cannot go
-                            let verticalDist = nextY - touch.y;
-                            let clearWidth = touch.r + (verticalDist * 0.25); // Wedge opens downward
-
-                            if (Math.abs(distX) < clearWidth && verticalDist > -touch.r) {
-                                // Force water strictly OUTWARD to left or right
-                                let direction = distX >= 0 ? 1 : -1;
-                                if (distX === 0) direction = stream.xRatio > 0.5 ? 1 : -1;
-
-                                let pushAmount = clearWidth - Math.abs(distX) + 8;
-                                nextX += direction * pushAmount;
-                            }
-                        }
-                    }
-
-                    // Gentle fluid motion texture down the spillway
-                    let textureShift = Math.sin((time * stream.speed) + (i * 0.3)) * 0.7;
-                    nextX += textureShift;
-
-                    ctx.lineTo(nextX, nextY);
-                }
-
-                ctx.stroke();
-            }
-
-            // 3. BOTTOM POOL & SPLASH EFFECTS
+        function drawBottomPool() {
+            // Lower Basin Pool
             let poolGrad = ctx.createLinearGradient(0, damBottom, 0, height);
-            poolGrad.addColorStop(0, '#132e22');
-            poolGrad.addColorStop(1, '#050c09');
+            poolGrad.addColorStop(0, '#11291e');
+            poolGrad.addColorStop(1, '#040a07');
             ctx.fillStyle = poolGrad;
             ctx.fillRect(0, damBottom, width, height - damBottom);
 
-            // Splash Mist at Base
-            let mistGrad = ctx.createLinearGradient(0, damBottom - 15, 0, damBottom + 25);
+            // Base Foam/Mist where water crashes down
+            let mistGrad = ctx.createLinearGradient(0, damBottom - 20, 0, damBottom + 25);
             mistGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-            mistGrad.addColorStop(0.5, 'rgba(230, 250, 255, 0.8)');
+            mistGrad.addColorStop(0.5, 'rgba(230, 252, 255, 0.85)');
             mistGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-            ctx.fillStyle = mistGrad;
-            ctx.fillRect(damLeft, damBottom - 15, damWidth, 40);
 
-            // Touch Indicators & Splashes around fingers
+            ctx.fillStyle = mistGrad;
+            ctx.fillRect(damLeft, damBottom - 20, damWidth, 45);
+
+            // Touch Indicators & Splashes
             for (let touch of activeTouches) {
-                // Obstacle circle (Finger position)
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                // Splash ring where top water hits the finger
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+                ctx.beginPath();
+                ctx.arc(touch.x, touch.y - touch.r + 5, touch.r * 0.9, Math.PI, 0);
+                ctx.fill();
+
+                // Finger obstacle footprint
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
                 ctx.beginPath();
                 ctx.arc(touch.x, touch.y, touch.r, 0, Math.PI * 2);
                 ctx.fill();
 
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
                 ctx.lineWidth = 2;
                 ctx.stroke();
-
-                // Top Splash Rim where water hits the finger
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                ctx.beginPath();
-                ctx.arc(touch.x, touch.y - touch.r + 4, touch.r * 0.8, Math.PI, 0);
-                ctx.fill();
             }
-
-            requestAnimationFrame(render);
         }
 
-        render();
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+
+            drawEnvironment();
+
+            // Render and update every particle downward
+            for (let p of particles) {
+                p.update();
+                p.draw();
+            }
+
+            drawBottomPool();
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
     </script>
 </body>
 </html>
