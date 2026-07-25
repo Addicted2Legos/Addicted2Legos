@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Waterfall Flow</title>
+    <title>Realistic Waterfall Parting</title>
     <style>
         * {
             box-sizing: border-box;
@@ -17,7 +17,7 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #0c1810;
+            background-color: #080f0b;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
         canvas {
@@ -30,16 +30,17 @@
             top: 20px;
             width: 100%;
             text-align: center;
-            color: rgba(255, 255, 255, 0.85);
-            font-size: 15px;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 16px;
+            font-weight: 500;
             pointer-events: none;
-            text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+            text-shadow: 0 2px 6px rgba(0,0,0,0.8);
         }
     </style>
 </head>
 <body>
 
-    <div id="ui">Touch to part the falling water</div>
+    <div id="ui">Touch the waterfall to block and split the water</div>
     <canvas id="canvas"></canvas>
 
     <script>
@@ -53,15 +54,15 @@
             width = canvas.width = window.innerWidth;
             height = canvas.height = window.innerHeight;
             
-            damTop = height * 0.18;
-            damBottom = height * 0.78;
-            damWidth = Math.min(width * 0.85, 800);
+            damTop = height * 0.15;
+            damBottom = height * 0.82;
+            damWidth = Math.min(width * 0.88, 900);
             damLeft = (width - damWidth) / 2;
         }
         window.addEventListener('resize', resize);
         resize();
 
-        // Touch & Mouse Interaction handling
+        // Touch & Mouse Handling
         const activeTouches = [];
 
         function handlePointer(e) {
@@ -74,14 +75,14 @@
                     activeTouches.push({
                         x: e.touches[i].clientX - rect.left,
                         y: e.touches[i].clientY - rect.top,
-                        radius: 50 // Splitting radius around finger
+                        r: 35 // Finger obstacle radius
                     });
                 }
             } else if (isMouseDown) {
                 activeTouches.push({
                     x: e.clientX - rect.left,
                     y: e.clientY - rect.top,
-                    radius: 50
+                    r: 35
                 });
             }
         }
@@ -94,102 +95,103 @@
         canvas.addEventListener('mousemove', (e) => { if(isMouseDown) handlePointer(e); });
         canvas.addEventListener('mouseup', () => { isMouseDown = false; activeTouches.length = 0; });
 
-        // Streams for smooth vertical sheet
-        const NUM_STREAMS = 160;
+        // High density vertical stream lines
+        const NUM_STREAMS = 220;
         const streams = [];
 
         for (let i = 0; i < NUM_STREAMS; i++) {
             streams.push({
-                offsetRatio: i / NUM_STREAMS,
-                speed: 3 + Math.random() * 2,
-                phase: Math.random() * 50,
-                width: 1.5 + Math.random() * 2
+                xRatio: i / (NUM_STREAMS - 1),
+                speed: 4 + Math.random() * 3,
+                width: 1.5 + Math.random() * 2,
+                alpha: 0.5 + Math.random() * 0.4
             });
         }
 
-        let flowOffset = 0;
+        let time = 0;
 
-        function drawBackground() {
-            // Background Environment
-            ctx.fillStyle = '#0f1a14';
+        function render() {
+            time += 0.05;
+            ctx.clearRect(0, 0, width, height);
+
+            // 1. ENVIRONMENT BACKGROUND
+            ctx.fillStyle = '#0a140d';
             ctx.fillRect(0, 0, width, height);
 
-            // Upper Quiet Reservoir
+            // Upper Pool
             let topGrad = ctx.createLinearGradient(0, 0, 0, damTop);
-            topGrad.addColorStop(0, '#0a1d13');
-            topGrad.addColorStop(1, '#1a3c2b');
+            topGrad.addColorStop(0, '#0d261a');
+            topGrad.addColorStop(1, '#1b4d35');
             ctx.fillStyle = topGrad;
             ctx.fillRect(0, 0, width, damTop);
 
-            // Concrete Side Abutments
-            ctx.fillStyle = '#2d3032';
-            ctx.fillRect(0, 0, damLeft, height);
-            ctx.fillRect(damLeft + damWidth, 0, damLeft, height);
-
-            // Concrete Backwall behind water
+            // Wall Background (Dark behind water)
             let wallGrad = ctx.createLinearGradient(0, damTop, 0, damBottom);
-            wallGrad.addColorStop(0, '#1d1f21');
-            wallGrad.addColorStop(1, '#0e0f10');
+            wallGrad.addColorStop(0, '#151718');
+            wallGrad.addColorStop(1, '#08090a');
             ctx.fillStyle = wallGrad;
             ctx.fillRect(damLeft, damTop, damWidth, damBottom - damTop);
 
-            // Spillway Crest Edge
-            ctx.fillStyle = '#565b60';
-            ctx.fillRect(damLeft - 5, damTop - 6, damWidth + 10, 8);
-        }
+            // Concrete Side Concrete Abutments
+            ctx.fillStyle = '#2b2d30';
+            ctx.fillRect(0, 0, damLeft, height);
+            ctx.fillRect(damLeft + damWidth, 0, damLeft, height);
 
-        function drawWaterSheet() {
-            flowOffset += 0.12; // Downward movement tracking
-            
-            const numSteps = 50; // High resolution downward steps
-            const stepHeight = (damBottom - damTop) / numSteps;
+            // Spillway Lip
+            ctx.fillStyle = '#51565a';
+            ctx.fillRect(damLeft - 4, damTop - 5, damWidth + 8, 6);
 
-            ctx.save();
-            
+            // 2. WATERFALL CURTAIN WITH EXCLUSION/PARTING LOGIC
+            const steps = 60;
+            const dy = (damBottom - damTop) / steps;
+
             for (let s = 0; s < NUM_STREAMS; s++) {
                 const stream = streams[s];
-                const baseX = damLeft + (stream.offsetRatio * damWidth);
-                
+                const originX = damLeft + (stream.xRatio * damWidth);
+
                 ctx.beginPath();
-                ctx.lineWidth = stream.width + (width > 600 ? 2.5 : 1.2);
-
-                // Waterfall Color Gradient
+                ctx.lineWidth = stream.width;
+                
+                // Realistic water gradient
                 let streamGrad = ctx.createLinearGradient(0, damTop, 0, damBottom);
-                streamGrad.addColorStop(0, 'rgba(220, 248, 255, 0.85)');
-                streamGrad.addColorStop(0.25, 'rgba(170, 225, 238, 0.65)');
-                streamGrad.addColorStop(0.85, 'rgba(195, 238, 248, 0.75)');
-                streamGrad.addColorStop(1, 'rgba(245, 255, 255, 0.95)');
-
+                streamGrad.addColorStop(0, `rgba(225, 250, 255, ${stream.alpha})`);
+                streamGrad.addColorStop(0.5, `rgba(165, 225, 240, ${stream.alpha * 0.7})`);
+                streamGrad.addColorStop(1, `rgba(240, 255, 255, ${stream.alpha})`);
                 ctx.strokeStyle = streamGrad;
 
-                let currentX = baseX;
-                let currentY = damTop;
-                ctx.moveTo(currentX, currentY);
+                let currX = originX;
+                let currY = damTop;
+                ctx.moveTo(currX, currY);
 
-                // Calculate downward flow curve for this stream
-                for (let i = 1; i <= numSteps; i++) {
-                    let nextY = damTop + (i * stepHeight); // Strictly DOWNWARD progression
-                    let nextX = baseX;
+                for (let i = 1; i <= steps; i++) {
+                    let nextY = damTop + (i * dy);
+                    let nextX = originX;
 
-                    // Apply outward splitting force around any finger/touch
+                    // Calculate deflection for all active touch obstacles
                     for (let touch of activeTouches) {
-                        let dx = nextX - touch.x;
-                        let dy = nextY - touch.y;
-                        let dist = Math.sqrt(dx * dx + dy * dy);
+                        // Only affect water at or below touch point
+                        if (nextY >= touch.y - touch.r) {
+                            let distX = nextX - touch.x;
+                            let distY = nextY - touch.y;
 
-                        // Push water to left/right off finger
-                        if (dist < touch.radius && nextY >= touch.y - 10) {
-                            let pushForce = (1 - (dist / touch.radius));
-                            // Determine which side of the finger center the water is on
-                            let side = dx >= 0 ? 1 : -1; 
-                            
-                            // Strong horizontal displacement to split water
-                            nextX += side * (touch.radius - Math.abs(dx) + 15) * pushForce;
+                            // Shadow/Wedge region below finger where water cannot go
+                            let verticalDist = nextY - touch.y;
+                            let clearWidth = touch.r + (verticalDist * 0.25); // Wedge opens downward
+
+                            if (Math.abs(distX) < clearWidth && verticalDist > -touch.r) {
+                                // Force water strictly OUTWARD to left or right
+                                let direction = distX >= 0 ? 1 : -1;
+                                if (distX === 0) direction = stream.xRatio > 0.5 ? 1 : -1;
+
+                                let pushAmount = clearWidth - Math.abs(distX) + 8;
+                                nextX += direction * pushAmount;
+                            }
                         }
                     }
 
-                    // Gentle downward wave animation
-                    nextX += Math.sin((flowOffset * stream.speed) + (i * 0.25) + stream.phase) * 0.8;
+                    // Gentle fluid motion texture down the spillway
+                    let textureShift = Math.sin((time * stream.speed) + (i * 0.3)) * 0.7;
+                    nextX += textureShift;
 
                     ctx.lineTo(nextX, nextY);
                 }
@@ -197,47 +199,44 @@
                 ctx.stroke();
             }
 
-            ctx.restore();
-        }
-
-        function drawBottomPool() {
-            // Lower Basin Pool
+            // 3. BOTTOM POOL & SPLASH EFFECTS
             let poolGrad = ctx.createLinearGradient(0, damBottom, 0, height);
-            poolGrad.addColorStop(0, '#17362a');
-            poolGrad.addColorStop(1, '#08120d');
+            poolGrad.addColorStop(0, '#132e22');
+            poolGrad.addColorStop(1, '#050c09');
             ctx.fillStyle = poolGrad;
             ctx.fillRect(0, damBottom, width, height - damBottom);
 
-            // Base Foam/Mist where falling water lands
-            let mistGrad = ctx.createLinearGradient(0, damBottom - 20, 0, damBottom + 25);
+            // Splash Mist at Base
+            let mistGrad = ctx.createLinearGradient(0, damBottom - 15, 0, damBottom + 25);
             mistGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-            mistGrad.addColorStop(0.5, 'rgba(235, 252, 255, 0.75)');
+            mistGrad.addColorStop(0.5, 'rgba(230, 250, 255, 0.8)');
             mistGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
             ctx.fillStyle = mistGrad;
-            ctx.fillRect(damLeft, damBottom - 20, damWidth, 45);
+            ctx.fillRect(damLeft, damBottom - 15, damWidth, 40);
 
-            // Draw finger touch point indicator
+            // Touch Indicators & Splashes around fingers
             for (let touch of activeTouches) {
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-                ctx.lineWidth = 2;
+                // Obstacle circle (Finger position)
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
                 ctx.beginPath();
-                ctx.arc(touch.x, touch.y, touch.radius * 0.8, 0, Math.PI * 2);
+                ctx.arc(touch.x, touch.y, touch.r, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.lineWidth = 2;
                 ctx.stroke();
+
+                // Top Splash Rim where water hits the finger
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.beginPath();
+                ctx.arc(touch.x, touch.y - touch.r + 4, touch.r * 0.8, Math.PI, 0);
+                ctx.fill();
             }
+
+            requestAnimationFrame(render);
         }
 
-        function animate() {
-            ctx.clearRect(0, 0, width, height);
-
-            drawBackground();
-            drawWaterSheet();
-            drawBottomPool();
-
-            requestAnimationFrame(animate);
-        }
-
-        animate();
+        render();
     </script>
 </body>
 </html>
