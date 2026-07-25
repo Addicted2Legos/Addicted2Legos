@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Downward Waterfall Flow</title>
+    <title>Inverted Direction Waterfall Flow</title>
     <style>
         * {
             box-sizing: border-box;
@@ -40,7 +40,7 @@
 </head>
 <body>
 
-    <div id="ui">Touch the waterfall to split the falling water</div>
+    <div id="ui">Touch to part the falling water into parallel streams</div>
     <canvas id="canvas"></canvas>
 
     <script>
@@ -75,14 +75,14 @@
                     activeTouches.push({
                         x: e.touches[i].clientX - rect.left,
                         y: e.touches[i].clientY - rect.top,
-                        r: 40 // Obstacle radius
+                        r: 35 // Finger radius
                     });
                 }
             } else if (isMouseDown) {
                 activeTouches.push({
                     x: e.clientX - rect.left,
                     y: e.clientY - rect.top,
-                    r: 40
+                    r: 35
                 });
             }
         }
@@ -95,8 +95,8 @@
         canvas.addEventListener('mousemove', (e) => { if(isMouseDown) handlePointer(e); });
         canvas.addEventListener('mouseup', () => { isMouseDown = false; activeTouches.length = 0; });
 
-        // Physics Water Strands
-        const NUM_PARTICLES = 500;
+        // Stream Particles
+        const NUM_PARTICLES = 600;
         const particles = [];
 
         class WaterDroplet {
@@ -106,60 +106,57 @@
 
             reset(randomY = false) {
                 this.x = damLeft + Math.random() * damWidth;
-                this.y = randomY ? damTop + Math.random() * (damBottom - damTop) : damTop;
-                this.vy = 8 + Math.random() * 6; // High downward velocity
+                // Inverted Y positioning: spawn at bottom, move UP to reverse optical motion
+                this.y = randomY ? damTop + Math.random() * (damBottom - damTop) : damBottom;
+                this.vy = -(8 + Math.random() * 6); // Upward velocity vector
                 this.vx = 0;
-                this.length = 15 + Math.random() * 25; // Vertical trailing line length
+                this.length = 18 + Math.random() * 25;
                 this.width = 1.5 + Math.random() * 2.5;
                 this.alpha = 0.4 + Math.random() * 0.5;
             }
 
             update() {
-                // Gravity acceleration (strictly DOWN)
-                this.vy += 0.3;
-                
-                // Position updates
-                let nextY = this.y + this.vy;
+                this.y += this.vy;
                 let nextX = this.x + this.vx;
 
-                // Air resistance / friction recovery
-                this.vx *= 0.85;
+                // Dampen horizontal velocity so streams fall straight once parted
+                this.vx *= 0.7;
 
-                // Collision & Parting Logic around Finger
                 for (let touch of activeTouches) {
                     let dx = nextX - touch.x;
-                    let dy = nextY - touch.y;
-                    
-                    // Direct touch collision
+                    let dy = this.y - touch.y;
                     let dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < touch.r + 5) {
+
+                    // 1. Direct Touch Collision: Shift water to the exact outer edge of the finger
+                    if (dist < touch.r + 2) {
                         let side = dx >= 0 ? 1 : -1;
                         if (dx === 0) side = Math.random() > 0.5 ? 1 : -1;
                         
-                        // Push violently to the side
-                        this.vx = side * (8 + Math.random() * 4);
-                        nextX = touch.x + side * (touch.r + 6);
+                        // Set position right at the side boundary
+                        nextX = touch.x + side * (touch.r + 4);
+                        this.vx = 0; // Prevent diagonal spraying
                     }
 
-                    // Shadow / Wake Wedge UNDER the finger (downward wedge)
-                    if (nextY > touch.y && nextY < touch.y + 180) {
-                        let vertDist = nextY - touch.y;
-                        let wedgeWidth = touch.r + (vertDist * 0.35); // Expanding wake wedge down
-                        let distFromCenter = nextX - touch.x;
+                    // 2. Straight Vertical Channeling: Force water below/above finger to stay aligned in straight lines
+                    let vertDist = Math.abs(dy);
+                    let vertLimit = 150; 
 
-                        if (Math.abs(distFromCenter) < wedgeWidth) {
-                            let side = distFromCenter >= 0 ? 1 : -1;
-                            nextX = touch.x + (side * wedgeWidth);
-                            this.vx = side * 3;
+                    if (vertDist < vertLimit) {
+                        let side = dx >= 0 ? 1 : -1;
+                        let targetX = touch.x + side * (touch.r + 6);
+                        
+                        // Strict straight corridor check
+                        if (Math.abs(dx) < touch.r + 6) {
+                            nextX = targetX;
+                            this.vx = 0;
                         }
                     }
                 }
 
                 this.x = nextX;
-                this.y = nextY;
 
-                // Reset when hitting bottom basin
-                if (this.y >= damBottom) {
+                // Reset when passing top boundary
+                if (this.y <= damTop) {
                     this.reset(false);
                 }
             }
@@ -168,44 +165,42 @@
                 ctx.beginPath();
                 ctx.lineWidth = this.width;
                 
-                // Trail line pointing DOWN
-                let grad = ctx.createLinearGradient(this.x, this.y - this.length, this.x, this.y);
+                // Trail line pointing up
+                let grad = ctx.createLinearGradient(this.x, this.y + this.length, this.x, this.y);
                 grad.addColorStop(0, `rgba(255, 255, 255, 0)`);
                 grad.addColorStop(0.7, `rgba(180, 235, 250, ${this.alpha})`);
                 grad.addColorStop(1, `rgba(255, 255, 255, ${this.alpha + 0.2})`);
 
                 ctx.strokeStyle = grad;
-                ctx.moveTo(this.x - (this.vx * 1.5), this.y - this.length);
+                ctx.moveTo(this.x, this.y + this.length);
                 ctx.lineTo(this.x, this.y);
                 ctx.stroke();
             }
         }
 
-        // Initialize particles
         for (let i = 0; i < NUM_PARTICLES; i++) {
             particles.push(new WaterDroplet());
         }
 
         function drawEnvironment() {
-            // Dark Background
             ctx.fillStyle = '#060f09';
             ctx.fillRect(0, 0, width, height);
 
-            // Upper Pool
+            // Top Basin
             let topGrad = ctx.createLinearGradient(0, 0, 0, damTop);
             topGrad.addColorStop(0, '#0a2116');
             topGrad.addColorStop(1, '#184732');
             ctx.fillStyle = topGrad;
             ctx.fillRect(0, 0, width, damTop);
 
-            // Back Wall (Dark behind falling sheet)
+            // Wall Background
             let wallGrad = ctx.createLinearGradient(0, damTop, 0, damBottom);
             wallGrad.addColorStop(0, '#121415');
             wallGrad.addColorStop(1, '#070809');
             ctx.fillStyle = wallGrad;
             ctx.fillRect(damLeft, damTop, damWidth, damBottom - damTop);
 
-            // Concrete Abutments
+            // Concrete Side Walls
             ctx.fillStyle = '#26282a';
             ctx.fillRect(0, 0, damLeft, height);
             ctx.fillRect(damLeft + damWidth, 0, damLeft, height);
@@ -216,14 +211,13 @@
         }
 
         function drawBottomPool() {
-            // Lower Basin Pool
             let poolGrad = ctx.createLinearGradient(0, damBottom, 0, height);
             poolGrad.addColorStop(0, '#11291e');
             poolGrad.addColorStop(1, '#040a07');
             ctx.fillStyle = poolGrad;
             ctx.fillRect(0, damBottom, width, height - damBottom);
 
-            // Base Foam/Mist where water crashes down
+            // Base Foam/Mist
             let mistGrad = ctx.createLinearGradient(0, damBottom - 20, 0, damBottom + 25);
             mistGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
             mistGrad.addColorStop(0.5, 'rgba(230, 252, 255, 0.85)');
@@ -232,21 +226,14 @@
             ctx.fillStyle = mistGrad;
             ctx.fillRect(damLeft, damBottom - 20, damWidth, 45);
 
-            // Touch Indicators & Splashes
+            // Touch Indicators
             for (let touch of activeTouches) {
-                // Splash ring where top water hits the finger
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-                ctx.beginPath();
-                ctx.arc(touch.x, touch.y - touch.r + 5, touch.r * 0.9, Math.PI, 0);
-                ctx.fill();
-
-                // Finger obstacle footprint
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
                 ctx.beginPath();
                 ctx.arc(touch.x, touch.y, touch.r, 0, Math.PI * 2);
                 ctx.fill();
 
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
                 ctx.lineWidth = 2;
                 ctx.stroke();
             }
@@ -257,7 +244,6 @@
 
             drawEnvironment();
 
-            // Render and update every particle downward
             for (let p of particles) {
                 p.update();
                 p.draw();
