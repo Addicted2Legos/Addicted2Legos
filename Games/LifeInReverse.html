@@ -126,35 +126,82 @@
             justify-content: space-between;
             align-items: flex-end;
             width: 100%;
+            gap: 16px;
         }
-        #wheel-container {
-            width: 130px;
-            height: 130px;
-            position: relative;
-            touch-action: none;
+        
+        /* Steering Column Container */
+        .steering-column {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
         }
-        #wheel-img {
-            width: 100%;
-            height: 100%;
+        
+        /* Visual Steering Wheel */
+        #wheel-display {
+            width: 80px;
+            height: 80px;
             border-radius: 50%;
             background: radial-gradient(circle, #334155 0%, #0f172a 70%);
-            border: 8px solid #475569;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            border: 6px solid #475569;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            position: relative;
             display: flex;
             align-items: center;
             justify-content: center;
             transform-origin: center center;
-            position: relative;
+            transition: transform 0.05s linear;
         }
-        #wheel-img::after {
+        #wheel-display::after {
             content: '';
-            width: 10px;
+            width: 6px;
             height: 50%;
             background: #38bdf8;
             position: absolute;
             top: 0;
-            border-radius: 4px;
+            border-radius: 3px;
         }
+
+        /* Touch Steering Slider */
+        #slider-container {
+            width: 220px;
+            height: 54px;
+            background: rgba(30, 41, 59, 0.85);
+            border: 2px solid #475569;
+            border-radius: 27px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+            touch-action: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+        }
+        .slider-label {
+            position: absolute;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: #64748b;
+        }
+        .slider-label.left { left: 16px; }
+        .slider-label.right { right: 16px; }
+        #slider-handle {
+            width: 44px;
+            height: 44px;
+            background: #38bdf8;
+            border-radius: 50%;
+            position: absolute;
+            left: calc(50% - 22px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #0f172a;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
         .right-controls {
             display: flex;
             gap: 12px;
@@ -237,8 +284,14 @@
         <div id="status-msg">⚠️ JACKKNIFE WARNING!</div>
 
         <div class="controls-container">
-            <div id="wheel-container" class="interactive">
-                <div id="wheel-img"></div>
+            <!-- Steering Wheel Display + Slider -->
+            <div class="steering-column">
+                <div id="wheel-display"></div>
+                <div id="slider-container" class="interactive">
+                    <span class="slider-label left">◀ L</span>
+                    <div id="slider-handle">◄ ►</div>
+                    <span class="slider-label right">R ▶</span>
+                </div>
             </div>
 
             <div class="right-controls">
@@ -283,11 +336,7 @@
         let gear = -1; 
         let inputs = { gas: false, brake: false, steer: 0 };
 
-        const scenarios = [
-            { env: 'ramp' },
-            { env: 'yard' },
-            { env: 'lot' }
-        ];
+        const scenarios = [{ env: 'ramp' }, { env: 'yard' }, { env: 'lot' }];
 
         function init() {
             const container = document.getElementById('canvas-container');
@@ -330,7 +379,6 @@
         function createVehicleMeshes() {
             truckMesh = new THREE.Group();
             
-            // Truck body
             const truckBody = new THREE.Mesh(
                 new THREE.BoxGeometry(2.1, 1.4, 4.8),
                 new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2 })
@@ -339,7 +387,6 @@
             truckBody.castShadow = true;
             truckMesh.add(truckBody);
 
-            // Cab
             const cab = new THREE.Mesh(
                 new THREE.BoxGeometry(1.95, 1.0, 2.3),
                 new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 0.1 })
@@ -350,7 +397,6 @@
 
             scene.add(truckMesh);
 
-            // Trailer
             trailerMesh = new THREE.Group();
             const trailerBed = new THREE.Mesh(
                 new THREE.BoxGeometry(2.2, 0.4, 6.0),
@@ -372,7 +418,6 @@
             }
 
             if (type === 'ramp') {
-                // MasterCraft Dark Blue Boat
                 const boat = new THREE.Mesh(
                     new THREE.BoxGeometry(1.9, 1.3, 5.2),
                     new THREE.MeshStandardMaterial({ color: 0x0f2b48, roughness: 0.2 })
@@ -381,7 +426,6 @@
                 boat.castShadow = true;
                 payloadMesh.add(boat);
 
-                // Boat Windshield
                 const glass = new THREE.Mesh(
                     new THREE.BoxGeometry(1.7, 0.5, 1.2),
                     new THREE.MeshStandardMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.6 })
@@ -390,7 +434,6 @@
                 payloadMesh.add(glass);
 
             } else if (type === 'yard') {
-                // Horse Trailer Enclosure
                 const enclosure = new THREE.Mesh(
                     new THREE.BoxGeometry(2.1, 1.9, 5.5),
                     new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.4 })
@@ -400,7 +443,6 @@
                 payloadMesh.add(enclosure);
 
             } else if (type === 'lot') {
-                // ATV
                 const atv = new THREE.Mesh(
                     new THREE.BoxGeometry(1.4, 0.8, 1.8),
                     new THREE.MeshStandardMaterial({ color: 0xd97706 })
@@ -409,7 +451,6 @@
                 atv.castShadow = true;
                 payloadMesh.add(atv);
 
-                // Bikes
                 const bike1 = new THREE.Mesh(
                     new THREE.BoxGeometry(0.5, 0.8, 1.6),
                     new THREE.MeshStandardMaterial({ color: 0xdc2626 })
@@ -543,6 +584,13 @@
             camera.position.z = truck.z + 16;
         }
 
+        function updateWheelDisplay() {
+            const wheelDisplay = document.getElementById('wheel-display');
+            // Steer input is normalized (-1 to 1); rotate visual wheel up to -140 to +140 degrees
+            const angleDeg = -inputs.steer * 140;
+            wheelDisplay.style.transform = `rotate(${angleDeg}deg)`;
+        }
+
         function setupControls() {
             document.getElementById('btn-menu').onclick = () => {
                 document.getElementById('menu-screen').style.display = 'flex';
@@ -553,16 +601,20 @@
             const gearD = document.getElementById('gear-d');
             const gearR = document.getElementById('gear-r');
 
-            gearD.onclick = () => {
+            gearD.onclick = setDrive;
+            gearR.onclick = setReverse;
+
+            function setDrive() {
                 gear = 1;
                 gearD.classList.add('active');
                 gearR.classList.remove('active');
-            };
-            gearR.onclick = () => {
+            }
+
+            function setReverse() {
                 gear = -1;
                 gearR.classList.add('active');
                 gearD.classList.remove('active');
-            };
+            }
 
             const gasPedal = document.getElementById('gas-pedal');
             const brakePedal = document.getElementById('brake-pedal');
@@ -576,52 +628,94 @@
             bindPedal(gasPedal, 'gas');
             bindPedal(brakePedal, 'brake');
 
-            const wheelContainer = document.getElementById('wheel-container');
-            const wheelImg = document.getElementById('wheel-img');
-            let isDraggingWheel = false;
-            let center = { x: 0, y: 0 };
+            // --- TOUCH SLIDER STEERING (NO AUTO-CENTER) ---
+            const sliderContainer = document.getElementById('slider-container');
+            const sliderHandle = document.getElementById('slider-handle');
+            let isDraggingSlider = false;
 
-            function handleWheelMove(clientX, clientY) {
-                const rad = Math.atan2(clientY - center.y, clientX - center.x);
-                let deg = rad * (180 / Math.PI) + 90;
-                if (deg > 180) deg -= 360;
-                deg = Math.max(-150, Math.min(150, deg));
-                
-                wheelImg.style.transform = `rotate(${deg}deg)`;
-                inputs.steer = -deg / 150;
+            function updateSliderPosition(steerVal) {
+                // steerVal is -1 to 1
+                const rect = sliderContainer.getBoundingClientRect();
+                const minX = 22;
+                const maxX = rect.width - 22;
+                const norm = (-steerVal + 1) / 2; // Map -1..1 to 0..1
+                const handlePos = minX + norm * (maxX - minX) - 22;
+                sliderHandle.style.left = `${handlePos}px`;
+                updateWheelDisplay();
             }
 
-            wheelContainer.addEventListener('touchstart', (e) => {
-                isDraggingWheel = true;
-                const rect = wheelContainer.getBoundingClientRect();
-                center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            function updateSliderFromClientX(clientX) {
+                const rect = sliderContainer.getBoundingClientRect();
+                const minX = rect.left + 22;
+                const maxX = rect.right - 22;
+                const clampedX = Math.max(minX, Math.min(maxX, clientX));
+                
+                const handlePos = clampedX - rect.left - 22;
+                sliderHandle.style.left = `${handlePos}px`;
+
+                const range = (maxX - minX);
+                const norm = ((clampedX - minX) / range) * 2 - 1;
+                inputs.steer = -norm; // Set steer value
+                
+                updateWheelDisplay();
+            }
+
+            sliderContainer.addEventListener('touchstart', (e) => {
+                isDraggingSlider = true;
+                if(e.touches[0]) updateSliderFromClientX(e.touches[0].clientX);
             });
 
             window.addEventListener('touchmove', (e) => {
-                if (isDraggingWheel && e.touches[0]) {
-                    handleWheelMove(e.touches[0].clientX, e.touches[0].clientY);
+                if (isDraggingSlider && e.touches[0]) {
+                    updateSliderFromClientX(e.touches[0].clientX);
                 }
             });
 
-            window.addEventListener('touchend', () => {
-                if (isDraggingWheel) {
-                    isDraggingWheel = false;
-                    wheelImg.style.transform = `rotate(0deg)`;
-                    inputs.steer = 0;
-                }
+            // NO AUTO-CENTER ON RELEASE
+            window.addEventListener('touchend', () => { isDraggingSlider = false; });
+            window.addEventListener('touchcancel', () => { isDraggingSlider = false; });
+
+            sliderContainer.addEventListener('mousedown', (e) => {
+                isDraggingSlider = true;
+                updateSliderFromClientX(e.clientX);
             });
 
+            window.addEventListener('mousemove', (e) => {
+                if (isDraggingSlider) updateSliderFromClientX(e.clientX);
+            });
+
+            window.addEventListener('mouseup', () => { isDraggingSlider = false; });
+
+            // --- KEYBOARD CONTROLS (Steering shifts slider permanently) ---
             window.addEventListener('keydown', (e) => {
-                if (e.key === 'ArrowUp' || e.key === 'w') inputs.gas = true;
-                if (e.key === 'ArrowDown' || e.key === 's') inputs.brake = true;
-                if (e.key === 'ArrowLeft' || e.key === 'a') inputs.steer = 1;
-                if (e.key === 'ArrowRight' || e.key === 'd') inputs.steer = -1;
+                if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+                    setDrive();
+                    inputs.gas = true;
+                }
+                if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+                    setReverse();
+                    inputs.gas = true;
+                }
+                if (e.key === ' ') {
+                    inputs.brake = true;
+                }
+                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                    inputs.steer = Math.min(1, inputs.steer + 0.1);
+                    updateSliderPosition(inputs.steer);
+                }
+                if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                    inputs.steer = Math.max(-1, inputs.steer - 0.1);
+                    updateSliderPosition(inputs.steer);
+                }
             });
 
             window.addEventListener('keyup', (e) => {
-                if (e.key === 'ArrowUp' || e.key === 'w') inputs.gas = false;
-                if (e.key === 'ArrowDown' || e.key === 's') inputs.brake = false;
-                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'ArrowRight' || e.key === 'd') inputs.steer = 0;
+                if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+                    inputs.gas = false;
+                }
+                if (e.key === ' ') {
+                    inputs.brake = false;
+                }
             });
         }
 
@@ -635,16 +729,18 @@
             trailer.x = 0;
             trailer.z = 8 - (truck.length / 2) - trailer.length;
             trailer.angle = 0;
+
+            inputs.steer = 0;
+            const sliderHandle = document.getElementById('slider-handle');
+            sliderHandle.style.left = `calc(50% - 22px)`;
+            updateWheelDisplay();
         }
 
         function selectScenario(index) {
-            currentScenario = index;
             const sc = scenarios[index];
-            
             updatePayloadMesh(sc.env);
             buildEnvironment(sc.env);
             resetRig();
-
             document.getElementById('menu-screen').style.display = 'none';
         }
 
