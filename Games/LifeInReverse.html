@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D Trailer Backing Simulator</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #111;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        /* UI Overlay */
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 16px;
+        }
+        .interactive {
+            pointer-events: auto;
+        }
+        /* Menu Overlay */
+        #menu-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(8px);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            padding: 20px;
+        }
+        #menu-screen h1 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+            color: #f8fafc;
+            text-align: center;
+        }
+        #menu-screen p {
+            color: #94a3b8;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+            width: 100%;
+            max-width: 900px;
+        }
+        .scenario-card {
+            background: #1e293b;
+            border: 2px solid #334155;
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .scenario-card:hover {
+            border-color: #38bdf8;
+            transform: translateY(-2px);
+            background: #334155;
+        }
+        .scenario-card h3 {
+            color: #38bdf8;
+            margin-bottom: 6px;
+        }
+        .scenario-card p {
+            font-size: 0.85rem;
+            color: #cbd5e1;
+            text-align: left;
+            margin-bottom: 0;
+        }
+        /* HUD Top Bar */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+        .btn {
+            background: rgba(30, 41, 59, 0.85);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+        }
+        .btn:active {
+            background: #38bdf8;
+            color: #0f172a;
+        }
+        /* Controls Bottom Bar */
+        .controls-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+        }
+        /* Steering Wheel */
+        #wheel-container {
+            width: 140px;
+            height: 140px;
+            position: relative;
+            touch-action: none;
+        }
+        #wheel-img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: radial-gradient(circle, #334155 0%, #0f172a 70%);
+            border: 8px solid #475569;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform-origin: center center;
+        }
+        #wheel-img::after {
+            content: '';
+            width: 12px;
+            height: 100%;
+            background: #38bdf8;
+            position: absolute;
+            top: 0;
+        }
+        /* Pedals & Gear Switch */
+        .right-controls {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .gear-toggle {
+            display: flex;
+            flex-direction: column;
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #334155;
+        }
+        .gear-btn {
+            padding: 12px 18px;
+            background: transparent;
+            color: #64748b;
+            border: none;
+            font-weight: bold;
+            font-size: 1.1rem;
+            cursor: pointer;
+        }
+        .gear-btn.active {
+            background: #38bdf8;
+            color: #0f172a;
+        }
+        .pedal-group {
+            display: flex;
+            gap: 10px;
+        }
+        .pedal {
+            width: 60px;
+            height: 110px;
+            background: #334155;
+            border: 2px solid #475569;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            touch-action: none;
+        }
+        .pedal:active, .pedal.active {
+            background: #22c55e;
+            border-color: #4ade80;
+        }
+        #brake-pedal:active, #brake-pedal.active {
+            background: #ef4444;
+            border-color: #f87171;
+        }
+        /* Status Banner */
+        #status-msg {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(220, 38, 38, 0.9);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: none;
+        }
+    </style>
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <!-- UI Overlay -->
+    <div class="ui-overlay">
+        <div class="top-bar">
+            <button class="btn interactive" id="btn-menu">☰ Menu</button>
+            <button class="btn interactive" id="btn-reset">↺ Reset</button>
+        </div>
+
+        <div id="status-msg">JACKKNIFE WARNING!</div>
+
+        <div class="controls-container">
+            <!-- Steering Wheel -->
+            <div id="wheel-container" class="interactive">
+                <div id="wheel-img"></div>
+            </div>
+
+            <!-- Gear & Pedals -->
+            <div class="right-controls">
+                <div class="gear-toggle interactive">
+                    <button class="gear-btn" id="gear-d">D</button>
+                    <button class="gear-btn active" id="gear-r">R</button>
+                </div>
+                <div class="pedal-group">
+                    <div class="pedal interactive" id="brake-pedal">BRAKE</div>
+                    <div class="pedal interactive" id="gas-pedal">GAS</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scenario Selection Menu -->
+    <div id="menu-screen" class="interactive">
+        <h1>Trailer Backing Simulator</h1>
+        <p>Select a scenario to practice backing up your rig</p>
+        <div class="scenario-grid">
+            <div class="scenario-card" onclick="selectScenario(0)">
+                <h3>1. Boat Ramp</h3>
+                <p>Black GMC Denali & Dark Blue 24' MasterCraft Boat on a triple axle trailer.</p>
+            </div>
+            <div class="scenario-card" onclick="selectScenario(1)">
+                <h3>2. Stock Yard</h3>
+                <p>Ford F350 Dually pulling a triple axle horse trailer through narrow wooden pens.</p>
+            </div>
+            <div class="scenario-card" onclick="selectScenario(2)">
+                <h3>3. Tight Parking Lot</h3>
+                <p>Toyota Tacoma pulling a utility trailer loaded with an ATV & 2 motorcycles.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- GAME ENGINE & PHYSICS ---
+        let scene, camera, renderer;
+        let truckMesh, trailerMesh, payloadMesh;
+        let environmentGroup;
+
+        // Kinematic State
+        let truck = { x: 0, z: 0, angle: 0, steerAngle: 0, speed: 0, length: 4.5, width: 2.0 };
+        let trailer = { x: 0, z: -5.5, angle: 0, length: 6.0, hitchOffset: 2.2 };
+        let gear = -1; // -1 for Reverse, 1 for Drive
+        let inputs = { gas: false, brake: false, steer: 0 };
+
+        // Scenario definitions
+        const scenarios = [
+            { name: "Boat Ramp", truckColor: 0x111111, trailerColor: 0x222222, payloadColor: 0x0f2b48, env: 'ramp' },
+            { name: "Stock Yard", truckColor: 0x334155, trailerColor: 0x94a3b8, payloadColor: 0x475569, env: 'yard' },
+            { name: "Parking Lot", truckColor: 0x0284c7, trailerColor: 0x475569, payloadColor: 0xd97706, env: 'lot' }
+        ];
+        let currentScenario = 0;
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+            
+            // Scene & Camera (75-degree offset top-down view)
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87ceeb);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            // Angle setup: high up, angled down ~75 deg
+            camera.position.set(0, 22, 14);
+            camera.lookAt(0, 0, 0);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+            sun.position.set(20, 40, 20);
+            sun.castShadow = true;
+            sun.shadow.mapSize.width = 2048;
+            sun.shadow.mapSize.height = 2048;
+            sun.shadow.camera.near = 0.5;
+            sun.shadow.camera.far = 100;
+            const d = 25;
+            sun.shadow.camera.left = -d;
+            sun.shadow.camera.right = d;
+            sun.shadow.camera.top = d;
+            sun.shadow.camera.bottom = -d;
+            scene.add(sun);
+
+            environmentGroup = new THREE.Group();
+            scene.add(environmentGroup);
+
+            // Build Models
+            createVehicleMeshes();
+            loadScenario(0);
+
+            // Handlers
+            setupControls();
+            window.addEventListener('resize', onWindowResize);
+
+            // Loop
+            animate();
+        }
+
+        // --- MESH CREATION ---
+        function createVehicleMeshes() {
+            // Truck
+            truckMesh = new THREE.Group();
+            const truckBody = new THREE.Mesh(
+                new THREE.BoxGeometry(2.1, 1.4, 4.5),
+                new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2 })
+            );
+            truckBody.position.y = 0.9;
+            truckBody.castShadow = true;
+            truckMesh.add(truckBody);
+
+            // Cab details
+            const cab = new THREE.Mesh(
+                new THREE.BoxGeometry(1.9, 1.0, 2.2),
+                new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1 })
+            );
+            cab.position.set(0, 1.6, 0.3);
+            cab.castShadow = true;
+            truckMesh.add(cab);
+
+            scene.add(truckMesh);
+
+            // Trailer
+            trailerMesh = new THREE.Group();
+            const trailerBed = new THREE.Mesh(
+                new THREE.BoxGeometry(2.2, 0.4, 5.8),
+                new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.5 })
+            );
+            trailerBed.position.set(0, 0.4, -2.2);
+            trailerBed.castShadow = true;
+            trailerMesh.add(trailerBed);
+
+            // Dynamic Payload (Boat / Enclosure / Quad + Bikes)
+            payloadMesh = new THREE.Group();
+            trailerMesh.add(payloadMesh);
+
+            scene.add(trailerMesh);
+        }
+
+        function updatePayloadMesh(type) {
+            // Clear existing payload
+            while(payloadMesh.children.length > 0) { 
+                payloadMesh.remove(payloadMesh.children[0]); 
+            }
+
+            if (type === 'ramp') {
+                // MasterCraft Boat Hull
+                const boat = new THREE.Mesh(
+                    new THREE.ConeGeometry(1.2, 5.2, 4),
+                    new THREE.MeshStandardMaterial({ color: 0x0f2b48, roughness: 0.1 })
+                );
+                boat.rotation.x = Math.PI / 2;
+                boat.rotation.z = Math.PI;
+                boat.position.set(0, 1.2, -2.2);
+                boat.scale.set(1, 1, 0.5);
+                boat.castShadow = true;
+                payloadMesh.add(boat);
+            } else if (type === 'yard') {
+                // Horse Trailer Enclosure
+                const enclosure = new THREE.Mesh(
+                    new THREE.BoxGeometry(2.1, 1.8, 5.2),
+                    new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.5 })
+                );
+                enclosure.position.set(0, 1.3, -2.2);
+                enclosure.castShadow = true;
+                payloadMesh.add(enclosure);
+            } else if (type === 'lot') {
+                // ATV & Bikes
+                const atv = new THREE.Mesh(
+                    new THREE.BoxGeometry(1.4, 0.8, 1.8),
+                    new THREE.MeshStandardMaterial({ color: 0xd97706 })
+                );
+                atv.position.set(0, 0.9, -1.2);
+                atv.castShadow = true;
+                payloadMesh.add(atv);
+
+                const bike = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.5, 0.8, 1.6),
+                    new THREE.MeshStandardMaterial({ color: 0xdc2626 })
+                );
+                bike.position.set(0, 0.9, -3.2);
+                bike.castShadow = true;
+                payloadMesh.add(bike);
+            }
+        }
+
+        function buildEnvironment(type) {
+            while(environmentGroup.children.length > 0) { 
+                environmentGroup.remove(environmentGroup.children[0]); 
+            }
+
+            if (type === 'ramp') {
+                // Concrete Ramp + Water
+                const ground = new THREE.Mesh(
+                    new THREE.PlaneGeometry(40, 60),
+                    new THREE.MeshStandardMaterial({ color: 0x475569 })
+                );
+                ground.rotation.x = -Math.PI / 2;
+                ground.receiveShadow = true;
+                environmentGroup.add(ground);
+
+                const water = new THREE.Mesh(
+                    new THREE.PlaneGeometry(40, 30),
+                    new THREE.MeshStandardMaterial({ color: 0x0284c7, transparent: true, opacity: 0.8 })
+                );
+                water.rotation.x = -Math.PI / 2;
+                water.position.set(0, 0.05, -15);
+                environmentGroup.add(water);
+
+                // Docks
+                const dock = new THREE.Mesh(
+                    new THREE.BoxGeometry(1.5, 0.6, 25),
+                    new THREE.MeshStandardMaterial({ color: 0x78350f })
+                );
+                dock.position.set(-6, 0.3, -10);
+                dock.castShadow = true;
+                environmentGroup.add(dock);
+            } else if (type === 'yard') {
+                // Dirt Yard with Wooden Fences
+                const ground = new THREE.Mesh(
+                    new THREE.PlaneGeometry(50, 50),
+                    new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 })
+                );
+                ground.rotation.x = -Math.PI / 2;
+                ground.receiveShadow = true;
+                environmentGroup.add(ground);
+
+                // Fence Posts
+                for(let z = -20; z <= 20; z += 5) {
+                    const postLeft = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.5, 0.3), new THREE.MeshStandardMaterial({color: 0x451a03}));
+                    postLeft.position.set(-7, 0.75, z);
+                    environmentGroup.add(postLeft);
+
+                    const postRight = postLeft.clone();
+                    postRight.position.set(7, 0.75, z);
+                    environmentGroup.add(postRight);
+                }
+            } else if (type === 'lot') {
+                // Asphalt Parking Lot with Obstacles
+                const ground = new THREE.Mesh(
+                    new THREE.PlaneGeometry(50, 50),
+                    new THREE.MeshStandardMaterial({ color: 0x1e293b })
+                );
+                ground.rotation.x = -Math.PI / 2;
+                ground.receiveShadow = true;
+                environmentGroup.add(ground);
+
+                // Parked Cars
+                const carGeo = new THREE.BoxGeometry(2, 1.3, 4);
+                const carMat = new THREE.MeshStandardMaterial({ color: 0x991b1b });
+                
+                const car1 = new THREE.Mesh(carGeo, carMat);
+                car1.position.set(-5, 0.65, -6);
+                car1.castShadow = true;
+                environmentGroup.add(car1);
+
+                const car2 = new THREE.Mesh(carGeo, new THREE.MeshStandardMaterial({ color: 0x15803d }));
+                car2.position.set(5, 0.65, -8);
+                car2.castShadow = true;
+                environmentGroup.add(car2);
+            }
+        }
+
+        // --- PHYSICS & KINEMATICS ---
+        function updatePhysics() {
+            // Acceleration & Braking
+            const accel = 0.005;
+            const friction = 0.96;
+
+            if (inputs.gas) {
+                truck.speed += accel * gear;
+            } else if (inputs.brake) {
+                truck.speed *= 0.85; // Active Braking
+            } else {
+                truck.speed *= friction; // Natural friction
+            }
+
+            // Steering angle adjustment
+            truck.steerAngle = inputs.steer * 0.6; // Max ~35 degrees
+
+            // Update Truck Position
+            truck.angle += (truck.speed * Math.tan(truck.steerAngle)) / truck.length;
+            truck.x += Math.sin(truck.angle) * truck.speed;
+            truck.z += Math.cos(truck.angle) * truck.speed;
+
+            // Update Trailer Articulation Kinematics
+            const hitchX = truck.x - Math.sin(truck.angle) * (truck.length / 2);
+            const hitchZ = truck.z - Math.cos(truck.angle) * (truck.length / 2);
+
+            const deltaX = hitchX - trailer.x;
+            const deltaZ = hitchZ - trailer.z;
+            
+            trailer.angle = Math.atan2(deltaX, deltaZ);
+            trailer.x = hitchX - Math.sin(trailer.angle) * trailer.length;
+            trailer.y = 0;
+            trailer.z = hitchZ - Math.cos(trailer.angle) * trailer.length;
+
+            // Check Jackknife Warning
+            let angleDiff = Math.abs(truck.angle - trailer.angle) % (Math.PI * 2);
+            if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+            
+            const warningEl = document.getElementById('status-msg');
+            if (angleDiff > 1.1) { // ~63 degrees
+                warningEl.style.display = 'block';
+            } else {
+                warningEl.style.display = 'none';
+            }
+
+            // Apply to 3D Meshes
+            truckMesh.position.set(truck.x, 0, truck.z);
+            truckMesh.rotation.y = truck.angle;
+
+            trailerMesh.position.set(trailer.x, 0, trailer.z);
+            trailerMesh.rotation.y = trailer.angle;
+
+            // Smooth Camera Follow Offset
+            camera.position.x = truck.x;
+            camera.position.z = truck.z + 14;
+        }
+
+        // --- CONTROLS & INTERACTION ---
+        function setupControls() {
+            // UI Button Events
+            document.getElementById('btn-menu').onclick = () => {
+                document.getElementById('menu-screen').style.display = 'flex';
+            };
+            
+            document.getElementById('btn-reset').onclick = resetRig;
+
+            // Gear Selector
+            const gearD = document.getElementById('gear-d');
+            const gearR = document.getElementById('gear-r');
+
+            gearD.onclick = () => {
+                gear = 1;
+                gearD.classList.add('active');
+                gearR.classList.remove('active');
+            };
+            gearR.onclick = () => {
+                gear = -1;
+                gearR.classList.add('active');
+                gearD.classList.remove('active');
+            };
+
+            // Touch Pedals
+            const gasPedal = document.getElementById('gas-pedal');
+            const brakePedal = document.getElementById('brake-pedal');
+
+            const bindPedal = (el, key) => {
+                el.addEventListener('touchstart', (e) => { e.preventDefault(); inputs[key] = true; el.classList.add('active'); });
+                el.addEventListener('touchend', (e) => { e.preventDefault(); inputs[key] = false; el.classList.remove('active'); });
+                el.addEventListener('mousedown', () => { inputs[key] = true; el.classList.add('active'); });
+                el.addEventListener('mouseup', () => { inputs[key] = false; el.classList.remove('active'); });
+            };
+            bindPedal(gasPedal, 'gas');
+            bindPedal(brakePedal, 'brake');
+
+            // Steering Wheel Touch Drag
+            const wheelContainer = document.getElementById('wheel-container');
+            const wheelImg = document.getElementById('wheel-img');
+            let isDraggingWheel = false;
+            let center = { x: 0, y: 0 };
+
+            function handleWheelMove(clientX, clientY) {
+                const rad = Math.atan2(clientY - center.y, clientX - center.x);
+                let deg = rad * (180 / Math.PI) + 90;
+                if (deg > 180) deg -= 360;
+                
+                // Clamp steering angle
+                deg = Math.max(-150, Math.min(150, deg));
+                
+                wheelImg.style.transform = `rotate(${deg}deg)`;
+                inputs.steer = -deg / 150; // Normalized -1 to 1
+            }
+
+            wheelContainer.addEventListener('touchstart', (e) => {
+                isDraggingWheel = true;
+                const rect = wheelContainer.getBoundingClientRect();
+                center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            });
+
+            window.addEventListener('touchmove', (e) => {
+                if (isDraggingWheel && e.touches[0]) {
+                    handleWheelMove(e.touches[0].clientX, e.touches[0].clientY);
+                }
+            });
+
+            window.addEventListener('touchend', () => {
+                if (isDraggingWheel) {
+                    isDraggingWheel = false;
+                    wheelImg.style.transform = `rotate(0deg)`;
+                    inputs.steer = 0;
+                }
+            });
+
+            // Keyboard Fallback for Desktop
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowUp' || e.key === 'w') inputs.gas = true;
+                if (e.key === 'ArrowDown' || e.key === 's') inputs.brake = true;
+                if (e.key === 'ArrowLeft' || e.key === 'a') inputs.steer = 1;
+                if (e.key === 'ArrowRight' || e.key === 'd') inputs.steer = -1;
+            });
+
+            window.addEventListener('keyup', (e) => {
+                if (e.key === 'ArrowUp' || e.key === 'w') inputs.gas = false;
+                if (e.key === 'ArrowDown' || e.key === 's') inputs.brake = false;
+                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'ArrowRight' || e.key === 'd') inputs.steer = 0;
+            });
+        }
+
+        function resetRig() {
+            truck.x = 0;
+            truck.z = 8;
+            truck.angle = 0;
+            truck.speed = 0;
+            truck.steerAngle = 0;
+
+            trailer.x = 0;
+            trailer.z = 8 - (truck.length / 2) - trailer.length;
+            trailer.angle = 0;
+        }
+
+        function selectScenario(index) {
+            currentScenario = index;
+            const sc = scenarios[index];
+            
+            updatePayloadMesh(sc.env);
+            buildEnvironment(sc.env);
+            resetRig();
+
+            document.getElementById('menu-screen').style.display = 'none';
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- MAIN LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+            updatePhysics();
+            renderer.render(scene, camera);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
