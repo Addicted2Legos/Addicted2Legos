@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Upriver Outfitters Navigator</title>
+  <title>Upriver Navigator - Fish Market Edition</title>
   <style>
     * {
       box-sizing: border-box;
@@ -17,7 +17,7 @@
       width: 100vw;
       height: 100vh;
       overflow: hidden;
-      background: #09121d;
+      background: #08111a;
       color: #fff;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       display: flex;
@@ -39,37 +39,72 @@
       height: 100%;
       display: block;
     }
-    /* HUD Overlays */
+
     .hud-box {
       position: absolute;
-      background: rgba(0, 0, 0, 0.65);
+      background: rgba(0, 0, 0, 0.7);
       border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 8px;
+      border-radius: 10px;
       padding: 8px 12px;
       font-weight: bold;
       text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
       z-index: 5;
       pointer-events: none;
     }
-    #hud-left { top: 12px; left: 12px; font-size: 16px; line-height: 1.3; }
-    #hud-right { top: 12px; right: 12px; font-size: 20px; }
+    #hud-left { 
+      top: 12px; 
+      left: 12px; 
+      font-size: 14px; 
+      line-height: 1.4; 
+    }
+    #hud-right { 
+      top: 12px; 
+      right: 12px; 
+      font-size: 15px; 
+      text-align: right; 
+      line-height: 1.4;
+      border-color: rgba(241, 196, 15, 0.4);
+    }
 
-    /* Control Buttons */
+    #dock-prompt {
+      position: absolute;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(180deg, #f39c12 0%, #d35400 100%);
+      border: 2px solid #f1c40f;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 25px;
+      font-weight: 900;
+      font-size: 16px;
+      letter-spacing: 1px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      z-index: 8;
+      cursor: pointer;
+      display: none;
+      animation: pulse 1s infinite alternate;
+    }
+    @keyframes pulse {
+      from { transform: translateX(-50%) scale(1); }
+      to { transform: translateX(-50%) scale(1.06); }
+    }
+
     .controls-overlay {
       position: absolute;
-      bottom: 20px;
-      left: 15px;
-      right: 15px;
-      height: 90px;
+      bottom: 15px;
+      left: 12px;
+      right: 12px;
+      height: 85px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       z-index: 6;
       pointer-events: none;
     }
-    .steer-group {
+    .steer-group, .gas-group {
       display: flex;
-      gap: 10px;
+      gap: 8px;
       pointer-events: auto;
     }
     .ctrl-btn {
@@ -77,7 +112,7 @@
       border: 2px solid #486a8a;
       border-radius: 12px;
       color: #72a5d4;
-      font-size: 28px;
+      font-size: 24px;
       font-weight: 900;
       display: flex;
       align-items: center;
@@ -91,33 +126,29 @@
       border-color: #3b82f6;
       color: #fff;
     }
-    .steer-btn { width: 75px; height: 75px; }
+    .steer-btn { width: 68px; height: 68px; }
+    .drive-btn { width: 72px; height: 68px; font-size: 15px; }
     .gas-btn {
-      width: 120px;
-      height: 75px;
-      pointer-events: auto;
-      background: linear-gradient(180deg, #388e3c 0%, #1b5e20 100%);
-      border: 2px solid #66bb6a;
-      color: #a5d6a7;
-      font-size: 22px;
-      letter-spacing: 1px;
+      background: linear-gradient(180deg, #27ae60 0%, #1e8449 100%);
+      border-color: #2ecc71;
+      color: #e8f8f5;
     }
-    .gas-btn:active, .gas-btn.active {
-      background: #1b5e20;
-      color: #fff;
+    .rev-btn {
+      background: linear-gradient(180deg, #c0392b 0%, #922b21 100%);
+      border-color: #e74c3c;
+      color: #fadbd8;
     }
 
-    /* Upgrade Shop Overlay */
     .shop-overlay {
       position: absolute;
       inset: 0;
-      background: rgba(8, 18, 28, 0.88);
-      backdrop-filter: blur(4px);
+      background: rgba(8, 18, 28, 0.92);
+      backdrop-filter: blur(5px);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 24px;
+      padding: 20px;
       z-index: 10;
       text-align: center;
     }
@@ -127,7 +158,7 @@
       border-radius: 16px;
       padding: 20px;
       width: 100%;
-      max-width: 340px;
+      max-width: 350px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.7);
     }
     .shop-title {
@@ -138,7 +169,18 @@
     .shop-subtitle {
       font-size: 13px;
       color: #90a4ae;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
+      line-height: 1.4;
+    }
+    .trade-box {
+      background: rgba(241, 196, 15, 0.1);
+      border: 1px dashed #f1c40f;
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
     .btn-upgrade {
       width: 100%;
@@ -147,7 +189,7 @@
       color: white;
       padding: 12px;
       border-radius: 8px;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: bold;
       margin-bottom: 10px;
       cursor: pointer;
@@ -163,11 +205,17 @@
       color: white;
       padding: 14px;
       border-radius: 8px;
-      font-size: 17px;
+      font-size: 16px;
       font-weight: bold;
-      margin-top: 10px;
+      margin-top: 8px;
       cursor: pointer;
       letter-spacing: 1px;
+    }
+    .btn-launch:disabled {
+      background: #444;
+      border-color: #666;
+      color: #aaa;
+      cursor: not-allowed;
     }
   </style>
 </head>
@@ -176,11 +224,15 @@
 <div id="game-container">
   <div class="hud-box" id="hud-left">
     Distance: <span id="dist-val">0</span>m<br>
-    River Speed: <span id="spd-val">1.8</span>x
+    Current: <span id="spd-val">1.8</span>x
   </div>
+  
   <div class="hud-box" id="hud-right">
-    Coins: $<span id="cash-val">0</span>
+    🐟 Fish: <span id="fish-val">0</span><br>
+    💵 Cash: $<span id="cash-val">0</span>
   </div>
+
+  <div id="dock-prompt">⚓ PRESS TO DOCK & SELL FISH</div>
 
   <canvas id="canvas"></canvas>
 
@@ -189,14 +241,25 @@
       <div class="ctrl-btn steer-btn" id="btn-left">◀</div>
       <div class="ctrl-btn steer-btn" id="btn-right">▶</div>
     </div>
-    <div class="ctrl-btn gas-btn" id="btn-gas">GAS ▶</div>
+    <div class="gas-group">
+      <div class="ctrl-btn drive-btn rev-btn" id="btn-rev">REV ▼</div>
+      <div class="ctrl-btn drive-btn gas-btn" id="btn-gas">GAS ▲</div>
+    </div>
   </div>
 
   <div id="shop" class="shop-overlay">
     <div class="shop-card">
-      <h2 class="shop-title" id="shop-header">💰 Upriver Outfitters</h2>
-      <div class="shop-subtitle" id="shop-desc">Fight the current, collect loot, and upgrade your gear!</div>
+      <h2 class="shop-title" id="shop-header">⚓ River Fish Market</h2>
+      <div class="shop-subtitle" id="shop-desc">Catch fish in the river, stop at docks to trade for cash, and upgrade your boat!</div>
       
+      <div class="trade-box" id="trade-container">
+        <div>
+          <div style="font-size: 12px; color: #aaa;">CARGO HOLD</div>
+          <div style="font-size: 16px; font-weight: bold; color: #fff;"><span id="shop-fish-count">0</span> Fish</div>
+        </div>
+        <button class="ctrl-btn" id="sell-fish-btn" style="height: 36px; padding: 0 12px; font-size: 13px; background: #27ae60; border-color: #2ecc71; color: #fff;">SELL ALL ($5/ea)</button>
+      </div>
+
       <button class="btn-upgrade" id="buy-motor">
         <span>Engine Lvl <span id="lvl-m">1</span></span>
         <span id="cost-m">$10</span>
@@ -220,7 +283,6 @@
     canvas.height = canvas.clientHeight;
   }
 
-  // --- Audio System ---
   let audioCtx = null;
   function initAudio() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -231,13 +293,25 @@
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
-    osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.08); // E5
-    osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.16); // G5
-    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+    osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
     osc.connect(gain); gain.connect(audioCtx.destination);
-    osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.25);
+  }
+  function playSellSound() {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+    osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.08);
+    osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.16);
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.35);
   }
   function playCrashSound() {
     if (!audioCtx) return;
@@ -252,20 +326,22 @@
     osc.start(); osc.stop(audioCtx.currentTime + 0.4);
   }
 
-  // --- Game State ---
   let distance = 0;
-  let coins = 0;
+  let fishCollected = 0;
+  let cash = 0;
   let motorLevel = 1;
   let rudderLevel = 1;
   let playing = false;
+  let nextDockDistance = 120;
 
   const boat = { x: 0, y: 0, angle: 0, width: 28, height: 56 };
   let currentSpeed = 1.8;
   let items = [];
   let obstacles = [];
-  let inputState = { left: false, right: false, gas: false };
+  let docks = [];
+  let activeDockNear = null;
+  let inputState = { left: false, right: false, gas: false, rev: false };
 
-  // Generate Rock Shape Mesh
   function generateRockShape(radius) {
     const points = [];
     const numPoints = 8 + Math.floor(Math.random() * 5);
@@ -277,19 +353,19 @@
     return points;
   }
 
-  // Key Controls
   window.addEventListener('keydown', e => {
     if (e.code === 'ArrowLeft' || e.code === 'KeyA') inputState.left = true;
     if (e.code === 'ArrowRight' || e.code === 'KeyD') inputState.right = true;
-    if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') inputState.gas = true;
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') inputState.gas = true;
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') inputState.rev = true;
   });
   window.addEventListener('keyup', e => {
     if (e.code === 'ArrowLeft' || e.code === 'KeyA') inputState.left = false;
     if (e.code === 'ArrowRight' || e.code === 'KeyD') inputState.right = false;
-    if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') inputState.gas = false;
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') inputState.gas = false;
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') inputState.rev = false;
   });
 
-  // Touch controls
   function bindTouch(id, key) {
     const btn = document.getElementById(id);
     const start = (e) => { e.preventDefault(); inputState[key] = true; btn.classList.add('active'); };
@@ -300,23 +376,41 @@
   bindTouch('btn-left', 'left');
   bindTouch('btn-right', 'right');
   bindTouch('btn-gas', 'gas');
+  bindTouch('btn-rev', 'rev');
 
-  document.getElementById('start-btn').addEventListener('click', startGame);
+  document.getElementById('dock-prompt').addEventListener('click', openDockMarket);
+  document.getElementById('sell-fish-btn').addEventListener('click', () => {
+    if (fishCollected > 0) {
+      cash += fishCollected * 5;
+      fishCollected = 0;
+      playSellSound();
+      updateShopUI();
+    }
+  });
+
+  document.getElementById('start-btn').addEventListener('click', () => {
+    if (document.getElementById('start-btn').disabled) return;
+    startGame();
+  });
+
   document.getElementById('buy-motor').addEventListener('click', () => {
-    if (coins >= motorLevel * 10) { coins -= motorLevel * 10; motorLevel++; updateShopUI(); }
+    if (cash >= motorLevel * 10) { cash -= motorLevel * 10; motorLevel++; updateShopUI(); }
   });
   document.getElementById('buy-rudder').addEventListener('click', () => {
-    if (coins >= rudderLevel * 10) { coins -= rudderLevel * 10; rudderLevel++; updateShopUI(); }
+    if (cash >= rudderLevel * 10) { cash -= rudderLevel * 10; rudderLevel++; updateShopUI(); }
   });
 
   function updateShopUI() {
-    document.getElementById('cash-val').innerText = coins;
+    document.getElementById('fish-val').innerText = fishCollected;
+    document.getElementById('cash-val').innerText = cash;
+    document.getElementById('shop-fish-count').innerText = fishCollected;
     document.getElementById('lvl-m').innerText = motorLevel;
     document.getElementById('cost-m').innerText = `$${motorLevel * 10}`;
     document.getElementById('lvl-r').innerText = rudderLevel;
     document.getElementById('cost-r').innerText = `$${rudderLevel * 10}`;
-    document.getElementById('buy-motor').disabled = coins < motorLevel * 10;
-    document.getElementById('buy-rudder').disabled = coins < rudderLevel * 10;
+    document.getElementById('buy-motor').disabled = cash < motorLevel * 10;
+    document.getElementById('buy-rudder').disabled = cash < rudderLevel * 10;
+    document.getElementById('sell-fish-btn').disabled = fishCollected === 0;
   }
 
   function startGame() {
@@ -329,26 +423,42 @@
     currentSpeed = 1.8;
     items = [];
     obstacles = [];
+    docks = [];
+    activeDockNear = null;
+    nextDockDistance = 120;
     playing = true;
+    document.getElementById('dock-prompt').style.display = 'none';
     document.getElementById('shop').style.display = 'none';
     requestAnimationFrame(gameLoop);
   }
 
-  // --- Rendering Helpers ---
+  function openDockMarket() {
+    playing = false;
+    document.getElementById('dock-prompt').style.display = 'none';
+    document.getElementById('shop-header').innerText = "⚓ Docked at Outfitter";
+    document.getElementById('shop-desc').innerText = "Trade your fish cargo for cash and upgrade your boat!";
+    
+    const launchBtn = document.getElementById('start-btn');
+    launchBtn.innerText = "RESUME TRIP";
+    launchBtn.disabled = false;
+
+    updateShopUI();
+    document.getElementById('shop').style.display = 'flex';
+  }
+
   function drawDetailedBoat(b) {
     ctx.save();
     ctx.translate(b.x, b.y);
     ctx.rotate(b.angle);
 
-    // Motor Prop Wash Water
-    if (inputState.gas) {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    if (inputState.gas || inputState.rev) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
       ctx.beginPath();
-      ctx.arc(0, b.height / 2 + 12, 8 + Math.random() * 4, 0, Math.PI * 2);
+      const dir = inputState.gas ? 1 : -1;
+      ctx.arc(0, (dir * b.height / 2) + (dir * 10), 8 + Math.random() * 4, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // Outer Wooden Hull
     ctx.fillStyle = '#4a2c11';
     ctx.beginPath();
     ctx.moveTo(0, -b.height / 2);
@@ -360,7 +470,6 @@
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Inner Deck
     ctx.fillStyle = '#8b5a2b';
     ctx.beginPath();
     ctx.moveTo(0, -b.height / 2 + 5);
@@ -369,17 +478,14 @@
     ctx.bezierCurveTo(-b.width / 1.5, b.height / 3, -b.width / 1.5, -b.height / 4, 0, -b.height / 2 + 5);
     ctx.fill();
 
-    // Benches
     ctx.fillStyle = '#5c3a1e';
     ctx.fillRect(-b.width / 2.3, -b.height / 8, b.width / 1.15, 6);
     ctx.fillRect(-b.width / 2.2, b.height / 4, b.width / 1.1, 6);
 
-    // Fishing Rod
     ctx.strokeStyle = '#d0d0d0';
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(b.width / 3, 0); ctx.lineTo(b.width / 2 + 10, -b.height / 3); ctx.stroke();
 
-    // Outboard Engine
     ctx.fillStyle = '#111';
     ctx.fillRect(-5, b.height / 2 - 2, 10, 10);
     ctx.fillStyle = '#333';
@@ -392,13 +498,11 @@
     ctx.save();
     ctx.translate(rock.x, rock.y);
 
-    // Water Shadow / Ripple
     ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
     ctx.beginPath();
     ctx.arc(2, 4, rock.radius + 3, 0, Math.PI * 2);
     ctx.fill();
 
-    // Rock Base Polygon
     ctx.fillStyle = '#656d78';
     ctx.beginPath();
     rock.points.forEach((pt, i) => {
@@ -408,87 +512,101 @@
     ctx.closePath();
     ctx.fill();
 
-    // Crag Shading / Textures
     ctx.strokeStyle = '#434a54';
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    ctx.fillStyle = '#8cc152'; // Moss highlight
+    ctx.restore();
+  }
+
+  function drawFish(item) {
+    ctx.save();
+    ctx.translate(item.x, item.y);
+
+    ctx.fillStyle = '#3498db';
     ctx.beginPath();
-    ctx.arc(-rock.radius / 3, -rock.radius / 3, rock.radius / 3, 0, Math.PI);
+    ctx.ellipse(0, 0, 10, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(8, 0);
+    ctx.lineTo(14, -5);
+    ctx.lineTo(14, 5);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(-5, -2, 2, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.restore();
   }
 
-  function drawCashStack(item) {
+  function drawDock(dock) {
     ctx.save();
-    ctx.translate(item.x, item.y);
+    ctx.translate(dock.x, dock.y);
 
-    // Stack Shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.fillRect(-11, -6, 24, 14);
+    ctx.fillStyle = '#795548';
+    ctx.fillRect(0, -20, dock.width, 40);
+    ctx.strokeStyle = '#3e2723';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0, -20, dock.width, 40);
 
-    // Money Bill
-    ctx.fillStyle = '#85bb65';
-    ctx.fillRect(-12, -8, 24, 14);
-    ctx.strokeStyle = '#2e5618';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(-12, -8, 24, 14);
-
-    // Gold Strap
-    ctx.fillStyle = '#f1c40f';
-    ctx.fillRect(-3, -8, 6, 14);
-
-    // $ Emblem
-    ctx.fillStyle = '#1e4620';
-    ctx.font = 'bold 9px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('$', 0, 3);
+    ctx.fillStyle = '#212121';
+    ctx.fillRect(dock.width - 6, -24, 8, 8);
+    ctx.fillRect(dock.width - 6, 16, 8, 8);
 
     ctx.restore();
   }
 
-  // --- Main Loop ---
   function gameLoop() {
     if (!playing) return;
 
-    // Controls Logic
-    const turnSpeed = 0.035 + (rudderLevel * 0.006);
+    const turnSpeed = 0.04 + (rudderLevel * 0.007);
     if (inputState.left) boat.angle -= turnSpeed;
     if (inputState.right) boat.angle += turnSpeed;
 
-    let appliedPower = 0.8;
+    let drivePower = 0;
     if (inputState.gas) {
-      appliedPower = 2.4 + (motorLevel * 0.6);
+      drivePower = 2.4 + (motorLevel * 0.6);
+    } else if (inputState.rev) {
+      drivePower = -(1.5 + (motorLevel * 0.3));
     }
 
-    const forwardX = Math.sin(boat.angle) * appliedPower;
-    const forwardY = -Math.cos(boat.angle) * appliedPower;
-    const sidewaysDrag = Math.sin(boat.angle) * currentSpeed * 1.6;
+    const forwardX = Math.sin(boat.angle) * drivePower;
+    const forwardY = -Math.cos(boat.angle) * drivePower;
 
-    boat.x += forwardX + sidewaysDrag;
+    boat.x += forwardX;
     boat.y += forwardY + currentSpeed;
 
     distance += 0.1;
     currentSpeed = 1.8 + (distance / 600);
 
-    if (boat.y < 80) boat.y = 80;
+    if (boat.y < 60) boat.y = 60;
 
-    // Loss Checks
-    if (Math.abs(boat.angle) > 1.25 || boat.y > canvas.height + 40) {
+    if (boat.y > canvas.height + 40) {
       playCrashSound();
-      endGame("The rapid river current flipped your vessel!");
+      endGame("The swift river swept your boat downriver!");
       return;
     }
+
     if (boat.x < 35 || boat.x > canvas.width - 35) {
       playCrashSound();
-      endGame("You crashed into the shoreline!");
+      endGame("You crashed into the river bank!");
       return;
     }
 
-    // Spawns
-    if (Math.random() < 0.03) {
+    if (distance >= nextDockDistance) {
+      docks.push({
+        x: 25,
+        y: -40,
+        width: 65
+      });
+      nextDockDistance += 150 + Math.random() * 100;
+    }
+
+    if (Math.random() < 0.035) {
       items.push({ x: Math.random() * (canvas.width - 120) + 60, y: -30 });
     }
     if (Math.random() < 0.008 + (distance / 12000)) {
@@ -501,33 +619,47 @@
       });
     }
 
-    // --- Render Frame ---
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // River Shorelines
     ctx.fillStyle = '#2d4a22';
     ctx.fillRect(0, 0, 30, canvas.height);
     ctx.fillRect(canvas.width - 30, 0, 30, canvas.height);
-    
-    // Shore Reeds
-    ctx.fillStyle = '#1e3317';
-    ctx.fillRect(25, 0, 5, canvas.height);
-    ctx.fillRect(canvas.width - 30, 0, 5, canvas.height);
 
-    // Items (Cash)
+    activeDockNear = null;
+    for (let i = docks.length - 1; i >= 0; i--) {
+      let dock = docks[i];
+      dock.y += currentSpeed;
+      drawDock(dock);
+
+      const distToDock = Math.hypot(boat.x - (dock.x + dock.width), boat.y - dock.y);
+      if (distToDock < 55) {
+        activeDockNear = dock;
+      }
+
+      if (dock.y > canvas.height + 60) {
+        docks.splice(i, 1);
+      }
+    }
+
+    const promptElem = document.getElementById('dock-prompt');
+    if (activeDockNear) {
+      promptElem.style.display = 'block';
+    } else {
+      promptElem.style.display = 'none';
+    }
+
     for (let i = items.length - 1; i >= 0; i--) {
       let item = items[i];
       item.y += currentSpeed;
-      drawCashStack(item);
+      drawFish(item);
 
       if (Math.hypot(boat.x - item.x, boat.y - item.y) < 22) {
-        coins += 5;
+        fishCollected += 1;
         playPickupSound();
         items.splice(i, 1);
       }
     }
 
-    // Obstacles (Rocks)
     for (let i = obstacles.length - 1; i >= 0; i--) {
       let rock = obstacles[i];
       rock.y += currentSpeed;
@@ -545,24 +677,40 @@
       }
     }
 
-    // Player Boat
     drawDetailedBoat(boat);
 
-    // HUD Update
     document.getElementById('dist-val').innerText = Math.floor(distance);
     document.getElementById('spd-val').innerText = (currentSpeed / 1.8).toFixed(1);
-    document.getElementById('cash-val').innerText = coins;
+    document.getElementById('fish-val').innerText = fishCollected;
+    document.getElementById('cash-val').innerText = cash;
 
     requestAnimationFrame(gameLoop);
   }
 
   function endGame(reason) {
     playing = false;
-    document.getElementById('shop-header').innerText = "💥 Washed Out!";
+    document.getElementById('dock-prompt').style.display = 'none';
+    document.getElementById('shop-header').innerText = "💥 Boat Damaged!";
     document.getElementById('shop-desc').innerText = `${reason} Traveled ${Math.floor(distance)} meters.`;
-    document.getElementById('start-btn').innerText = "TRY AGAIN";
+    
+    const launchBtn = document.getElementById('start-btn');
+    launchBtn.disabled = true;
     updateShopUI();
     document.getElementById('shop').style.display = 'flex';
+
+    let countdown = 3;
+    launchBtn.innerText = `TRY AGAIN (${countdown}s)`;
+
+    const timer = setInterval(() => {
+      countdown--;
+      if (countdown > 0) {
+        launchBtn.innerText = `TRY AGAIN (${countdown}s)`;
+      } else {
+        clearInterval(timer);
+        launchBtn.innerText = "TRY AGAIN";
+        launchBtn.disabled = false;
+      }
+    }, 1000);
   }
 
   window.addEventListener('resize', resizeCanvas);
