@@ -1,692 +1,720 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dock Director - Fort Lauderdale Waterways</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            user-select: none;
-            -webkit-user-select: none;
-            touch-action: manipulation;
-        }
-        body {
-            background-color: #0f172a;
-            color: #f8fafc;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            overflow: hidden;
-        }
-        #game-container {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-            max-width: 900px;
-            max-height: 650px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            background: #0284c7;
-            overflow: hidden;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-            background-color: #0284c7;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Upriver Navigator - Fish Market Edition</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: #08111a;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    #game-container {
+      position: relative;
+      width: 100%;
+      max-width: 480px;
+      height: 100%;
+      max-height: 850px;
+      overflow: hidden;
+      background: #113859;
+      box-shadow: 0 0 30px rgba(0,0,0,0.8);
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
 
-        /* HUD Overlay */
-        .ui-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 12px;
-        }
-        .hud-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 8px;
-        }
-        .card {
-            background: rgba(15, 23, 42, 0.85);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 8px;
-            padding: 8px 12px;
-            pointer-events: auto;
-        }
-        .level-title {
-            font-size: 0.95rem;
-            font-weight: 700;
-            color: #38bdf8;
-        }
-        .vessel-info {
-            font-size: 0.75rem;
-            color: #9ca3af;
-        }
-        .status-badge {
-            display: inline-block;
-            padding: 3px 6px;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-        .status-ok { background: #065f46; color: #34d399; }
-        .status-warn { background: #92400e; color: #fcd34d; }
-        .status-danger { background: #991b1b; color: #fca5a5; }
+    .hud-box {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+      z-index: 5;
+      pointer-events: none;
+    }
+    #hud-left { 
+      top: 12px; 
+      left: 12px; 
+      font-size: 14px; 
+      line-height: 1.4; 
+    }
+    #hud-right { 
+      top: 12px; 
+      right: 12px; 
+      font-size: 15px; 
+      text-align: right; 
+      line-height: 1.4;
+      border-color: rgba(241, 196, 15, 0.4);
+    }
 
-        /* Mobile Controls */
-        .touch-controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            width: 100%;
-            padding: 8px 12px;
-            pointer-events: none;
-        }
-        .control-group {
-            display: flex;
-            gap: 10px;
-            pointer-events: auto;
-        }
-        .touch-btn {
-            width: 56px;
-            height: 56px;
-            background: rgba(15, 23, 42, 0.85);
-            border: 2px solid rgba(255, 255, 255, 0.25);
-            border-radius: 50%;
-            color: #ffffff;
-            font-size: 1.25rem;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            touch-action: manipulation;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-        }
-        .touch-btn:active {
-            background: rgba(56, 189, 248, 0.8);
-            border-color: #ffffff;
-            transform: scale(0.95);
-        }
-        .btn-bridge {
-            width: auto;
-            padding: 0 16px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            background: rgba(217, 119, 6, 0.85);
-            border-color: #fcd34d;
-        }
+    #dock-prompt {
+      position: absolute;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(180deg, #f39c12 0%, #d35400 100%);
+      border: 2px solid #f1c40f;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 25px;
+      font-weight: 900;
+      font-size: 16px;
+      letter-spacing: 1px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      z-index: 8;
+      cursor: pointer;
+      display: none;
+      animation: pulse 1s infinite alternate;
+    }
+    @keyframes pulse {
+      from { transform: translateX(-50%) scale(1); }
+      to { transform: translateX(-50%) scale(1.06); }
+    }
 
-        /* Modal Overlay */
-        .modal {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(3, 7, 18, 0.88);
-            backdrop-filter: blur(6px);
-            -webkit-backdrop-filter: blur(6px);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-            z-index: 50;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.25s ease;
-        }
-        .modal.active {
-            opacity: 1;
-            pointer-events: auto;
-        }
-        .modal-card {
-            background: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 12px;
-            padding: 24px;
-            max-width: 380px;
-            width: 100%;
-            text-align: center;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-        }
-        .modal h2 {
-            font-size: 1.5rem;
-            color: #f8fafc;
-            margin-bottom: 8px;
-        }
-        .modal p {
-            color: #94a3b8;
-            font-size: 0.9rem;
-            margin-bottom: 20px;
-            line-height: 1.4;
-        }
-        .btn {
-            background: #0284c7;
-            color: white;
-            border: none;
-            padding: 12px 28px;
-            font-size: 1rem;
-            font-weight: 600;
-            border-radius: 8px;
-            cursor: pointer;
-            width: 100%;
-        }
-        .btn:active {
-            background: #0369a1;
-        }
-    </style>
+    .controls-overlay {
+      position: absolute;
+      bottom: 15px;
+      left: 12px;
+      right: 12px;
+      height: 85px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 6;
+      pointer-events: none;
+    }
+    .steer-group, .gas-group {
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+    .ctrl-btn {
+      background: linear-gradient(180deg, #2b4258 0%, #172736 100%);
+      border: 2px solid #486a8a;
+      border-radius: 12px;
+      color: #72a5d4;
+      font-size: 24px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      cursor: pointer;
+    }
+    .ctrl-btn:active, .ctrl-btn.active {
+      transform: scale(0.95);
+      background: #172736;
+      border-color: #3b82f6;
+      color: #fff;
+    }
+    .steer-btn { width: 68px; height: 68px; }
+    .drive-btn { width: 72px; height: 68px; font-size: 15px; }
+    .gas-btn {
+      background: linear-gradient(180deg, #27ae60 0%, #1e8449 100%);
+      border-color: #2ecc71;
+      color: #e8f8f5;
+    }
+    .rev-btn {
+      background: linear-gradient(180deg, #c0392b 0%, #922b21 100%);
+      border-color: #e74c3c;
+      color: #fadbd8;
+    }
+
+    .shop-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(8, 18, 28, 0.92);
+      backdrop-filter: blur(5px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 10;
+      text-align: center;
+    }
+    .shop-card {
+      background: linear-gradient(180deg, #152535 0%, #0d1722 100%);
+      border: 2px solid #2c445a;
+      border-radius: 16px;
+      padding: 20px;
+      width: 100%;
+      max-width: 350px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+    }
+    .shop-title {
+      font-size: 22px;
+      margin: 0 0 6px 0;
+      color: #f1c40f;
+    }
+    .shop-subtitle {
+      font-size: 13px;
+      color: #90a4ae;
+      margin-bottom: 16px;
+      line-height: 1.4;
+    }
+    .trade-box {
+      background: rgba(241, 196, 15, 0.1);
+      border: 1px dashed #f1c40f;
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .btn-upgrade {
+      width: 100%;
+      background: #1e3a5f;
+      border: 1px solid #3b82f6;
+      color: white;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .btn-upgrade:disabled { opacity: 0.4; border-color: #555; }
+    .btn-launch {
+      width: 100%;
+      background: linear-gradient(180deg, #e67e22 0%, #d35400 100%);
+      border: 1px solid #f39c12;
+      color: white;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      margin-top: 8px;
+      cursor: pointer;
+      letter-spacing: 1px;
+    }
+    .btn-launch:disabled {
+      background: #444;
+      border-color: #666;
+      color: #aaa;
+      cursor: not-allowed;
+    }
+  </style>
 </head>
 <body>
 
 <div id="game-container">
-    <canvas id="gameCanvas" width="900" height="650"></canvas>
-    
-    <div class="ui-overlay">
-        <div class="hud-top">
-            <div class="card">
-                <div class="level-title" id="hud-level">Level 1: Middle River Run</div>
-                <div class="vessel-info" id="hud-vessel">Vessel: 18ft Center Console Skiff</div>
-            </div>
-            <div class="card" style="text-align: right;">
-                <div id="hud-status" class="status-badge status-ok">Ready</div>
-                <div class="vessel-info" style="margin-top: 4px;" id="hud-timer">Time: 0s</div>
-            </div>
-        </div>
+  <div class="hud-box" id="hud-left">
+    Distance: <span id="dist-val">0</span>m<br>
+    Current: <span id="spd-val">1.8</span>x
+  </div>
+  
+  <div class="hud-box" id="hud-right">
+    🐟 Fish: <span id="fish-val">0</span><br>
+    💵 Cash: $<span id="cash-val">0</span>
+  </div>
 
-        <div class="touch-controls">
-            <!-- Steering Left/Right -->
-            <div class="control-group">
-                <div class="touch-btn" id="btn-left">◀</div>
-                <div class="touch-btn" id="btn-right">▶</div>
-            </div>
-            <!-- Action Bridge -->
-            <div class="control-group">
-                <div class="touch-btn btn-bridge" id="btn-bridge">🌉 Drawbridge</div>
-            </div>
-            <!-- Throttle Forward/Reverse -->
-            <div class="control-group">
-                <div class="touch-btn" id="btn-down">▼</div>
-                <div class="touch-btn" id="btn-up">▲</div>
-            </div>
-        </div>
-    </div>
+  <div id="dock-prompt">⚓ PRESS TO DOCK & SELL FISH</div>
 
-    <div id="modal" class="modal active">
-        <div class="modal-card">
-            <h2 id="modal-title">Dock Director</h2>
-            <p id="modal-desc">Navigate Fort Lauderdale's intricate waterways. Dock your vessel safely in the designated green slip without colliding with seawalls or bridges.</p>
-            <button class="btn" id="modal-btn" onclick="startLevel()">Start Level 1</button>
-        </div>
+  <canvas id="canvas"></canvas>
+
+  <div class="controls-overlay">
+    <div class="steer-group">
+      <div class="ctrl-btn steer-btn" id="btn-left">◀</div>
+      <div class="ctrl-btn steer-btn" id="btn-right">▶</div>
     </div>
+    <div class="gas-group">
+      <div class="ctrl-btn drive-btn rev-btn" id="btn-rev">REV ▼</div>
+      <div class="ctrl-btn drive-btn gas-btn" id="btn-gas">GAS ▲</div>
+    </div>
+  </div>
+
+  <div id="shop" class="shop-overlay">
+    <div class="shop-card">
+      <h2 class="shop-title" id="shop-header">⚓ River Fish Market</h2>
+      <div class="shop-subtitle" id="shop-desc">Catch fish in the river, stop at docks to trade for cash, and upgrade your boat!</div>
+      
+      <div class="trade-box" id="trade-container">
+        <div>
+          <div style="font-size: 12px; color: #aaa;">CARGO HOLD</div>
+          <div style="font-size: 16px; font-weight: bold; color: #fff;"><span id="shop-fish-count">0</span> Fish</div>
+        </div>
+        <button class="ctrl-btn" id="sell-fish-btn" style="height: 36px; padding: 0 12px; font-size: 13px; background: #27ae60; border-color: #2ecc71; color: #fff;">SELL ALL ($5/ea)</button>
+      </div>
+
+      <button class="btn-upgrade" id="buy-motor">
+        <span>Engine Lvl <span id="lvl-m">1</span></span>
+        <span id="cost-m">$10</span>
+      </button>
+      <button class="btn-upgrade" id="buy-rudder">
+        <span>Rudder Lvl <span id="lvl-r">1</span></span>
+        <span id="cost-r">$10</span>
+      </button>
+
+      <button class="btn-launch" id="start-btn">LAUNCH BOAT</button>
+    </div>
+  </div>
 </div>
 
 <script>
-/**
- * DOCK DIRECTOR - Mobile-Friendly Navigation Prototype
- */
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
 
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+  function resizeCanvas() {
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+  }
 
-// --- GAME STATE ---
-let currentLevelIdx = 0;
-let gameState = 'MENU'; // 'MENU', 'PLAYING', 'SUCCESS', 'FAILED'
-let levelStartTime = 0;
-let elapsedTime = 0;
-let spawnGracePeriod = 0;
+  let audioCtx = null;
+  function initAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+  function playPickupSound() {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.25);
+  }
+  function playSellSound() {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+    osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.08);
+    osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.16);
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.35);
+  }
+  function playCrashSound() {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(130, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.4);
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+  }
 
-// --- INPUT TRACKING ---
-const inputs = { up: false, down: false, left: false, right: false };
+  let distance = 0;
+  let fishCollected = 0;
+  let cash = 0;
+  let motorLevel = 1;
+  let rudderLevel = 1;
+  let playing = false;
+  let nextDockDistance = 120;
 
-// Keyboard controls
-window.addEventListener('keydown', (e) => {
-    if (['ArrowUp', 'KeyW'].includes(e.code)) inputs.up = true;
-    if (['ArrowDown', 'KeyS'].includes(e.code)) inputs.down = true;
-    if (['ArrowLeft', 'KeyA'].includes(e.code)) inputs.left = true;
-    if (['ArrowRight', 'KeyD'].includes(e.code)) inputs.right = true;
-    if (e.code === 'Space' && gameState === 'PLAYING') triggerDrawbridges();
-});
+  const boat = { x: 0, y: 0, angle: 0, width: 28, height: 56 };
+  let currentSpeed = 1.8;
+  let items = [];
+  let obstacles = [];
+  let docks = [];
+  let activeDockNear = null;
+  let inputState = { left: false, right: false, gas: false, rev: false };
 
-window.addEventListener('keyup', (e) => {
-    if (['ArrowUp', 'KeyW'].includes(e.code)) inputs.up = false;
-    if (['ArrowDown', 'KeyS'].includes(e.code)) inputs.down = false;
-    if (['ArrowLeft', 'KeyA'].includes(e.code)) inputs.left = false;
-    if (['ArrowRight', 'KeyD'].includes(e.code)) inputs.right = false;
-});
-
-// Touch controls
-function bindTouchBtn(elementId, inputKey) {
-    const btn = document.getElementById(elementId);
-    const startHandler = (e) => { e.preventDefault(); inputs[inputKey] = true; };
-    const endHandler = (e) => { e.preventDefault(); inputs[inputKey] = false; };
-
-    btn.addEventListener('touchstart', startHandler, { passive: false });
-    btn.addEventListener('touchend', endHandler, { passive: false });
-    btn.addEventListener('mousedown', startHandler);
-    btn.addEventListener('mouseup', endHandler);
-    btn.addEventListener('mouseleave', endHandler);
-}
-
-bindTouchBtn('btn-up', 'up');
-bindTouchBtn('btn-down', 'down');
-bindTouchBtn('btn-left', 'left');
-bindTouchBtn('btn-right', 'right');
-
-document.getElementById('btn-bridge').addEventListener('click', () => {
-    if (gameState === 'PLAYING') triggerDrawbridges();
-});
-
-// --- REVISED MAP & LEVEL DEFINITIONS (WIDE OPEN SPAWNS) ---
-const levels = [
-    {
-        name: "Level 1: Middle River Run",
-        vesselName: "18ft Center Console Skiff",
-        vesselSpecs: { width: 14, length: 28, maxSpeed: 2.8, turnSpeed: 0.05, accel: 0.08, friction: 0.98 },
-        startPos: { x: 80, y: 480, angle: -Math.PI / 2 },
-        dock: { x: 780, y: 90, width: 36, height: 60 },
-        landmasses: [
-            { x: 0, y: 560, w: 900, h: 90 },
-            { x: 0, y: 0, w: 900, h: 40 },
-            { x: 160, y: 150, w: 450, h: 240 },
-            { x: 730, y: 180, w: 170, h: 370 }
-        ],
-        bridges: [],
-        sandbars: [{ x: 300, y: 460, radius: 35 }]
-    },
-    {
-        name: "Level 2: Las Olas Isles & Drawbridge",
-        vesselName: "42ft Cabin Cruiser",
-        vesselSpecs: { width: 22, length: 50, maxSpeed: 2.0, turnSpeed: 0.035, accel: 0.04, friction: 0.97 },
-        startPos: { x: 100, y: 480, angle: -Math.PI / 2 },
-        dock: { x: 780, y: 70, width: 50, height: 80 },
-        landmasses: [
-            { x: 0, y: 0, w: 900, h: 40 },
-            { x: 0, y: 580, w: 900, h: 70 },
-            { x: 180, y: 120, w: 380, h: 180 },
-            { x: 680, y: 120, w: 80, h: 280 }
-        ],
-        bridges: [
-            { x: 220, y: 380, w: 120, h: 30, targetOpen: 0, openProgress: 0 }
-        ],
-        sandbars: [{ x: 600, y: 480, radius: 45 }]
-    },
-    {
-        name: "Level 3: Intracoastal Superyacht Basin",
-        vesselName: "110ft Tri-Deck Superyacht",
-        vesselSpecs: { width: 32, length: 90, maxSpeed: 1.4, turnSpeed: 0.02, accel: 0.02, friction: 0.96 },
-        startPos: { x: 100, y: 320, angle: 0 },
-        dock: { x: 730, y: 480, width: 60, height: 120 },
-        landmasses: [
-            { x: 0, y: 0, w: 900, h: 50 },
-            { x: 0, y: 50, w: 180, h: 180 },
-            { x: 0, y: 450, w: 180, h: 200 },
-            { x: 300, y: 150, w: 300, h: 320 },
-            { x: 700, y: 50, w: 200, h: 320 },
-            { x: 810, y: 450, w: 90, h: 200 }
-        ],
-        bridges: [
-            { x: 180, y: 250, w: 120, h: 30, targetOpen: 0, openProgress: 0 },
-            { x: 600, y: 370, w: 100, h: 30, targetOpen: 0, openProgress: 0 }
-        ],
-        sandbars: [
-            { x: 240, y: 550, radius: 45 },
-            { x: 660, y: 100, radius: 40 }
-        ]
+  function generateRockShape(radius) {
+    const points = [];
+    const numPoints = 8 + Math.floor(Math.random() * 5);
+    for (let i = 0; i < numPoints; i++) {
+      const angle = (i / numPoints) * Math.PI * 2;
+      const r = radius * (0.75 + Math.random() * 0.4);
+      points.push({ x: Math.cos(angle) * r, y: Math.sin(angle) * r });
     }
-];
+    return points;
+  }
 
-// --- BOAT OBJECT CLASS ---
-class Boat {
-    constructor(x, y, angle, specs) {
-        this.x = x;
-        this.y = y;
-        this.angle = angle;
-        this.speed = 0;
-        this.specs = specs;
+  window.addEventListener('keydown', e => {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') inputState.left = true;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') inputState.right = true;
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') inputState.gas = true;
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') inputState.rev = true;
+  });
+  window.addEventListener('keyup', e => {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') inputState.left = false;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') inputState.right = false;
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') inputState.gas = false;
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') inputState.rev = false;
+  });
+
+  function bindTouch(id, key) {
+    const btn = document.getElementById(id);
+    const start = (e) => { e.preventDefault(); inputState[key] = true; btn.classList.add('active'); };
+    const end = (e) => { e.preventDefault(); inputState[key] = false; btn.classList.remove('active'); };
+    btn.addEventListener('touchstart', start); btn.addEventListener('touchend', end);
+    btn.addEventListener('mousedown', start); btn.addEventListener('mouseup', end); btn.addEventListener('mouseleave', end);
+  }
+  bindTouch('btn-left', 'left');
+  bindTouch('btn-right', 'right');
+  bindTouch('btn-gas', 'gas');
+  bindTouch('btn-rev', 'rev');
+
+  document.getElementById('dock-prompt').addEventListener('click', openDockMarket);
+  document.getElementById('sell-fish-btn').addEventListener('click', () => {
+    if (fishCollected > 0) {
+      cash += fishCollected * 5;
+      fishCollected = 0;
+      playSellSound();
+      updateShopUI();
     }
+  });
 
-    update() {
-        if (gameState !== 'PLAYING') return;
+  document.getElementById('start-btn').addEventListener('click', () => {
+    if (document.getElementById('start-btn').disabled) return;
+    startGame();
+  });
 
-        if (Math.abs(this.speed) > 0.05) {
-            const dir = this.speed > 0 ? 1 : -1;
-            if (inputs.left) this.angle -= this.specs.turnSpeed * dir;
-            if (inputs.right) this.angle += this.specs.turnSpeed * dir;
-        }
+  document.getElementById('buy-motor').addEventListener('click', () => {
+    if (cash >= motorLevel * 10) { cash -= motorLevel * 10; motorLevel++; updateShopUI(); }
+  });
+  document.getElementById('buy-rudder').addEventListener('click', () => {
+    if (cash >= rudderLevel * 10) { cash -= rudderLevel * 10; rudderLevel++; updateShopUI(); }
+  });
 
-        if (inputs.up) {
-            this.speed = Math.min(this.speed + this.specs.accel, this.specs.maxSpeed);
-        } else if (inputs.down) {
-            this.speed = Math.max(this.speed - this.specs.accel, -this.specs.maxSpeed * 0.5);
-        } else {
-            this.speed *= this.specs.friction;
-        }
+  function updateShopUI() {
+    document.getElementById('fish-val').innerText = fishCollected;
+    document.getElementById('cash-val').innerText = cash;
+    document.getElementById('shop-fish-count').innerText = fishCollected;
+    document.getElementById('lvl-m').innerText = motorLevel;
+    document.getElementById('cost-m').innerText = `$${motorLevel * 10}`;
+    document.getElementById('lvl-r').innerText = rudderLevel;
+    document.getElementById('cost-r').innerText = `$${rudderLevel * 10}`;
+    document.getElementById('buy-motor').disabled = cash < motorLevel * 10;
+    document.getElementById('buy-rudder').disabled = cash < rudderLevel * 10;
+    document.getElementById('sell-fish-btn').disabled = fishCollected === 0;
+  }
 
-        this.x += Math.cos(this.angle) * this.speed;
-        this.y += Math.sin(this.angle) * this.speed;
-    }
+  function startGame() {
+    initAudio();
+    resizeCanvas();
+    boat.x = canvas.width / 2;
+    boat.y = canvas.height - 180;
+    boat.angle = 0;
+    distance = 0;
+    currentSpeed = 1.8;
+    items = [];
+    obstacles = [];
+    docks = [];
+    activeDockNear = null;
+    nextDockDistance = 120;
+    playing = true;
+    document.getElementById('dock-prompt').style.display = 'none';
+    document.getElementById('shop').style.display = 'none';
+    requestAnimationFrame(gameLoop);
+  }
 
-    getBounds() {
-        const cos = Math.cos(this.angle);
-        const sin = Math.sin(this.angle);
-        const hw = this.specs.width / 2;
-        const hl = this.specs.length / 2;
-
-        return [
-            { x: this.x + cos * hl - sin * hw, y: this.y + sin * hl + cos * hw },
-            { x: this.x + cos * hl + sin * hw, y: this.y + sin * hl - cos * hw },
-            { x: this.x - cos * hl + sin * hw, y: this.y - sin * hl - cos * hw },
-            { x: this.x - cos * hl - sin * hw, y: this.y - sin * hl + cos * hw }
-        ];
-    }
-
-    draw() {
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.angle);
-
-        // Water wake
-        if (Math.abs(this.speed) > 0.3) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
-            ctx.beginPath();
-            ctx.moveTo(-this.specs.length / 2, -this.specs.width / 3);
-            ctx.lineTo(-this.specs.length / 2 - (this.speed * 6), -this.specs.width);
-            ctx.lineTo(-this.specs.length / 2 - (this.speed * 6), this.specs.width);
-            ctx.lineTo(-this.specs.length / 2, this.specs.width / 3);
-            ctx.fill();
-        }
-
-        // Hull
-        ctx.fillStyle = '#f8fafc';
-        ctx.strokeStyle = '#0f172a';
-        ctx.lineWidth = 2;
-
-        ctx.beginPath();
-        ctx.moveTo(this.specs.length / 2, 0);
-        ctx.lineTo(this.specs.length / 4, -this.specs.width / 2);
-        ctx.lineTo(-this.specs.length / 2, -this.specs.width / 2);
-        ctx.lineTo(-this.specs.length / 2, this.specs.width / 2);
-        ctx.lineTo(this.specs.length / 4, this.specs.width / 2);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        // Cabin
-        ctx.fillStyle = '#0284c7';
-        ctx.fillRect(-this.specs.length / 4, -this.specs.width / 3, this.specs.length / 2, this.specs.width * 0.66);
-
-        ctx.restore();
-    }
-}
-
-// --- LEVEL INITIALIZATION & RUNTIME ---
-let currentLevel = levels[0];
-let playerBoat;
-
-function initLevel(index) {
-    currentLevelIdx = index;
-    currentLevel = levels[currentLevelIdx];
+  function openDockMarket() {
+    playing = false;
+    document.getElementById('dock-prompt').style.display = 'none';
+    document.getElementById('shop-header').innerText = "⚓ Docked at Outfitter";
+    document.getElementById('shop-desc').innerText = "Trade your fish cargo for cash and upgrade your boat!";
     
-    // Completely re-instantiate boat to guarantee correct position/rotation/speed
-    playerBoat = new Boat(
-        currentLevel.startPos.x,
-        currentLevel.startPos.y,
-        currentLevel.startPos.angle,
-        currentLevel.vesselSpecs
-    );
+    const launchBtn = document.getElementById('start-btn');
+    launchBtn.innerText = "RESUME TRIP";
+    launchBtn.disabled = false;
 
-    currentLevel.bridges.forEach(b => {
-        b.targetOpen = 0;
-        b.openProgress = 0;
+    updateShopUI();
+    document.getElementById('shop').style.display = 'flex';
+  }
+
+  function drawDetailedBoat(b) {
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(b.angle);
+
+    if (inputState.gas || inputState.rev) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.beginPath();
+      const dir = inputState.gas ? 1 : -1;
+      ctx.arc(0, (dir * b.height / 2) + (dir * 10), 8 + Math.random() * 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = '#4a2c11';
+    ctx.beginPath();
+    ctx.moveTo(0, -b.height / 2);
+    ctx.bezierCurveTo(b.width / 1.1, -b.height / 4, b.width / 1.1, b.height / 3, b.width / 2, b.height / 2);
+    ctx.lineTo(-b.width / 2, b.height / 2);
+    ctx.bezierCurveTo(-b.width / 1.1, b.height / 3, -b.width / 1.1, -b.height / 4, 0, -b.height / 2);
+    ctx.fill();
+    ctx.strokeStyle = '#2b1808';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#8b5a2b';
+    ctx.beginPath();
+    ctx.moveTo(0, -b.height / 2 + 5);
+    ctx.bezierCurveTo(b.width / 1.5, -b.height / 4, b.width / 1.5, b.height / 3, b.width / 2 - 3, b.height / 2 - 3);
+    ctx.lineTo(-b.width / 2 + 3, b.height / 2 - 3);
+    ctx.bezierCurveTo(-b.width / 1.5, b.height / 3, -b.width / 1.5, -b.height / 4, 0, -b.height / 2 + 5);
+    ctx.fill();
+
+    ctx.fillStyle = '#5c3a1e';
+    ctx.fillRect(-b.width / 2.3, -b.height / 8, b.width / 1.15, 6);
+    ctx.fillRect(-b.width / 2.2, b.height / 4, b.width / 1.1, 6);
+
+    ctx.strokeStyle = '#d0d0d0';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(b.width / 3, 0); ctx.lineTo(b.width / 2 + 10, -b.height / 3); ctx.stroke();
+
+    ctx.fillStyle = '#111';
+    ctx.fillRect(-5, b.height / 2 - 2, 10, 10);
+    ctx.fillStyle = '#333';
+    ctx.fillRect(-7, b.height / 2 + 4, 14, 6);
+
+    ctx.restore();
+  }
+
+  function drawTexturedRock(rock) {
+    ctx.save();
+    ctx.translate(rock.x, rock.y);
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    ctx.beginPath();
+    ctx.arc(2, 4, rock.radius + 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#656d78';
+    ctx.beginPath();
+    rock.points.forEach((pt, i) => {
+      if (i === 0) ctx.moveTo(pt.x, pt.y);
+      else ctx.lineTo(pt.x, pt.y);
     });
+    ctx.closePath();
+    ctx.fill();
 
-    document.getElementById('hud-level').innerText = currentLevel.name;
-    document.getElementById('hud-vessel').innerText = `Vessel: ${currentLevel.vesselName}`;
-    updateStatus('Ready', 'status-ok');
-}
+    ctx.strokeStyle = '#434a54';
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
-function startLevel() {
-    initLevel(currentLevelIdx);
-    gameState = 'PLAYING';
-    levelStartTime = Date.now();
-    spawnGracePeriod = Date.now() + 1500; // 1.5s grace period
-    document.getElementById('modal').classList.remove('active');
-}
+    ctx.restore();
+  }
 
-function triggerDrawbridges() {
-    currentLevel.bridges.forEach(b => {
-        b.targetOpen = b.targetOpen === 0 ? 1 : 0;
-    });
-}
+  function drawFish(item) {
+    ctx.save();
+    ctx.translate(item.x, item.y);
 
-function updateStatus(text, className) {
-    const badge = document.getElementById('hud-status');
-    badge.innerText = text;
-    badge.className = `status-badge ${className}`;
-}
+    ctx.fillStyle = '#3498db';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 10, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
 
-// --- COLLISION LOGIC ---
-function pointInRect(px, py, rx, ry, rw, rh) {
-    return px >= rx && px <= rx + rw && py >= ry && py <= ry + rh;
-}
+    ctx.beginPath();
+    ctx.moveTo(8, 0);
+    ctx.lineTo(14, -5);
+    ctx.lineTo(14, 5);
+    ctx.closePath();
+    ctx.fill();
 
-function checkCollisions() {
-    if (gameState !== 'PLAYING') return;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(-5, -2, 2, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Grace period check
-    if (Date.now() < spawnGracePeriod) return;
+    ctx.restore();
+  }
 
-    const corners = playerBoat.getBounds();
+  function drawDock(dock) {
+    ctx.save();
+    ctx.translate(dock.x, dock.y);
 
-    // 1. Coastal boundary
-    for (let p of corners) {
-        if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) {
-            handleCrash("Collided with coastal boundary!");
-            return;
-        }
+    ctx.fillStyle = '#795548';
+    ctx.fillRect(0, -20, dock.width, 40);
+    ctx.strokeStyle = '#3e2723';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0, -20, dock.width, 40);
+
+    ctx.fillStyle = '#212121';
+    ctx.fillRect(dock.width - 6, -24, 8, 8);
+    ctx.fillRect(dock.width - 6, 16, 8, 8);
+
+    ctx.restore();
+  }
+
+  function gameLoop() {
+    if (!playing) return;
+
+    const turnSpeed = 0.04 + (rudderLevel * 0.007);
+    if (inputState.left) boat.angle -= turnSpeed;
+    if (inputState.right) boat.angle += turnSpeed;
+
+    let drivePower = 0;
+    if (inputState.gas) {
+      drivePower = 2.4 + (motorLevel * 0.6);
+    } else if (inputState.rev) {
+      drivePower = -(1.5 + (motorLevel * 0.3));
     }
 
-    // 2. Seawalls & Landmasses
-    for (let land of currentLevel.landmasses) {
-        for (let p of corners) {
-            if (pointInRect(p.x, p.y, land.x, land.y, land.w, land.h)) {
-                handleCrash("Seawall impact!");
-                return;
-            }
-        }
+    const forwardX = Math.sin(boat.angle) * drivePower;
+    const forwardY = -Math.cos(boat.angle) * drivePower;
+
+    boat.x += forwardX;
+    boat.y += forwardY + currentSpeed;
+
+    distance += 0.1;
+    currentSpeed = 1.8 + (distance / 600);
+
+    if (boat.y < 60) boat.y = 60;
+
+    if (boat.y > canvas.height + 40) {
+      playCrashSound();
+      endGame("The swift river swept your boat downriver!");
+      return;
     }
 
-    // 3. Drawbridges
-    for (let b of currentLevel.bridges) {
-        const gap = b.w * b.openProgress;
-        const leftSpanW = (b.w - gap) / 2;
-        
-        for (let p of corners) {
-            if (pointInRect(p.x, p.y, b.x, b.y, leftSpanW, b.h) ||
-                pointInRect(p.x, p.y, b.x + b.w - leftSpanW, b.y, leftSpanW, b.h)) {
-                handleCrash("Bridge span collision!");
-                return;
-            }
-        }
+    if (boat.x < 35 || boat.x > canvas.width - 35) {
+      playCrashSound();
+      endGame("You crashed into the river bank!");
+      return;
     }
 
-    // 4. Sandbars
-    let grounded = false;
-    for (let sb of currentLevel.sandbars) {
-        const dx = playerBoat.x - sb.x;
-        const dy = playerBoat.y - sb.y;
-        if (Math.sqrt(dx * dx + dy * dy) < sb.radius) {
-            grounded = true;
-            break;
-        }
+    if (distance >= nextDockDistance) {
+      docks.push({
+        x: 25,
+        y: -40,
+        width: 65
+      });
+      nextDockDistance += 150 + Math.random() * 100;
     }
 
-    if (grounded) {
-        playerBoat.speed *= 0.85;
-        updateStatus('Shallow Waters', 'status-warn');
+    if (Math.random() < 0.035) {
+      items.push({ x: Math.random() * (canvas.width - 120) + 60, y: -30 });
+    }
+    if (Math.random() < 0.008 + (distance / 12000)) {
+      const radius = 16 + Math.random() * 12;
+      obstacles.push({
+        x: Math.random() * (canvas.width - 140) + 70,
+        y: -40,
+        radius: radius,
+        points: generateRockShape(radius)
+      });
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = '#2d4a22';
+    ctx.fillRect(0, 0, 30, canvas.height);
+    ctx.fillRect(canvas.width - 30, 0, 30, canvas.height);
+
+    activeDockNear = null;
+    for (let i = docks.length - 1; i >= 0; i--) {
+      let dock = docks[i];
+      dock.y += currentSpeed;
+      drawDock(dock);
+
+      const distToDock = Math.hypot(boat.x - (dock.x + dock.width), boat.y - dock.y);
+      if (distToDock < 55) {
+        activeDockNear = dock;
+      }
+
+      if (dock.y > canvas.height + 60) {
+        docks.splice(i, 1);
+      }
+    }
+
+    const promptElem = document.getElementById('dock-prompt');
+    if (activeDockNear) {
+      promptElem.style.display = 'block';
     } else {
-        updateStatus('Navigating', 'status-ok');
+      promptElem.style.display = 'none';
     }
 
-    // 5. Docking Check
-    const d = currentLevel.dock;
-    const boatInDock = pointInRect(playerBoat.x, playerBoat.y, d.x, d.y, d.width, d.height);
+    for (let i = items.length - 1; i >= 0; i--) {
+      let item = items[i];
+      item.y += currentSpeed;
+      drawFish(item);
+
+      if (Math.hypot(boat.x - item.x, boat.y - item.y) < 22) {
+        fishCollected += 1;
+        playPickupSound();
+        items.splice(i, 1);
+      }
+    }
+
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+      let rock = obstacles[i];
+      rock.y += currentSpeed;
+      drawTexturedRock(rock);
+
+      if (rock.y > canvas.height + 60) {
+        obstacles.splice(i, 1);
+        continue;
+      }
+
+      if (Math.hypot(boat.x - rock.x, boat.y - rock.y) < rock.radius + 14) {
+        playCrashSound();
+        endGame("Smashed into a jagged rock!");
+        return;
+      }
+    }
+
+    drawDetailedBoat(boat);
+
+    document.getElementById('dist-val').innerText = Math.floor(distance);
+    document.getElementById('spd-val').innerText = (currentSpeed / 1.8).toFixed(1);
+    document.getElementById('fish-val').innerText = fishCollected;
+    document.getElementById('cash-val').innerText = cash;
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  function endGame(reason) {
+    playing = false;
+    document.getElementById('dock-prompt').style.display = 'none';
+    document.getElementById('shop-header').innerText = "💥 Boat Damaged!";
+    document.getElementById('shop-desc').innerText = `${reason} Traveled ${Math.floor(distance)} meters.`;
     
-    if (boatInDock && Math.abs(playerBoat.speed) < 0.3) {
-        handleWin();
-    }
-}
+    const launchBtn = document.getElementById('start-btn');
+    launchBtn.disabled = true;
+    updateShopUI();
+    document.getElementById('shop').style.display = 'flex';
 
-function handleCrash(reason) {
-    gameState = 'FAILED';
-    updateStatus('Crashed', 'status-danger');
-    showModal('Vessel Damaged!', `${reason} Keep an eye on channel clearance.`, 'Try Again', () => startLevel());
-}
+    let countdown = 3;
+    launchBtn.innerText = `TRY AGAIN (${countdown}s)`;
 
-function handleWin() {
-    gameState = 'SUCCESS';
-    updateStatus('Docked', 'status-ok');
-    
-    if (currentLevelIdx < levels.length - 1) {
-        showModal('Successfully Docked!', `You navigated ${currentLevel.vesselName} safely into the marina.`, 'Next Level', () => {
-            currentLevelIdx++;
-            startLevel();
-        });
-    } else {
-        showModal('Master Navigator!', 'You have mastered all waterways from small skiffs up to mega yachts!', 'Play Again', () => {
-            currentLevelIdx = 0;
-            startLevel();
-        });
-    }
-}
+    const timer = setInterval(() => {
+      countdown--;
+      if (countdown > 0) {
+        launchBtn.innerText = `TRY AGAIN (${countdown}s)`;
+      } else {
+        clearInterval(timer);
+        launchBtn.innerText = "TRY AGAIN";
+        launchBtn.disabled = false;
+      }
+    }, 1000);
+  }
 
-function showModal(title, desc, btnText, action) {
-    document.getElementById('modal-title').innerText = title;
-    document.getElementById('modal-desc').innerText = desc;
-    const btn = document.getElementById('modal-btn');
-    btn.innerText = btnText;
-    btn.onclick = action;
-    document.getElementById('modal').classList.add('active');
-}
-
-// --- RENDER & GAME LOOP ---
-function update() {
-    if (gameState === 'PLAYING') {
-        playerBoat.update();
-        checkCollisions();
-        elapsedTime = Math.floor((Date.now() - levelStartTime) / 1000);
-        document.getElementById('hud-timer').innerText = `Time: ${elapsedTime}s`;
-
-        // Smooth drawbridge movement
-        currentLevel.bridges.forEach(b => {
-            if (b.openProgress < b.targetOpen) {
-                b.openProgress = Math.min(b.openProgress + 0.025, b.targetOpen);
-            } else if (b.openProgress > b.targetOpen) {
-                b.openProgress = Math.max(b.openProgress - 0.025, b.targetOpen);
-            }
-        });
-    }
-}
-
-function drawMap() {
-    // Water
-    ctx.fillStyle = '#0284c7';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Sandbars
-    currentLevel.sandbars.forEach(sb => {
-        ctx.beginPath();
-        ctx.arc(sb.x, sb.y, sb.radius, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(253, 224, 71, 0.35)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(234, 179, 8, 0.5)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-    });
-
-    // Landmasses
-    ctx.fillStyle = '#15803d';
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 3;
-
-    currentLevel.landmasses.forEach(l => {
-        ctx.fillRect(l.x, l.y, l.w, l.h);
-        ctx.strokeRect(l.x, l.y, l.w, l.h);
-    });
-
-    // Drawbridges
-    currentLevel.bridges.forEach(b => {
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(b.x, b.y, b.w, b.h);
-
-        const gap = b.w * b.openProgress;
-        const spanWidth = (b.w - gap) / 2;
-
-        ctx.fillStyle = '#64748b';
-        ctx.strokeStyle = '#f59e0b';
-        ctx.lineWidth = 2;
-
-        ctx.fillRect(b.x, b.y, spanWidth, b.h);
-        ctx.strokeRect(b.x, b.y, spanWidth, b.h);
-
-        ctx.fillRect(b.x + b.w - spanWidth, b.y, spanWidth, b.h);
-        ctx.strokeRect(b.x + b.w - spanWidth, b.y, spanWidth, b.h);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '10px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(b.openProgress > 0.8 ? "OPEN" : "DRAWBRIDGE", b.x + b.w / 2, b.y + b.h / 2 + 3);
-    });
-
-    // Docking Target
-    const d = currentLevel.dock;
-    ctx.fillStyle = 'rgba(34, 197, 94, 0.35)';
-    ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth = 3;
-    ctx.setLineDash([6, 6]);
-    ctx.fillRect(d.x, d.y, d.width, d.height);
-    ctx.strokeRect(d.x, d.y, d.width, d.height);
-    ctx.setLineDash([]);
-
-    ctx.fillStyle = '#22c55e';
-    ctx.font = 'bold 12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText("PARK", d.x + d.width / 2, d.y + d.height / 2);
-}
-
-function loop() {
-    update();
-    drawMap();
-    if (playerBoat) playerBoat.draw();
-    requestAnimationFrame(loop);
-}
-
-// Start Main Loop
-initLevel(0);
-loop();
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
 </script>
-
 </body>
 </html>
