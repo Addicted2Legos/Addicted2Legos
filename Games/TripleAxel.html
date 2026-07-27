@@ -52,7 +52,6 @@
             background-color: #1e293b;
         }
 
-        /* Active Vehicle Banner */
         #statusBanner {
             position: absolute;
             top: 15px;
@@ -67,7 +66,6 @@
             color: #38bdf8;
         }
 
-        /* Launch Button UI Overlay */
         #launchBtn {
             position: absolute;
             top: 15px;
@@ -81,7 +79,7 @@
             font-size: 0.9rem;
             cursor: pointer;
             box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
-            display: none; /* Hidden until trailer is in water */
+            display: none;
             transition: all 0.2s ease;
         }
 
@@ -149,8 +147,8 @@
 
     <div class="controls-info">
         <div class="keys">
-            <span><span class="key-badge">W</span> / <span class="key-badge">↑</span> Accelerate</span>
-            <span><span class="key-badge">S</span> / <span class="key-badge">↓</span> Reverse/Brake</span>
+            <span><span class="key-badge">W</span> / <span class="key-badge">↑</span> Drive Forward</span>
+            <span><span class="key-badge">S</span> / <span class="key-badge">↓</span> Reverse</span>
             <span><span class="key-badge">A</span> / <span class="key-badge">D</span> / <span class="key-badge">←</span> <span class="key-badge">→</span> Steer</span>
         </div>
         <button class="btn-reset" onclick="resetVehicle()">Reset All</button>
@@ -172,11 +170,13 @@
         const TRUCK_LENGTH = 52;
         const TRAILER_WIDTH = 28;
         const TRAILER_LENGTH = 65;
-        const HITCH_OFFSET = 30; // Hitch distance behind truck center
+        
+        // Exact hitch distance at the VERY REAR bumper tow ball:
+        const HITCH_OFFSET = TRUCK_LENGTH / 2 + 6; 
 
         let truck, trailer, boat;
         let isBoatLaunched = false;
-        let activeControl = 'truck'; // 'truck' or 'boat'
+        let activeControl = 'truck';
 
         function resetVehicle() {
             isBoatLaunched = false;
@@ -186,19 +186,23 @@
             activeVehicleText.innerText = "Truck & Trailer";
 
             truck = {
-                x: 220,
+                x: 200,
                 y: 200,
                 angle: 0,
                 speed: 0,
-                maxSpeed: 2.8,
-                accel: 0.06,
-                friction: 0.035,
-                maxSteer: 0.035
+                maxSpeed: 3,
+                accel: 0.08,
+                friction: 0.04,
+                maxSteer: 0.04
             };
 
+            // Calculate exact rear hitch ball position
+            const initialHitchX = truck.x - Math.cos(truck.angle) * HITCH_OFFSET;
+            const initialHitchY = truck.y - Math.sin(truck.angle) * HITCH_OFFSET;
+
             trailer = {
-                x: truck.x - (HITCH_OFFSET + TRAILER_LENGTH / 2 - 10),
-                y: truck.y,
+                x: initialHitchX - TRAILER_LENGTH / 2,
+                y: initialHitchY,
                 angle: 0
             };
 
@@ -231,18 +235,17 @@
         }
 
         function updatePhysics() {
-            // --- TRUCK PHYSICS ---
+            // --- ORIGINAL STEERING & DRIVING PHYSICS ---
             if (activeControl === 'truck') {
                 if (keys['w'] || keys['W'] || keys['ArrowUp']) {
                     if (truck.speed < truck.maxSpeed) truck.speed += truck.accel;
                 } else if (keys['s'] || keys['S'] || keys['ArrowDown']) {
-                    if (truck.speed > -truck.maxSpeed * 0.5) truck.speed -= truck.accel;
+                    if (truck.speed > -truck.maxSpeed * 0.6) truck.speed -= truck.accel;
                 } else {
                     if (truck.speed > 0) truck.speed = Math.max(0, truck.speed - truck.friction);
                     if (truck.speed < 0) truck.speed = Math.min(0, truck.speed + truck.friction);
                 }
 
-                // Steering
                 if (keys['a'] || keys['A'] || keys['ArrowLeft']) {
                     truck.angle -= truck.maxSteer * (truck.speed / truck.maxSpeed);
                 }
@@ -250,7 +253,6 @@
                     truck.angle += truck.maxSteer * (truck.speed / truck.maxSpeed);
                 }
             } else {
-                // Decay truck speed if switching to boat
                 if (truck.speed > 0) truck.speed = Math.max(0, truck.speed - truck.friction);
                 if (truck.speed < 0) truck.speed = Math.min(0, truck.speed + truck.friction);
             }
@@ -259,30 +261,21 @@
             truck.x += Math.cos(truck.angle) * truck.speed;
             truck.y += Math.sin(truck.angle) * truck.speed;
 
-            // Hitch position (Angled ball hitch at rear bumper)
+            // Hitch position (At the very rear tow ball)
             const hitchX = truck.x - Math.cos(truck.angle) * HITCH_OFFSET;
             const hitchY = truck.y - Math.sin(truck.angle) * HITCH_OFFSET;
 
-            // --- TRAILER PHYSICS (Tuned for Reversing Stability) ---
+            // --- ORIGINAL Snappy Trailer Physics ---
             const dx = hitchX - trailer.x;
             const dy = hitchY - trailer.y;
-            const targetAngle = Math.atan2(dy, dx);
-            
-            // Damped rotation lerp when backing up prevents over-sensitivity / jackknifing
-            let angleDiff = targetAngle - trailer.angle;
-            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+            trailer.angle = Math.atan2(dy, dx);
 
-            // Dampening rotation speed during reverse
-            const dampingFactor = truck.speed < 0 ? 0.08 : 0.25; 
-            trailer.angle += angleDiff * dampingFactor;
-
-            // Constrain distance from hitch to trailer center
-            const trailerDistance = TRAILER_LENGTH / 2 - 8;
+            // Set trailer position strictly behind hitch ball
+            const trailerDistance = TRAILER_LENGTH / 2;
             trailer.x = hitchX - Math.cos(trailer.angle) * trailerDistance;
             trailer.y = hitchY - Math.sin(trailer.angle) * trailerDistance;
 
-            // Check if trailer is backed into the lake (x > 620)
+            // Check if trailer is in lake
             if (trailer.x > 610 && !isBoatLaunched) {
                 launchBtn.style.display = 'block';
             } else if (!isBoatLaunched) {
@@ -291,12 +284,10 @@
 
             // --- BOAT PHYSICS ---
             if (!isBoatLaunched) {
-                // Locked to Trailer
                 boat.x = trailer.x;
                 boat.y = trailer.y;
                 boat.angle = trailer.angle;
             } else {
-                // Free Navigation in Water
                 if (activeControl === 'boat') {
                     if (keys['w'] || keys['W'] || keys['ArrowUp']) {
                         if (boat.speed < boat.maxSpeed) boat.speed += boat.accel;
@@ -382,7 +373,7 @@
             ctx.translate(trailer.x, trailer.y);
             ctx.rotate(trailer.angle);
 
-            // Frame
+            // Trailer Frame
             ctx.fillStyle = '#1e293b';
             ctx.fillRect(-TRAILER_LENGTH / 2, -TRAILER_WIDTH / 2, TRAILER_LENGTH, TRAILER_WIDTH);
 
@@ -394,12 +385,12 @@
                 ctx.fillRect(offset - 4, TRAILER_WIDTH / 2 - 1, 8, 4);
             });
 
-            // Trailer V-Tongue (Front angled connection to truck)
+            // Trailer V-Tongue extending forward to hitch ball
             ctx.strokeStyle = '#475569';
             ctx.lineWidth = 3;
             ctx.beginPath();
             ctx.moveTo(-TRAILER_LENGTH / 2, 0);
-            ctx.lineTo(-TRAILER_LENGTH / 2 - 12, 0); // Coupler tongue
+            ctx.lineTo(-TRAILER_LENGTH / 2 - 6, 0);
             ctx.stroke();
 
             ctx.restore();
@@ -409,7 +400,6 @@
             ctx.translate(boat.x, boat.y);
             ctx.rotate(boat.angle);
 
-            // Water Ripple Effect if driving boat
             if (isBoatLaunched && Math.abs(boat.speed) > 0.2) {
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
                 ctx.lineWidth = 2;
@@ -423,19 +413,15 @@
             ctx.beginPath();
             ctx.moveTo(-TRAILER_LENGTH / 2 + 5, -TRAILER_WIDTH / 2 + 4);
             ctx.lineTo(TRAILER_LENGTH / 2 - 10, -TRAILER_WIDTH / 2 + 4);
-            ctx.lineTo(TRAILER_LENGTH / 2 + 10, 0); // Bow tip
+            ctx.lineTo(TRAILER_LENGTH / 2 + 10, 0);
             ctx.lineTo(TRAILER_LENGTH / 2 - 10, TRAILER_WIDTH / 2 - 4);
             ctx.lineTo(-TRAILER_LENGTH / 2 + 5, TRAILER_WIDTH / 2 - 4);
             ctx.closePath();
             ctx.fill();
 
-            // Boat Cover/Cockpit
+            // Cockpit
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(-TRAILER_LENGTH / 2 + 10, -TRAILER_WIDTH / 2 + 7, TRAILER_LENGTH - 26, TRAILER_WIDTH - 14);
-
-            // Outboard / Stern Details
-            ctx.fillStyle = '#475569';
-            ctx.fillRect(-TRAILER_LENGTH / 2 + 2, -6, 4, 12);
 
             ctx.restore();
 
@@ -444,21 +430,21 @@
             ctx.translate(truck.x, truck.y);
             ctx.rotate(truck.angle);
 
-            // Truck Tires
+            // Tires
             ctx.fillStyle = '#000000';
             ctx.fillRect(-16, -TRUCK_WIDTH / 2 - 2, 10, 4);
             ctx.fillRect(-16, TRUCK_WIDTH / 2 - 2, 10, 4);
             ctx.fillRect(14, -TRUCK_WIDTH / 2 - 2, 10, 4);
             ctx.fillRect(14, TRUCK_WIDTH / 2 - 2, 10, 4);
 
-            // Truck Body (Black)
+            // Body
             ctx.fillStyle = '#090d16';
             ctx.fillRect(-TRUCK_LENGTH / 2, -TRUCK_WIDTH / 2, TRUCK_LENGTH, TRUCK_WIDTH);
 
-            // TRUCK BED (Detailed Interior)
-            ctx.fillStyle = '#1e293b'; // Bed liner color
+            // Truck Bed
+            ctx.fillStyle = '#1e293b';
             ctx.fillRect(-TRUCK_LENGTH / 2 + 3, -TRUCK_WIDTH / 2 + 3, 24, TRUCK_WIDTH - 6);
-            ctx.strokeStyle = '#334155'; // Ribbed bed floor
+            ctx.strokeStyle = '#334155';
             ctx.lineWidth = 1;
             for (let bx = -TRUCK_LENGTH / 2 + 6; bx < -TRUCK_LENGTH / 2 + 24; bx += 4) {
                 ctx.beginPath();
@@ -471,30 +457,19 @@
             ctx.fillStyle = '#38bdf8';
             ctx.fillRect(2, -TRUCK_WIDTH / 2 + 3, 14, TRUCK_WIDTH - 6);
 
-            // Side Mirrors
-            ctx.fillStyle = '#090d16';
-            ctx.fillRect(8, -TRUCK_WIDTH / 2 - 6, 4, 6);
-            ctx.fillRect(8, TRUCK_WIDTH / 2, 4, 6);
-
             // Headlights
             ctx.fillStyle = '#fef08a';
             ctx.fillRect(TRUCK_LENGTH / 2 - 2, -TRUCK_WIDTH / 2 + 2, 2, 5);
             ctx.fillRect(TRUCK_LENGTH / 2 - 2, TRUCK_WIDTH / 2 - 7, 2, 5);
 
-            // ANGLED HITCH / DRAWBAR (Connecting Rear Bumper to Trailer)
+            // REAR TOW HITCH (Directly at back bumper)
             ctx.fillStyle = '#64748b';
-            ctx.beginPath();
-            ctx.moveTo(-TRUCK_LENGTH / 2, -3);
-            ctx.lineTo(-TRUCK_LENGTH / 2 - 8, -1);
-            ctx.lineTo(-TRUCK_LENGTH / 2 - 8, 1);
-            ctx.lineTo(-TRUCK_LENGTH / 2, 3);
-            ctx.closePath();
-            ctx.fill();
+            ctx.fillRect(-TRUCK_LENGTH / 2 - 5, -2, 5, 4);
 
-            // Chrome Tow Ball
+            // Tow Ball
             ctx.fillStyle = '#cbd5e1';
             ctx.beginPath();
-            ctx.arc(-TRUCK_LENGTH / 2 - 8, 0, 3, 0, Math.PI * 2);
+            ctx.arc(-TRUCK_LENGTH / 2 - 6, 0, 3, 0, Math.PI * 2);
             ctx.fill();
 
             ctx.restore();
