@@ -1,0 +1,877 @@
+<!--Make with Claude-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Hitch &amp; Back — Trailer Backing Trainer</title>
+<style>
+  :root{
+    --ink:#0c1116;
+    --panel:#151b22;
+    --panel-2:#1c242d;
+    --line:#2a343f;
+    --amber:#f2a33c;
+    --amber-dim:#8a5f24;
+    --green:#5fb87a;
+    --red:#e2554f;
+    --txt:#e8edf2;
+    --txt-dim:#8fa0ac;
+    font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
+  html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:var(--ink); color:var(--txt);}
+  #wrap{position:fixed; inset:0; display:flex; flex-direction:column;}
+  #canvasHolder{position:relative; flex:1; min-height:0;}
+  canvas{display:block; width:100%; height:100%; background:#0c1116;}
+
+  /* ---------- TOP HUD ---------- */
+  #topHud{
+    position:absolute; top:0; left:0; right:0;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    padding:10px 12px; pointer-events:none; gap:8px;
+  }
+  .badge{
+    background:linear-gradient(180deg,var(--panel-2),var(--panel));
+    border:1px solid var(--line); border-radius:10px;
+    padding:6px 12px; font-size:12px; letter-spacing:.04em; color:var(--txt-dim);
+    pointer-events:auto;
+  }
+  .badge b{color:var(--amber); font-weight:700;}
+  #msgBanner{
+    position:absolute; top:52px; left:50%; transform:translateX(-50%);
+    background:rgba(15,20,26,.92); border:1px solid var(--amber-dim); border-radius:10px;
+    padding:8px 16px; font-size:13px; color:var(--amber); opacity:0; transition:opacity .25s;
+    pointer-events:none; text-align:center; max-width:86%; white-space:nowrap;
+  }
+  #msgBanner.show{opacity:1;}
+
+  #introCard{
+    position:absolute; inset:0; background:rgba(8,11,14,.86); display:flex;
+    align-items:center; justify-content:center; z-index:50; padding:16px;
+  }
+  #introCard .card{
+    background:linear-gradient(180deg,var(--panel-2),var(--panel));
+    border:1px solid var(--line); border-radius:16px; padding:22px 24px; max-width:440px;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+  }
+  #introCard h1{margin:0 0 4px; font-size:20px; letter-spacing:.02em;}
+  #introCard h1 span{color:var(--amber);}
+  #introCard p{color:var(--txt-dim); font-size:13.5px; line-height:1.55; margin:10px 0;}
+  #introCard .key{
+    display:inline-block; background:var(--panel); border:1px solid var(--line); border-radius:5px;
+    padding:1px 7px; font-size:12px; color:var(--txt); margin:0 2px;
+  }
+  #introCard button{
+    margin-top:14px; width:100%; padding:12px; border:none; border-radius:10px;
+    background:linear-gradient(180deg,var(--amber),#c97f22); color:#1a1204; font-weight:700;
+    font-size:15px; letter-spacing:.02em; cursor:pointer;
+  }
+
+  /* ---------- BOTTOM CONTROL BAR ---------- */
+  #controls{
+    position:relative; flex:0 0 auto; background:linear-gradient(180deg,var(--panel-2),#10151b);
+    border-top:1px solid var(--line); padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+  .ctrlSide{display:flex; flex-direction:column; gap:6px; width:78px; flex:0 0 auto;}
+  .pedalBtn{
+    height:56px; border-radius:12px; border:1px solid var(--line);
+    background:linear-gradient(180deg,var(--panel-2),var(--panel));
+    color:var(--txt); font-size:11px; font-weight:700; letter-spacing:.05em;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+    cursor:pointer; touch-action:none;
+  }
+  .pedalBtn .arrow{font-size:18px; line-height:1;}
+  .pedalBtn.active{background:linear-gradient(180deg,var(--amber),#c97f22); color:#1a1204; border-color:var(--amber);}
+  #fwdBtn .arrow{transform:translateY(-1px);}
+
+  #wheelCol{flex:1 1 auto; display:flex; flex-direction:column; align-items:center; min-width:0; max-width:320px; margin:0 auto;}
+  #wheelSvgWrap{width:74px; height:74px; margin-bottom:2px; filter:drop-shadow(0 3px 6px rgba(0,0,0,.5));}
+  #wheelSvg{width:100%; height:100%; transition:transform .03s linear;}
+  #steerSlider{
+    -webkit-appearance:none; appearance:none; width:100%; max-width:280px; height:34px;
+    background:transparent; touch-action:none; margin:2px 0 0;
+  }
+  #steerSlider::-webkit-slider-runnable-track{
+    height:8px; border-radius:6px; background:linear-gradient(90deg,var(--panel),var(--line),var(--panel));
+    border:1px solid var(--line);
+  }
+  #steerSlider::-webkit-slider-thumb{
+    -webkit-appearance:none; width:30px; height:30px; margin-top:-12px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#ffd18a,var(--amber) 60%,#a86e1e);
+    border:2px solid #3a2a10; box-shadow:0 2px 5px rgba(0,0,0,.5);
+  }
+  #steerSlider::-moz-range-track{height:8px; border-radius:6px; background:var(--panel); border:1px solid var(--line);}
+  #steerSlider::-moz-range-thumb{
+    width:28px; height:28px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#ffd18a,var(--amber) 60%,#a86e1e); border:2px solid #3a2a10;
+  }
+  #steerLabel{font-size:10px; color:var(--txt-dim); letter-spacing:.08em; margin-top:2px;}
+
+  .ctrlSide.right{align-items:flex-end;}
+  #resetBtn, #zoomRow{width:100%;}
+  #zoomRow{display:flex; gap:4px;}
+  .miniBtn{
+    flex:1; height:26px; border-radius:8px; border:1px solid var(--line); background:var(--panel);
+    color:var(--txt-dim); font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  #resetBtn{
+    height:24px; border-radius:8px; border:1px solid var(--line); background:var(--panel);
+    color:var(--txt-dim); font-size:10.5px; letter-spacing:.05em; cursor:pointer;
+  }
+
+  #speedo{
+    position:absolute; bottom:10px; left:10px; background:rgba(15,20,26,.88); border:1px solid var(--line);
+    border-radius:10px; padding:6px 10px; font-size:11px; color:var(--txt-dim); pointer-events:none; line-height:1.5;
+  }
+  #speedo b{color:var(--txt); font-variant-numeric:tabular-nums;}
+
+  @media (max-width:480px){
+    .ctrlSide{width:60px;}
+    .pedalBtn{height:50px; font-size:9.5px;}
+    #wheelSvgWrap{width:62px; height:62px;}
+    #speedo{font-size:10px; padding:5px 8px;}
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="canvasHolder">
+    <canvas id="game"></canvas>
+    <div id="topHud">
+      <div class="badge">🚤 <b>MasterCraft</b> · 24ft Triple-Axle</div>
+      <div class="badge" id="goalBadge">Goal: back the boat into the lake at the ramp</div>
+    </div>
+    <div id="msgBanner"></div>
+    <div id="speedo">SPEED <b id="spdVal">0.0</b> mph &nbsp;|&nbsp; GEAR <b id="gearVal">P</b> &nbsp;|&nbsp; HITCH ANGLE <b id="hitchVal">0°</b></div>
+    <div id="introCard">
+      <div class="card">
+        <h1>Hitch &amp; Back <span>— Trailer Trainer</span></h1>
+        <p>Tow a 24' MasterCraft on a triple-axle trailer out of the neighborhood and back it straight down the boat ramp into the lake.</p>
+        <p><b>Steering:</b> drag the slider, or <span class="key">◀</span> <span class="key">▶</span> on a keyboard.<br>
+        <b>Throttle:</b> tap &amp; hold FWD / REV, or <span class="key">▲</span> <span class="key">▼</span>.</p>
+        <p>Remember: while backing up, the trailer turns opposite your steering input at first — small, patient inputs win.</p>
+        <button id="startBtn">Get in the truck</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <div class="ctrlSide">
+      <button class="pedalBtn" id="revBtn"><span class="arrow">▼</span>REV</button>
+      <button class="pedalBtn" id="fwdBtn"><span class="arrow">▲</span>FWD</button>
+    </div>
+
+    <div id="wheelCol">
+      <div id="wheelSvgWrap">
+        <svg id="wheelSvg" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="44" fill="#1c242d" stroke="#3a4552" stroke-width="5"/>
+          <circle cx="50" cy="50" r="44" fill="none" stroke="#f2a33c" stroke-width="2.5" opacity=".55"/>
+          <circle cx="50" cy="50" r="13" fill="#2a343f" stroke="#f2a33c" stroke-width="2"/>
+          <rect x="46" y="10" width="8" height="26" rx="3" fill="#c7cfd6"/>
+          <rect x="12" y="46" width="26" height="8" rx="3" fill="#c7cfd6" transform="rotate(-25 50 50)"/>
+          <rect x="62" y="46" width="26" height="8" rx="3" fill="#c7cfd6" transform="rotate(25 50 50)"/>
+          <circle cx="50" cy="50" r="4" fill="#f2a33c"/>
+        </svg>
+      </div>
+      <input type="range" id="steerSlider" min="-100" max="100" value="0" step="1">
+      <div id="steerLabel">STEERING — CENTER</div>
+    </div>
+
+    <div class="ctrlSide right">
+      <button id="resetBtn">↺ RESET POSITION</button>
+      <div id="zoomRow">
+        <button class="miniBtn" id="zoomOut">−</button>
+        <button class="miniBtn" id="zoomIn">+</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   CANVAS / RESIZE
+   ============================================================ */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+function resize(){
+  const holder = document.getElementById('canvasHolder');
+  const dpr = Math.min(window.devicePixelRatio||1, 2);
+  canvas.width = holder.clientWidth*dpr;
+  canvas.height = holder.clientHeight*dpr;
+  canvas.style.width = holder.clientWidth+'px';
+  canvas.style.height = holder.clientHeight+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', resize);
+
+/* ============================================================
+   WORLD LAYOUT  (units = meters)
+   ============================================================ */
+const WORLD = {w:560, h:420};
+const ROAD_W = 9;
+
+// Street centerlines
+const vRoads = [40, 140, 240, 330];       // vertical streets (x)
+const hRoads = [40, 130, 230, 320, 400];  // horizontal streets (y)
+
+const houses = [];
+const houseColors = ['#8a6a52','#9b7a5a','#6f7d63','#8f8368','#7a6478','#8a7350','#6c7a86','#977058'];
+let hc = 0;
+function addHouseBlock(x0,x1,y0,y1,margin){
+  // fills a block between streets with a row of houses along each side
+  const rows = [y0+margin, y1-margin-14];
+  for(const hy of rows){
+    for(let hx=x0+margin; hx<x1-margin; hx+=34){
+      if(hx+22>x1-margin) break;
+      houses.push({x:hx, y:hy, w:22+ (hc%3), h:14+(hc%2), color:houseColors[hc%houseColors.length], height:5+(hc%3)});
+      hc++;
+    }
+  }
+}
+for(let i=0;i<vRoads.length-1;i++){
+  for(let j=0;j<hRoads.length-1;j++){
+    // leave the block nearest the lake (right edge, bottom rows) open for parking/ramp approach
+    if(i===vRoads.length-2 && j>=hRoads.length-2) continue;
+    addHouseBlock(vRoads[i]+ROAD_W/2, vRoads[i+1]-ROAD_W/2, hRoads[j]+ROAD_W/2, hRoads[j+1]-ROAD_W/2, 6);
+  }
+}
+
+// Trees scattered near streets
+const trees = [];
+function seededRand(seed){ let s=seed; return ()=>{ s=(s*9301+49297)%233280; return s/233280; }; }
+const rnd = seededRand(42);
+for(let i=0;i<70;i++){
+  const x = rnd()*WORLD.w, y = rnd()*WORLD.h;
+  // keep off roads & water roughly
+  let onRoad=false;
+  for(const rx of vRoads) if(Math.abs(x-rx)<ROAD_W) onRoad=true;
+  for(const ry of hRoads) if(Math.abs(y-ry)<ROAD_W) onRoad=true;
+  if(x>360) continue; // keep lake area clear
+  if(!onRoad) trees.push({x,y,r:2.2+rnd()*1.6});
+}
+
+// Lake occupies the right portion of the world; ramp cuts through the shoreline
+const shoreX = 360; // shoreline runs roughly along this x, water to the right
+const ramp = { // ramp corridor (world coords) - a strip crossing the shoreline
+  cx: shoreX+2, cy: 360, angle: 0, // heading east into the lake
+  x0: 330, x1: 400, y0: 344, y1: 376
+};
+const targetZone = {x:378, y0:352, y1:368, x1:410}; // where trailer axle should end up (in the water)
+
+/* ============================================================
+   VEHICLE MODEL
+   ============================================================ */
+const TRUCK_L = 3.75;          // wheelbase (m)
+const TRUCK_W = 2.05;
+const TRUCK_LEN = 6.3;         // overall length incl bed
+const HITCH_BEHIND_AXLE = 1.55;// distance from rear axle to hitch ball
+const TRAILER_D = 6.4;         // hitch to trailer axle group
+const TRAILER_LEN = 8.6;       // overall trailer length (boat overhangs a bit)
+const TRAILER_W = 2.3;
+const MAX_STEER = 34*Math.PI/180;
+const MAX_V_FWD = 9.0;   // m/s (~20 mph forward)
+const MAX_V_REV = 2.6;   // reverse stays slow/controlled for backing practice
+const ACCEL = 3.6;
+const DECEL_FREE = 1.6;  // coast friction
+const BRAKE = 5.5;
+
+const start = {x:60, y:44, theta:0};
+
+const state = {
+  x:start.x, y:start.y, theta:start.theta, // truck REAR AXLE center
+  v:0,
+  phi:start.theta, // trailer heading
+  steerInput:0,    // -1..1 (left..right)
+  throttle:0,      // -1..1 target (rev..fwd)
+  bumped:false,
+  won:false
+};
+
+function resetVehicle(){
+  state.x=start.x; state.y=start.y; state.theta=start.theta;
+  state.v=0; state.phi=start.theta; state.steerInput=0; state.throttle=0;
+  state.bumped=false; state.won=false;
+  camera.x = state.x; camera.y = state.y;
+  showMsg('Position reset.', 1400);
+}
+
+/* ============================================================
+   INPUT
+   ============================================================ */
+const keys = {left:false, right:false, up:false, down:false};
+window.addEventListener('keydown', e=>{
+  if(e.key==='ArrowLeft'){keys.left=true; e.preventDefault();}
+  if(e.key==='ArrowRight'){keys.right=true; e.preventDefault();}
+  if(e.key==='ArrowUp'){keys.up=true; e.preventDefault();}
+  if(e.key==='ArrowDown'){keys.down=true; e.preventDefault();}
+});
+window.addEventListener('keyup', e=>{
+  if(e.key==='ArrowLeft'){keys.left=false;}
+  if(e.key==='ArrowRight'){keys.right=false;}
+  if(e.key==='ArrowUp'){keys.up=false;}
+  if(e.key==='ArrowDown'){keys.down=false;}
+});
+
+const slider = document.getElementById('steerSlider');
+const wheelSvg = document.getElementById('wheelSvg');
+const steerLabel = document.getElementById('steerLabel');
+let sliderDragging = false;
+slider.addEventListener('input', ()=>{
+  sliderDragging = true;
+  state.steerInput = parseFloat(slider.value)/100;
+});
+slider.addEventListener('pointerdown', ()=> sliderDragging=true);
+slider.addEventListener('pointerup', ()=> { /* keep dragging flag; released to spring back below */ });
+
+function setWheelVisual(v){
+  const deg = v*430; // steering wheel rotation (visual only)
+  wheelSvg.style.transform = 'rotate('+deg+'deg)';
+  slider.value = Math.round(v*100);
+  if(Math.abs(v)<0.04) steerLabel.textContent = 'STEERING — CENTER';
+  else steerLabel.textContent = 'STEERING — '+(v<0?'LEFT ':'RIGHT ')+Math.round(Math.abs(v)*100)+'%';
+}
+
+function bindHold(id, onDown, onUp){
+  const el = document.getElementById(id);
+  const down = e=>{ e.preventDefault(); el.classList.add('active'); onDown(); };
+  const up = e=>{ e.preventDefault(); el.classList.remove('active'); onUp(); };
+  el.addEventListener('pointerdown', down);
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointerleave', up);
+  el.addEventListener('pointercancel', up);
+}
+let touchThrottle = 0;
+bindHold('fwdBtn', ()=>touchThrottle=1, ()=>{ if(touchThrottle===1) touchThrottle=0; });
+bindHold('revBtn', ()=>touchThrottle=-1, ()=>{ if(touchThrottle===-1) touchThrottle=0; });
+
+document.getElementById('resetBtn').addEventListener('click', resetVehicle);
+
+/* zoom */
+const camera = {x:start.x, y:start.y, scale:13};
+document.getElementById('zoomIn').addEventListener('click', ()=>{ camera.scale=Math.min(24, camera.scale+2); });
+document.getElementById('zoomOut').addEventListener('click', ()=>{ camera.scale=Math.max(7, camera.scale-2); });
+
+/* intro */
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  document.getElementById('introCard').style.display='none';
+  resize();
+});
+
+/* messages */
+let msgTimer=null;
+function showMsg(text, ms){
+  const el = document.getElementById('msgBanner');
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(msgTimer);
+  msgTimer = setTimeout(()=> el.classList.remove('show'), ms||1600);
+}
+
+/* ============================================================
+   PHYSICS STEP
+   ============================================================ */
+function angleDiff(a,b){
+  let d = a-b;
+  while(d>Math.PI) d-=2*Math.PI;
+  while(d<-Math.PI) d+=2*Math.PI;
+  return d;
+}
+
+function step(dt){
+  // steering: keyboard nudges the same value the slider drives
+  const steerRate = 1.7; // per second
+  if(keys.left)  state.steerInput = Math.max(-1, state.steerInput - steerRate*dt);
+  if(keys.right) state.steerInput = Math.min(1,  state.steerInput + steerRate*dt);
+  if(!keys.left && !keys.right && !sliderDragging){
+    // self-center gently when nothing is pressed (keyboard mode)
+  }
+  sliderDragging = false; // reset each frame; slider 'input' sets it true only when moved
+  setWheelVisual(state.steerInput);
+
+  // throttle target
+  let throttleTarget = 0;
+  if(keys.up) throttleTarget = 1;
+  else if(keys.down) throttleTarget = -1;
+  else if(touchThrottle!==0) throttleTarget = touchThrottle;
+
+  const targetV = throttleTarget>0 ? MAX_V_FWD*throttleTarget : MAX_V_REV*throttleTarget;
+  if(throttleTarget===0){
+    // coast to stop
+    if(state.v>0) state.v = Math.max(0, state.v-DECEL_FREE*dt);
+    else if(state.v<0) state.v = Math.min(0, state.v+DECEL_FREE*dt);
+  } else {
+    const diff = targetV-state.v;
+    const rate = (Math.sign(diff)===Math.sign(state.v)||state.v===0)? ACCEL : BRAKE;
+    if(Math.abs(diff) < rate*dt) state.v = targetV;
+    else state.v += Math.sign(diff)*rate*dt;
+  }
+
+  if(state.bumped){ state.v *= 0.0; }
+
+  const delta = state.steerInput*MAX_STEER;
+  const v = state.v;
+
+  // truck kinematics (bicycle model, reference = rear axle)
+  state.x += v*Math.cos(state.theta)*dt;
+  state.y += v*Math.sin(state.theta)*dt;
+  state.theta += (v/TRUCK_L)*Math.tan(delta)*dt;
+
+  // trailer heading dynamics (hitch approx at rear axle, small offset used only for drawing)
+  const gamma = angleDiff(state.theta, state.phi);
+  state.phi += (v/TRAILER_D)*Math.sin(gamma)*dt;
+
+  // jackknife guard: clamp hitch angle
+  const g2 = angleDiff(state.theta, state.phi);
+  if(Math.abs(g2) > 1.35){
+    state.phi = state.theta - Math.sign(g2)*1.35;
+  }
+
+  // camera follow (smooth)
+  camera.x += (state.x-camera.x)*Math.min(1, dt*3.2);
+  camera.y += (state.y-camera.y)*Math.min(1, dt*3.2);
+
+  checkCollisions();
+  checkGoal();
+}
+
+function truckCorners(){
+  // footprint centered along axle line, front extends TRUCK_L + overhang forward, small overhang back
+  const frontOverhang = 1.0, rearOverhang = 0.9;
+  const front = TRUCK_L+frontOverhang, back = -rearOverhang;
+  const hw = TRUCK_W/2;
+  const pts = [[front,-hw],[front,hw],[back,hw],[back,-hw]];
+  return pts.map(p=> rotatePoint(p[0],p[1], state.theta, state.x, state.y));
+}
+function trailerAxlePos(){
+  const hitchX = state.x - HITCH_BEHIND_AXLE*Math.cos(state.theta);
+  const hitchY = state.y - HITCH_BEHIND_AXLE*Math.sin(state.theta);
+  const ax = hitchX - TRAILER_D*Math.cos(state.phi);
+  const ay = hitchY - TRAILER_D*Math.sin(state.phi);
+  return {hitchX,hitchY,ax,ay};
+}
+function trailerCorners(){
+  const {hitchX,hitchY,ax,ay} = trailerAxlePos();
+  const frontOverhang = 1.3; // tongue length beyond axle toward hitch already covered by D; extend rear for boat overhang
+  const rearOverhang = TRAILER_LEN - TRAILER_D - frontOverhang;
+  const hw = TRAILER_W/2;
+  // local coords along phi axis, origin at axle
+  const front = TRAILER_D*0 + frontOverhang; // small tongue poking past axle towards hitch is implicit
+  const pts = [[frontOverhang,-hw],[frontOverhang,hw],[-rearOverhang,hw],[-rearOverhang,-hw]];
+  return pts.map(p=> rotatePoint(p[0],p[1], state.phi, ax, ay));
+}
+function rotatePoint(lx,ly,ang,ox,oy){
+  const c=Math.cos(ang), s=Math.sin(ang);
+  return {x: ox + lx*c - ly*s, y: oy + lx*s + ly*c};
+}
+function polyBounds(pts){
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  for(const p of pts){ minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y);}
+  return {minX,maxX,minY,maxY};
+}
+function rectsOverlap(a,b){ return a.minX<b.maxX && a.maxX>b.minX && a.minY<b.maxY && a.maxY>b.minY; }
+
+function checkCollisions(){
+  const tb = polyBounds(truckCorners());
+  const rb = polyBounds(trailerCorners());
+  let hit=false;
+  for(const h of houses){
+    const hb = {minX:h.x, maxX:h.x+h.w, minY:h.y, maxY:h.y+h.h};
+    if(rectsOverlap(tb,hb) || rectsOverlap(rb,hb)){ hit=true; break; }
+  }
+  if(hit && !state.bumped){
+    state.bumped = true;
+    showMsg('⚠ Bumped something — shift into the other gear to back away.', 1800);
+  }
+  if(!hit) state.bumped = false;
+}
+
+function checkGoal(){
+  const {ax,ay} = trailerAxlePos();
+  if(ax>targetZone.x && ax<targetZone.x1 && ay>targetZone.y0 && ay<targetZone.y1 && !state.won){
+    state.won = true;
+    showMsg('🎉 Nice backing! The boat is launched.', 3200);
+  }
+}
+
+/* ============================================================
+   RENDERING  (pseudo-3D: true top-down ground plane + extruded
+   boxes for buildings/trees so the scene reads as 3D at a glance)
+   ============================================================ */
+const HEIGHT_PX_PER_M = 2.0; // how tall extrusions appear per world scale unit
+
+function w2s(x,y){
+  return { x: canvas.clientWidth/2 + (x-camera.x)*camera.scale,
+           y: canvas.clientHeight/2 + (y-camera.y)*camera.scale };
+}
+
+function draw(){
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  ctx.clearRect(0,0,W,H);
+
+  // grass background
+  ctx.fillStyle = '#31402f';
+  ctx.fillRect(0,0,W,H);
+
+  drawWater();
+  drawRamp();
+  drawRoads();
+  drawParking();
+  drawGoalMarker();
+  drawHouses();
+  drawTrees();
+  drawTruckTrailer();
+
+  document.getElementById('spdVal').textContent = Math.abs(state.v*2.237).toFixed(1);
+  document.getElementById('gearVal').textContent = state.v>0.05?'D': state.v<-0.05?'R':'P';
+  const hitchDeg = Math.round(angleDiff(state.theta,state.phi)*180/Math.PI);
+  document.getElementById('hitchVal').textContent = hitchDeg+'°';
+}
+
+function drawWater(){
+  const p0 = w2s(shoreX, -50), p1 = w2s(WORLD.w+80, WORLD.h+80);
+  const grad = ctx.createLinearGradient(p0.x,0,p1.x,0);
+  grad.addColorStop(0,'#2c5f78'); grad.addColorStop(1,'#1b3f52');
+  ctx.fillStyle = grad;
+  ctx.fillRect(p0.x, -9999, p1.x-p0.x+9999, 19998);
+  // ripple lines
+  ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1;
+  for(let i=0;i<26;i++){
+    const wy = -40 + i*20 + (camera.y*0.0); 
+    const s1 = w2s(shoreX+8, wy), s2 = w2s(WORLD.w+40, wy+6);
+    ctx.beginPath(); ctx.moveTo(s1.x,s1.y); ctx.lineTo(s2.x,s2.y); ctx.stroke();
+  }
+}
+
+function drawRamp(){
+  const corners = [[ramp.x0,ramp.y0],[ramp.x1,ramp.y0],[ramp.x1,ramp.y1],[ramp.x0,ramp.y1]].map(c=>w2s(c[0],c[1]));
+  ctx.fillStyle = '#8b8d86';
+  ctx.beginPath(); ctx.moveTo(corners[0].x,corners[0].y);
+  for(const c of corners.slice(1)) ctx.lineTo(c.x,c.y);
+  ctx.closePath(); ctx.fill();
+  // ramp expansion joints
+  ctx.strokeStyle='rgba(0,0,0,0.18)'; ctx.lineWidth=1.5;
+  for(let x=ramp.x0; x<ramp.x1; x+=4){
+    const a=w2s(x,ramp.y0), b=w2s(x,ramp.y1);
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  }
+  // centerline markings
+  ctx.strokeStyle='#e8d24a'; ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
+  const cy=(ramp.y0+ramp.y1)/2;
+  const ca=w2s(ramp.x0,cy), cb=w2s(ramp.x1,cy);
+  ctx.beginPath(); ctx.moveTo(ca.x,ca.y); ctx.lineTo(cb.x,cb.y); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawParking(){
+  // small lot near the ramp
+  const x0=300,x1=356,y0=344,y1=396;
+  const c=[[x0,y0],[x1,y0],[x1,y1],[x0,y1]].map(p=>w2s(p[0],p[1]));
+  ctx.fillStyle='#3a3f3f';
+  ctx.beginPath(); ctx.moveTo(c[0].x,c[0].y); for(const p of c.slice(1)) ctx.lineTo(p.x,p.y); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=1.3;
+  for(let x=x0+6;x<x1;x+=8){
+    const a=w2s(x,y0+2), b=w2s(x,y1-2);
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  }
+}
+
+function drawGoalMarker(){
+  const cx=(targetZone.x+targetZone.x1)/2, cy=(targetZone.y0+targetZone.y1)/2;
+  const p = w2s(cx,cy);
+  const t = performance.now()/500;
+  const r = 8 + Math.sin(t)*2;
+  ctx.strokeStyle = state.won? '#5fb87a':'#f2a33c';
+  ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.arc(p.x,p.y, r*camera.scale/13, 0, Math.PI*2); ctx.stroke();
+  ctx.fillStyle = state.won? 'rgba(95,184,122,0.25)':'rgba(242,163,60,0.2)';
+  ctx.fill();
+}
+
+function drawRoads(){
+  ctx.fillStyle = '#42484d';
+  for(const rx of vRoads){
+    const a=w2s(rx-ROAD_W/2,-40), b=w2s(rx+ROAD_W/2,WORLD.h+40);
+    ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);
+  }
+  for(const ry of hRoads){
+    const a=w2s(-40,ry-ROAD_W/2), b=w2s(Math.min(WORLD.w,shoreX)+10,ry+ROAD_W/2);
+    ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);
+  }
+  // lane dashes
+  ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=1.2; ctx.setLineDash([3,4]);
+  for(const rx of vRoads){
+    const a=w2s(rx,-40), b=w2s(rx,WORLD.h+40);
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  }
+  for(const ry of hRoads){
+    const a=w2s(-40,ry), b=w2s(Math.min(WORLD.w,shoreX)+10,ry);
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+}
+
+function extrudedBox(worldPts, heightM, topColor, sideColor){
+  // worldPts: array of {x,y} world-space footprint corners (any polygon, convex)
+  const screenBase = worldPts.map(p=>w2s(p.x,p.y));
+  const hpx = heightM*HEIGHT_PX_PER_M*(camera.scale/13);
+  const screenTop = screenBase.map(p=>({x:p.x, y:p.y-hpx}));
+  // side faces: connect each base edge to its top edge, only need visible ones but draw all (cheap)
+  ctx.fillStyle = sideColor;
+  for(let i=0;i<screenBase.length;i++){
+    const j=(i+1)%screenBase.length;
+    ctx.beginPath();
+    ctx.moveTo(screenBase[i].x,screenBase[i].y);
+    ctx.lineTo(screenBase[j].x,screenBase[j].y);
+    ctx.lineTo(screenTop[j].x,screenTop[j].y);
+    ctx.lineTo(screenTop[i].x,screenTop[i].y);
+    ctx.closePath(); ctx.fill();
+  }
+  // top face
+  ctx.fillStyle = topColor;
+  ctx.beginPath();
+  ctx.moveTo(screenTop[0].x,screenTop[0].y);
+  for(const p of screenTop.slice(1)) ctx.lineTo(p.x,p.y);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=1; ctx.stroke();
+}
+
+function shade(hex, amt){
+  const c = parseInt(hex.slice(1),16);
+  let r=(c>>16)&255, g=(c>>8)&255, b=c&255;
+  r=Math.max(0,Math.min(255,r+amt)); g=Math.max(0,Math.min(255,g+amt)); b=Math.max(0,Math.min(255,b+amt));
+  return 'rgb('+r+','+g+','+b+')';
+}
+
+function drawHouses(){
+  // sort back-to-front by y for correct overlap of extrusion
+  const sorted = houses.slice().sort((a,b)=>a.y-b.y);
+  for(const h of sorted){
+    const pts = [{x:h.x,y:h.y},{x:h.x+h.w,y:h.y},{x:h.x+h.w,y:h.y+h.h},{x:h.x,y:h.y+h.h}];
+    extrudedBox(pts, h.height, shade(h.color,26), shade(h.color,-30));
+    // simple roof ridge accent
+    const top = pts.map(p=>w2s(p.x,p.y-0)); // unused, roof already drawn as top face
+  }
+}
+
+function drawTrees(){
+  const sorted = trees.slice().sort((a,b)=>a.y-b.y);
+  for(const t of sorted){
+    const base = w2s(t.x,t.y);
+    const hpx = 6*HEIGHT_PX_PER_M*(camera.scale/13);
+    // trunk
+    ctx.strokeStyle='#4a3624'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(base.x,base.y); ctx.lineTo(base.x,base.y-hpx*0.4); ctx.stroke();
+    // canopy
+    ctx.fillStyle='#3d6b3f';
+    ctx.beginPath(); ctx.arc(base.x, base.y-hpx*0.75, t.r*camera.scale*0.9, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.08)';
+    ctx.beginPath(); ctx.arc(base.x-t.r*camera.scale*0.25, base.y-hpx*0.9, t.r*camera.scale*0.4,0,Math.PI*2); ctx.fill();
+  }
+}
+
+/* ---- truck + trailer detailed flat artwork, rotated to heading ---- */
+function drawTruckTrailer(){
+  drawTrailerAndBoat();
+  drawTruck();
+}
+
+function drawTruck(){
+  const s = camera.scale;
+  const p = w2s(state.x, state.y);
+  ctx.save();
+  ctx.translate(p.x,p.y);
+  ctx.rotate(state.theta);
+  const frontOverhang=1.0, rearOverhang=0.9;
+  const len = TRUCK_L+frontOverhang+rearOverhang;
+  const hw = (TRUCK_W/2)*s;
+  const front = (TRUCK_L+frontOverhang)*s, back=-rearOverhang*s;
+
+  // drop shadow
+  ctx.fillStyle='rgba(0,0,0,0.28)';
+  ctx.fillRect(back+2, -hw+2, front-back, hw*2);
+
+  // wheels (dark, drawn first so body overlaps)
+  ctx.fillStyle='#111';
+  const wheelR = 0.42*s, wheelLen=0.62*s;
+  const axleFront = TRUCK_L*s, axleRear=0*s;
+  for(const ax of [axleFront, axleRear]){
+    for(const side of [-1,1]){
+      ctx.fillRect(ax-wheelLen/2, side*hw - (side>0?wheelR*0.15:wheelR*1.05), wheelLen, wheelR*1.1);
+    }
+  }
+
+  // body
+  const bodyGrad = ctx.createLinearGradient(0,-hw,0,hw);
+  bodyGrad.addColorStop(0,'#2b2f34'); bodyGrad.addColorStop(0.5,'#15181b'); bodyGrad.addColorStop(1,'#0c0e10');
+  ctx.fillStyle = bodyGrad;
+  roundRectPath(back, -hw, front-back, hw*2, 3);
+  ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=1; ctx.stroke();
+
+  // cab (front portion)
+  const cabFront = front-0.3*s, cabBack = front-2.5*s;
+  ctx.fillStyle='#1a1d20';
+  roundRectPath(cabBack, -hw+2, cabFront-cabBack, hw*2-4, 3);
+  ctx.fill();
+  // windshield / windows
+  ctx.fillStyle='rgba(150,190,210,0.55)';
+  roundRectPath(cabBack+0.25*s, -hw+5, (cabFront-cabBack)-0.5*s, hw*2-10, 2);
+  ctx.fill();
+  // window divider (driver visible on left side per reference photo -> use +y as "left" arbitrarily)
+  ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo((cabBack+cabFront)/2, -hw+5); ctx.lineTo((cabBack+cabFront)/2, hw-5); ctx.stroke();
+
+  // bed lines
+  ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1;
+  for(let i=1;i<4;i++){
+    const bx = back + (cabBack-back)*(i/4);
+    ctx.beginPath(); ctx.moveTo(bx,-hw+2); ctx.lineTo(bx,hw-2); ctx.stroke();
+  }
+
+  // grille + headlights at front
+  ctx.fillStyle='#3a3f44';
+  ctx.fillRect(front-0.15*s, -hw+3, 0.15*s, hw*2-6);
+  ctx.fillStyle='#f2e08a';
+  ctx.fillRect(front-0.1*s, -hw+2, 0.1*s, hw*0.5);
+  ctx.fillRect(front-0.1*s, hw-2-hw*0.5, 0.1*s, hw*0.5);
+
+  // GMC badge hint
+  ctx.fillStyle='rgba(242,163,60,0.85)';
+  ctx.font = (0.5*s)+'px sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.save(); ctx.translate((cabBack+cabFront)/2, 0); ctx.rotate(Math.PI/2*0); ctx.restore();
+
+  // side mirrors
+  ctx.fillStyle='#111';
+  ctx.fillRect(cabFront-0.2*s, -hw-0.25*s, 0.18*s, 0.25*s);
+  ctx.fillRect(cabFront-0.2*s, hw, 0.18*s, 0.25*s);
+
+  ctx.restore();
+}
+
+function roundRectPath(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+function drawTrailerAndBoat(){
+  const s = camera.scale;
+  const {ax,ay,hitchX,hitchY} = trailerAxlePos();
+  const p = w2s(ax,ay);
+  ctx.save();
+  ctx.translate(p.x,p.y);
+  ctx.rotate(state.phi);
+
+  const frontOverhang=1.3;
+  const rearOverhang = TRAILER_LEN - TRAILER_D - frontOverhang;
+  const hw=(TRAILER_W/2)*s;
+  const front=frontOverhang*s, back=-rearOverhang*s;
+
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,0.25)';
+  ctx.fillRect(back+2,-hw+2,front-back,hw*2);
+
+  // trailer frame rails
+  ctx.strokeStyle='#5a6068'; ctx.lineWidth=2.2*s/13;
+  ctx.beginPath(); ctx.moveTo(back,-hw*0.55); ctx.lineTo(front,-hw*0.55); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(back,hw*0.55); ctx.lineTo(front,hw*0.55); ctx.stroke();
+  // tongue to hitch
+  ctx.strokeStyle='#6a7078'; ctx.lineWidth=3*s/13;
+  ctx.beginPath(); ctx.moveTo(front,0); ctx.lineTo(front+ (TRAILER_D-frontOverhang- (TRAILER_D-frontOverhang- ( (Math.hypot(hitchX-ax,hitchY-ay)-frontOverhang) )) )*0,0); ctx.stroke();
+  // simpler: draw straight tongue from front to computed hitch point (transform hitch into local space)
+  const hLocal = worldToLocal(hitchX,hitchY, state.phi, ax,ay);
+  ctx.beginPath(); ctx.moveTo(front,0); ctx.lineTo(hLocal.x*s, hLocal.y*s); ctx.stroke();
+  ctx.fillStyle='#222';
+  ctx.beginPath(); ctx.arc(hLocal.x*s, hLocal.y*s, 2.6, 0, Math.PI*2); ctx.fill();
+
+  // triple axle wheels
+  ctx.fillStyle='#111';
+  const wheelR=0.36*s, wheelLen=0.5*s;
+  const axleXs = [-0.55*s, 0, 0.55*s];
+  for(const axx of axleXs){
+    for(const side of [-1,1]){
+      ctx.fillRect(axx-wheelLen/2, side*hw - (side>0?0:wheelR*1.05), wheelLen, wheelR*1.05);
+    }
+  }
+
+  // bunks (carpeted rails boat sits on)
+  ctx.fillStyle='#3a3d33';
+  ctx.fillRect(back+0.3*s, -hw*0.35, (front-back)-0.6*s, hw*0.15);
+  ctx.fillRect(back+0.3*s, hw*0.20, (front-back)-0.6*s, hw*0.15);
+
+  // ---- boat hull (dark navy, MasterCraft-style) ----
+  const hullFront = front+0.15*s, hullBack = back-0.35*s;
+  ctx.fillStyle = '#12314a';
+  ctx.beginPath();
+  ctx.moveTo(hullFront, 0);
+  ctx.quadraticCurveTo(hullFront-0.4*s, -hw*0.95, hullFront-1.6*s, -hw*0.95);
+  ctx.lineTo(hullBack+0.6*s, -hw*0.95);
+  ctx.quadraticCurveTo(hullBack, -hw*0.5, hullBack, 0);
+  ctx.quadraticCurveTo(hullBack, hw*0.5, hullBack+0.6*s, hw*0.95);
+  ctx.lineTo(hullFront-1.6*s, hw*0.95);
+  ctx.quadraticCurveTo(hullFront-0.4*s, hw*0.95, hullFront, 0);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1; ctx.stroke();
+
+  // deck / windshield area
+  ctx.fillStyle='#d9dee2';
+  ctx.fillRect(hullBack+1.6*s, -hw*0.62, (hullFront-hullBack)-3.4*s, hw*1.24);
+  // MasterCraft racing stripe
+  ctx.fillStyle='#c94c3f';
+  ctx.fillRect(hullBack+0.5*s, -hw*0.12, (hullFront-hullBack)-1.0*s, hw*0.16);
+
+  // tower (wakeboard tower) - shown as an ellipse/lines to hint structure
+  ctx.strokeStyle='#cfd4d8'; ctx.lineWidth=2;
+  const towerX = hullBack+2.6*s;
+  ctx.beginPath();
+  ctx.moveTo(towerX,-hw*0.55); ctx.lineTo(towerX-0.9*s, -hw*1.55);
+  ctx.moveTo(towerX,hw*0.55); ctx.lineTo(towerX-0.9*s, hw*1.55);
+  ctx.moveTo(towerX-0.9*s,-hw*1.55); ctx.lineTo(towerX-0.9*s, hw*1.55);
+  ctx.stroke();
+
+  // cover snap lines
+  ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=1;
+  for(let i=1;i<4;i++){
+    const lx = hullBack + (hullFront-hullBack)*(i/4);
+    ctx.beginPath(); ctx.moveTo(lx,-hw*0.9); ctx.lineTo(lx,hw*0.9); ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function worldToLocal(wx,wy, ang, ox,oy){
+  const dx=wx-ox, dy=wy-oy;
+  const c=Math.cos(-ang), s=Math.sin(-ang);
+  return { x: dx*c - dy*s, y: dx*s + dy*c };
+}
+
+/* ============================================================
+   MAIN LOOP
+   ============================================================ */
+let last = performance.now();
+function loop(now){
+  const dt = Math.min(0.05, (now-last)/1000);
+  last = now;
+  step(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+resize();
+setTimeout(resize, 50);
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
