@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Boat Ramp Parking & Launch Simulator</title>
+    <title>GMC Sierra & MasterCraft Boat Ramp Simulator</title>
     <style>
         * {
             margin: 0;
@@ -50,6 +50,44 @@
         canvas {
             display: block;
             background-color: #1e293b;
+        }
+
+        /* Active Vehicle Banner */
+        #statusBanner {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(4px);
+            padding: 8px 14px;
+            border-radius: 6px;
+            border: 1px solid #334155;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #38bdf8;
+        }
+
+        /* Launch Button UI Overlay */
+        #launchBtn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background-color: #10b981;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+            display: none; /* Hidden until trailer is in water */
+            transition: all 0.2s ease;
+        }
+
+        #launchBtn:hover {
+            background-color: #059669;
+            transform: scale(1.05);
         }
 
         .controls-info {
@@ -100,231 +138,366 @@
 
     <div class="header">
         <h1>GMC Sierra & MasterCraft Boat Ramp Simulator</h1>
-        <p>Drive around the parking lot or reverse down the ramp to launch the boat!</p>
+        <p>Back trailer into the lake to launch and drive the boat!</p>
     </div>
 
     <div id="gameContainer">
+        <div id="statusBanner">Controlling: <span id="activeVehicleText" style="color: #fff;">Truck</span></div>
+        <button id="launchBtn" onclick="toggleBoatLaunch()">🚀 Launch Boat</button>
         <canvas id="simCanvas" width="800" height="500"></canvas>
     </div>
 
     <div class="controls-info">
         <div class="keys">
-            <span><span class="key-badge">W</span> / <span class="key-badge">↑</span> Drive Forward</span>
-            <span><span class="key-badge">S</span> / <span class="key-badge">↓</span> Reverse</span>
+            <span><span class="key-badge">W</span> / <span class="key-badge">↑</span> Accelerate</span>
+            <span><span class="key-badge">S</span> / <span class="key-badge">↓</span> Reverse/Brake</span>
             <span><span class="key-badge">A</span> / <span class="key-badge">D</span> / <span class="key-badge">←</span> <span class="key-badge">→</span> Steer</span>
         </div>
-        <button class="btn-reset" onclick="resetVehicle()">Reset Position</button>
+        <button class="btn-reset" onclick="resetVehicle()">Reset All</button>
     </div>
 
     <script>
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
+        const launchBtn = document.getElementById('launchBtn');
+        const activeVehicleText = document.getElementById('activeVehicleText');
 
-        // Keyboard State
+        // Input Handling
         const keys = {};
         window.addEventListener('keydown', e => keys[e.key] = true);
         window.addEventListener('keyup', e => keys[e.key] = false);
 
-        // Vehicle Dimensions & Physics Setup
+        // Vehicle Setup & Dimensions
         const TRUCK_WIDTH = 26;
-        const TRUCK_LENGTH = 50;
+        const TRUCK_LENGTH = 52;
         const TRAILER_WIDTH = 28;
         const TRAILER_LENGTH = 65;
-        const HITCH_OFFSET = 22; // distance from truck center to hitch
+        const HITCH_OFFSET = 30; // Hitch distance behind truck center
 
-        let truck, trailer;
+        let truck, trailer, boat;
+        let isBoatLaunched = false;
+        let activeControl = 'truck'; // 'truck' or 'boat'
 
         function resetVehicle() {
+            isBoatLaunched = false;
+            activeControl = 'truck';
+            launchBtn.style.display = 'none';
+            launchBtn.innerText = "🚀 Launch Boat";
+            activeVehicleText.innerText = "Truck & Trailer";
+
             truck = {
-                x: 200,
-                y: 150,
-                angle: 0, // radians
+                x: 220,
+                y: 200,
+                angle: 0,
                 speed: 0,
-                maxSpeed: 3,
-                accel: 0.08,
-                friction: 0.04,
-                steerAngle: 0,
-                maxSteer: 0.04
+                maxSpeed: 2.8,
+                accel: 0.06,
+                friction: 0.035,
+                maxSteer: 0.035
             };
 
             trailer = {
-                x: truck.x - (HITCH_OFFSET + TRAILER_LENGTH / 2),
+                x: truck.x - (HITCH_OFFSET + TRAILER_LENGTH / 2 - 10),
                 y: truck.y,
                 angle: 0
+            };
+
+            boat = {
+                x: trailer.x,
+                y: trailer.y,
+                angle: 0,
+                speed: 0,
+                maxSpeed: 4.5,
+                accel: 0.08,
+                friction: 0.02,
+                maxSteer: 0.04
             };
         }
 
         resetVehicle();
 
-        // Environment Layout Drawing
-        function drawEnvironment() {
-            // Parking Lot (Asphalt)
-            ctx.fillStyle = '#334155';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Water Area (Lake Tahoe style blue)
-            ctx.fillStyle = '#0284c7';
-            ctx.fillRect(600, 0, 200, canvas.height);
-
-            // Boat Ramp (Grooved Concrete)
-            ctx.fillStyle = '#64748b';
-            ctx.beginPath();
-            ctx.moveTo(500, 150);
-            ctx.lineTo(650, 150);
-            ctx.lineTo(650, 350);
-            ctx.lineTo(500, 350);
-            ctx.closePath();
-            ctx.fill();
-
-            // Ramp Grooves / Texture
-            ctx.strokeStyle = '#475569';
-            ctx.lineWidth = 2;
-            for (let y = 160; y < 350; y += 12) {
-                ctx.beginPath();
-                ctx.moveTo(510, y);
-                ctx.lineTo(640, y);
-                ctx.stroke();
+        function toggleBoatLaunch() {
+            if (!isBoatLaunched) {
+                isBoatLaunched = true;
+                activeControl = 'boat';
+                launchBtn.innerText = "⚓ Dock Boat to Trailer";
+                activeVehicleText.innerText = "MasterCraft Boat";
+            } else {
+                isBoatLaunched = false;
+                activeControl = 'truck';
+                launchBtn.innerText = "🚀 Launch Boat";
+                activeVehicleText.innerText = "Truck & Trailer";
             }
-
-            // Wooden Docks
-            ctx.fillStyle = '#78350f';
-            ctx.fillRect(620, 120, 150, 20);
-            ctx.fillRect(620, 360, 150, 20);
-
-            // Parking Stalls Lines
-            ctx.strokeStyle = '#fef08a';
-            ctx.lineWidth = 2;
-            for (let y = 30; y < 450; y += 70) {
-                if (y < 120 || y > 360) {
-                    ctx.beginPath();
-                    ctx.moveTo(30, y);
-                    ctx.lineTo(120, y);
-                    ctx.stroke();
-                }
-            }
-
-            // Labels
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '12px sans-serif';
-            ctx.fillText('PARKING LOT', 40, 25);
-            ctx.fillText('BOAT RAMP', 535, 140);
-            ctx.fillText('LAKE', 700, 50);
         }
 
         function updatePhysics() {
-            // Acceleration / Reversing
-            if (keys['w'] || keys['W'] || keys['ArrowUp']) {
-                if (truck.speed < truck.maxSpeed) truck.speed += truck.accel;
-            } else if (keys['s'] || keys['S'] || keys['ArrowDown']) {
-                if (truck.speed > -truck.maxSpeed * 0.6) truck.speed -= truck.accel;
+            // --- TRUCK PHYSICS ---
+            if (activeControl === 'truck') {
+                if (keys['w'] || keys['W'] || keys['ArrowUp']) {
+                    if (truck.speed < truck.maxSpeed) truck.speed += truck.accel;
+                } else if (keys['s'] || keys['S'] || keys['ArrowDown']) {
+                    if (truck.speed > -truck.maxSpeed * 0.5) truck.speed -= truck.accel;
+                } else {
+                    if (truck.speed > 0) truck.speed = Math.max(0, truck.speed - truck.friction);
+                    if (truck.speed < 0) truck.speed = Math.min(0, truck.speed + truck.friction);
+                }
+
+                // Steering
+                if (keys['a'] || keys['A'] || keys['ArrowLeft']) {
+                    truck.angle -= truck.maxSteer * (truck.speed / truck.maxSpeed);
+                }
+                if (keys['d'] || keys['D'] || keys['ArrowRight']) {
+                    truck.angle += truck.maxSteer * (truck.speed / truck.maxSpeed);
+                }
             } else {
-                // Apply friction
+                // Decay truck speed if switching to boat
                 if (truck.speed > 0) truck.speed = Math.max(0, truck.speed - truck.friction);
                 if (truck.speed < 0) truck.speed = Math.min(0, truck.speed + truck.friction);
-            }
-
-            // Steering
-            if (keys['a'] || keys['A'] || keys['ArrowLeft']) {
-                truck.angle -= truck.maxSteer * (truck.speed / truck.maxSpeed);
-            }
-            if (keys['d'] || keys['D'] || keys['ArrowRight']) {
-                truck.angle += truck.maxSteer * (truck.speed / truck.maxSpeed);
             }
 
             // Move Truck
             truck.x += Math.cos(truck.angle) * truck.speed;
             truck.y += Math.sin(truck.angle) * truck.speed;
 
-            // Calculate Hitch Position behind Truck
+            // Hitch position (Angled ball hitch at rear bumper)
             const hitchX = truck.x - Math.cos(truck.angle) * HITCH_OFFSET;
             const hitchY = truck.y - Math.sin(truck.angle) * HITCH_OFFSET;
 
-            // Articulate Trailer relative to Hitch
+            // --- TRAILER PHYSICS (Tuned for Reversing Stability) ---
             const dx = hitchX - trailer.x;
             const dy = hitchY - trailer.y;
-            trailer.angle = Math.atan2(dy, dx);
+            const targetAngle = Math.atan2(dy, dx);
+            
+            // Damped rotation lerp when backing up prevents over-sensitivity / jackknifing
+            let angleDiff = targetAngle - trailer.angle;
+            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
 
-            // Maintain distance between hitch and trailer center
-            const trailerDistance = TRAILER_LENGTH / 2;
+            // Dampening rotation speed during reverse
+            const dampingFactor = truck.speed < 0 ? 0.08 : 0.25; 
+            trailer.angle += angleDiff * dampingFactor;
+
+            // Constrain distance from hitch to trailer center
+            const trailerDistance = TRAILER_LENGTH / 2 - 8;
             trailer.x = hitchX - Math.cos(trailer.angle) * trailerDistance;
             trailer.y = hitchY - Math.sin(trailer.angle) * trailerDistance;
+
+            // Check if trailer is backed into the lake (x > 620)
+            if (trailer.x > 610 && !isBoatLaunched) {
+                launchBtn.style.display = 'block';
+            } else if (!isBoatLaunched) {
+                launchBtn.style.display = 'none';
+            }
+
+            // --- BOAT PHYSICS ---
+            if (!isBoatLaunched) {
+                // Locked to Trailer
+                boat.x = trailer.x;
+                boat.y = trailer.y;
+                boat.angle = trailer.angle;
+            } else {
+                // Free Navigation in Water
+                if (activeControl === 'boat') {
+                    if (keys['w'] || keys['W'] || keys['ArrowUp']) {
+                        if (boat.speed < boat.maxSpeed) boat.speed += boat.accel;
+                    } else if (keys['s'] || keys['S'] || keys['ArrowDown']) {
+                        if (boat.speed > -boat.maxSpeed * 0.4) boat.speed -= boat.accel;
+                    } else {
+                        if (boat.speed > 0) boat.speed = Math.max(0, boat.speed - boat.friction);
+                        if (boat.speed < 0) boat.speed = Math.min(0, boat.speed + boat.friction);
+                    }
+
+                    if (keys['a'] || keys['A'] || keys['ArrowLeft']) {
+                        boat.angle -= boat.maxSteer * (Math.abs(boat.speed) / boat.maxSpeed);
+                    }
+                    if (keys['d'] || keys['D'] || keys['ArrowRight']) {
+                        boat.angle += boat.maxSteer * (Math.abs(boat.speed) / boat.maxSpeed);
+                    }
+                }
+
+                boat.x += Math.cos(boat.angle) * boat.speed;
+                boat.y += Math.sin(boat.angle) * boat.speed;
+            }
+        }
+
+        // Draw Environment & Objects
+        function drawEnvironment() {
+            // Asphalt Parking Lot
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Water Area
+            ctx.fillStyle = '#0284c7';
+            ctx.fillRect(600, 0, 200, canvas.height);
+
+            // Concrete Boat Ramp
+            ctx.fillStyle = '#64748b';
+            ctx.beginPath();
+            ctx.moveTo(480, 150);
+            ctx.lineTo(650, 150);
+            ctx.lineTo(650, 350);
+            ctx.lineTo(480, 350);
+            ctx.closePath();
+            ctx.fill();
+
+            // Ramp Grooves
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 2;
+            for (let y = 160; y < 350; y += 12) {
+                ctx.beginPath();
+                ctx.moveTo(490, y);
+                ctx.lineTo(640, y);
+                ctx.stroke();
+            }
+
+            // Docks
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(610, 120, 170, 20);
+            ctx.fillRect(610, 360, 170, 20);
+
+            // Parking Stalls
+            ctx.strokeStyle = '#fef08a';
+            ctx.lineWidth = 2;
+            for (let y = 30; y < 450; y += 70) {
+                if (y < 120 || y > 360) {
+                    ctx.beginPath();
+                    ctx.moveTo(20, y);
+                    ctx.lineTo(120, y);
+                    ctx.stroke();
+                }
+            }
+
+            // Labels
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '12px sans-serif';
+            ctx.fillText('PARKING LOT', 30, 25);
+            ctx.fillText('RAMP', 510, 140);
+            ctx.fillStyle = '#e0f2fe';
+            ctx.fillText('LAKE', 700, 50);
         }
 
         function drawEntities() {
-            // --- DRAW TRAILER & BOAT ---
+            // --- DRAW TRAILER ---
             ctx.save();
             ctx.translate(trailer.x, trailer.y);
             ctx.rotate(trailer.angle);
 
-            // Trailer Frame
+            // Frame
             ctx.fillStyle = '#1e293b';
             ctx.fillRect(-TRAILER_LENGTH / 2, -TRAILER_WIDTH / 2, TRAILER_LENGTH, TRAILER_WIDTH);
 
             // Triple Axle Wheels
             ctx.fillStyle = '#000000';
-            const wheelOffsets = [-10, 0, 10];
+            const wheelOffsets = [-12, 0, 12];
             wheelOffsets.forEach(offset => {
                 ctx.fillRect(offset - 4, -TRAILER_WIDTH / 2 - 3, 8, 4);
                 ctx.fillRect(offset - 4, TRAILER_WIDTH / 2 - 1, 8, 4);
             });
 
-            // MasterCraft Boat Hull
-            ctx.fillStyle = '#0284c7'; // Dark metallic blue hull
+            // Trailer V-Tongue (Front angled connection to truck)
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(-TRAILER_LENGTH / 2, 0);
+            ctx.lineTo(-TRAILER_LENGTH / 2 - 12, 0); // Coupler tongue
+            ctx.stroke();
+
+            ctx.restore();
+
+            // --- DRAW MASTERCRAFT BOAT ---
+            ctx.save();
+            ctx.translate(boat.x, boat.y);
+            ctx.rotate(boat.angle);
+
+            // Water Ripple Effect if driving boat
+            if (isBoatLaunched && Math.abs(boat.speed) > 0.2) {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(-TRAILER_LENGTH / 2, 0, 15, -Math.PI / 2, Math.PI / 2);
+                ctx.stroke();
+            }
+
+            // Boat Hull
+            ctx.fillStyle = '#0284c7';
             ctx.beginPath();
             ctx.moveTo(-TRAILER_LENGTH / 2 + 5, -TRAILER_WIDTH / 2 + 4);
             ctx.lineTo(TRAILER_LENGTH / 2 - 10, -TRAILER_WIDTH / 2 + 4);
-            ctx.lineTo(TRAILER_LENGTH / 2 + 8, 0); // Bow tip
+            ctx.lineTo(TRAILER_LENGTH / 2 + 10, 0); // Bow tip
             ctx.lineTo(TRAILER_LENGTH / 2 - 10, TRAILER_WIDTH / 2 - 4);
             ctx.lineTo(-TRAILER_LENGTH / 2 + 5, TRAILER_WIDTH / 2 - 4);
             ctx.closePath();
             ctx.fill();
 
-            // Boat Cover / Interior Top
-            ctx.fillStyle = '#334155';
-            ctx.fillRect(-TRAILER_LENGTH / 2 + 10, -TRAILER_WIDTH / 2 + 7, TRAILER_LENGTH - 25, TRAILER_WIDTH - 14);
+            // Boat Cover/Cockpit
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(-TRAILER_LENGTH / 2 + 10, -TRAILER_WIDTH / 2 + 7, TRAILER_LENGTH - 26, TRAILER_WIDTH - 14);
+
+            // Outboard / Stern Details
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(-TRAILER_LENGTH / 2 + 2, -6, 4, 12);
 
             ctx.restore();
 
-            // --- DRAW TRUCK (GMC Denali) ---
+            // --- DRAW TRUCK (GMC Sierra Denali) ---
             ctx.save();
             ctx.translate(truck.x, truck.y);
             ctx.rotate(truck.angle);
 
-            // Tires
+            // Truck Tires
             ctx.fillStyle = '#000000';
-            ctx.fillRect(-15, -TRUCK_WIDTH / 2 - 2, 10, 4);
-            ctx.fillRect(-15, TRUCK_WIDTH / 2 - 2, 10, 4);
-            ctx.fillRect(12, -TRUCK_WIDTH / 2 - 2, 10, 4);
-            ctx.fillRect(12, TRUCK_WIDTH / 2 - 2, 10, 4);
+            ctx.fillRect(-16, -TRUCK_WIDTH / 2 - 2, 10, 4);
+            ctx.fillRect(-16, TRUCK_WIDTH / 2 - 2, 10, 4);
+            ctx.fillRect(14, -TRUCK_WIDTH / 2 - 2, 10, 4);
+            ctx.fillRect(14, TRUCK_WIDTH / 2 - 2, 10, 4);
 
-            // Truck Body
-            ctx.fillStyle = '#0f172a'; // Sleek Black Denali finish
+            // Truck Body (Black)
+            ctx.fillStyle = '#090d16';
             ctx.fillRect(-TRUCK_LENGTH / 2, -TRUCK_WIDTH / 2, TRUCK_LENGTH, TRUCK_WIDTH);
 
-            // Cab / Windshield
+            // TRUCK BED (Detailed Interior)
+            ctx.fillStyle = '#1e293b'; // Bed liner color
+            ctx.fillRect(-TRUCK_LENGTH / 2 + 3, -TRUCK_WIDTH / 2 + 3, 24, TRUCK_WIDTH - 6);
+            ctx.strokeStyle = '#334155'; // Ribbed bed floor
+            ctx.lineWidth = 1;
+            for (let bx = -TRUCK_LENGTH / 2 + 6; bx < -TRUCK_LENGTH / 2 + 24; bx += 4) {
+                ctx.beginPath();
+                ctx.moveTo(bx, -TRUCK_WIDTH / 2 + 4);
+                ctx.lineTo(bx, TRUCK_WIDTH / 2 - 4);
+                ctx.stroke();
+            }
+
+            // Cab & Windshield
             ctx.fillStyle = '#38bdf8';
-            ctx.fillRect(-2, -TRUCK_WIDTH / 2 + 3, 14, TRUCK_WIDTH - 6);
+            ctx.fillRect(2, -TRUCK_WIDTH / 2 + 3, 14, TRUCK_WIDTH - 6);
 
-            // Truck Bed
-            ctx.fillStyle = '#1e293b';
-            ctx.fillRect(-TRUCK_LENGTH / 2 + 3, -TRUCK_WIDTH / 2 + 3, 20, TRUCK_WIDTH - 6);
+            // Side Mirrors
+            ctx.fillStyle = '#090d16';
+            ctx.fillRect(8, -TRUCK_WIDTH / 2 - 6, 4, 6);
+            ctx.fillRect(8, TRUCK_WIDTH / 2, 4, 6);
 
-            // Chrome Headlights
+            // Headlights
             ctx.fillStyle = '#fef08a';
             ctx.fillRect(TRUCK_LENGTH / 2 - 2, -TRUCK_WIDTH / 2 + 2, 2, 5);
             ctx.fillRect(TRUCK_LENGTH / 2 - 2, TRUCK_WIDTH / 2 - 7, 2, 5);
 
-            ctx.restore();
-
-            // Draw Drawbar / Hitch Connection
-            const hitchX = truck.x - Math.cos(truck.angle) * HITCH_OFFSET;
-            const hitchY = truck.y - Math.sin(truck.angle) * HITCH_OFFSET;
-            ctx.strokeStyle = '#94a3b8';
-            ctx.lineWidth = 3;
+            // ANGLED HITCH / DRAWBAR (Connecting Rear Bumper to Trailer)
+            ctx.fillStyle = '#64748b';
             ctx.beginPath();
-            ctx.moveTo(truck.x, truck.y);
-            ctx.lineTo(hitchX, hitchY);
-            ctx.stroke();
+            ctx.moveTo(-TRUCK_LENGTH / 2, -3);
+            ctx.lineTo(-TRUCK_LENGTH / 2 - 8, -1);
+            ctx.lineTo(-TRUCK_LENGTH / 2 - 8, 1);
+            ctx.lineTo(-TRUCK_LENGTH / 2, 3);
+            ctx.closePath();
+            ctx.fill();
+
+            // Chrome Tow Ball
+            ctx.fillStyle = '#cbd5e1';
+            ctx.beginPath();
+            ctx.arc(-TRUCK_LENGTH / 2 - 8, 0, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
         }
 
         // Game Loop
