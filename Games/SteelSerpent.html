@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3D Isometric Roller Coaster Tycoon</title>
+  <title>Steel Coaster - Roller Coaster Tycoon</title>
   <style>
     body {
       margin: 0;
@@ -29,15 +29,15 @@
       position: absolute;
       top: 15px;
       left: 15px;
-      background: rgba(15, 23, 42, 0.9);
-      border: 2px solid #22c55e;
+      background: rgba(15, 23, 42, 0.92);
+      border: 2px solid #eab308; /* Theme matching yellow border */
       border-radius: 8px;
       padding: 10px 14px;
-      color: #22c55e;
+      color: #eab308;
       font-size: 15px;
       font-weight: bold;
       letter-spacing: 0.5px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
       user-select: none;
       display: flex;
       flex-direction: column;
@@ -84,7 +84,7 @@
     }
 
     .buy-btn {
-      background-color: #22c55e;
+      background-color: #eab308;
       color: #0f172a;
       border: none;
       border-radius: 5px;
@@ -97,7 +97,7 @@
     }
 
     .buy-btn:hover:not(:disabled) {
-      background-color: #4ade80;
+      background-color: #fde047;
       transform: translateY(-1px);
     }
 
@@ -125,10 +125,10 @@
 
       <div class="btn-group">
         <button class="buy-btn" id="buyCarBtn" onclick="buyCar()">+ Add Car ($100)</button>
-        <button class="buy-btn active-track" id="btnClassic" onclick="selectTrack('classic', 0)">Track 1: Classic Oval (Active)</button>
-        <button class="buy-btn" id="btnZigZag" onclick="selectTrack('zigzag', 1000)">Track 2: Zig-Zag ($1,000)</button>
-        <button class="buy-btn" id="btnHills" onclick="selectTrack('hills', 1500)">Track 3: Roller Hills ($1,500)</button>
-        <button class="buy-btn" id="btnLoop" onclick="selectTrack('loop', 2000)">Track 4: Apex Loop ($2,000)</button>
+        <button class="buy-btn active-track" id="btnClassic" onclick="selectTrack('classic', 0)">Track 1: Classic Steel (Active)</button>
+        <button class="buy-btn" id="btnZigZag" onclick="selectTrack('zigzag', 1000)">Track 2: Steel Twister ($1,000)</button>
+        <button class="buy-btn" id="btnHills" onclick="selectTrack('hills', 1500)">Track 3: Steel Drops ($1,500)</button>
+        <button class="buy-btn" id="btnLoop" onclick="selectTrack('loop', 2000)">Track 4: Vertical Loop ($2,000)</button>
       </div>
     </div>
     <canvas id="trackCanvas" width="700" height="600"></canvas>
@@ -150,11 +150,10 @@
     const btnHills = document.getElementById('btnHills');
     const btnLoop = document.getElementById('btnLoop');
 
-    // 3D Isometric View Center Point
+    // 3D Isometric View Projection Origin
     const originX = canvas.width / 2;
     const originY = canvas.height / 2 + 30;
 
-    // Convert 3D (X, Y, Z) to Isometric 2D Screen Projection
     function project3D(x, y, z) {
       const isoX = (x - y) * Math.cos(Math.PI / 6);
       const isoY = (x + y) * Math.sin(Math.PI / 6) - z;
@@ -166,7 +165,7 @@
 
     // Coaster State
     let currentTrackType = 'classic';
-    let progress = 0; // Normalized progression along path [0, 1)
+    let progress = 0;
     let prevProgress = 0;
     const speed = 0.003;
     let cash = 500;
@@ -175,7 +174,6 @@
     let pendingCarts = 0;
     const maxCarts = 10;
 
-    // Track Unlocks
     const unlockedTracks = {
       classic: true,
       zigzag: false,
@@ -246,10 +244,10 @@
 
       buyCarBtn.disabled = (totalCars >= maxCarts || cash < 100);
 
-      updateTrackBtn(btnClassic, 'classic', 'Classic Oval', 0);
-      updateTrackBtn(btnZigZag, 'zigzag', 'Zig-Zag', 1000);
-      updateTrackBtn(btnHills, 'hills', 'Roller Hills', 1500);
-      updateTrackBtn(btnLoop, 'loop', 'Apex Loop', 2000);
+      updateTrackBtn(btnClassic, 'classic', 'Classic Steel', 0);
+      updateTrackBtn(btnZigZag, 'zigzag', 'Steel Twister', 1000);
+      updateTrackBtn(btnHills, 'hills', 'Steel Drops', 1500);
+      updateTrackBtn(btnLoop, 'loop', 'Vertical Loop', 2000);
     }
 
     function updateTrackBtn(btn, type, name, cost) {
@@ -268,44 +266,40 @@
       }
     }
 
-    // ==========================================
-    // 4 DISTINCT PARAMETRIC 3D TRACK DESIGN FORMULAS
-    // ==========================================
+    // Parametric 3D Track Layouts
     function get3DPoint(t, trackType = currentTrackType) {
       const angle = t * Math.PI * 2;
-      let x = 0, y = 0, z = 0;
+      let x = 0, y = 0, z = 0, roll = 0; // roll angle for upside-down loops
 
       if (trackType === 'classic') {
-        // Track 1: Standard Oval Track
         x = Math.cos(angle) * 180;
         y = Math.sin(angle) * 120;
-        z = 0;
+        z = 15;
       } else if (trackType === 'zigzag') {
-        // Track 2: Sharp Zig-Zag Loop
         const baseR = 150 + Math.sin(angle * 8) * 35;
         x = Math.cos(angle) * baseR;
         y = Math.sin(angle) * baseR;
-        z = Math.cos(angle * 4) * 15;
+        z = Math.cos(angle * 4) * 20 + 15;
       } else if (trackType === 'hills') {
-        // Track 3: Roller Hills (Dramatic elevation rises and drops)
         x = Math.cos(angle) * 170;
         y = Math.sin(angle) * 130;
-        z = Math.sin(angle * 3) * 60 + 20;
+        z = Math.sin(angle * 3) * 60 + 35;
       } else if (trackType === 'loop') {
-        // Track 4: 3D Apex Loop
         x = Math.cos(angle) * 160;
         y = Math.sin(angle) * 110;
-        z = 0;
-        // Loop at bottom apex
+        z = 15;
+
+        // Loop section with upside-down roll rotation
         if (t > 0.35 && t < 0.65) {
           const normT = (t - 0.35) / 0.3;
           const loopA = normT * Math.PI * 2;
-          z = (1 - Math.cos(loopA)) * 70;
+          z = (1 - Math.cos(loopA)) * 75 + 15;
           x += Math.sin(loopA) * 20;
+          roll = loopA; // Rotates car upside down
         }
       }
 
-      return { x, y, z };
+      return { x, y, z, roll };
     }
 
     function get3DTangentAngle(t) {
@@ -315,7 +309,6 @@
       return Math.atan2(p2.y - p1.y, p2.x - p1.x);
     }
 
-    // Station check
     function checkStationStop(deltaTime) {
       if (isStoppedAtStation) {
         stopTimeRemaining -= deltaTime;
@@ -325,7 +318,6 @@
         return;
       }
 
-      // Crossed 0/1.0 boundary
       if (prevProgress > 0.9 && progress < 0.1) {
         isStoppedAtStation = true;
         stopTimeRemaining = 1000;
@@ -350,68 +342,68 @@
       prevProgress = progress;
     }
 
-    // Render Ground Grid
-    function draw3DGrid() {
-      ctx.fillStyle = '#1b4332';
+    // Render Amusement Park Ground & Environment
+    function drawEnvironment() {
+      ctx.fillStyle = '#223829';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      ctx.strokeStyle = '#2d5a3f';
-      ctx.lineWidth = 1;
-
-      const gridSize = 350;
-      const step = 50;
-
-      for (let x = -gridSize; x <= gridSize; x += step) {
-        const p1 = project3D(x, -gridSize, 0);
-        const p2 = project3D(x, gridSize, 0);
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-        ctx.stroke();
-      }
-
-      for (let y = -gridSize; y <= gridSize; y += step) {
-        const p1 = project3D(-gridSize, y, 0);
-        const p2 = project3D(gridSize, y, 0);
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-        ctx.stroke();
-      }
+      // Distant Pathway
+      ctx.fillStyle = '#334155';
+      ctx.beginPath();
+      ctx.moveTo(0, 500);
+      ctx.lineTo(700, 420);
+      ctx.lineTo(700, 460);
+      ctx.lineTo(0, 540);
+      ctx.fill();
     }
 
-    // Render 3D Track
-    function draw3DTrack() {
-      const numSamples = 200;
+    // Render Steel Track & Bright Yellow Frame Supports
+    function drawSteelTrack() {
+      const numSamples = 220;
       const dt = 1.0 / numSamples;
 
-      // Vertical Support Pillars
-      ctx.strokeStyle = '#64748b';
-      ctx.lineWidth = 2;
-      for (let i = 0; i < numSamples; i += 8) {
+      // 1. Bright Yellow Frame Supports (A-Frames & Columns like reference photo)
+      for (let i = 0; i < numSamples; i += 6) {
         const t = i * dt;
         const pt = get3DPoint(t);
-        if (pt.z > 2) {
-          const topP = project3D(pt.x, pt.y, pt.z);
-          const botP = project3D(pt.x, pt.y, 0);
+        const topP = project3D(pt.x, pt.y, pt.z);
+        const botP = project3D(pt.x, pt.y, 0);
+
+        ctx.strokeStyle = '#eab308'; // Bright yellow
+        ctx.lineWidth = 4;
+
+        // Main Vertical Column
+        ctx.beginPath();
+        ctx.moveTo(topP.x, topP.y);
+        ctx.lineTo(botP.x, botP.y);
+        ctx.stroke();
+
+        // Angled A-frame legs for elevated track sections
+        if (pt.z > 25) {
+          const leg1 = project3D(pt.x + 20, pt.y + 20, 0);
+          const leg2 = project3D(pt.x - 20, pt.y - 20, 0);
+
+          ctx.lineWidth = 3;
           ctx.beginPath();
           ctx.moveTo(topP.x, topP.y);
-          ctx.lineTo(botP.x, botP.y);
+          ctx.lineTo(leg1.x, leg1.y);
+          ctx.moveTo(topP.x, topP.y);
+          ctx.lineTo(leg2.x, leg2.y);
           ctx.stroke();
         }
       }
 
-      // Wooden Ties
-      ctx.strokeStyle = '#78350f';
-      ctx.lineWidth = 3;
+      // 2. Steel Cross-Trusses (Triangular / Ladder Ties like reference photo)
+      ctx.strokeStyle = '#475569'; // Steel Slate Blue/Grey
+      ctx.lineWidth = 2;
       for (let i = 0; i < numSamples; i++) {
         const t = i * dt;
         const pt = get3DPoint(t);
         const tangent = get3DTangentAngle(t);
 
         const p = project3D(pt.x, pt.y, pt.z);
-        const perpX = Math.cos(tangent + Math.PI / 2) * 8;
-        const perpY = Math.sin(tangent + Math.PI / 2) * 8;
+        const perpX = Math.cos(tangent + Math.PI / 2) * 6;
+        const perpY = Math.sin(tangent + Math.PI / 2) * 6;
 
         ctx.beginPath();
         ctx.moveTo(p.x - perpX, p.y - perpY);
@@ -419,24 +411,39 @@
         ctx.stroke();
       }
 
-      // Tubular Steel Rails
+      // 3. Double Steel Tubular Rails
+      drawTubularRailOffset(-4);
+      drawTubularRailOffset(4);
+
+      drawSideTrack();
+    }
+
+    function drawTubularRailOffset(offsetPixels) {
+      const numSamples = 220;
+      const dt = 1.0 / numSamples;
+
       ctx.beginPath();
       for (let i = 0; i <= numSamples; i++) {
         const t = (i % numSamples) * dt;
         const pt = get3DPoint(t);
+        const tangent = get3DTangentAngle(t);
         const p = project3D(pt.x, pt.y, pt.z);
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
+
+        const perpX = Math.cos(tangent + Math.PI / 2) * offsetPixels;
+        const perpY = Math.sin(tangent + Math.PI / 2) * offsetPixels;
+
+        if (i === 0) ctx.moveTo(p.x + perpX, p.y + perpY);
+        else ctx.lineTo(p.x + perpX, p.y + perpY);
       }
-      ctx.strokeStyle = '#334155';
+      // Dark slate tube shadow
+      ctx.strokeStyle = '#1e293b';
       ctx.lineWidth = 5;
       ctx.stroke();
 
-      ctx.strokeStyle = '#cbd5e1';
-      ctx.lineWidth = 2;
+      // Steel highlight tube
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 3;
       ctx.stroke();
-
-      drawSideTrack();
     }
 
     // Storage Yard Track
@@ -444,18 +451,18 @@
       const pStart = project3D(80, 100, 0);
       const pEnd = project3D(200, 100, 0);
 
-      ctx.strokeStyle = '#78350f';
+      ctx.strokeStyle = '#eab308';
       ctx.lineWidth = 3;
-      for (let x = 80; x <= 200; x += 15) {
-        const p1 = project3D(x, 92, 0);
-        const p2 = project3D(x, 108, 0);
+      for (let x = 80; x <= 200; x += 30) {
+        const topP = project3D(x, 100, 0);
+        const botP = project3D(x, 100, -15);
         ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
+        ctx.moveTo(topP.x, topP.y);
+        ctx.lineTo(botP.x, botP.y);
         ctx.stroke();
       }
 
-      ctx.strokeStyle = '#334155';
+      ctx.strokeStyle = '#475569';
       ctx.lineWidth = 4;
       ctx.beginPath();
       ctx.moveTo(pStart.x, pStart.y);
@@ -466,20 +473,19 @@
     function drawPendingCarsInYard() {
       if (pendingCarts <= 0) return;
 
-      const palette = ['#0284c7', '#0369a1', '#0d9488', '#059669', '#d97706', '#7c3aed', '#c026d3', '#db2777', '#475569'];
-
       for (let i = 0; i < pendingCarts; i++) {
-        const x = 100 + (i * 12);
+        const x = 100 + (i * 14);
         const p = project3D(x, 100, 0);
 
-        ctx.fillStyle = palette[(numCarts + i) % palette.length];
+        // Crimson burgundy cart bodies
+        ctx.fillStyle = '#881337';
         ctx.beginPath();
         ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
         ctx.fill();
       }
     }
 
-    // Draw Station Banner
+    // Station Banner
     function draw3DStation() {
       const pt = get3DPoint(0);
       const p = project3D(pt.x, pt.y, pt.z);
@@ -491,7 +497,7 @@
       ctx.textAlign = 'center';
       ctx.fillText('STATION', p.x, p.y - 21);
 
-      ctx.strokeStyle = '#94a3b8';
+      ctx.strokeStyle = '#eab308';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(p.x - 18, p.y);
@@ -500,12 +506,12 @@
       ctx.lineTo(p.x + 18, p.y - 18);
       ctx.stroke();
 
-      // Sidewalk Queue
+      // Station Sidewalk
       const sP = project3D(pt.x, pt.y - 35, pt.z);
       ctx.fillStyle = '#94a3b8';
       ctx.fillRect(sP.x - 50, sP.y - 5, 100, 10);
 
-      // Queue People
+      // Passengers Line
       for (let i = 0; i < queueCount; i++) {
         const px = sP.x - 40 + (i * 4);
         ctx.fillStyle = passengerColors[i % passengerColors.length];
@@ -515,66 +521,84 @@
       }
     }
 
-    // Draw Coaster Cart in 3D
-    function draw3DCoasterCart(cartProgress, color, isFront = false) {
+    // Draw Crimson/Burgundy Steel Coaster Cart (Matching Image Reference)
+    function draw3DSteelCart(cartProgress, isFront = false) {
       let t = (cartProgress % 1.0 + 1.0) % 1.0;
       const pt = get3DPoint(t);
       const p = project3D(pt.x, pt.y, pt.z);
       const tangent = get3DTangentAngle(t);
 
-      const cartLength = 22;
-      const cartWidth = 14;
+      const cartLength = 24;
+      const cartWidth = 16;
 
       ctx.save();
       ctx.translate(p.x, p.y);
-      ctx.rotate(tangent);
+      ctx.rotate(tangent + (pt.roll || 0)); // Rotates upside down along loops!
 
-      // Body
-      ctx.fillStyle = color;
+      // Wheel Chassis Assemblies (Clamping onto rails like reference)
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(-cartLength / 2 + 2, -cartWidth / 2 - 3, 5, 3);
+      ctx.fillRect(cartLength / 2 - 7, -cartWidth / 2 - 3, 5, 3);
+      ctx.fillRect(-cartLength / 2 + 2, cartWidth / 2, 5, 3);
+      ctx.fillRect(cartLength / 2 - 7, cartWidth / 2, 5, 3);
+
+      // Deep Maroon/Burgundy Main Car Body
+      ctx.fillStyle = '#881337';
       ctx.beginPath();
-      ctx.roundRect(-cartLength / 2, -cartWidth / 2, cartLength, cartWidth, 3);
+      ctx.roundRect(-cartLength / 2, -cartWidth / 2, cartLength, cartWidth, 4);
       ctx.fill();
 
-      // Front Nose
+      // Crisp White Side Stripes / Trim
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(-cartLength / 2 + 1, -cartWidth / 2 + 1, cartLength - 2, 1.5);
+      ctx.fillRect(-cartLength / 2 + 1, cartWidth / 2 - 2.5, cartLength - 2, 1.5);
+
+      // Front Aerodynamic Nose
       if (isFront) {
-        ctx.fillStyle = '#f59e0b';
+        ctx.fillStyle = '#9f1239';
         ctx.beginPath();
         ctx.moveTo(cartLength / 2, -cartWidth / 2);
-        ctx.lineTo(cartLength / 2 + 4, 0);
+        ctx.lineTo(cartLength / 2 + 5, 0);
         ctx.lineTo(cartLength / 2, cartWidth / 2);
         ctx.closePath();
         ctx.fill();
       }
 
-      // Interior Cockpit Seats
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(-cartLength / 2 + 3, -cartWidth / 2 + 2, cartLength - 6, cartWidth - 4);
+      // Cockpit Seats & Silver Safety Restraints
+      ctx.fillStyle = '#4c0519';
+      ctx.fillRect(-cartLength / 2 + 4, -cartWidth / 2 + 3, cartLength - 8, cartWidth - 6);
+
+      // Silver Overhead Lapbars / Restraints
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(-cartLength / 2 + 5, -cartWidth / 2 + 4, 6, 3);
+      ctx.strokeRect(-cartLength / 2 + 5, cartWidth / 2 - 7, 6, 3);
+      ctx.strokeRect(2, -cartWidth / 2 + 4, 6, 3);
+      ctx.strokeRect(2, cartWidth / 2 - 7, 6, 3);
 
       ctx.restore();
     }
 
-    // Draw Coaster Train
+    // Render Full Train
     function drawCoasterTrain() {
-      const cartSpacing = 0.025;
-      const palette = ['#ef4444', '#dc2626', '#b91c1c', '#0284c7', '#0369a1', '#0d9488', '#059669', '#d97706', '#7c3aed', '#c026d3'];
+      const cartSpacing = 0.026;
 
       for (let i = numCarts - 1; i >= 0; i--) {
         const cartProgress = progress - (i * cartSpacing);
         const isFront = (i === 0);
-        const color = palette[i % palette.length];
-        draw3DCoasterCart(cartProgress, color, isFront);
+        draw3DSteelCart(cartProgress, isFront);
       }
     }
 
-    // Main Loop
+    // Animation Loop
     function animate(currentTime) {
       const deltaTime = currentTime - lastFrameTime;
       lastFrameTime = currentTime;
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      draw3DGrid();
-      draw3DTrack();
+      drawEnvironment();
+      drawSteelTrack();
       drawPendingCarsInYard();
       draw3DStation();
       drawCoasterTrain();
