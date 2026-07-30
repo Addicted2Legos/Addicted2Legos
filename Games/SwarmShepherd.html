@@ -2,118 +2,171 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Swarm Shepherd - Asymmetric Control Prototype</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Swarm Shepherd - Mobile Ready</title>
     <style>
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
             user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: none;
         }
         body {
             background-color: #111217;
             color: #f0f4f8;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
             overflow: hidden;
+            padding: 10px;
         }
         #game-container {
             position: relative;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
             border-radius: 8px;
             overflow: hidden;
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         canvas {
             display: block;
             background: #181a20;
+            width: 100%;
+            height: auto;
+            max-height: 70vh;
+            touch-action: none;
         }
         #ui-layer {
             position: absolute;
-            top: 15px;
-            left: 15px;
-            right: 15px;
+            top: 10px;
+            left: 10px;
+            right: 10px;
             display: flex;
             justify-content: space-between;
             pointer-events: none;
+            gap: 5px;
         }
         .hud-card {
             background: rgba(22, 25, 35, 0.85);
             backdrop-filter: blur(4px);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 10px 16px;
+            padding: 6px 10px;
             border-radius: 6px;
-            font-size: 14px;
+            font-size: 12px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            flex: 1;
+            text-align: center;
         }
         .hud-title {
-            font-size: 10px;
+            font-size: 9px;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             color: #8a99ad;
             margin-bottom: 2px;
         }
         .hud-value {
-            font-size: 18px;
+            font-size: 14px;
             font-weight: bold;
             color: #00f0ff;
         }
         .danger-text { color: #ff3366; }
         .warning-text { color: #ffaa00; }
-        #controls-overlay {
-            position: absolute;
-            bottom: 15px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(18, 20, 28, 0.9);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            padding: 8px 18px;
-            border-radius: 20px;
-            font-size: 12px;
-            color: #a0aec0;
-            pointer-events: none;
+
+        /* Mobile Controls Layout */
+        #mobile-controls {
+            width: 100%;
             display: flex;
-            gap: 15px;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #181a20;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
-        .key {
-            background: #2d3748;
-            color: #fff;
-            padding: 2px 6px;
-            border-radius: 4px;
+        
+        /* Touch D-Pad */
+        .dpad {
+            display: grid;
+            grid-template-columns: repeat(3, 40px);
+            grid-template-rows: repeat(3, 40px);
+            gap: 4px;
+        }
+        .dpad-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: white;
             font-weight: bold;
-            font-family: monospace;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            touch-action: manipulation;
         }
+        .dpad-btn:active {
+            background: #00f0ff;
+            color: #000;
+        }
+        .dpad-up { grid-column: 2; grid-row: 1; }
+        .dpad-left { grid-column: 1; grid-row: 2; }
+        .dpad-right { grid-column: 3; grid-row: 2; }
+        .dpad-down { grid-column: 2; grid-row: 3; }
+
+        /* Mobile Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        .action-btn {
+            background: rgba(0, 240, 255, 0.15);
+            border: 1px solid #00f0ff;
+            color: #00f0ff;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
+        }
+        .action-btn:active {
+            background: #00f0ff;
+            color: #000;
+        }
+
         #game-over-screen {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(10, 11, 15, 0.9);
+            background: rgba(10, 11, 15, 0.95);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             z-index: 10;
+            padding: 20px;
+            text-align: center;
         }
         #game-over-screen.hidden { display: none; }
-        button {
+        button.reset-btn {
             background: #00f0ff;
             color: #000;
             border: none;
-            padding: 10px 24px;
-            border-radius: 4px;
+            padding: 12px 28px;
+            border-radius: 6px;
             font-weight: bold;
-            font-size: 16px;
+            font-size: 18px;
             cursor: pointer;
             margin-top: 15px;
-            transition: all 0.2s;
-        }
-        button:hover {
-            background: #33f3ff;
-            transform: translateY(-2px);
-            box-shadow: 0 0 12px rgba(0, 240, 255, 0.5);
         }
     </style>
 </head>
@@ -124,34 +177,49 @@
     
     <div id="ui-layer">
         <div class="hud-card">
-            <div class="hud-title">Swarm Remaining</div>
+            <div class="hud-title">Swarm</div>
             <div id="swarm-count" class="hud-value">50 / 50</div>
         </div>
         <div class="hud-card">
-            <div class="hud-title">Commander State</div>
-            <div id="commander-state" class="hud-value warning-text">HALTED [Space]</div>
+            <div class="hud-title">State</div>
+            <div id="commander-state" class="hud-value warning-text">HALTED</div>
         </div>
         <div class="hud-card">
-            <div class="hud-title">Deployables</div>
-            <div id="inventory" class="hud-value" style="font-size: 13px; margin-top:2px;">
-                [E] Bait: <span id="bait-count" style="color:#00f0ff">3</span> | 
-                [Q] Flare: <span id="flare-count" style="color:#00f0ff">3</span>
+            <div class="hud-title">Items</div>
+            <div id="inventory" class="hud-value" style="font-size: 11px; margin-top:2px;">
+                Bait: <span id="bait-count" style="color:#00f0ff">3</span> | 
+                Flare: <span id="flare-count" style="color:#00f0ff">3</span>
             </div>
         </div>
     </div>
 
-    <div id="controls-overlay">
-        <span><span class="key">WASD</span> Scout Move</span>
-        <span><span class="key">E</span> Drop Bait</span>
-        <span><span class="key">Q</span> Drop Flare</span>
-        <span><span class="key">SPACE</span> Toggle Swarm March</span>
-        <span><span class="key">MOUSE</span> Commander Beacon</span>
+    <!-- On-screen mobile touch controls -->
+    <div id="mobile-controls">
+        <div class="dpad">
+            <div class="dpad-btn dpad-up" id="btn-up">▲</div>
+            <div class="dpad-btn dpad-left" id="btn-left">◀</div>
+            <div class="dpad-btn dpad-right" id="btn-right">▶</div>
+            <div class="dpad-btn dpad-down" id="btn-down">▼</div>
+        </div>
+
+        <div class="action-buttons">
+            <button class="action-btn" id="btn-bait">
+                <span>BAIT</span>
+            </button>
+            <button class="action-btn" id="btn-flare">
+                <span>FLARE</span>
+            </button>
+            <button class="action-btn" id="btn-march" style="border-color:#ffaa00; color:#ffaa00;">
+                <span>TOGGLE</span>
+                <span>MARCH</span>
+            </button>
+        </div>
     </div>
 
     <div id="game-over-screen" class="hidden">
-        <h1 id="game-over-title" style="font-size: 36px; margin-bottom: 10px;">MISSION FAILED</h1>
+        <h1 id="game-over-title" style="font-size: 32px; margin-bottom: 10px;">MISSION FAILED</h1>
         <p id="game-over-desc">The apex predators devoured your entire swarm.</p>
-        <button onclick="resetGame()">Try Again</button>
+        <button class="reset-btn" onclick="resetGame()">Try Again</button>
     </div>
 </div>
 
@@ -166,15 +234,14 @@ const totalSwarm = 50;
 let baitRemaining = 3;
 let flareRemaining = 3;
 
-// Mouse Position (Commander Beacon)
+// Mouse/Touch Position (Commander Beacon)
 const mouse = { x: 150, y: 300 };
 
-// Key states
+// Key & Touch input states
 const keys = {};
+const touchInput = { up: false, down: false, left: false, right: false };
 
 // --- Game Objects ---
-
-// 1. Scout Unit (Player-Controlled directly)
 const scout = {
     x: 180,
     y: 300,
@@ -183,14 +250,12 @@ const scout = {
     color: '#00f0ff'
 };
 
-// 2. Commander Unit (Movement Manager / Beacon)
 const commander = {
     x: 100,
     y: 300,
     isMarching: false
 };
 
-// 3. Swarm Units
 class SwarmMember {
     constructor(x, y) {
         this.x = x + (Math.random() - 0.5) * 20;
@@ -205,12 +270,10 @@ class SwarmMember {
     update() {
         if (!this.alive) return;
 
-        // Target behavior: follow Commander Beacon if marching, else stay put/flock
         let targetX = commander.x;
         let targetY = commander.y;
 
         if (commander.isMarching) {
-            // Seek Beacon
             let dx = targetX - this.x;
             let dy = targetY - this.y;
             let dist = Math.hypot(dx, dy);
@@ -221,11 +284,9 @@ class SwarmMember {
             }
         }
 
-        // Apply friction
         this.vx *= 0.92;
         this.vy *= 0.92;
 
-        // Speed limit
         let speed = Math.hypot(this.vx, this.vy);
         if (speed > this.maxSpeed) {
             this.vx = (this.vx / speed) * this.maxSpeed;
@@ -245,14 +306,13 @@ class SwarmMember {
     }
 }
 
-// 4. Predators (Living Ecosystem Threat)
 class Predator {
     constructor(x, y) {
         this.x = x;
         this.y = y;
         this.radius = 16;
         this.speed = 1.4;
-        this.state = 'PATROL'; // PATROL, CHASE_SWARM, CHASE_BAIT, FLEE_FLARE
+        this.state = 'PATROL';
         this.homeX = x;
         this.homeY = y;
         this.angle = Math.random() * Math.PI * 2;
@@ -260,13 +320,11 @@ class Predator {
 
     update(swarms, baits, flares) {
         let target = null;
-        let highestPriority = 0; // 1: Swarm, 2: Bait, 3: Flare (Repel)
+        let highestPriority = 0;
 
-        // Check Flares (Terrified of flares)
         for (let f of flares) {
             let d = Math.hypot(f.x - this.x, f.y - this.y);
             if (d < f.radius + 50) {
-                // Flee Flare
                 let angle = Math.atan2(this.y - f.y, this.x - f.x);
                 this.x += Math.cos(angle) * (this.speed * 1.5);
                 this.y += Math.sin(angle) * (this.speed * 1.5);
@@ -275,7 +333,6 @@ class Predator {
             }
         }
 
-        // Check Baits (Attracted heavily to bait)
         for (let b of baits) {
             let d = Math.hypot(b.x - this.x, b.y - this.y);
             if (d < 250) {
@@ -286,10 +343,9 @@ class Predator {
             }
         }
 
-        // Check Swarm (If no bait, hunt nearest swarm member)
         if (highestPriority < 2) {
             let closestSwarm = null;
-            let minDist = 180; // Aggro range
+            let minDist = 180;
 
             for (let s of swarms) {
                 if (!s.alive) continue;
@@ -307,7 +363,6 @@ class Predator {
             }
         }
 
-        // Move towards target or Patrol
         if (target) {
             let dx = target.x - this.x;
             let dy = target.y - this.y;
@@ -316,20 +371,17 @@ class Predator {
             this.x += (dx / dist) * this.speed;
             this.y += (dy / dist) * this.speed;
 
-            // Eat swarm if close enough
             if (highestPriority === 1 && dist < this.radius + target.radius) {
                 target.alive = false;
                 swarmCount--;
                 updateHUD();
             }
         } else {
-            // Idle Patrol around home position
             this.state = 'PATROL';
             this.angle += (Math.random() - 0.5) * 0.1;
             this.x += Math.cos(this.angle) * 0.5;
             this.y += Math.sin(this.angle) * 0.5;
             
-            // Keep near home
             if (Math.hypot(this.x - this.homeX, this.y - this.homeY) > 80) {
                 this.angle = Math.atan2(this.homeY - this.y, this.homeX - this.x);
             }
@@ -339,11 +391,8 @@ class Predator {
     draw() {
         ctx.save();
         ctx.translate(this.x, this.y);
-
-        // Visual indicator of state
         ctx.fillStyle = this.state === 'FLEE' ? '#aa00ff' : (this.state === 'HUNTING' ? '#ff3366' : '#ffaa00');
         
-        // Draw predator body (spiky shape)
         ctx.beginPath();
         for (let i = 0; i < 6; i++) {
             let a = (i / 6) * Math.PI * 2;
@@ -353,7 +402,6 @@ class Predator {
         ctx.closePath();
         ctx.fill();
 
-        // Perception Ring
         ctx.strokeStyle = 'rgba(255, 51, 102, 0.15)';
         ctx.beginPath();
         ctx.arc(0, 0, 180, 0, Math.PI * 2);
@@ -363,7 +411,6 @@ class Predator {
     }
 }
 
-// 5. Environmental Items (Bait, Flares, Hazards, Exit)
 let swarms = [];
 let predators = [];
 let baits = [];
@@ -371,13 +418,11 @@ let flares = [];
 
 const exitZone = { x: 800, y: 250, w: 70, h: 100 };
 const hazards = [
-    { x: 350, y: 0, w: 40, h: 380, type: 'PIT' },      // Vertical wall/chasm
+    { x: 350, y: 0, w: 40, h: 380, type: 'PIT' },
     { x: 350, y: 480, w: 40, h: 120, type: 'PIT' },
     { x: 600, y: 150, w: 40, h: 300, type: 'PIT' }
 ];
-let bridges = []; // Constructed path by scout over pits
-
-// --- Game Logic Initialization ---
+let bridges = [];
 
 function init() {
     gameState = 'PLAYING';
@@ -419,13 +464,21 @@ function updateHUD() {
         cmdUI.innerText = "MARCHING";
         cmdUI.className = "hud-value";
     } else {
-        cmdUI.innerText = "HALTED [Space]";
+        cmdUI.innerText = "HALTED";
         cmdUI.className = "hud-value warning-text";
     }
 }
 
-// --- Input Handling ---
+// Helper to calculate canvas coordinates from Touch or Mouse
+function setPointerPosition(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    mouse.x = (clientX - rect.left) * scaleX;
+    mouse.y = (clientY - rect.top) * scaleY;
+}
 
+// --- Keyboard Input ---
 window.addEventListener('keydown', (e) => {
     keys[e.key.toLowerCase()] = true;
 
@@ -434,50 +487,102 @@ window.addEventListener('keydown', (e) => {
         updateHUD();
     }
 
-    // Deploy Bait (E)
-    if (e.key.toLowerCase() === 'e' && baitRemaining > 0) {
-        baits.push({ x: scout.x, y: scout.y, duration: 300 }); // 5 sec duration
-        baitRemaining--;
-        updateHUD();
-    }
-
-    // Deploy Flare (Q)
-    if (e.key.toLowerCase() === 'q' && flareRemaining > 0) {
-        flares.push({ x: scout.x, y: scout.y, radius: 120, duration: 240 });
-        flareRemaining--;
-        updateHUD();
-    }
+    if (e.key.toLowerCase() === 'e') deployBait();
+    if (e.key.toLowerCase() === 'q') deployFlare();
 });
 
 window.addEventListener('keyup', (e) => {
     keys[e.key.toLowerCase()] = false;
 });
 
+// --- Mouse Input ---
 canvas.addEventListener('mousemove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    mouse.x = e.clientX - rect.left;
-    mouse.y = e.clientY - rect.top;
+    setPointerPosition(e.clientX, e.clientY);
 });
 
-// --- Main Update Loop ---
+// --- iOS / Mobile Touch Input for Canvas Target Beacon ---
+canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (e.touches.length > 0) {
+        setPointerPosition(e.touches[0].clientX, e.touches[0].clientY);
+    }
+}, { passive: false });
 
+canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (e.touches.length > 0) {
+        setPointerPosition(e.touches[0].clientX, e.touches[0].clientY);
+    }
+}, { passive: false });
+
+// Deploy Actions
+function deployBait() {
+    if (baitRemaining > 0) {
+        baits.push({ x: scout.x, y: scout.y, duration: 300 });
+        baitRemaining--;
+        updateHUD();
+    }
+}
+
+function deployFlare() {
+    if (flareRemaining > 0) {
+        flares.push({ x: scout.x, y: scout.y, radius: 120, duration: 240 });
+        flareRemaining--;
+        updateHUD();
+    }
+}
+
+function toggleMarch() {
+    commander.isMarching = !commander.isMarching;
+    updateHUD();
+}
+
+// Setup D-Pad and Touch Buttons
+function setupMobileButton(id, onPress, onRelease) {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    const startHandler = (e) => {
+        e.preventDefault();
+        if (onPress) onPress();
+    };
+
+    const endHandler = (e) => {
+        e.preventDefault();
+        if (onRelease) onRelease();
+    };
+
+    el.addEventListener('touchstart', startHandler, { passive: false });
+    el.addEventListener('touchend', endHandler, { passive: false });
+    el.addEventListener('mousedown', startHandler);
+    el.addEventListener('mouseup', endHandler);
+}
+
+setupMobileButton('btn-up', () => touchInput.up = true, () => touchInput.up = false);
+setupMobileButton('btn-down', () => touchInput.down = true, () => touchInput.down = false);
+setupMobileButton('btn-left', () => touchInput.left = true, () => touchInput.left = false);
+setupMobileButton('btn-right', () => touchInput.right = true, () => touchInput.right = false);
+
+setupMobileButton('btn-bait', deployBait, null);
+setupMobileButton('btn-flare', deployFlare, null);
+setupMobileButton('btn-march', toggleMarch, null);
+
+// --- Main Update Loop ---
 function update() {
     if (gameState !== 'PLAYING') return;
 
-    // 1. Update Scout (WASD Movement)
-    if (keys['w'] || keys['arrowup']) scout.y -= scout.speed;
-    if (keys['s'] || keys['arrowdown']) scout.y += scout.speed;
-    if (keys['a'] || keys['arrowleft']) scout.x -= scout.speed;
-    if (keys['d'] || keys['arrowright']) scout.x += scout.speed;
+    // Scout Movement (Keyboard + Mobile D-Pad Support)
+    if (keys['w'] || keys['arrowup'] || touchInput.up) scout.y -= scout.speed;
+    if (keys['s'] || keys['arrowdown'] || touchInput.down) scout.y += scout.speed;
+    if (keys['a'] || keys['arrowleft'] || touchInput.left) scout.x -= scout.speed;
+    if (keys['d'] || keys['arrowright'] || touchInput.right) scout.x += scout.speed;
 
-    // Keep Scout in Canvas
     scout.x = Math.max(scout.radius, Math.min(canvas.width - scout.radius, scout.x));
     scout.y = Math.max(scout.radius, Math.min(canvas.height - scout.radius, scout.y));
 
-    // Scout Construction Check: Build Bridge over Hazards automatically if standing near
+    // Scout Bridge Construction
     hazards.forEach(h => {
         if (scout.x > h.x - 15 && scout.x < h.x + h.w + 15 && scout.y > h.y && scout.y < h.y + h.h) {
-            // Check if bridge already exists here
             let exists = bridges.some(b => Math.abs(b.y - scout.y) < 30 && b.hazard === h);
             if (!exists) {
                 bridges.push({ x: h.x, y: scout.y - 20, w: h.w, h: 40, hazard: h });
@@ -485,11 +590,9 @@ function update() {
         }
     });
 
-    // 2. Update Commander Beacon Position
     commander.x = mouse.x;
     commander.y = mouse.y;
 
-    // 3. Update Deployables
     baits.forEach((b, index) => {
         b.duration--;
         if (b.duration <= 0) baits.splice(index, 1);
@@ -500,39 +603,33 @@ function update() {
         if (f.duration <= 0) flares.splice(index, 1);
     });
 
-    // 4. Update Swarm & Check Environment Collisions
     let savedCount = 0;
     swarms.forEach(s => {
         if (!s.alive) return;
         s.update();
 
-        // Check if Swarm member hits hazard (PIT) without bridge
         hazards.forEach(h => {
             if (s.x > h.x && s.x < h.x + h.w && s.y > h.y && s.y < h.y + h.h) {
-                // Is inside hazard bounding box, check if on a bridge
                 let onBridge = bridges.some(b => s.x >= b.x && s.x <= b.x + b.w && s.y >= b.y && s.y <= b.y + b.h);
                 if (!onBridge) {
-                    s.alive = false; // Fell in pit
+                    s.alive = false;
                     swarmCount--;
                     updateHUD();
                 }
             }
         });
 
-        // Check Victory Condition (Reaching Exit)
         if (s.x > exitZone.x && s.x < exitZone.x + exitZone.w &&
             s.y > exitZone.y && s.y < exitZone.y + exitZone.h) {
             savedCount++;
         }
     });
 
-    // 5. Update Predators
     predators.forEach(p => p.update(swarms, baits, flares));
 
-    // Win / Lose Checks
     if (swarmCount <= 0) {
         endGame(false, "Your entire swarm was wiped out!");
-    } else if (savedCount >= Math.floor(totalSwarm * 0.6)) { // 60% win threshold
+    } else if (savedCount >= Math.floor(totalSwarm * 0.6)) {
         endGame(true, `You successfully escorted ${savedCount} swarmers to safety!`);
     }
 }
@@ -554,29 +651,24 @@ function resetGame() {
 }
 
 // --- Render Loop ---
-
 function draw() {
-    // Clear Screen
     ctx.fillStyle = '#14161d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 1. Draw Hazards (Pits)
-    ctx.fillStyle = '#090a0d';
     hazards.forEach(h => {
+        ctx.fillStyle = '#090a0d';
         ctx.fillRect(h.x, h.y, h.w, h.h);
         ctx.strokeStyle = 'rgba(255, 51, 102, 0.3)';
         ctx.strokeRect(h.x, h.y, h.w, h.h);
     });
 
-    // 2. Draw Built Bridges
-    ctx.fillStyle = '#4a5568';
     bridges.forEach(b => {
+        ctx.fillStyle = '#4a5568';
         ctx.fillRect(b.x, b.y, b.w, b.h);
         ctx.strokeStyle = '#00f0ff';
         ctx.strokeRect(b.x, b.y, b.w, b.h);
     });
 
-    // 3. Draw Exit Zone
     ctx.fillStyle = 'rgba(0, 240, 255, 0.15)';
     ctx.fillRect(exitZone.x, exitZone.y, exitZone.w, exitZone.h);
     ctx.strokeStyle = '#00f0ff';
@@ -588,14 +680,12 @@ function draw() {
     ctx.font = '12px sans-serif';
     ctx.fillText('ESCAPE ZONE', exitZone.x + 2, exitZone.y - 8);
 
-    // 4. Draw Deployables (Bait & Flares)
     baits.forEach(b => {
         ctx.fillStyle = '#ffaa00';
         ctx.beginPath();
         ctx.arc(b.x, b.y, 8, 0, Math.PI * 2);
         ctx.fill();
         
-        // Pulses
         ctx.strokeStyle = 'rgba(255, 170, 0, 0.4)';
         ctx.beginPath();
         ctx.arc(b.x, b.y, 15 + Math.sin(Date.now() * 0.01) * 5, 0, Math.PI * 2);
@@ -614,13 +704,9 @@ function draw() {
         ctx.fill();
     });
 
-    // 5. Draw Swarm
     swarms.forEach(s => s.draw());
-
-    // 6. Draw Predators
     predators.forEach(p => p.draw());
 
-    // 7. Draw Commander Beacon Line & Cursor
     if (commander.isMarching) {
         ctx.strokeStyle = 'rgba(0, 240, 255, 0.3)';
         ctx.setLineDash([4, 4]);
@@ -638,7 +724,6 @@ function draw() {
     ctx.stroke();
     ctx.lineWidth = 1;
 
-    // 8. Draw Scout Unit
     ctx.fillStyle = scout.color;
     ctx.beginPath();
     ctx.arc(scout.x, scout.y, scout.radius, 0, Math.PI * 2);
@@ -653,16 +738,8 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
-// Start Game
 init();
 loop();
 </script>
 </body>
 </html>
-
-<!--
-Asymmetric Control (Two Opposing Forces)
-Combine the concept of keeping the swarm alive with an active, opposing force you must constantly outsmart.
-Environmental Predators / Ecosystems: The level isn't just static spikes and pits; it's a living ecosystem. You have to lure native predators away from your swarm using bait, light sources, or sound cues, turning the game into a fast-paced herding/shepherding puzzle.
-The "Escort vs. Construction" Split: You control two entities at once: a scout unit on the frontlines clearing traps and building paths, and a commander managing the flow rate, speed, and emergency stops of the swarm behind them.
--->
