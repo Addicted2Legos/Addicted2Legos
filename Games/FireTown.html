@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Firefighter Simulator 3D - Development Build</title>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background: #333; font-family: 'Courier New', Courier, monospace; color: white; -webkit-user-select: none; user-select: none; touch-action: none; }
+        canvas { display: block; }
+
+        /* HUD & UI Elements */
+        #hud { position: absolute; top: 10px; left: 10px; pointer-events: none; }
+        .hud-stat { margin-bottom: 5px; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px; }
+        .emergency-blink { color: rgb(255, 60, 60); font-weight: bold; animation: blink 1s infinite; }
+
+        /* Mobile Controls - Visible by default for this example */
+        #controls { position: absolute; bottom: 20px; left: 20px; right: 20px; display: flex; justify-content: space-between; pointer-events: none; }
+        .control-group { display: flex; flex-direction: column; gap: 10px; }
+        .btn { width: 70px; height: 70px; background: rgba(255,255,255,0.2); border: 2px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; pointer-events: auto; }
+        .btn:active { background: rgba(255,255,255,0.5); }
+        .btn-action { background: rgba(255, 60, 60, 0.4); }
+
+        /* Job Skills Menu */
+        #skills-menu { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(20,20,20,0.95); padding: 20px; border: 2px solid #555; border-radius: 8px; display: none; width: 300px; text-align: center; pointer-events: auto; }
+        #skills-menu h2 { margin-top: 0; color: #ffca28; }
+        .skill-item { margin: 15px 0; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .skill-item button { width: 100%; padding: 10px; margin-top: 5px; background: #ff9800; border: none; color: black; font-weight: bold; border-radius: 4px; display: none;}
+        
+        #toggle-skills { position: absolute; top: 10px; right: 10px; pointer-events: auto; }
+
+        @keyframes blink { 50% { opacity: 0.2; } }
+    </style>
+</head>
+<body>
+
+    <!-- HUD Overlay -->
+    <div id="hud">
+        <div class="hud-stat">Level: <span id="stat-level">1</span> (XP: <span id="stat-xp">0/100</span>)</div>
+        <div class="hud-stat">Water: <span id="stat-water">100</span>%</div>
+        <div id="emergency-alert" class="hud-stat emergency-blink" style="display:none;">! NEW FIRE REPORTED !</div>
+    </div>
+
+    <!-- Mobile Controls -->
+    <div id="controls">
+        <div class="control-group">
+            <div id="btn-up" class="btn">⬆️</div>
+            <div style="display:flex; gap:10px;">
+                <div id="btn-left" class="btn">⬅️</div>
+                <div id="btn-right" class="btn">➡️</div>
+            </div>
+            <div id="btn-down" class="btn">⬇️</div>
+        </div>
+        <div class="control-group">
+            <div id="btn-hose" class="btn btn-action">💦</div>
+            <div id="btn-refill" class="btn btn-action">⛽</div>
+        </div>
+    </div>
+
+    <!-- Skills Menu -->
+    <button id="toggle-skills" class="btn btn-action">🔧 SKILLS</button>
+    <div id="skills-menu">
+        <h2>Job Skills</h2>
+        <div class="skill-item">Driving Speed: <span id="skill-speed">1</span><br><button id="upgrade-speed">Upgrade (200 XP)</button></div>
+        <div class="skill-item">Hose Range: <span id="skill-range">1</span><br><button id="upgrade-range">Upgrade (150 XP)</button></div>
+        <div class="skill-item">Tank Capacity: <span id="skill-tank">1</span><br><button id="upgrade-tank">Upgrade (300 XP)</button></div>
+        <button id="close-skills" class="btn" style="margin-top:20px; width: auto; height: auto; padding: 10px; border-radius: 4px; font-size: 16px;">Close</button>
+    </div>
+
+    <!-- MAIN GAME SCRIPT (THREE.JS) -->
+    <script type="module">
+        import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+
+        // --- GAME STATE ---
+        const gameState = {
+            level: 1,
+            xp: 0,
+            xpToNextLevel: 100,
+            water: 100,
+            maxWater: 100,
+            skills: { speed: 1, range: 1, tank: 1 },
+            activeFires: [],
+            truckSpeed: 0.15,
+            truckTurnSpeed: 0.04,
+            hoseActive: false,
+            refilling: false,
+            maintenanceOk: true,
+        };
+
+        // --- CONSTANTS ---
+        const PYRO_INTERVAL = 3 * 60 * 1000; // 3 minutes
+        const MAP_SIZE = 50;
+        const GRID_CELLS = 20;
+        const CELL_SIZE = MAP_SIZE / GRID_CELLS;
+        const WATER_CONSUMPTION_RATE = 0.5; // per frame
+        const REFILL_RATE = 2.0;
+
+        // --- THREE.JS BASIC SETUP ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xa0a0a0);
+        scene.fog = new THREE.Fog(0xa0a0a0, 10, 80);
+
+        // STEEP TOP-DOWN CAMERA (Orthographic for stylized look)
+        const aspect = window.innerWidth / window.innerHeight;
+        const frustumSize = 15;
+        const camera = new THREE.OrthographicCamera(frustumSize * aspect / -2, frustumSize * aspect / 2, frustumSize / 2, frustumSize / -2, 1, 1000);
+        
+        // Match the user's top-right steep angle preference
+        camera.position.set(frustumSize, frustumSize * 1.5, frustumSize);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        // --- LIGHTING ---
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(10, 20, 10);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // --- WORLD GENERATION (Stylized Google Maps 3D) ---
+        const groundGeometry = new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE);
+        const groundMaterial = new THREE.MeshPhongMaterial({ color: 0xcccccc, depthWrite: false });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        const gridHelper = new THREE.GridHelper(MAP_SIZE, GRID_CELLS, 0x000000, 0x888888);
+        gridHelper.position.y = 0.01;
+        scene.add(gridHelper);
+
+        const buildBuildings = () => {
+            const buildingsGroup = new THREE.Group();
+            for (let i = 0; i < 20; i++) {
+                const height = Math.random() * 5 + 1;
+                const geometry = new THREE.BoxGeometry(CELL_SIZE * 0.8, height, CELL_SIZE * 0.8);
+                const material = new THREE.MeshPhongMaterial({ color: 0x88aabb });
+                const building = new THREE.Mesh(geometry, material);
+                building.position.set(
+                    (Math.floor(Math.random() * GRID_CELLS) - GRID_CELLS / 2) * CELL_SIZE + CELL_SIZE/2,
+                    height / 2,
+                    (Math.floor(Math.random() * GRID_CELLS) - GRID_CELLS / 2) * CELL_SIZE + CELL_SIZE/2
+                );
+                building.castShadow = true;
+                building.receiveShadow = true;
+                buildingsGroup.add(building);
+            }
+            scene.add(buildingsGroup);
+        };
+        buildBuildings();
+
+        // Fire Hydrants (Yellow dots)
+        const hydrantsGroup = new THREE.Group();
+        const hydrantGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.4, 6);
+        const hydrantMat = new THREE.MeshPhongMaterial({color: 0xffcc00});
+        for(let i = 0; i<30; i++){
+            const h = new THREE.Mesh(hydrantGeo, hydrantMat);
+            h.position.set(
+                (Math.floor(Math.random() * GRID_CELLS) - GRID_CELLS / 2) * CELL_SIZE,
+                0.2,
+                (Math.floor(Math.random() * GRID_CELLS) - GRID_CELLS / 2) * CELL_SIZE
+            )
+            hydrantsGroup.add(h);
+        }
+        scene.add(hydrantsGroup);
+
+        // --- THE FIRE TRUCK (Player) ---
+        const truckGeometry = new THREE.BoxGeometry(0.6, 0.8, 1.8);
+        const truckMaterial = new THREE.MeshPhongMaterial({ color: 0xff2200 });
+        const truck = new THREE.Mesh(truckGeometry, truckMaterial);
+        truck.position.set(0, 0.4, 0); // Start at station
+        truck.castShadow = true;
+        scene.add(truck);
+
+        // Hose marker (helper visual)
+        const hoseGeo = new THREE.RingGeometry(1, 1.1, 12);
+        const hoseMat = new THREE.MeshBasicMaterial({color: 0x00aaff, transparent: true, opacity: 0});
+        const hoseMarker = new THREE.Mesh(hoseGeo, hoseMat);
+        hoseMarker.rotation.x = -Math.PI / 2;
+        truck.add(hoseMarker);
+
+        // --- GAMEPLAY MECHANICS ---
+
+        // Pyromaniac Logic (sets a new fire every 3 mins)
+        function startPyromaniacLoop() {
+            setInterval(setNewFire, PYRO_INTERVAL);
+            // set one fire immediately for testing:
+            setTimeout(setNewFire, 1000);
+        }
+
+        const fireMaterial = new THREE.MeshBasicMaterial({color: 0xff3300});
+        function setNewFire() {
+            const fireGeo = new THREE.DodecahedronGeometry(0.5);
+            const fire = new THREE.Mesh(fireGeo, fireMaterial);
+            
+            // Random street intersection
+            fire.position.set(
+                (Math.floor(Math.random() * GRID_CELLS) - GRID_CELLS / 2) * CELL_SIZE,
+                0.3,
+                (Math.floor(Math.random() * GRID_CELLS) - GRID_CELLS / 2) * CELL_SIZE
+            );
+            
+            // Add a point light to the fire
+            const fireLight = new THREE.PointLight(0xff6600, 2, 5);
+            fire.add(fireLight);
+            
+            scene.add(fire);
+            gameState.activeFires.push(fire);
+            
+            document.getElementById('emergency-alert').style.display = 'block';
+            console.warn("PYRO ALERT: New fire set at:", fire.position);
+        }
+
+        // Job Skill Gain (from putting out fires)
+        function gainXP(amount) {
+            gameState.xp += amount;
+            if (gameState.xp >= gameState.xpToNextLevel) {
+                gameState.xp = 0;
+                gameState.level++;
+                gameState.xpToNextLevel = Math.floor(gameState.xpToNextLevel * 1.5);
+                updateSkillsMenu();
+                console.log("LEVEL UP! Level", gameState.level);
+            }
+            updateHUD();
+        }
+
+        // --- CONTROLS & INPUT ---
+        const keys = { up: false, down: false, left: false, right: false };
+        const virtualKeys = { up: false, down: false, left: false, right: false, hose: false, refill: false };
+
+        // Real Keyboard Events
+        window.addEventListener('keydown', e => {
+            if (e.key === 'ArrowUp') keys.up = true;
+            if (e.key === 'ArrowDown') keys.down = true;
+            if (e.key === 'ArrowLeft') keys.left = true;
+            if (e.key === 'ArrowRight') keys.right = true;
+        });
+        window.addEventListener('keyup', e => {
+            if (e.key === 'ArrowUp') keys.up = false;
+            if (e.key === 'ArrowDown') keys.down = false;
+            if (e.key === 'ArrowLeft') keys.left = false;
+            if (e.key === 'ArrowRight') keys.right = false;
+        });
+
+        // Mobile Touch Events (Binding virtual buttons to logic)
+        function bindVirtualBtn(id, keyName) {
+            const btn = document.getElementById(id);
+            btn.addEventListener('pointerdown', e => { e.preventDefault(); virtualKeys[keyName] = true; });
+            btn.addEventListener('pointerup', e => { e.preventDefault(); virtualKeys[keyName] = false; });
+        }
+        bindVirtualBtn('btn-up', 'up');
+        bindVirtualBtn('btn-down', 'down');
+        bindVirtualBtn('btn-left', 'left');
+        bindVirtualBtn('btn-right', 'right');
+        bindVirtualBtn('btn-hose', 'hose');
+        bindVirtualBtn('btn-refill', 'refill');
+
+        // --- UI INTERACTION ---
+        const skillsMenu = document.getElementById('skills-menu');
+        document.getElementById('toggle-skills').addEventListener('click', () => skillsMenu.style.display = 'block');
+        document.getElementById('close-skills').addEventListener('click', () => skillsMenu.style.display = 'none');
+
+        function updateHUD() {
+            document.getElementById('stat-level').innerText = gameState.level;
+            document.getElementById('stat-xp').innerText = `${gameState.xp}/${gameState.xpToNextLevel}`;
+            document.getElementById('stat-water').innerText = gameState.water.toFixed(0);
+        }
+
+        function updateSkillsMenu() {
+            document.getElementById('skill-speed').innerText = gameState.skills.speed;
+            document.getElementById('skill-range').innerText = gameState.skills.range;
+            document.getElementById('skill-tank').innerText = gameState.skills.tank;
+            
+            // Show upgrade buttons if XP allows (Simplified: Level threshold for now)
+            const showBtn = (id) => document.getElementById(id).style.display = gameState.level >= gameState.skills.speed + 1 ? 'block' : 'none';
+            showBtn('upgrade-speed');
+            showBtn('upgrade-range');
+            showBtn('upgrade-tank');
+        }
+
+        // Skill upgrades (apply logic here)
+        document.getElementById('upgrade-speed').addEventListener('click', () => {
+            gameState.skills.speed++;
+            gameState.truckSpeed += 0.05;
+            updateSkillsMenu();
+        });
+
+        // --- THE GAME LOOP (Update and Render) ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Driving Physics (Combined Keyboard + Virtual)
+            let moveSpeed = 0;
+            if (keys.up || virtualKeys.up) moveSpeed = gameState.truckSpeed;
+            if (keys.down || virtualKeys.down) moveSpeed = -gameState.truckSpeed * 0.5;
+
+            truck.translateZ(-moveSpeed);
+
+            let turnSpeed = 0;
+            if (keys.left || virtualKeys.left) turnSpeed = gameState.truckTurnSpeed;
+            if (keys.right || virtualKeys.right) turnSpeed = -gameState.truckTurnSpeed;
+
+            if (moveSpeed !== 0) truck.rotateY(turnSpeed);
+
+            // Water Mechanic
+            gameState.refilling = false;
+            // Near Hydrant Check
+            let nearHydrant = false;
+            hydrantsGroup.children.forEach(h => {
+                if(truck.position.distanceTo(h.position) < 2.0) {
+                    nearHydrant = true;
+                    // Maintenance Check is implicit if no fires exist
+                    if(gameState.activeFires.length === 0 && h.material.color.g !== 1.0){
+                        // Make hydrant 'OK' green after check
+                        h.material.color.set(0x00ff00);
+                        console.log("Hydrant Maintenance Check Complete.");
+                    }
+                }
+            });
+
+            if (nearHydrant && virtualKeys.refill && gameState.water < gameState.maxWater) {
+                gameState.refilling = true;
+                gameState.water += REFILL_RATE;
+                if (gameState.water > gameState.maxWater) gameState.water = gameState.maxWater;
+            }
+
+            // Hose Mechanic
+            hoseMarker.material.opacity = 0; // Default
+            if (virtualKeys.hose && gameState.water > 0 && !gameState.refilling) {
+                hoseMarker.material.opacity = 0.5; // Visual feedback
+                const hoseRange = gameState.skills.range + 1;
+                hoseMarker.scale.set(hoseRange, hoseRange, 1);
+                gameState.water -= WATER_CONSUMPTION_RATE;
+
+                // Fire Extinguishing Logic
+                gameState.activeFires.forEach((fire, index) => {
+                    if (truck.position.distanceTo(fire.position) < hoseRange) {
+                        // Extinguished!
+                        console.log("FIRE OUT!");
+                        scene.remove(fire);
+                        gameState.activeFires.splice(index, 1);
+                        gainXP(150); // Skill Gain
+                        if(gameState.activeFires.length === 0){
+                             document.getElementById('emergency-alert').style.display = 'none';
+                        }
+                    }
+                });
+            }
+
+            // Camera follow (Steep top-down, locked relative position)
+            const cameraOffset = new THREE.Vector3(frustumSize * 0.7, frustumSize * 1.5, frustumSize * 0.7);
+            camera.position.lerp(truck.position.clone().add(cameraOffset), 0.1);
+            camera.lookAt(truck.position.clone().add(new THREE.Vector3(0,0.5,0)));
+
+            updateHUD();
+            renderer.render(scene, camera);
+        }
+
+        // Start everything
+        updateHUD();
+        updateSkillsMenu();
+        startPyromaniacLoop();
+        animate();
+
+        // Handle Resize
+        window.addEventListener('resize', () => {
+            const aspect = window.innerWidth / window.innerHeight;
+            camera.left = frustumSize * aspect / -2;
+            camera.right = frustumSize * aspect / 2;
+            camera.top = frustumSize / 2;
+            camera.bottom = frustumSize / -2;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+</html>
