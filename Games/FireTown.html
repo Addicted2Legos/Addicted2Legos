@@ -905,19 +905,32 @@
 
             // Driving Physics (Keyboard + Joystick), frozen while the crew is out fighting a fire
             if (fireResponse.state === 'idle') {
-                let moveSpeed = 0;
-                if (keys.up) moveSpeed = gameState.truckSpeed;
-                if (keys.down) moveSpeed = -gameState.truckSpeed * 0.5;
-                if (Math.abs(joystickVector.y) > 0.12) {
-                    moveSpeed = joystickVector.y > 0
-                        ? gameState.truckSpeed * joystickVector.y
-                        : gameState.truckSpeed * 0.5 * joystickVector.y;
-                }
+                const JOY_DEADZONE = 0.15;
+                const joyMagnitude = Math.min(1, Math.hypot(joystickVector.x, joystickVector.y));
 
+                let moveSpeed = 0;
                 let turnSpeed = 0;
-                if (keys.left) turnSpeed = gameState.truckTurnSpeed;
-                if (keys.right) turnSpeed = -gameState.truckTurnSpeed;
-                if (Math.abs(joystickVector.x) > 0.12) turnSpeed = -joystickVector.x * gameState.truckTurnSpeed;
+
+                if (joyMagnitude > JOY_DEADZONE) {
+                    // Auto-steer: turn the truck to face wherever the stick is pointing, then
+                    // drive that way. Directions are camera-relative since this chase camera
+                    // never rotates - it always looks from the +X/+Z side toward -X/-Z.
+                    const dirX = 0.7071 * joystickVector.x - 0.7071 * joystickVector.y;
+                    const dirZ = -0.7071 * joystickVector.x - 0.7071 * joystickVector.y;
+                    const desiredYaw = Math.atan2(-dirX, -dirZ);
+
+                    let angleDiff = desiredYaw - truck.rotation.y;
+                    angleDiff = ((angleDiff + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+                    const maxTurn = gameState.truckTurnSpeed * 1.8;
+                    truck.rotation.y += THREE.MathUtils.clamp(angleDiff, -maxTurn, maxTurn);
+
+                    moveSpeed = gameState.truckSpeed * joyMagnitude;
+                } else {
+                    if (keys.up) moveSpeed = gameState.truckSpeed;
+                    if (keys.down) moveSpeed = -gameState.truckSpeed * 0.5;
+                    if (keys.left) turnSpeed = gameState.truckTurnSpeed;
+                    if (keys.right) turnSpeed = -gameState.truckTurnSpeed;
+                }
 
                 if (moveSpeed !== 0) {
                     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(truck.quaternion);
