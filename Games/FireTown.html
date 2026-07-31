@@ -20,6 +20,10 @@
         .btn:active { background: rgba(255,255,255,0.5); }
         .btn-action { background: rgba(255, 60, 60, 0.4); }
 
+        /* Joystick (movement) */
+        #joystick-base { width: 120px; height: 120px; background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.6); border-radius: 50%; position: relative; pointer-events: auto; touch-action: none; }
+        #joystick-knob { width: 54px; height: 54px; background: rgba(255,255,255,0.55); border: 2px solid white; border-radius: 50%; position: absolute; left: 50%; top: 50%; margin-left: -27px; margin-top: -27px; touch-action: none; }
+
         /* Job Skills Menu */
         #skills-menu { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(20,20,20,0.95); padding: 20px; border: 2px solid #555; border-radius: 8px; display: none; width: 300px; text-align: center; pointer-events: auto; }
         #skills-menu h2 { margin-top: 0; color: #ffca28; }
@@ -36,23 +40,19 @@
     <!-- HUD Overlay -->
     <div id="hud">
         <div class="hud-stat">Level: <span id="stat-level">1</span> (XP: <span id="stat-xp">0/100</span>)</div>
-        <div class="hud-stat">Water: <span id="stat-water">100</span>%</div>
         <div id="emergency-alert" class="hud-stat emergency-blink" style="display:none;">! NEW FIRE REPORTED !</div>
+        <div id="hud-status" class="hud-stat" style="display:none;"></div>
     </div>
 
     <!-- Mobile Controls -->
     <div id="controls">
         <div class="control-group">
-            <div id="btn-up" class="btn">⬆️</div>
-            <div style="display:flex; gap:10px;">
-                <div id="btn-left" class="btn">⬅️</div>
-                <div id="btn-right" class="btn">➡️</div>
+            <div id="joystick-base">
+                <div id="joystick-knob"></div>
             </div>
-            <div id="btn-down" class="btn">⬇️</div>
         </div>
         <div class="control-group">
             <div id="btn-hose" class="btn btn-action">💦</div>
-            <div id="btn-refill" class="btn btn-action">⛽</div>
         </div>
     </div>
 
@@ -62,7 +62,6 @@
         <h2>Job Skills</h2>
         <div class="skill-item">Driving Speed: <span id="skill-speed">1</span><br><button id="upgrade-speed">Upgrade (200 XP)</button></div>
         <div class="skill-item">Hose Range: <span id="skill-range">1</span><br><button id="upgrade-range">Upgrade (150 XP)</button></div>
-        <div class="skill-item">Tank Capacity: <span id="skill-tank">1</span><br><button id="upgrade-tank">Upgrade (300 XP)</button></div>
         <button id="close-skills" class="btn" style="margin-top:20px; width: auto; height: auto; padding: 10px; border-radius: 4px; font-size: 16px;">Close</button>
     </div>
 
@@ -75,24 +74,23 @@
             level: 1,
             xp: 0,
             xpToNextLevel: 100,
-            water: 100,
-            maxWater: 100,
-            skills: { speed: 1, range: 1, tank: 1 },
+            skills: { speed: 1, range: 1 },
             activeFires: [],
-            truckSpeed: 0.15,
+            truckSpeed: 0.07,
             truckTurnSpeed: 0.04,
             hoseActive: false,
-            refilling: false,
             maintenanceOk: true,
         };
 
         // --- CONSTANTS ---
         const PYRO_INTERVAL = 3 * 60 * 1000; // 3 minutes
-        const MAP_SIZE = 50;
-        const GRID_CELLS = 20;
+        const MAP_SIZE = 21; // 6x6 blocks
+        const GRID_CELLS = 6;
         const CELL_SIZE = MAP_SIZE / GRID_CELLS;
-        const WATER_CONSUMPTION_RATE = 0.5; // per frame
-        const REFILL_RATE = 2.0;
+        const HYDRANT_RANGE = 2.2;
+        const BUILDING_FOOTPRINT_FRACTION = 0.6;
+        const TRUCK_COLLISION_BUFFER = 0.32;
+        const STREET_MARGIN = 0.55; // clear street corridor kept between a block's edge and any house on it
 
         // --- THREE.JS BASIC SETUP ---
         const scene = new THREE.Scene();
@@ -123,66 +121,575 @@
         scene.add(dirLight);
 
         // --- WORLD GENERATION (Stylized Google Maps 3D) ---
+
+        // Procedural ground texture: grass blocks + asphalt street grid with sidewalks & lane markings
+        const createGroundTexture = () => {
+            const size = 1024;
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#7cb769';
+            ctx.fillRect(0, 0, size, size);
+
+            const cellPx = size / GRID_CELLS;
+            const roadWidth = cellPx * 0.22;
+
+            ctx.strokeStyle = '#bbbbbb';
+            ctx.lineWidth = 4;
+            for (let i = 0; i <= GRID_CELLS; i++) {
+                const pos = i * cellPx;
+                ctx.strokeRect(pos - roadWidth / 2 - 3, 0, roadWidth + 6, size);
+                ctx.strokeRect(0, pos - roadWidth / 2 - 3, size, roadWidth + 6);
+            }
+
+            ctx.fillStyle = '#4a4a4a';
+            for (let i = 0; i <= GRID_CELLS; i++) {
+                const pos = i * cellPx;
+                ctx.fillRect(pos - roadWidth / 2, 0, roadWidth, size);
+                ctx.fillRect(0, pos - roadWidth / 2, size, roadWidth);
+            }
+
+            ctx.strokeStyle = '#ffcc00';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([10, 10]);
+            for (let i = 0; i <= GRID_CELLS; i++) {
+                const pos = i * cellPx;
+                ctx.beginPath(); ctx.moveTo(pos, 0); ctx.lineTo(pos, size); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, pos); ctx.lineTo(size, pos); ctx.stroke();
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            if ('colorSpace' in texture) texture.colorSpace = THREE.SRGBColorSpace;
+            return texture;
+        };
+
         const groundGeometry = new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE);
-        const groundMaterial = new THREE.MeshPhongMaterial({ color: 0xcccccc, depthWrite: false });
+        const groundMaterial = new THREE.MeshPhongMaterial({ map: createGroundTexture(), depthWrite: false });
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
 
-        const gridHelper = new THREE.GridHelper(MAP_SIZE, GRID_CELLS, 0x000000, 0x888888);
-        gridHelper.position.y = 0.01;
-        scene.add(gridHelper);
-
-        const buildBuildings = () => {
-            const buildingsGroup = new THREE.Group();
-            for (let i = 0; i < 20; i++) {
-                const height = Math.random() * 5 + 1;
-                const geometry = new THREE.BoxGeometry(CELL_SIZE * 0.8, height, CELL_SIZE * 0.8);
-                const material = new THREE.MeshPhongMaterial({ color: 0x88aabb });
-                const building = new THREE.Mesh(geometry, material);
-                building.position.set(
-                    (Math.floor(Math.random() * GRID_CELLS) - GRID_CELLS / 2) * CELL_SIZE + CELL_SIZE/2,
-                    height / 2,
-                    (Math.floor(Math.random() * GRID_CELLS) - GRID_CELLS / 2) * CELL_SIZE + CELL_SIZE/2
-                );
-                building.castShadow = true;
-                building.receiveShadow = true;
-                buildingsGroup.add(building);
+        // Procedural window texture reused (tinted) across building facades
+        const createWindowTexture = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, 64, 128);
+            ctx.fillStyle = 'rgba(255, 245, 180, 0.9)';
+            for (let y = 8; y < 128; y += 20) {
+                for (let x = 6; x < 64; x += 16) {
+                    if (Math.random() > 0.3) ctx.fillRect(x, y, 8, 10);
+                }
             }
-            scene.add(buildingsGroup);
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            return texture;
         };
-        buildBuildings();
+        const windowTexture = createWindowTexture();
 
-        // Fire Hydrants (Yellow dots)
-        const hydrantsGroup = new THREE.Group();
-        const hydrantGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.4, 6);
-        const hydrantMat = new THREE.MeshPhongMaterial({color: 0xffcc00});
-        for(let i = 0; i<30; i++){
-            const h = new THREE.Mesh(hydrantGeo, hydrantMat);
-            h.position.set(
-                (Math.floor(Math.random() * GRID_CELLS) - GRID_CELLS / 2) * CELL_SIZE,
-                0.2,
-                (Math.floor(Math.random() * GRID_CELLS) - GRID_CELLS / 2) * CELL_SIZE
-            )
-            hydrantsGroup.add(h);
+        const BUILDING_COLORS = [0xd68c6a, 0xc9b280, 0x9fb8c4, 0xb08bbb, 0xe0c56d, 0x8fae8f, 0xc97b63];
+        const HOUSE_COLORS = [0xe8c9a0, 0xd9a5a0, 0xa9c4a5, 0xb8c9d9, 0xe0d8a0, 0xc9b3d9];
+        const ROOF_COLORS = [0x7a3b2e, 0x5c4a3a, 0x4a4a4a, 0x8a5a3a];
+
+        // A single taller apartment/downtown-style building filling most of a block
+        function addBuilding(group, x, z, footprintSize, height) {
+            const color = BUILDING_COLORS[Math.floor(Math.random() * BUILDING_COLORS.length)];
+            const geometry = new THREE.BoxGeometry(footprintSize, height, footprintSize);
+            const facadeTexture = windowTexture.clone();
+            facadeTexture.needsUpdate = true;
+            facadeTexture.repeat.set(2, Math.max(1, Math.round(height)));
+            const material = new THREE.MeshPhongMaterial({ color, map: facadeTexture });
+            const building = new THREE.Mesh(geometry, material);
+            building.position.set(x, height / 2, z);
+            building.castShadow = true;
+            building.receiveShadow = true;
+            group.add(building);
+
+            const roof = new THREE.Mesh(
+                new THREE.BoxGeometry(footprintSize + 0.1, 0.15, footprintSize + 0.1),
+                new THREE.MeshPhongMaterial({ color: 0x4a4a4a })
+            );
+            roof.position.set(x, height + 0.08, z);
+            roof.castShadow = true;
+            group.add(roof);
+
+            return { x, z, half: footprintSize / 2 };
         }
+
+        // A small single-story house with a pitched roof
+        function addHouse(group, x, z, footprintSize, height) {
+            const wallColor = HOUSE_COLORS[Math.floor(Math.random() * HOUSE_COLORS.length)];
+            const facadeTexture = windowTexture.clone();
+            facadeTexture.needsUpdate = true;
+            facadeTexture.repeat.set(1, 1);
+            const walls = new THREE.Mesh(
+                new THREE.BoxGeometry(footprintSize, height, footprintSize),
+                new THREE.MeshPhongMaterial({ color: wallColor, map: facadeTexture })
+            );
+            walls.position.set(x, height / 2, z);
+            walls.castShadow = true;
+            walls.receiveShadow = true;
+            group.add(walls);
+
+            const roof = new THREE.Mesh(
+                new THREE.ConeGeometry(footprintSize * 0.8, footprintSize * 0.55, 4),
+                new THREE.MeshPhongMaterial({ color: ROOF_COLORS[Math.floor(Math.random() * ROOF_COLORS.length)] })
+            );
+            roof.rotation.y = Math.PI / 4;
+            roof.position.set(x, height + footprintSize * 0.275, z);
+            roof.castShadow = true;
+            group.add(roof);
+
+            return { x, z, half: footprintSize / 2 };
+        }
+
+        function addTree(group, x, z) {
+            const trunk = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.08, 0.1, 0.5, 6),
+                new THREE.MeshPhongMaterial({ color: 0x6b4423 })
+            );
+            const foliage = new THREE.Mesh(
+                new THREE.ConeGeometry(0.45, 1.1, 8),
+                new THREE.MeshPhongMaterial({ color: 0x3f7d3f })
+            );
+            trunk.position.set(x, 0.25, z);
+            foliage.position.set(x, 0.95, z);
+            trunk.castShadow = foliage.castShadow = true;
+            group.add(trunk, foliage);
+        }
+
+        // Fire Station: the truck's home base. Its block is reserved (no random building/house
+        // there), and the truck spawns just outside it on the street.
+        const STATION_BLOCK = { gx: 0, gz: 0 };
+        const STATION_FOOTPRINT_FRACTION = 0.65;
+
+        function createSignTexture(text) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, 256, 64);
+            ctx.strokeStyle = '#cc1111';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(4, 4, 248, 56);
+            ctx.fillStyle = '#cc1111';
+            ctx.font = 'bold 30px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 128, 33);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function buildFireStation() {
+            const x = STATION_BLOCK.gx * CELL_SIZE + CELL_SIZE / 2;
+            const z = STATION_BLOCK.gz * CELL_SIZE + CELL_SIZE / 2;
+            const footprintSize = CELL_SIZE * STATION_FOOTPRINT_FRACTION;
+            const height = 2.4;
+            const group = new THREE.Group();
+
+            const walls = new THREE.Mesh(
+                new THREE.BoxGeometry(footprintSize, height, footprintSize),
+                new THREE.MeshPhongMaterial({ color: 0xf2ece1 })
+            );
+            walls.position.set(x, height / 2, z);
+            walls.castShadow = true;
+            walls.receiveShadow = true;
+            group.add(walls);
+
+            // Garage door facing south, toward the street
+            const doorWidth = footprintSize * 0.55;
+            const doorHeight = height * 0.7;
+            const door = new THREE.Mesh(
+                new THREE.PlaneGeometry(doorWidth, doorHeight),
+                new THREE.MeshPhongMaterial({ color: 0x2a2a2a, side: THREE.DoubleSide })
+            );
+            door.position.set(x, doorHeight / 2, z - footprintSize / 2 - 0.01);
+            group.add(door);
+
+            // Red roof cap
+            const roof = new THREE.Mesh(
+                new THREE.BoxGeometry(footprintSize + 0.15, 0.2, footprintSize + 0.15),
+                new THREE.MeshPhongMaterial({ color: 0x991111 })
+            );
+            roof.position.set(x, height + 0.1, z);
+            roof.castShadow = true;
+            group.add(roof);
+
+            // "FIRE STATION" sign above the door
+            const sign = new THREE.Mesh(
+                new THREE.PlaneGeometry(footprintSize * 0.7, 0.45),
+                new THREE.MeshBasicMaterial({ map: createSignTexture('FIRE STATION'), side: THREE.DoubleSide })
+            );
+            sign.position.set(x, doorHeight + 0.35, z - footprintSize / 2 - 0.02);
+            group.add(sign);
+
+            scene.add(group);
+            return { x, z, half: footprintSize / 2 };
+        }
+
+        const buildTown = () => {
+            const townGroup = new THREE.Group();
+            const structures = []; // {x, z, half} of every building/house, used for collision + fire spawns
+
+            for (let gx = -GRID_CELLS / 2; gx < GRID_CELLS / 2; gx++) {
+                for (let gz = -GRID_CELLS / 2; gz < GRID_CELLS / 2; gz++) {
+                    if (gx === STATION_BLOCK.gx && gz === STATION_BLOCK.gz) continue; // reserved for the fire station
+
+                    const blockX = gx * CELL_SIZE + CELL_SIZE / 2;
+                    const blockZ = gz * CELL_SIZE + CELL_SIZE / 2;
+                    const roll = Math.random();
+
+                    if (roll < 0.15) {
+                        // Open park block
+                        const treeCount = 1 + Math.floor(Math.random() * 3);
+                        for (let t = 0; t < treeCount; t++) {
+                            addTree(
+                                townGroup,
+                                blockX + (Math.random() - 0.5) * CELL_SIZE * 0.7,
+                                blockZ + (Math.random() - 0.5) * CELL_SIZE * 0.7
+                            );
+                        }
+                    } else if (roll < 0.3) {
+                        // Taller apartment/downtown building for skyline variety
+                        const footprintSize = CELL_SIZE * BUILDING_FOOTPRINT_FRACTION;
+                        const height = Math.random() * 5 + 2.5;
+                        structures.push(addBuilding(townGroup, blockX, blockZ, footprintSize, height));
+                    } else {
+                        // Several small houses in a 2x2 grid, kept well inside the block so a
+                        // clear street corridor remains between the houses and the road
+                        const buildableSize = CELL_SIZE - STREET_MARGIN * 2;
+                        const lotSize = buildableSize / 2;
+                        const houseFootprint = lotSize * 0.5;
+                        for (let lx = 0; lx < 2; lx++) {
+                            for (let lz = 0; lz < 2; lz++) {
+                                if (Math.random() < 0.15) continue; // occasional empty yard
+                                const hx = blockX - buildableSize / 2 + lotSize / 2 + lx * lotSize;
+                                const hz = blockZ - buildableSize / 2 + lotSize / 2 + lz * lotSize;
+                                const height = 0.75 + Math.random() * 0.35;
+                                structures.push(addHouse(townGroup, hx, hz, houseFootprint, height));
+                            }
+                        }
+                    }
+                }
+            }
+
+            scene.add(townGroup);
+            return structures;
+        };
+        const structures = buildTown(); // fire-eligible buildings/houses
+        const fireStation = buildFireStation();
+        const obstacles = structures.concat([fireStation]); // everything the truck can't drive through
+
+        function collidesWithBuilding(pos) {
+            for (const s of obstacles) {
+                if (Math.abs(pos.x - s.x) < s.half + TRUCK_COLLISION_BUFFER &&
+                    Math.abs(pos.z - s.z) < s.half + TRUCK_COLLISION_BUFFER) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Fire Hydrants (spread evenly around the city at street intersections)
+        const hydrantsGroup = new THREE.Group();
+
+        function createHydrant() {
+            const group = new THREE.Group();
+
+            // Light concrete pad so the hydrant reads clearly against grass/asphalt from above
+            const pad = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.4, 0.4, 0.04, 12),
+                new THREE.MeshPhongMaterial({ color: 0xd8d8d8 })
+            );
+            pad.position.y = 0.02;
+            pad.receiveShadow = true;
+
+            const body = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.16, 0.2, 0.55, 8),
+                new THREE.MeshPhongMaterial({ color: 0xdd2222 })
+            );
+            body.position.y = 0.32;
+            body.castShadow = true;
+
+            const cap = new THREE.Mesh(
+                new THREE.SphereGeometry(0.18, 8, 8),
+                new THREE.MeshPhongMaterial({ color: 0xdd2222 })
+            );
+            cap.position.y = 0.6;
+            cap.castShadow = true;
+
+            const nozzleGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.16, 6);
+            const nozzleMat = new THREE.MeshPhongMaterial({ color: 0xffcc00 });
+            const nozzleLeft = new THREE.Mesh(nozzleGeo, nozzleMat);
+            nozzleLeft.rotation.z = Math.PI / 2;
+            nozzleLeft.position.set(-0.22, 0.42, 0);
+            const nozzleRight = nozzleLeft.clone();
+            nozzleRight.position.x = 0.22;
+
+            group.add(pad, body, cap, nozzleLeft, nozzleRight);
+            group.userData.body = body;
+            return group;
+        }
+
+        const intersections = [];
+        for (let i = 0; i <= GRID_CELLS; i++) {
+            for (let j = 0; j <= GRID_CELLS; j++) {
+                intersections.push({
+                    x: (i - GRID_CELLS / 2) * CELL_SIZE,
+                    z: (j - GRID_CELLS / 2) * CELL_SIZE
+                });
+            }
+        }
+        for (let i = intersections.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [intersections[i], intersections[j]] = [intersections[j], intersections[i]];
+        }
+
+        const HYDRANT_COUNT = 14;
+        intersections.slice(0, HYDRANT_COUNT).forEach(spot => {
+            const h = createHydrant();
+            h.position.set(spot.x, 0, spot.z);
+            hydrantsGroup.add(h);
+        });
         scene.add(hydrantsGroup);
 
         // --- THE FIRE TRUCK (Player) ---
-        const truckGeometry = new THREE.BoxGeometry(0.6, 0.8, 1.8);
-        const truckMaterial = new THREE.MeshPhongMaterial({ color: 0xff2200 });
-        const truck = new THREE.Mesh(truckGeometry, truckMaterial);
-        truck.position.set(0, 0.4, 0); // Start at station
-        truck.castShadow = true;
+        const truck = new THREE.Group();
+        truck.position.set(0, 0, 0); // Start at station
+
+        const truckRedMat = new THREE.MeshPhongMaterial({ color: 0xd6281e, shininess: 60 });
+        const truckDarkMat = new THREE.MeshPhongMaterial({ color: 0x1a1a1a });
+        const truckSilverMat = new THREE.MeshPhongMaterial({ color: 0xcccccc, shininess: 80 });
+        const truckGlassMat = new THREE.MeshPhongMaterial({ color: 0x9fd8ff, shininess: 100, transparent: true, opacity: 0.85 });
+        const truckWhiteMat = new THREE.MeshPhongMaterial({ color: 0xf2f2f2 });
+
+        // Main body / water tank
+        const truckBody = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.55, 1.9), truckRedMat);
+        truckBody.position.y = 0.5;
+        truckBody.castShadow = true;
+        truck.add(truckBody);
+
+        // Cab (front)
+        const truckCab = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.5, 0.6), truckRedMat);
+        truckCab.position.set(0, 0.55, -0.85);
+        truckCab.castShadow = true;
+        truck.add(truckCab);
+
+        // Windshield
+        const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.32, 0.05), truckGlassMat);
+        windshield.position.set(0, 0.62, -1.14);
+        truck.add(windshield);
+
+        // Roof trim stripe
+        const roofTrim = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.06, 2.5), truckWhiteMat);
+        roofTrim.position.set(0, 0.79, -0.35);
+        truck.add(roofTrim);
+
+        // Ladder on top
+        const ladder = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.12, 1.5), truckSilverMat);
+        ladder.position.set(0, 0.88, 0.2);
+        ladder.castShadow = true;
+        truck.add(ladder);
+        for (let i = -1; i <= 1; i++) {
+            const rung = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.03, 0.03), truckDarkMat);
+            rung.position.set(0, 0.94, 0.2 + i * 0.45);
+            truck.add(rung);
+        }
+
+        // Front bumper
+        const bumper = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.15, 0.1), truckDarkMat);
+        bumper.position.set(0, 0.28, -1.18);
+        truck.add(bumper);
+
+        // Emergency light bar
+        const lightBarBase = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.15), truckDarkMat);
+        lightBarBase.position.set(0, 0.85, -0.85);
+        truck.add(lightBarBase);
+        const redBeacon = new THREE.Mesh(
+            new THREE.BoxGeometry(0.18, 0.08, 0.12),
+            new THREE.MeshPhongMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 1 })
+        );
+        redBeacon.position.set(-0.15, 0.9, -0.85);
+        truck.add(redBeacon);
+        const amberBeacon = new THREE.Mesh(
+            new THREE.BoxGeometry(0.18, 0.08, 0.12),
+            new THREE.MeshPhongMaterial({ color: 0xffaa00, emissive: 0xffaa00, emissiveIntensity: 1 })
+        );
+        amberBeacon.position.set(0.15, 0.9, -0.85);
+        truck.add(amberBeacon);
+
+        // Wheels
+        const wheelGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.2, 12);
+        const wheelPositions = [
+            [-0.42, 0.22, -0.75], [0.42, 0.22, -0.75],
+            [-0.42, 0.22, 0.75], [0.42, 0.22, 0.75]
+        ];
+        wheelPositions.forEach(([x, y, z]) => {
+            const wheel = new THREE.Mesh(wheelGeo, truckDarkMat);
+            wheel.rotation.z = Math.PI / 2;
+            wheel.position.set(x, y, z);
+            wheel.castShadow = true;
+            truck.add(wheel);
+        });
+
+        truck.scale.setScalar(0.8); // scale the whole rig down a bit
         scene.add(truck);
 
-        // Hose marker (helper visual)
-        const hoseGeo = new THREE.RingGeometry(1, 1.1, 12);
-        const hoseMat = new THREE.MeshBasicMaterial({color: 0x00aaff, transparent: true, opacity: 0});
+        // Water splash marker, shown at the fire's position while it's being doused
+        const hoseGeo = new THREE.RingGeometry(0.6, 0.8, 24);
+        const hoseMat = new THREE.MeshBasicMaterial({color: 0x00aaff, transparent: true, opacity: 0, side: THREE.DoubleSide});
         const hoseMarker = new THREE.Mesh(hoseGeo, hoseMat);
         hoseMarker.rotation.x = -Math.PI / 2;
-        truck.add(hoseMarker);
+        hoseMarker.visible = false;
+        scene.add(hoseMarker);
+
+        // --- FIREFIGHTING CREW & HOSE ---
+        function createFirefighter() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(
+                new THREE.CapsuleGeometry(0.12, 0.3, 4, 8),
+                new THREE.MeshPhongMaterial({ color: 0xffcc00 })
+            );
+            body.position.y = 0.33;
+            body.castShadow = true;
+            const head = new THREE.Mesh(
+                new THREE.SphereGeometry(0.12, 8, 8),
+                new THREE.MeshPhongMaterial({ color: 0xe8b88a })
+            );
+            head.position.y = 0.6;
+            head.castShadow = true;
+            const helmet = new THREE.Mesh(
+                new THREE.SphereGeometry(0.14, 8, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+                new THREE.MeshPhongMaterial({ color: 0xdddddd })
+            );
+            helmet.position.y = 0.64;
+            helmet.castShadow = true;
+            group.add(body, head, helmet);
+            group.visible = false;
+            return group;
+        }
+        const crew = [createFirefighter(), createFirefighter(), createFirefighter()];
+        crew.forEach(c => scene.add(c));
+
+        // Hose line mesh, stretched/oriented between two points each frame
+        const hoseLineGeo = new THREE.CylinderGeometry(0.04, 0.04, 1, 6);
+        const hoseLineMat = new THREE.MeshPhongMaterial({ color: 0xaa2222 });
+        const hoseLine = new THREE.Mesh(hoseLineGeo, hoseLineMat);
+        hoseLine.visible = false;
+        scene.add(hoseLine);
+
+        function orientHoseLine(start, end) {
+            const dir = new THREE.Vector3().subVectors(end, start);
+            const len = Math.max(dir.length(), 0.001);
+            hoseLine.position.copy(start).addScaledVector(dir, 0.5);
+            hoseLine.scale.set(1, len, 1);
+            hoseLine.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+        }
+
+        // Hydrant -> fire response state machine
+        const fireResponse = { state: 'idle', timer: 0, hydrant: null, fire: null, advanceDuration: 1000, extinguishStartScale: 1 };
+
+        function getHoseRunRange() {
+            return MAP_SIZE * 0.6 + (gameState.skills.range - 1) * 4;
+        }
+
+        function startFireResponse(hydrant, fire) {
+            fireResponse.state = 'deploy';
+            fireResponse.timer = 0;
+            fireResponse.hydrant = hydrant;
+            fireResponse.fire = fire;
+            crew.forEach((c, i) => {
+                c.visible = true;
+                c.position.copy(truck.position).add(new THREE.Vector3((i - 1) * 0.3, 0, 0.3));
+            });
+        }
+
+        function updateFireResponse() {
+            if (fireResponse.state === 'idle') return;
+            const hydrant = fireResponse.hydrant;
+            const fire = fireResponse.fire;
+            const hydrantGround = hydrant.position.clone().setY(0.15);
+
+            if (fireResponse.state === 'deploy') {
+                fireResponse.timer += 16;
+                const t = Math.min(fireResponse.timer / 500, 1);
+                crew.forEach((c, i) => {
+                    const start = truck.position.clone().add(new THREE.Vector3((i - 1) * 0.3, 0, 0.3));
+                    const target = hydrant.position.clone().add(new THREE.Vector3((i - 1) * 0.35, 0, 0.35));
+                    c.position.lerpVectors(start, target, t);
+                });
+                if (t >= 1) { fireResponse.state = 'connect'; fireResponse.timer = 0; }
+            }
+            else if (fireResponse.state === 'connect') {
+                hoseLine.visible = true;
+                orientHoseLine(hydrantGround, hydrantGround.clone().add(new THREE.Vector3(0.001, 0, 0.001)));
+                fireResponse.timer += 16;
+                if (fireResponse.timer >= 600) {
+                    fireResponse.state = 'advance';
+                    fireResponse.timer = 0;
+                    fireResponse.advanceDuration = THREE.MathUtils.clamp(hydrant.position.distanceTo(fire.position) * 220, 700, 3000);
+                }
+            }
+            else if (fireResponse.state === 'advance') {
+                fireResponse.timer += 16;
+                const t = Math.min(fireResponse.timer / fireResponse.advanceDuration, 1);
+                const nozzlePos = hydrant.position.clone().lerp(fire.position, t).setY(0.15);
+                orientHoseLine(hydrantGround, nozzlePos);
+                crew[0].position.copy(hydrant.position).add(new THREE.Vector3(-0.35, 0, 0.35));
+                crew[1].position.copy(nozzlePos);
+                crew[2].position.copy(hydrant.position.clone().lerp(fire.position, Math.max(0, t - 0.08)).setY(0));
+                crew[1].lookAt(fire.position.x, 0, fire.position.z);
+                crew[2].lookAt(fire.position.x, 0, fire.position.z);
+                if (t >= 1) {
+                    fireResponse.state = 'extinguish';
+                    fireResponse.timer = 0;
+                    fireResponse.extinguishStartScale = fire.userData.growth;
+                }
+            }
+            else if (fireResponse.state === 'extinguish') {
+                hoseMarker.visible = true;
+                hoseMarker.position.set(fire.position.x, 0.05, fire.position.z);
+                const pulse = 1 + Math.sin(fireResponse.timer * 0.02) * 0.15;
+                hoseMarker.scale.set(pulse, pulse, 1);
+                hoseMarker.material.opacity = 0.5;
+
+                fireResponse.timer += 16;
+                const startScale = fireResponse.extinguishStartScale;
+                fire.scale.setScalar(Math.max(0.15, startScale * (1 - fireResponse.timer / 1800)));
+
+                if (fireResponse.timer >= 1800) {
+                    scene.remove(fire);
+                    gameState.activeFires.splice(gameState.activeFires.indexOf(fire), 1);
+                    gainXP(150);
+                    if (gameState.activeFires.length === 0) {
+                        document.getElementById('emergency-alert').style.display = 'none';
+                    }
+                    hoseMarker.visible = false;
+                    fireResponse.state = 'retreat';
+                    fireResponse.timer = 0;
+                }
+            }
+            else if (fireResponse.state === 'retreat') {
+                fireResponse.timer += 16;
+                const t = Math.min(fireResponse.timer / 700, 1);
+                crew.forEach((c, i) => {
+                    const from = hydrant.position.clone().add(new THREE.Vector3((i - 1) * 0.35, 0, 0.35));
+                    const to = truck.position.clone().add(new THREE.Vector3((i - 1) * 0.3, 0, 0.3));
+                    c.position.lerpVectors(from, to, t);
+                });
+                hoseLine.visible = t < 0.5;
+                if (t >= 1) {
+                    crew.forEach(c => c.visible = false);
+                    hoseLine.visible = false;
+                    fireResponse.state = 'idle';
+                    fireResponse.hydrant = null;
+                    fireResponse.fire = null;
+                }
+            }
+        }
 
         // --- GAMEPLAY MECHANICS ---
 
@@ -193,25 +700,74 @@
             setTimeout(setNewFire, 1000);
         }
 
-        const fireMaterial = new THREE.MeshBasicMaterial({color: 0xff3300});
-        function setNewFire() {
-            const fireGeo = new THREE.DodecahedronGeometry(0.5);
-            const fire = new THREE.Mesh(fireGeo, fireMaterial);
-            
-            // Random street intersection
-            fire.position.set(
-                (Math.floor(Math.random() * GRID_CELLS) - GRID_CELLS / 2) * CELL_SIZE,
-                0.3,
-                (Math.floor(Math.random() * GRID_CELLS) - GRID_CELLS / 2) * CELL_SIZE
-            );
-            
-            // Add a point light to the fire
+        const FIRE_GROWTH_INTERVAL = 2000; // ms
+        const FIRE_GROWTH_STEP = 0.18;
+        const FIRE_MAX_SCALE = 3.0;
+
+        // Layered, flickering flame: a stack of tapering cones (deep red base -> yellow tip) + glow light
+        function createFireVisual() {
+            const group = new THREE.Group();
+            const layers = [
+                { radius: 0.34, height: 0.7, y: 0.35, color: 0xcc2200 },
+                { radius: 0.24, height: 0.58, y: 0.56, color: 0xff6600 },
+                { radius: 0.14, height: 0.42, y: 0.74, color: 0xffcc33 }
+            ];
+            const flameMeshes = layers.map(l => {
+                const mesh = new THREE.Mesh(
+                    new THREE.ConeGeometry(l.radius, l.height, 8),
+                    new THREE.MeshBasicMaterial({ color: l.color, transparent: true, opacity: 0.92 })
+                );
+                mesh.position.y = l.y;
+                group.add(mesh);
+                return mesh;
+            });
+
             const fireLight = new THREE.PointLight(0xff6600, 2, 5);
-            fire.add(fireLight);
-            
+            fireLight.position.y = 0.5;
+            group.add(fireLight);
+
+            group.userData.flameMeshes = flameMeshes;
+            group.userData.light = fireLight;
+            group.userData.age = 0;
+            group.userData.growth = 1;
+            group.userData.flickerSeed = Math.random() * 100;
+            return group;
+        }
+
+        function updateFires() {
+            const now = performance.now();
+            gameState.activeFires.forEach(fire => {
+                const beingDoused = fireResponse.state === 'extinguish' && fireResponse.fire === fire;
+
+                if (!beingDoused) {
+                    fire.userData.age += 16;
+                    if (fire.userData.age >= FIRE_GROWTH_INTERVAL) {
+                        fire.userData.age -= FIRE_GROWTH_INTERVAL;
+                        fire.userData.growth = Math.min(FIRE_MAX_SCALE, fire.userData.growth + FIRE_GROWTH_STEP);
+                        fire.scale.setScalar(fire.userData.growth);
+                    }
+                }
+
+                // Flicker: gentle flame-height pulsing, light-intensity pulsing, slow spin
+                const seed = fire.userData.flickerSeed;
+                fire.rotation.y += 0.015;
+                fire.userData.flameMeshes.forEach((m, i) => {
+                    m.scale.y = 1 + Math.sin(now * 0.01 + seed + i * 1.3) * 0.08;
+                });
+                fire.userData.light.intensity = 1.6 + Math.sin(now * 0.02 + seed) * 0.6;
+            });
+        }
+
+        function setNewFire() {
+            if (structures.length === 0) return;
+            const spot = structures[Math.floor(Math.random() * structures.length)];
+
+            const fire = createFireVisual();
+            fire.position.set(spot.x, 0, spot.z);
+
             scene.add(fire);
             gameState.activeFires.push(fire);
-            
+
             document.getElementById('emergency-alert').style.display = 'block';
             console.warn("PYRO ALERT: New fire set at:", fire.position);
         }
@@ -231,7 +787,7 @@
 
         // --- CONTROLS & INPUT ---
         const keys = { up: false, down: false, left: false, right: false };
-        const virtualKeys = { up: false, down: false, left: false, right: false, hose: false, refill: false };
+        const virtualKeys = { hose: false };
 
         // Real Keyboard Events
         window.addEventListener('keydown', e => {
@@ -239,48 +795,96 @@
             if (e.key === 'ArrowDown') keys.down = true;
             if (e.key === 'ArrowLeft') keys.left = true;
             if (e.key === 'ArrowRight') keys.right = true;
+            if (e.key === ' ') virtualKeys.hose = true;
         });
         window.addEventListener('keyup', e => {
             if (e.key === 'ArrowUp') keys.up = false;
             if (e.key === 'ArrowDown') keys.down = false;
             if (e.key === 'ArrowLeft') keys.left = false;
             if (e.key === 'ArrowRight') keys.right = false;
+            if (e.key === ' ') virtualKeys.hose = false;
         });
 
-        // Mobile Touch Events (Binding virtual buttons to logic)
+        // Mobile Touch Events (Binding virtual action buttons to logic)
         function bindVirtualBtn(id, keyName) {
             const btn = document.getElementById(id);
             btn.addEventListener('pointerdown', e => { e.preventDefault(); virtualKeys[keyName] = true; });
             btn.addEventListener('pointerup', e => { e.preventDefault(); virtualKeys[keyName] = false; });
         }
-        bindVirtualBtn('btn-up', 'up');
-        bindVirtualBtn('btn-down', 'down');
-        bindVirtualBtn('btn-left', 'left');
-        bindVirtualBtn('btn-right', 'right');
         bindVirtualBtn('btn-hose', 'hose');
-        bindVirtualBtn('btn-refill', 'refill');
+
+        // Joystick (touch/iPad movement control)
+        const joystickBase = document.getElementById('joystick-base');
+        const joystickKnob = document.getElementById('joystick-knob');
+        const joystickVector = { x: 0, y: 0 }; // -1..1, y positive = forward
+        const JOY_RADIUS = 45;
+        let joystickPointerId = null;
+
+        function handleJoystickMove(clientX, clientY) {
+            const rect = joystickBase.getBoundingClientRect();
+            const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            let dx = clientX - center.x;
+            let dy = clientY - center.y;
+            const dist = Math.min(Math.hypot(dx, dy), JOY_RADIUS);
+            const angle = Math.atan2(dy, dx);
+            dx = Math.cos(angle) * dist;
+            dy = Math.sin(angle) * dist;
+            joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+            joystickVector.x = dx / JOY_RADIUS;
+            joystickVector.y = -dy / JOY_RADIUS;
+        }
+        function resetJoystick() {
+            joystickPointerId = null;
+            joystickKnob.style.transform = 'translate(0px, 0px)';
+            joystickVector.x = 0;
+            joystickVector.y = 0;
+        }
+        joystickBase.addEventListener('pointerdown', e => {
+            e.preventDefault();
+            joystickPointerId = e.pointerId;
+            handleJoystickMove(e.clientX, e.clientY);
+        });
+        window.addEventListener('pointermove', e => {
+            if (joystickPointerId === e.pointerId) handleJoystickMove(e.clientX, e.clientY);
+        });
+        window.addEventListener('pointerup', e => {
+            if (joystickPointerId === e.pointerId) resetJoystick();
+        });
+        window.addEventListener('pointercancel', e => {
+            if (joystickPointerId === e.pointerId) resetJoystick();
+        });
 
         // --- UI INTERACTION ---
         const skillsMenu = document.getElementById('skills-menu');
         document.getElementById('toggle-skills').addEventListener('click', () => skillsMenu.style.display = 'block');
         document.getElementById('close-skills').addEventListener('click', () => skillsMenu.style.display = 'none');
 
+        const RESPONSE_STATUS_TEXT = {
+            deploy: '🚒 Crew jumping out...',
+            connect: '🔧 Connecting hose to hydrant...',
+            advance: '🏃 Running hose to the fire...',
+            extinguish: '💦 Dousing the fire...',
+            retreat: '↩️ Crew heading back to the truck...'
+        };
+
         function updateHUD() {
             document.getElementById('stat-level').innerText = gameState.level;
             document.getElementById('stat-xp').innerText = `${gameState.xp}/${gameState.xpToNextLevel}`;
-            document.getElementById('stat-water').innerText = gameState.water.toFixed(0);
+
+            const statusEl = document.getElementById('hud-status');
+            const statusText = RESPONSE_STATUS_TEXT[fireResponse.state];
+            statusEl.style.display = statusText ? 'block' : 'none';
+            if (statusText) statusEl.innerText = statusText;
         }
 
         function updateSkillsMenu() {
             document.getElementById('skill-speed').innerText = gameState.skills.speed;
             document.getElementById('skill-range').innerText = gameState.skills.range;
-            document.getElementById('skill-tank').innerText = gameState.skills.tank;
-            
+
             // Show upgrade buttons if XP allows (Simplified: Level threshold for now)
             const showBtn = (id) => document.getElementById(id).style.display = gameState.level >= gameState.skills.speed + 1 ? 'block' : 'none';
             showBtn('upgrade-speed');
             showBtn('upgrade-range');
-            showBtn('upgrade-tank');
         }
 
         // Skill upgrades (apply logic here)
@@ -289,73 +893,89 @@
             gameState.truckSpeed += 0.05;
             updateSkillsMenu();
         });
+        document.getElementById('upgrade-range').addEventListener('click', () => {
+            gameState.skills.range++;
+            updateSkillsMenu();
+        });
 
         // --- THE GAME LOOP (Update and Render) ---
+        const halfMap = MAP_SIZE / 2 - 0.6;
         function animate() {
             requestAnimationFrame(animate);
 
-            // Driving Physics (Combined Keyboard + Virtual)
-            let moveSpeed = 0;
-            if (keys.up || virtualKeys.up) moveSpeed = gameState.truckSpeed;
-            if (keys.down || virtualKeys.down) moveSpeed = -gameState.truckSpeed * 0.5;
+            // Driving Physics (Keyboard + Joystick), frozen while the crew is out fighting a fire
+            if (fireResponse.state === 'idle') {
+                let moveSpeed = 0;
+                if (keys.up) moveSpeed = gameState.truckSpeed;
+                if (keys.down) moveSpeed = -gameState.truckSpeed * 0.5;
+                if (Math.abs(joystickVector.y) > 0.12) {
+                    moveSpeed = joystickVector.y > 0
+                        ? gameState.truckSpeed * joystickVector.y
+                        : gameState.truckSpeed * 0.5 * joystickVector.y;
+                }
 
-            truck.translateZ(-moveSpeed);
+                let turnSpeed = 0;
+                if (keys.left) turnSpeed = gameState.truckTurnSpeed;
+                if (keys.right) turnSpeed = -gameState.truckTurnSpeed;
+                if (Math.abs(joystickVector.x) > 0.12) turnSpeed = -joystickVector.x * gameState.truckTurnSpeed;
 
-            let turnSpeed = 0;
-            if (keys.left || virtualKeys.left) turnSpeed = gameState.truckTurnSpeed;
-            if (keys.right || virtualKeys.right) turnSpeed = -gameState.truckTurnSpeed;
+                if (moveSpeed !== 0) {
+                    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(truck.quaternion);
 
-            if (moveSpeed !== 0) truck.rotateY(turnSpeed);
+                    // Resolve X and Z movement independently so the truck can slide along a
+                    // wall/corner instead of freezing when only the combined diagonal move collides
+                    const testX = THREE.MathUtils.clamp(truck.position.x + forward.x * moveSpeed, -halfMap, halfMap);
+                    if (!collidesWithBuilding(new THREE.Vector3(testX, 0, truck.position.z))) {
+                        truck.position.x = testX;
+                    }
 
-            // Water Mechanic
-            gameState.refilling = false;
-            // Near Hydrant Check
-            let nearHydrant = false;
+                    const testZ = THREE.MathUtils.clamp(truck.position.z + forward.z * moveSpeed, -halfMap, halfMap);
+                    if (!collidesWithBuilding(new THREE.Vector3(truck.position.x, 0, testZ))) {
+                        truck.position.z = testZ;
+                    }
+
+                    truck.rotateY(turnSpeed);
+                }
+            }
+
+            // Near Hydrant Check (city water supply, so no tank to refill - just find the closest one)
+            let nearbyHydrantObj = null;
             hydrantsGroup.children.forEach(h => {
-                if(truck.position.distanceTo(h.position) < 2.0) {
-                    nearHydrant = true;
+                if(truck.position.distanceTo(h.position) < HYDRANT_RANGE) {
+                    if (!nearbyHydrantObj) nearbyHydrantObj = h;
                     // Maintenance Check is implicit if no fires exist
-                    if(gameState.activeFires.length === 0 && h.material.color.g !== 1.0){
+                    if(gameState.activeFires.length === 0 && h.userData.body.material.color.g !== 1.0){
                         // Make hydrant 'OK' green after check
-                        h.material.color.set(0x00ff00);
+                        h.userData.body.material.color.set(0x00ff00);
                         console.log("Hydrant Maintenance Check Complete.");
                     }
                 }
             });
 
-            if (nearHydrant && virtualKeys.refill && gameState.water < gameState.maxWater) {
-                gameState.refilling = true;
-                gameState.water += REFILL_RATE;
-                if (gameState.water > gameState.maxWater) gameState.water = gameState.maxWater;
-            }
+            updateFires();
 
-            // Hose Mechanic
-            hoseMarker.material.opacity = 0; // Default
-            if (virtualKeys.hose && gameState.water > 0 && !gameState.refilling) {
-                hoseMarker.material.opacity = 0.5; // Visual feedback
-                const hoseRange = gameState.skills.range + 1;
-                hoseMarker.scale.set(hoseRange, hoseRange, 1);
-                gameState.water -= WATER_CONSUMPTION_RATE;
-
-                // Fire Extinguishing Logic
-                gameState.activeFires.forEach((fire, index) => {
-                    if (truck.position.distanceTo(fire.position) < hoseRange) {
-                        // Extinguished!
-                        console.log("FIRE OUT!");
-                        scene.remove(fire);
-                        gameState.activeFires.splice(index, 1);
-                        gainXP(150); // Skill Gain
-                        if(gameState.activeFires.length === 0){
-                             document.getElementById('emergency-alert').style.display = 'none';
-                        }
-                    }
-                });
+            // Hose Mechanic: pull up to a hydrant, and the crew runs a hose out to the fire
+            if (fireResponse.state === 'idle') {
+                if (virtualKeys.hose && nearbyHydrantObj && gameState.activeFires.length) {
+                    const runRange = getHoseRunRange();
+                    const reachableFire = gameState.activeFires.find(
+                        fire => nearbyHydrantObj.position.distanceTo(fire.position) < runRange
+                    );
+                    if (reachableFire) startFireResponse(nearbyHydrantObj, reachableFire);
+                }
+            } else {
+                updateFireResponse();
             }
 
             // Camera follow (Steep top-down, locked relative position)
             const cameraOffset = new THREE.Vector3(frustumSize * 0.7, frustumSize * 1.5, frustumSize * 0.7);
             camera.position.lerp(truck.position.clone().add(cameraOffset), 0.1);
             camera.lookAt(truck.position.clone().add(new THREE.Vector3(0,0.5,0)));
+
+            // Emergency light bar blink
+            const blinkPhase = Math.floor(performance.now() / 300) % 2 === 0;
+            redBeacon.material.emissiveIntensity = blinkPhase ? 1.2 : 0.15;
+            amberBeacon.material.emissiveIntensity = blinkPhase ? 0.15 : 1.2;
 
             updateHUD();
             renderer.render(scene, camera);
