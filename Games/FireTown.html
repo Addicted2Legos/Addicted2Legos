@@ -40,7 +40,9 @@
     <!-- HUD Overlay -->
     <div id="hud">
         <div class="hud-stat">Level: <span id="stat-level">1</span> (XP: <span id="stat-xp">0/100</span>)</div>
+        <div class="hud-stat">Fuel: <span id="stat-fuel">100</span>%</div>
         <div id="emergency-alert" class="hud-stat emergency-blink" style="display:none;">! NEW FIRE REPORTED !</div>
+        <div id="out-of-gas" class="hud-stat emergency-blink" style="display:none;">⛽ OUT OF GAS - refuel at the station!</div>
         <div id="hud-status" class="hud-stat" style="display:none;"></div>
     </div>
 
@@ -76,6 +78,8 @@
             xpToNextLevel: 100,
             skills: { speed: 1, range: 1 },
             activeFires: [],
+            fuel: 100,
+            maxFuel: 100,
             truckSpeed: 0.07,
             truckTurnSpeed: 0.04,
             hoseActive: false,
@@ -91,6 +95,11 @@
         const BUILDING_FOOTPRINT_FRACTION = 0.6;
         const TRUCK_COLLISION_BUFFER = 0.32;
         const STREET_MARGIN = 0.55; // clear street corridor kept between a block's edge and any house on it
+        const FUEL_DRAIN_MS = 5 * 60 * 1000; // empty tank after 5 minutes
+        const FUEL_DRAIN_PER_FRAME = gameState.maxFuel / (FUEL_DRAIN_MS / 16);
+        const REFUEL_RANGE = 3.0;
+        const REFUEL_RATE = gameState.maxFuel / (8000 / 16); // full tank in ~8 seconds
+        const DOOR_TRIGGER_RANGE = 3.0;
 
         // --- THREE.JS BASIC SETUP ---
         const scene = new THREE.Scene();
@@ -265,17 +274,25 @@
         // there), and the truck spawns just outside it on the street.
         const STATION_BLOCK = { gx: 0, gz: 0 };
         const STATION_FOOTPRINT_FRACTION = 0.65;
+        const STATION_X = STATION_BLOCK.gx * CELL_SIZE + CELL_SIZE / 2;
+        const STATION_Z = STATION_BLOCK.gz * CELL_SIZE + CELL_SIZE / 2;
 
-        function createSignTexture(text) {
+        // Sinclair Gas Station: on the far corner of the map from the fire station
+        const GAS_STATION_BLOCK = { gx: -GRID_CELLS / 2, gz: -GRID_CELLS / 2 };
+        const GAS_STATION_FOOTPRINT_FRACTION = 0.28; // just the kiosk; the canopy/pumps stay open to drive under
+        const GAS_STATION_X = GAS_STATION_BLOCK.gx * CELL_SIZE + CELL_SIZE / 2;
+        const GAS_STATION_Z = GAS_STATION_BLOCK.gz * CELL_SIZE + CELL_SIZE / 2;
+
+        function createSignTexture(text, color) {
             const canvas = document.createElement('canvas');
             canvas.width = 256; canvas.height = 64;
             const ctx = canvas.getContext('2d');
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, 256, 64);
-            ctx.strokeStyle = '#cc1111';
+            ctx.strokeStyle = color;
             ctx.lineWidth = 4;
             ctx.strokeRect(4, 4, 248, 56);
-            ctx.fillStyle = '#cc1111';
+            ctx.fillStyle = color;
             ctx.font = 'bold 30px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -283,9 +300,23 @@
             return new THREE.CanvasTexture(canvas);
         }
 
+        function createGarageDoorTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#3a3a3a';
+            ctx.fillRect(0, 0, 128, 128);
+            ctx.strokeStyle = '#1a1a1a';
+            ctx.lineWidth = 3;
+            for (let y = 16; y < 128; y += 16) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(128, y); ctx.stroke();
+            }
+            return new THREE.CanvasTexture(canvas);
+        }
+
         function buildFireStation() {
-            const x = STATION_BLOCK.gx * CELL_SIZE + CELL_SIZE / 2;
-            const z = STATION_BLOCK.gz * CELL_SIZE + CELL_SIZE / 2;
+            const x = STATION_X;
+            const z = STATION_Z;
             const footprintSize = CELL_SIZE * STATION_FOOTPRINT_FRACTION;
             const height = 2.4;
             const group = new THREE.Group();
@@ -299,14 +330,16 @@
             walls.receiveShadow = true;
             group.add(walls);
 
-            // Garage door facing south, toward the street
+            // Garage door facing south, toward the street. It slides up into the header when
+            // the truck is nearby (see updateGarageDoor), so the truck visibly pulls in and out.
             const doorWidth = footprintSize * 0.55;
             const doorHeight = height * 0.7;
             const door = new THREE.Mesh(
                 new THREE.PlaneGeometry(doorWidth, doorHeight),
-                new THREE.MeshPhongMaterial({ color: 0x2a2a2a, side: THREE.DoubleSide })
+                new THREE.MeshPhongMaterial({ map: createGarageDoorTexture(), side: THREE.DoubleSide })
             );
-            door.position.set(x, doorHeight / 2, z - footprintSize / 2 - 0.01);
+            const doorBaseY = doorHeight / 2;
+            door.position.set(x, doorBaseY, z - footprintSize / 2 - 0.01);
             group.add(door);
 
             // Red roof cap
@@ -321,13 +354,148 @@
             // "FIRE STATION" sign above the door
             const sign = new THREE.Mesh(
                 new THREE.PlaneGeometry(footprintSize * 0.7, 0.45),
-                new THREE.MeshBasicMaterial({ map: createSignTexture('FIRE STATION'), side: THREE.DoubleSide })
+                new THREE.MeshBasicMaterial({ map: createSignTexture('FIRE STATION', '#cc1111'), side: THREE.DoubleSide })
             );
             sign.position.set(x, doorHeight + 0.35, z - footprintSize / 2 - 0.02);
             group.add(sign);
 
             scene.add(group);
-            return { x, z, half: footprintSize / 2 };
+            return { x, z, half: footprintSize / 2, door, doorBaseY, doorHeight, doorOpen: 0 };
+        }
+
+        // The Sinclair mascot: a simple low-poly green sauropod statue
+        function buildDino(x, z) {
+            const group = new THREE.Group();
+            const green = new THREE.MeshPhongMaterial({ color: 0x4a8f5c });
+
+            const body = new THREE.Mesh(new THREE.SphereGeometry(0.4, 10, 8), green);
+            body.scale.set(1.3, 0.85, 0.9);
+            body.position.y = 0.6;
+            body.castShadow = true;
+            group.add(body);
+
+            const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.16, 0.7, 8), green);
+            neck.position.set(0.55, 0.95, 0);
+            neck.rotation.z = -Math.PI / 3.2;
+            neck.castShadow = true;
+            group.add(neck);
+
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), green);
+            head.position.set(0.88, 1.32, 0);
+            head.castShadow = true;
+            group.add(head);
+
+            const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.14, 0.85, 8), green);
+            tail.position.set(-0.8, 0.5, 0);
+            tail.rotation.z = Math.PI / 2.6;
+            tail.castShadow = true;
+            group.add(tail);
+
+            [[-0.25, 0.2], [0.25, 0.2], [-0.25, -0.2], [0.25, -0.2]].forEach(([lx, lz]) => {
+                const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.4, 8), green);
+                leg.position.set(lx, 0.2, lz);
+                leg.castShadow = true;
+                group.add(leg);
+            });
+
+            group.position.set(x, 0, z);
+            return group;
+        }
+
+        // Sinclair Gas Station: kiosk (collidable), canopy + pumps (open, drive-under), sign, dino
+        function buildGasStation() {
+            const x = GAS_STATION_X;
+            const z = GAS_STATION_Z;
+            const kioskSize = CELL_SIZE * GAS_STATION_FOOTPRINT_FRACTION;
+            const kioskHeight = 1.4;
+            const group = new THREE.Group();
+
+            const kioskX = x - 0.5, kioskZ = z - 0.5;
+            const kiosk = new THREE.Mesh(
+                new THREE.BoxGeometry(kioskSize, kioskHeight, kioskSize),
+                new THREE.MeshPhongMaterial({ color: 0xf5f2e8 })
+            );
+            kiosk.position.set(kioskX, kioskHeight / 2, kioskZ);
+            kiosk.castShadow = true;
+            kiosk.receiveShadow = true;
+            group.add(kiosk);
+
+            const kioskStripe = new THREE.Mesh(
+                new THREE.BoxGeometry(kioskSize + 0.05, 0.15, kioskSize + 0.05),
+                new THREE.MeshPhongMaterial({ color: 0x1e6b3a })
+            );
+            kioskStripe.position.set(kioskX, kioskHeight - 0.08, kioskZ);
+            group.add(kioskStripe);
+
+            // Canopy over the pumps (open underneath - not a collidable obstacle)
+            const canopyX = x + 0.4, canopyZ = z + 0.2;
+            const canopyWidth = 1.4, canopyDepth = 1.0, canopyHeight = 1.7;
+            const canopyRoof = new THREE.Mesh(
+                new THREE.BoxGeometry(canopyWidth, 0.12, canopyDepth),
+                new THREE.MeshPhongMaterial({ color: 0x1e6b3a })
+            );
+            canopyRoof.position.set(canopyX, canopyHeight, canopyZ);
+            canopyRoof.castShadow = true;
+            group.add(canopyRoof);
+
+            const postGeo = new THREE.CylinderGeometry(0.06, 0.06, canopyHeight, 8);
+            const postMat = new THREE.MeshPhongMaterial({ color: 0xdddddd });
+            [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([px, pz]) => {
+                const post = new THREE.Mesh(postGeo, postMat);
+                post.position.set(
+                    canopyX + px * (canopyWidth / 2 - 0.15),
+                    canopyHeight / 2,
+                    canopyZ + pz * (canopyDepth / 2 - 0.15)
+                );
+                post.castShadow = true;
+                group.add(post);
+            });
+
+            [-0.35, 0.35].forEach(offset => {
+                const island = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.35, 0.08, 0.7),
+                    new THREE.MeshPhongMaterial({ color: 0xcccccc })
+                );
+                island.position.set(canopyX + offset, 0.04, canopyZ);
+                group.add(island);
+
+                const pump = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.22, 0.7, 0.22),
+                    new THREE.MeshPhongMaterial({ color: 0xffffff })
+                );
+                pump.position.set(canopyX + offset, 0.39, canopyZ);
+                pump.castShadow = true;
+                group.add(pump);
+
+                const pumpStripe = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.24, 0.12, 0.24),
+                    new THREE.MeshPhongMaterial({ color: 0x1e6b3a })
+                );
+                pumpStripe.position.set(canopyX + offset, 0.6, canopyZ);
+                group.add(pumpStripe);
+            });
+
+            // Sign pole
+            const signX = x - 0.5, signZ = z + 1.0;
+            const signPost = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.05, 0.05, 1.7, 8),
+                new THREE.MeshPhongMaterial({ color: 0xdddddd })
+            );
+            signPost.position.set(signX, 0.85, signZ);
+            group.add(signPost);
+
+            const sign = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.95, 0.42),
+                new THREE.MeshBasicMaterial({ map: createSignTexture('SINCLAIR', '#1e6b3a'), side: THREE.DoubleSide })
+            );
+            sign.position.set(signX, 1.6, signZ);
+            group.add(sign);
+
+            // The Sinclair dino mascot statue out front
+            group.add(buildDino(x + 0.1, z + 1.05));
+
+            scene.add(group);
+            return { x: kioskX, z: kioskZ, half: kioskSize / 2 };
         }
 
         const buildTown = () => {
@@ -337,6 +505,7 @@
             for (let gx = -GRID_CELLS / 2; gx < GRID_CELLS / 2; gx++) {
                 for (let gz = -GRID_CELLS / 2; gz < GRID_CELLS / 2; gz++) {
                     if (gx === STATION_BLOCK.gx && gz === STATION_BLOCK.gz) continue; // reserved for the fire station
+                    if (gx === GAS_STATION_BLOCK.gx && gz === GAS_STATION_BLOCK.gz) continue; // reserved for the gas station
 
                     const blockX = gx * CELL_SIZE + CELL_SIZE / 2;
                     const blockZ = gz * CELL_SIZE + CELL_SIZE / 2;
@@ -381,7 +550,8 @@
         };
         const structures = buildTown(); // fire-eligible buildings/houses
         const fireStation = buildFireStation();
-        const obstacles = structures.concat([fireStation]); // everything the truck can't drive through
+        const gasStation = buildGasStation();
+        const obstacles = structures.concat([fireStation, gasStation]); // everything the truck can't drive through
 
         function collidesWithBuilding(pos) {
             for (const s of obstacles) {
@@ -458,7 +628,7 @@
 
         // --- THE FIRE TRUCK (Player) ---
         const truck = new THREE.Group();
-        truck.position.set(0, 0, 0); // Start at station
+        truck.position.set(STATION_X, 0, 0); // Start just outside the fire station's garage door, facing out
 
         const truckRedMat = new THREE.MeshPhongMaterial({ color: 0xd6281e, shininess: 60 });
         const truckDarkMat = new THREE.MeshPhongMaterial({ color: 0x1a1a1a });
@@ -734,6 +904,14 @@
             return group;
         }
 
+        // Slides the garage door up into the header when the truck is nearby, back down when it leaves
+        function updateGarageDoor() {
+            const distance = truck.position.distanceTo(new THREE.Vector3(fireStation.x, 0, fireStation.z));
+            const target = distance < DOOR_TRIGGER_RANGE ? 1 : 0;
+            fireStation.doorOpen += (target - fireStation.doorOpen) * 0.06;
+            fireStation.door.position.y = fireStation.doorBaseY + fireStation.doorOpen * fireStation.doorHeight;
+        }
+
         function updateFires() {
             const now = performance.now();
             gameState.activeFires.forEach(fire => {
@@ -870,6 +1048,8 @@
         function updateHUD() {
             document.getElementById('stat-level').innerText = gameState.level;
             document.getElementById('stat-xp').innerText = `${gameState.xp}/${gameState.xpToNextLevel}`;
+            document.getElementById('stat-fuel').innerText = gameState.fuel.toFixed(0);
+            document.getElementById('out-of-gas').style.display = gameState.fuel <= 0 ? 'block' : 'none';
 
             const statusEl = document.getElementById('hud-status');
             const statusText = RESPONSE_STATUS_TEXT[fireResponse.state];
@@ -904,7 +1084,8 @@
             requestAnimationFrame(animate);
 
             // Driving Physics (Keyboard + Joystick), frozen while the crew is out fighting a fire
-            if (fireResponse.state === 'idle') {
+            // or while the tank is empty
+            if (fireResponse.state === 'idle' && gameState.fuel > 0) {
                 const JOY_DEADZONE = 0.15;
                 const joyMagnitude = Math.min(1, Math.hypot(joystickVector.x, joystickVector.y));
 
@@ -947,7 +1128,7 @@
                         truck.position.z = testZ;
                     }
 
-                    truck.rotateY(turnSpeed);
+                    if (turnSpeed !== 0) truck.rotateY(turnSpeed);
                 }
             }
 
@@ -965,6 +1146,15 @@
                 }
             });
 
+            // Fuel: drains steadily, refills near the fire station or the Sinclair gas station
+            gameState.fuel = Math.max(0, gameState.fuel - FUEL_DRAIN_PER_FRAME);
+            const nearFireStation = truck.position.distanceTo(new THREE.Vector3(fireStation.x, 0, fireStation.z)) < REFUEL_RANGE;
+            const nearGasStation = truck.position.distanceTo(new THREE.Vector3(gasStation.x, 0, gasStation.z)) < REFUEL_RANGE;
+            if (nearFireStation || nearGasStation) {
+                gameState.fuel = Math.min(gameState.maxFuel, gameState.fuel + REFUEL_RATE);
+            }
+
+            updateGarageDoor();
             updateFires();
 
             // Hose Mechanic: pull up to a hydrant, and the crew runs a hose out to the fire
