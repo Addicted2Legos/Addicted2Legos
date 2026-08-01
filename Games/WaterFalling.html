@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Inverted Direction Waterfall Flow</title>
+    <title>Waterfall Flow</title>
     <style>
         * {
             box-sizing: border-box;
@@ -40,7 +40,7 @@
 </head>
 <body>
 
-    <div id="ui">Touch to part the falling water into parallel streams</div>
+    <div id="ui">Touch to part the flowing river into channels</div>
     <canvas id="canvas"></canvas>
 
     <script>
@@ -48,19 +48,27 @@
         const ctx = canvas.getContext('2d');
 
         let width, height;
-        let damTop, damBottom, damLeft, damWidth;
+        let damTop, damBottom, damLeft, damWidth, archDepth;
 
         function resize() {
             width = canvas.width = window.innerWidth;
             height = canvas.height = window.innerHeight;
-            
+
             damTop = height * 0.15;
             damBottom = height * 0.82;
             damWidth = Math.min(width * 0.88, 900);
             damLeft = (width - damWidth) / 2;
+            archDepth = Math.min(60, height * 0.055); // how deep the crest arcs downstream at its center
         }
         window.addEventListener('resize', resize);
         resize();
+
+        // The spillway crest isn't a flat line - it arcs, dipping lowest at the
+        // center of the dam and rising to meet the canyon walls at the edges.
+        function crestY(x) {
+            let t = Math.min(Math.max((x - damLeft) / damWidth, 0), 1);
+            return damTop + archDepth * Math.sin(Math.PI * t);
+        }
 
         // Pointer Tracking
         const activeTouches = [];
@@ -95,119 +103,311 @@
         canvas.addEventListener('mousemove', (e) => { if(isMouseDown) handlePointer(e); });
         canvas.addEventListener('mouseup', () => { isMouseDown = false; activeTouches.length = 0; });
 
-        // Stream Particles
-        const NUM_PARTICLES = 600;
-        const particles = [];
+        // River Flow: continuous wavy strands instead of discrete droplets, so the
+        // water reads as one connected sheet flowing down rather than individual streaks.
+        // Wide, overlapping, low-amplitude strands moving at a slow uniform speed read as
+        // one even sheet; it's high speed + high-frequency wobble that reads as separate
+        // fast-moving streams, so both are kept low here.
+        const NUM_BODY_STRANDS = 55;
+        const NUM_HIGHLIGHT_STRANDS = 60;
+        const NUM_FOAM_PATCHES = 70;
+        const NUM_MIST_CLOUDS = 16;
+        const SAMPLE_STEP = 12; // px between path samples along each strand
+        const GRAVITY = 0.35;
+        let flowTime = 0;
+        const splashes = [];
 
-        class WaterDroplet {
-            constructor() {
-                this.reset(true);
-            }
+        class Strand {
+            constructor(kind) {
+                this.kind = kind; // 'body' = wide opaque foam mass, 'highlight' = thin bright streak
+                this.frac = Math.random(); // horizontal position as a fraction of damWidth (resize-safe)
 
-            reset(randomY = false) {
-                this.x = damLeft + Math.random() * damWidth;
-                // Inverted Y positioning: spawn at bottom, move UP to reverse optical motion
-                this.y = randomY ? damTop + Math.random() * (damBottom - damTop) : damBottom;
-                this.vy = -(8 + Math.random() * 6); // Upward velocity vector
-                this.vx = 0;
-                this.length = 18 + Math.random() * 25;
-                this.width = 1.5 + Math.random() * 2.5;
-                this.alpha = 0.4 + Math.random() * 0.5;
-            }
-
-            update() {
-                this.y += this.vy;
-                let nextX = this.x + this.vx;
-
-                // Dampen horizontal velocity so streams fall straight once parted
-                this.vx *= 0.7;
-
-                for (let touch of activeTouches) {
-                    let dx = nextX - touch.x;
-                    let dy = this.y - touch.y;
-                    let dist = Math.sqrt(dx * dx + dy * dy);
-
-                    // 1. Direct Touch Collision: Shift water to the exact outer edge of the finger
-                    if (dist < touch.r + 2) {
-                        let side = dx >= 0 ? 1 : -1;
-                        if (dx === 0) side = Math.random() > 0.5 ? 1 : -1;
-                        
-                        // Set position right at the side boundary
-                        nextX = touch.x + side * (touch.r + 4);
-                        this.vx = 0; // Prevent diagonal spraying
-                    }
-
-                    // 2. Straight Vertical Channeling: Force water below/above finger to stay aligned in straight lines
-                    let vertDist = Math.abs(dy);
-                    let vertLimit = 150; 
-
-                    if (vertDist < vertLimit) {
-                        let side = dx >= 0 ? 1 : -1;
-                        let targetX = touch.x + side * (touch.r + 6);
-                        
-                        // Strict straight corridor check
-                        if (Math.abs(dx) < touch.r + 6) {
-                            nextX = targetX;
-                            this.vx = 0;
-                        }
-                    }
-                }
-
-                this.x = nextX;
-
-                // Reset when passing top boundary
-                if (this.y <= damTop) {
-                    this.reset(false);
-                }
-            }
-
-            draw() {
-                ctx.beginPath();
-                ctx.lineWidth = this.width;
-                
-                // Trail line pointing up
-                let grad = ctx.createLinearGradient(this.x, this.y + this.length, this.x, this.y);
-                grad.addColorStop(0, `rgba(255, 255, 255, 0)`);
-                grad.addColorStop(0.7, `rgba(180, 235, 250, ${this.alpha})`);
-                grad.addColorStop(1, `rgba(255, 255, 255, ${this.alpha + 0.2})`);
-
-                ctx.strokeStyle = grad;
-                ctx.moveTo(this.x, this.y + this.length);
-                ctx.lineTo(this.x, this.y);
-                ctx.stroke();
+                const isBody = kind === 'body';
+                this.freq1 = 0.004 + Math.random() * 0.006;
+                this.freq2 = 0.012 + Math.random() * 0.012;
+                this.freq3 = 0.025 + Math.random() * 0.02; // gentle boil, not a fast jitter
+                this.phase = Math.random() * Math.PI * 2;
+                this.amp1 = isBody ? 3 + Math.random() * 4 : 2 + Math.random() * 3;
+                this.amp2 = isBody ? 1.5 + Math.random() * 2 : 1 + Math.random() * 1.5;
+                this.amp3 = isBody ? 0.5 + Math.random() * 1 : 0.5 + Math.random() * 1;
+                this.speed = isBody ? 6 + Math.random() * 5 : 10 + Math.random() * 8;
+                this.width = isBody ? 16 + Math.random() * 18 : 2 + Math.random() * 2.5;
+                this.alpha = isBody ? 0.18 + Math.random() * 0.10 : 0.12 + Math.random() * 0.14;
+                this.color = isBody ? '25, 75, 115' : '55, 115, 160';
             }
         }
 
-        for (let i = 0; i < NUM_PARTICLES; i++) {
-            particles.push(new WaterDroplet());
+        const bodyStrands = [];
+        const highlightStrands = [];
+        for (let i = 0; i < NUM_BODY_STRANDS; i++) bodyStrands.push(new Strand('body'));
+        for (let i = 0; i < NUM_HIGHLIGHT_STRANDS; i++) highlightStrands.push(new Strand('highlight'));
+
+        // Push a sample point around any active touch: left untouched above the
+        // fingertip (water hasn't reached it yet), eased smoothly into a straight side
+        // channel as it passes through the fingertip's height, then held in that
+        // channel indefinitely below it - so directly beneath the finger stays dry and
+        // both channels fall straight rather than snapping back to the wavy path.
+        function deflect(x, y, halfWidth = 6) {
+            for (let touch of activeTouches) {
+                const dy = y - touch.y;
+                if (dy < -touch.r) continue; // above the fingertip: leave it alone
+
+                const side = x >= touch.x ? 1 : -1;
+                // Inner edge of the strand lands at touch.r + 6 regardless of the
+                // strand's own width, so every strand leaves the same dry gap
+                const channelX = touch.x + side * (touch.r + halfWidth + 6);
+
+                if (dy <= touch.r) {
+                    const t = Math.min(Math.max((dy + touch.r) / (touch.r * 2), 0), 1);
+                    const eased = t * t * (3 - 2 * t); // smoothstep - no hard jump
+                    x = x + (channelX - x) * eased;
+                } else {
+                    x = channelX;
+                }
+            }
+            return x;
+        }
+
+        // Traveling sine waves (phase shifts with flowTime) make the ripple pattern
+        // visibly migrate downward each frame, which is what sells the "flowing" look.
+        // The high-frequency third term adds the chaotic boil of real whitewater.
+        function strandX(strand, y) {
+            let baseX = damLeft + strand.frac * damWidth;
+            let wave = Math.sin(strand.freq1 * y - flowTime * strand.speed * 0.01 + strand.phase) * strand.amp1
+                     + Math.sin(strand.freq2 * y - flowTime * strand.speed * 0.02 + strand.phase * 1.7) * strand.amp2
+                     + Math.sin(strand.freq3 * y - flowTime * strand.speed * 0.05 + strand.phase * 2.3) * strand.amp3;
+            return deflect(baseX + wave, y, strand.width / 2);
+        }
+
+        function drawStrand(strand) {
+            const points = [];
+            const topY = crestY(damLeft + strand.frac * damWidth);
+            for (let y = topY; y <= damBottom; y += SAMPLE_STEP) {
+                points.push({ x: strandX(strand, y), y });
+            }
+            if (points.length < 2) return;
+
+            const path = new Path2D();
+            path.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length - 1; i++) {
+                const midX = (points[i].x + points[i + 1].x) / 2;
+                const midY = (points[i].y + points[i + 1].y) / 2;
+                path.quadraticCurveTo(points[i].x, points[i].y, midX, midY);
+            }
+            const last = points[points.length - 1];
+            path.lineTo(last.x, last.y);
+
+            // Fade in/out at the crest and pool so the strand doesn't cut off abruptly
+            const midX = points[Math.floor(points.length / 2)].x;
+            const fade = ctx.createLinearGradient(midX, topY, midX, damBottom);
+            fade.addColorStop(0, `rgba(${strand.color}, 0)`);
+            fade.addColorStop(0.15, `rgba(${strand.color}, ${strand.alpha})`);
+            fade.addColorStop(0.85, `rgba(${strand.color}, ${strand.alpha})`);
+            fade.addColorStop(1, `rgba(${strand.color}, 0)`);
+
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = fade;
+
+            // Wide, half-opacity outer pass feathers the sideways edge, then a
+            // narrower core pass keeps a touch of definition in the middle
+            ctx.lineWidth = strand.width * 1.9;
+            ctx.globalAlpha = 0.45;
+            ctx.stroke(path);
+
+            ctx.lineWidth = strand.width;
+            ctx.globalAlpha = 1;
+            ctx.stroke(path);
+        }
+
+        // Soft drifting foam blobs layered over the strands break up the clean
+        // parallel lines into the broken, frothy texture of real cascading whitewater.
+        class FoamPatch {
+            constructor() { this.reset(true); }
+
+            reset(randomStart) {
+                this.frac = Math.random();
+                const baseX = damLeft + this.frac * damWidth;
+                const topY = crestY(baseX);
+                this.y = randomStart ? topY + Math.random() * (damBottom - topY) : topY - Math.random() * 20;
+                this.vy = 1 + Math.random() * 1;
+                this.radius = 10 + Math.random() * 22;
+                this.alpha = 0.12 + Math.random() * 0.18;
+                this.wobbleSeed = Math.random() * Math.PI * 2;
+                this.wobbleSpeed = 0.3 + Math.random() * 0.8;
+            }
+
+            update() {
+                this.vy = Math.min(this.vy + GRAVITY * 0.12, 4.5);
+                this.y += this.vy;
+                const baseX = damLeft + this.frac * damWidth;
+                const wobble = Math.sin(this.y * 0.03 + this.wobbleSeed + flowTime * 0.02 * this.wobbleSpeed) * 6;
+                this.x = deflect(baseX + wobble, this.y, this.radius * 0.5);
+
+                if (this.y >= damBottom) this.reset(false);
+            }
+
+            draw() {
+                const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+                grad.addColorStop(0, `rgba(120, 175, 205, ${this.alpha})`);
+                grad.addColorStop(1, 'rgba(120, 175, 205, 0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        const foamPatches = [];
+        for (let i = 0; i < NUM_FOAM_PATCHES; i++) foamPatches.push(new FoamPatch());
+
+        // Ambient billowing mist clouds hovering where the falls hit the pool
+        const mistClouds = [];
+        for (let i = 0; i < NUM_MIST_CLOUDS; i++) {
+            mistClouds.push({
+                frac: Math.random(),
+                radius: 30 + Math.random() * 50,
+                phase: Math.random() * Math.PI * 2,
+                speed: 0.3 + Math.random() * 0.6,
+                bob: 8 + Math.random() * 14,
+                alphaBase: 0.15 + Math.random() * 0.15
+            });
+        }
+
+        function drawMist() {
+            for (let c of mistClouds) {
+                const x = damLeft + c.frac * damWidth;
+                const y = damBottom + Math.sin(flowTime * 0.02 * c.speed + c.phase) * c.bob;
+                const alpha = c.alphaBase + Math.sin(flowTime * 0.03 * c.speed + c.phase * 1.3) * 0.05;
+                const grad = ctx.createRadialGradient(x, y, 0, x, y, c.radius);
+                grad.addColorStop(0, `rgba(255, 255, 255, ${Math.max(alpha, 0)})`);
+                grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(x, y, c.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function spawnSplash(x, y, impactSpeed) {
+            if (splashes.length > 220) return; // Cap for performance
+            const dropletCount = 2 + Math.floor(Math.random() * 3);
+            for (let i = 0; i < dropletCount; i++) {
+                const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.8; // Mostly upward spray
+                const speed = (impactSpeed * 0.18) + Math.random() * 2.5;
+                splashes.push({
+                    x, y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    radius: 1 + Math.random() * 1.5,
+                    alpha: 0.6 + Math.random() * 0.3,
+                    isRing: false
+                });
+            }
+            splashes.push({
+                x, y,
+                radius: 2,
+                maxRadius: 10 + Math.random() * 10,
+                alpha: 0.5,
+                isRing: true
+            });
+        }
+
+        function updateSplashes() {
+            for (let i = splashes.length - 1; i >= 0; i--) {
+                const s = splashes[i];
+                if (s.isRing) {
+                    s.radius += 0.9;
+                    s.alpha -= 0.03;
+                    if (s.alpha <= 0 || s.radius >= s.maxRadius) splashes.splice(i, 1);
+                } else {
+                    s.vy += GRAVITY * 0.6;
+                    s.x += s.vx;
+                    s.y += s.vy;
+                    s.alpha -= 0.025;
+                    if (s.alpha <= 0 || s.y > damBottom + 30) splashes.splice(i, 1);
+                }
+            }
+        }
+
+        function drawSplashes() {
+            for (let s of splashes) {
+                ctx.beginPath();
+                if (s.isRing) {
+                    ctx.strokeStyle = `rgba(220, 250, 255, ${Math.max(s.alpha, 0)})`;
+                    ctx.lineWidth = 1.5;
+                    ctx.ellipse(s.x, s.y, s.radius, s.radius * 0.35, 0, 0, Math.PI * 2);
+                    ctx.stroke();
+                } else {
+                    ctx.fillStyle = `rgba(210, 245, 255, ${Math.max(s.alpha, 0)})`;
+                    ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
         }
 
         function drawEnvironment() {
             ctx.fillStyle = '#060f09';
             ctx.fillRect(0, 0, width, height);
 
-            // Top Basin
-            let topGrad = ctx.createLinearGradient(0, 0, 0, damTop);
-            topGrad.addColorStop(0, '#0a2116');
-            topGrad.addColorStop(1, '#184732');
-            ctx.fillStyle = topGrad;
-            ctx.fillRect(0, 0, width, damTop);
-
-            // Wall Background
+            // Wall/fall background behind the dam channel, from the deepest point of the
+            // curved crest down to the pool
             let wallGrad = ctx.createLinearGradient(0, damTop, 0, damBottom);
             wallGrad.addColorStop(0, '#121415');
             wallGrad.addColorStop(1, '#070809');
             ctx.fillStyle = wallGrad;
             ctx.fillRect(damLeft, damTop, damWidth, damBottom - damTop);
 
-            // Concrete Side Walls
+            // Reservoir - fills everything above the arced spillway crest
+            let topGrad = ctx.createLinearGradient(0, 0, 0, damTop + archDepth);
+            topGrad.addColorStop(0, '#0a2116');
+            topGrad.addColorStop(1, '#184732');
+            ctx.fillStyle = topGrad;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(width, 0);
+            ctx.lineTo(width, crestY(width));
+            for (let x = damLeft + damWidth; x >= damLeft; x -= 8) {
+                ctx.lineTo(x, crestY(x));
+            }
+            ctx.lineTo(0, crestY(0));
+            ctx.closePath();
+            ctx.fill();
+
+            // Concrete Side Walls (canyon)
             ctx.fillStyle = '#26282a';
             ctx.fillRect(0, 0, damLeft, height);
             ctx.fillRect(damLeft + damWidth, 0, damLeft, height);
 
-            // Concrete Dam Lip
-            ctx.fillStyle = '#4d5256';
-            ctx.fillRect(damLeft - 4, damTop - 5, damWidth + 8, 6);
+            // Concrete Dam Lip - follows the curved crest
+            ctx.beginPath();
+            ctx.moveTo(damLeft - 4, crestY(damLeft) - 3);
+            for (let x = damLeft; x <= damLeft + damWidth; x += 8) {
+                ctx.lineTo(x, crestY(x) - 3);
+            }
+            ctx.lineTo(damLeft + damWidth + 4, crestY(damLeft + damWidth) - 3);
+            ctx.strokeStyle = '#4d5256';
+            ctx.lineWidth = 7;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
+
+        // A soft, continuous midtone wash across the whole falling-water channel so the
+        // gaps between individual strands read as blended water, not the dark wall behind them
+        function drawWaterWash() {
+            ctx.beginPath();
+            ctx.moveTo(damLeft, crestY(damLeft));
+            for (let x = damLeft; x <= damLeft + damWidth; x += 8) {
+                ctx.lineTo(x, crestY(x));
+            }
+            ctx.lineTo(damLeft + damWidth, damBottom);
+            ctx.lineTo(damLeft, damBottom);
+            ctx.closePath();
+
+            let grad = ctx.createLinearGradient(0, damTop, 0, damBottom);
+            grad.addColorStop(0, 'rgba(30, 90, 130, 0.40)');
+            grad.addColorStop(1, 'rgba(55, 120, 155, 0.55)');
+            ctx.fillStyle = grad;
+            ctx.fill();
         }
 
         function drawBottomPool() {
@@ -217,14 +417,8 @@
             ctx.fillStyle = poolGrad;
             ctx.fillRect(0, damBottom, width, height - damBottom);
 
-            // Base Foam/Mist
-            let mistGrad = ctx.createLinearGradient(0, damBottom - 20, 0, damBottom + 25);
-            mistGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-            mistGrad.addColorStop(0.5, 'rgba(230, 252, 255, 0.85)');
-            mistGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-            ctx.fillStyle = mistGrad;
-            ctx.fillRect(damLeft, damBottom - 20, damWidth, 45);
+            // Billowing mist where the falls hit the pool
+            drawMist();
 
             // Touch Indicators
             for (let touch of activeTouches) {
@@ -243,13 +437,30 @@
             ctx.clearRect(0, 0, width, height);
 
             drawEnvironment();
+            drawWaterWash();
 
-            for (let p of particles) {
-                p.update();
-                p.draw();
+            flowTime += 1;
+
+            ctx.save();
+            ctx.filter = 'blur(7px)';
+            for (let s of bodyStrands) drawStrand(s);
+            ctx.restore();
+
+            ctx.save();
+            ctx.filter = 'blur(4px)';
+            for (let s of highlightStrands) drawStrand(s);
+            ctx.restore();
+
+            for (let f of foamPatches) { f.update(); f.draw(); }
+
+            // Continuous foam spray where the river hits the pool, instead of
+            // per-droplet impact events (there are no discrete droplets anymore)
+            if (Math.random() < 0.6) {
+                spawnSplash(damLeft + Math.random() * damWidth, damBottom, 5 + Math.random() * 4);
             }
-
+            updateSplashes();
             drawBottomPool();
+            drawSplashes();
 
             requestAnimationFrame(animate);
         }

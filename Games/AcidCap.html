@@ -189,11 +189,25 @@
     const acidPit = { x: 260, y: 520, w: 280, h: 30 };
     const extractionPipe = { x: 700, y: 310, radius: 35 };
 
+    // Continuous collision helper: intersection point of two line segments, or null
+    function segmentIntersection(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2) {
+      const d = (ax2 - ax1) * (by2 - by1) - (ay2 - ay1) * (bx2 - bx1);
+      if (d === 0) return null;
+      const t = ((bx1 - ax1) * (by2 - by1) - (by1 - ay1) * (bx2 - bx1)) / d;
+      const u = ((bx1 - ax1) * (ay2 - ay1) - (by1 - ay1) * (ax2 - ax1)) / d;
+      if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+        return { x: ax1 + t * (ax2 - ax1), y: ay1 + t * (ay2 - ay1) };
+      }
+      return null;
+    }
+
     // Physics Particles (Creature Horde)
     class Particle {
       constructor(x, y) {
         this.x = x;
         this.y = y;
+        this.prevX = x;
+        this.prevY = y;
         this.vx = (Math.random() - 0.5) * 1.5;
         this.vy = Math.random() * 0.5;
         this.radius = 6;
@@ -203,6 +217,9 @@
 
       update() {
         if (!this.isAlive) return;
+
+        this.prevX = this.x;
+        this.prevY = this.y;
 
         // Gravity
         this.vy += 0.25;
@@ -245,27 +262,53 @@
         const len = Math.sqrt(dx * dx + dy * dy);
         const u = ((this.x - x1) * dx + (this.y - y1) * dy) / (len * len);
 
+        let ix, iy, hit = false;
+
         if (u >= 0 && u <= 1) {
-          const ix = x1 + u * dx;
-          const iy = y1 + u * dy;
-          const dist = Math.sqrt((this.x - ix) ** 2 + (this.y - iy) ** 2);
-
+          const cix = x1 + u * dx;
+          const ciy = y1 + u * dy;
+          const dist = Math.sqrt((this.x - cix) ** 2 + (this.y - ciy) ** 2);
           if (dist < this.radius) {
-            const nx = -(y2 - y1) / len;
-            const ny = (x2 - x1) / len;
-
-            // Push out of terrain
-            this.x = ix + nx * this.radius;
-            this.y = iy + ny * this.radius;
-
-            // Reflect velocity
-            const dot = this.vx * nx + this.vy * ny;
-            this.vx -= (1 + bounce) * dot * nx;
-            this.vy -= (1 + bounce) * dot * ny;
-
-            // Apply friction along surface
-            this.vx *= 0.85;
+            ix = cix;
+            iy = ciy;
+            hit = true;
           }
+        }
+
+        // Fallback: fast movement can jump clean over the wall in one frame
+        // (the check above only looks at where the particle ended up). Catch
+        // that by testing the path it swept through this frame too.
+        if (!hit) {
+          const cross = segmentIntersection(this.prevX, this.prevY, this.x, this.y, x1, y1, x2, y2);
+          if (cross) {
+            ix = cross.x;
+            iy = cross.y;
+            hit = true;
+          }
+        }
+
+        if (hit) {
+          let nx = -(y2 - y1) / len;
+          let ny = (x2 - x1) / len;
+
+          // Orient the normal toward the side the particle approached from
+          const side = (this.prevX - ix) * nx + (this.prevY - iy) * ny;
+          if (side < 0) {
+            nx = -nx;
+            ny = -ny;
+          }
+
+          // Push out of terrain
+          this.x = ix + nx * this.radius;
+          this.y = iy + ny * this.radius;
+
+          // Reflect velocity
+          const dot = this.vx * nx + this.vy * ny;
+          this.vx -= (1 + bounce) * dot * nx;
+          this.vy -= (1 + bounce) * dot * ny;
+
+          // Apply friction along surface
+          this.vx *= 0.97;
         }
       }
     }
@@ -349,27 +392,53 @@
             let len = Math.sqrt(dx * dx + dy * dy);
             let u = ((p.x - n1.x) * dx + (p.y - n1.y) * dy) / (len * len || 1);
 
+            let ix, iy, hit = false;
+
             if (u >= 0 && u <= 1) {
-              let ix = n1.x + u * dx;
-              let iy = n1.y + u * dy;
-              let dist = Math.sqrt((p.x - ix) ** 2 + (p.y - iy) ** 2);
-
+              const cix = n1.x + u * dx;
+              const ciy = n1.y + u * dy;
+              const dist = Math.sqrt((p.x - cix) ** 2 + (p.y - ciy) ** 2);
               if (dist < p.radius + 3) {
-                let nx = -(n2.y - n1.y) / len;
-                let ny = (n2.x - n1.x) / len;
-
-                // Push particle out of cable
-                p.x = ix + nx * (p.radius + 3);
-                p.y = iy + ny * (p.radius + 3);
-
-                // Transfer weight to cable nodes (Sagging effect!)
-                if (!n1.pinned) n1.y += 0.35;
-                if (!n2.pinned) n2.y += 0.35;
-
-                // Dampen particle velocity
-                p.vy *= 0.5;
-                p.vx *= 0.9;
+                ix = cix;
+                iy = ciy;
+                hit = true;
               }
+            }
+
+            // Fallback: a fast-falling particle can cross the cable segment
+            // entirely within one frame and never register as "close" to it.
+            // Check the swept path it moved through this frame as well.
+            if (!hit) {
+              const cross = segmentIntersection(p.prevX, p.prevY, p.x, p.y, n1.x, n1.y, n2.x, n2.y);
+              if (cross) {
+                ix = cross.x;
+                iy = cross.y;
+                hit = true;
+              }
+            }
+
+            if (hit) {
+              let nx = -(n2.y - n1.y) / len;
+              let ny = (n2.x - n1.x) / len;
+
+              // Orient the normal toward the side the particle approached from
+              const side = (p.prevX - ix) * nx + (p.prevY - iy) * ny;
+              if (side < 0) {
+                nx = -nx;
+                ny = -ny;
+              }
+
+              // Push particle out of cable
+              p.x = ix + nx * (p.radius + 3);
+              p.y = iy + ny * (p.radius + 3);
+
+              // Transfer weight to cable nodes (Sagging effect!)
+              if (!n1.pinned) n1.y += 0.35;
+              if (!n2.pinned) n2.y += 0.35;
+
+              // Dampen particle velocity
+              p.vy *= 0.5;
+              p.vx *= 0.9;
             }
           }
         }
@@ -544,16 +613,24 @@
       ctx.textAlign = "center";
       ctx.fillText("EXIT", extractionPipe.x, extractionPipe.y + 4);
 
-      // 4. Update & Draw Dynamic Cables
-      cables.forEach(c => {
-        if (gameState === "PLAYING") {
+      // 4. Physics Update (particles move first, then cables react to their
+      // new positions/paths so collisions are checked against this frame's
+      // actual movement instead of one frame stale)
+      if (gameState === "PLAYING") {
+        particles.forEach(p => {
+          if (p.isAlive) p.update();
+        });
+        cables.forEach(c => {
           c.update();
           c.interactWithParticles(particles);
-        }
-        c.draw();
-      });
+        });
+        handleSpawning();
+      }
 
-      // 5. Active Mouse Cable Preview
+      // 5. Draw Dynamic Cables
+      cables.forEach(c => c.draw());
+
+      // 6. Active Mouse Cable Preview
       if (isDrawing) {
         const dx = currentMouse.x - dragStart.x;
         const dy = currentMouse.y - dragStart.y;
@@ -570,10 +647,9 @@
         ctx.setLineDash([]);
       }
 
-      // 6. Update & Draw Particles (Viscous Blob Creatures)
+      // 7. Draw Particles (Viscous Blob Creatures)
       particles.forEach(p => {
         if (!p.isAlive) return;
-        if (gameState === "PLAYING") p.update();
 
         // Draw glowing blob particle
         ctx.fillStyle = "#a5d6ff";
@@ -586,11 +662,6 @@
         ctx.arc(p.x - 1, p.y - 1, p.radius * 0.5, 0, Math.PI * 2);
         ctx.fill();
       });
-
-      // 7. Update Spawner Logic
-      if (gameState === "PLAYING") {
-        handleSpawning();
-      }
 
       requestAnimationFrame(render);
     }
