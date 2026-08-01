@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Frontier Outpost</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- HUD: resource counters -->
+  <header id="hud">
+    <div class="hud-title">🤠 FRONTIER OUTPOST</div>
+    <div id="resource-bar"></div>
+    <div id="wave-indicator">Wave <span id="wave-num">0</span></div>
+  </header>
+
+  <!-- Game world -->
+  <main id="stage">
+    <canvas id="game-canvas"></canvas>
+    <div id="toast-anchor"></div>
+  </main>
+
+  <!-- Contextual panel: shown when a building is selected (train units) -->
+  <div id="building-panel" class="hidden">
+    <div class="panel-header">
+      <span id="bp-icon"></span>
+      <span id="bp-name"></span>
+      <button id="bp-close" class="icon-btn">✕</button>
+    </div>
+    <button id="bp-train" class="action-btn"></button>
+  </div>
+
+  <!-- Placement helper bar -->
+  <div id="placement-bar" class="hidden">
+    <span>Tap the map to place <b id="placement-name"></b></span>
+    <button id="placement-cancel" class="action-btn secondary">Cancel</button>
+  </div>
+
+  <!-- Bottom build bar -->
+  <footer id="build-bar"></footer>
+
+  <!-- Game over overlay -->
+  <div id="game-over" class="hidden">
+    <div class="panel">
+      <h2>The Outpost Has Fallen</h2>
+      <p>Survived to wave <span id="go-wave">0</span></p>
+      <button id="restart-btn" class="action-btn">Try Again</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Data files -->
+<script src="js/data/resources.js"></script>
+<script src="js/data/terrain.js"></script>
+<script src="js/data/buildings.js"></script>
+<script src="js/data/units.js"></script>
+<script src="js/data/enemies.js"></script>
+
+<!-- Engine files -->
+<script src="js/engine/state.js"></script>
+<script src="js/engine/render.js"></script>
+<script src="js/engine/input.js"></script>
+<script src="js/engine/game.js"></script>
+
+<!-- Entry point -->
+<script src="js/main.js"></script>
+</body>
+</html>
