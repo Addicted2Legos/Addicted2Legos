@@ -67,6 +67,7 @@
   function renderBuildBar() {
     buildBarEl.innerHTML = '';
     Object.values(BUILDINGS).forEach((def) => {
+      if (def.hidden) return;
       const btn = document.createElement('button');
       btn.className = 'build-btn';
       btn.id = `build-${def.id}`;
@@ -122,6 +123,11 @@
     const btn = document.getElementById('bp-train');
     if (!selectedBuilding.complete) {
       btn.textContent = `Building… ${Math.round(selectedBuilding.progress * 100)}%`;
+      btn.disabled = true;
+      return;
+    }
+    if (!selectedBuilding.def.produces) {
+      btn.textContent = 'Nothing to train here';
       btn.disabled = true;
       return;
     }

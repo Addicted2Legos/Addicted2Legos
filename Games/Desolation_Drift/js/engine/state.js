@@ -39,9 +39,21 @@ function resetState(state, mapData) {
   state.messages = [];
   state.elapsed = 0;
 
-  // Starting worker, placed on the home tile.
+  // Starting supply depot on the home tile — workers drop resources off here.
   const home = mapData.homeTile;
-  state.units.push(createUnit('worker', home.col + 0.5, home.row + 0.5, state));
+  const storage = createBuilding('storage', home.col, home.row);
+  storage.complete = true;
+  storage.progress = 1;
+  storage.hp = storage.maxHp;
+  state.buildings.push(storage);
+
+  // Starting worker + soldier, placed just below the depot.
+  const spawnCol = home.col + storage.def.size.w / 2;
+  const spawnRow = home.row + storage.def.size.h + 0.4;
+  state.units.push(createUnit('worker', spawnCol - 0.6, spawnRow, state));
+
+  // Starting soldier so the base isn't defenseless before the first wave.
+  state.units.push(createUnit('soldier', spawnCol + 0.6, spawnRow, state));
 
   return state;
 }
@@ -62,7 +74,8 @@ function createUnit(typeId, x, y, state) {
     maxHp: def.hp,
     carrying: 0,
     carryType: null,
-    job: null, // { kind: 'gather'|'move'|'attack'|'guard', nodeId?, targetId? }
+    job: null, // { kind: 'gather'|'deliver'|'move'|'attack', nodeId?, targetId?, buildingId?, resourceType? }
+    idleAlerted: false,
     lastAttack: 0,
     facing: 1,
   };

@@ -46,10 +46,10 @@ function drawTerrain(ctx, state) {
   }
 }
 
-// Sparse dark flecks + a faint crack line so sand doesn't read as flat color.
+// Sparse dark flecks + a faint crack line so the ground doesn't read as flat color.
 function drawSandGrain(ctx, px, py, tileSize, c, r) {
   const seed = (c * 31 + r * 17) % 100;
-  ctx.fillStyle = 'rgba(60,35,15,0.18)';
+  ctx.fillStyle = 'rgba(15,20,28,0.22)';
   ctx.beginPath();
   ctx.arc(px + tileSize * (0.2 + (seed % 5) * 0.12), py + tileSize * (0.3 + (seed % 3) * 0.18), tileSize * 0.03, 0, Math.PI * 2);
   ctx.fill();
@@ -57,7 +57,7 @@ function drawSandGrain(ctx, px, py, tileSize, c, r) {
   ctx.arc(px + tileSize * (0.55 + (seed % 4) * 0.1), py + tileSize * (0.65 - (seed % 3) * 0.1), tileSize * 0.025, 0, Math.PI * 2);
   ctx.fill();
   if (seed % 7 === 0) {
-    ctx.strokeStyle = 'rgba(60,35,15,0.12)';
+    ctx.strokeStyle = 'rgba(15,20,28,0.16)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(px + tileSize * 0.15, py + tileSize * 0.8);
@@ -66,7 +66,7 @@ function drawSandGrain(ctx, px, py, tileSize, c, r) {
   }
 }
 
-// Jagged sunlit boulder cluster, warm mesa tones with a bright top rim.
+// Jagged sunlit boulder cluster, cool grey-blue stone with a bright top rim.
 function drawRockOutcrop(ctx, px, py, tileSize, c, r) {
   const seed = (c * 13 + r * 29) % 5;
   ctx.save();
@@ -87,9 +87,9 @@ function drawRockOutcrop(ctx, px, py, tileSize, c, r) {
   });
   ctx.closePath();
   const grad = ctx.createLinearGradient(px, py, px, py + tileSize);
-  grad.addColorStop(0, '#c98858');
-  grad.addColorStop(0.5, '#8a5a3f');
-  grad.addColorStop(1, '#4a2e1e');
+  grad.addColorStop(0, '#7c8a99');
+  grad.addColorStop(0.5, '#4a5560');
+  grad.addColorStop(1, '#232830');
   ctx.fillStyle = grad;
   ctx.fill();
   ctx.strokeStyle = 'rgba(0,0,0,0.35)';
@@ -97,7 +97,7 @@ function drawRockOutcrop(ctx, px, py, tileSize, c, r) {
   ctx.stroke();
 
   // sunlit rim highlight along the top-left edge
-  ctx.strokeStyle = 'rgba(255,205,140,0.5)';
+  ctx.strokeStyle = 'rgba(190,220,255,0.5)';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(px + 0.16 * tileSize, py + 0.45 * tileSize);
@@ -130,16 +130,16 @@ function drawRuinColumns(ctx, px, py, tileSize, c, r) {
     ctx.rotate(tilt);
     ctx.translate(-(x + shaftW / 2), -(py + 0.85 * tileSize));
     const grad = ctx.createLinearGradient(x, topY, x + shaftW, topY);
-    grad.addColorStop(0, '#8a7c68');
-    grad.addColorStop(0.5, '#d8c6a8');
-    grad.addColorStop(1, '#8a7c68');
+    grad.addColorStop(0, '#6b7480');
+    grad.addColorStop(0.5, '#c7d0d8');
+    grad.addColorStop(1, '#6b7480');
     ctx.fillStyle = grad;
     ctx.fillRect(x, topY, shaftW, shaftH);
     // capital (top cap)
-    ctx.fillStyle = '#c9b791';
+    ctx.fillStyle = '#b3bcc4';
     ctx.fillRect(x - shaftW * 0.18, topY, shaftW * 1.36, shaftH * 0.1);
     // fluting lines
-    ctx.strokeStyle = 'rgba(90,75,55,0.4)';
+    ctx.strokeStyle = 'rgba(50,58,68,0.4)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(x + shaftW * 0.5, topY + shaftH * 0.12);
@@ -281,6 +281,8 @@ function drawPlacementGhost(ctx, state) {
   ctx.restore();
 }
 
+const BUILDING_ACCENTS = { barracks: '#ff5d6c', storage: '#ffd24f' };
+
 function drawBuildings(ctx, state) {
   const { tileSize } = state;
   state.buildings.forEach((b) => {
@@ -302,7 +304,7 @@ function drawBuildings(ctx, state) {
     ctx.fillStyle = grad;
     ctx.fillRect(px + w * 0.1, py + h * 0.05, w * 0.8, h * 0.75);
     // trim / glow color by type
-    const accent = b.type === 'barracks' ? '#ff5d6c' : '#4fe7ff';
+    const accent = BUILDING_ACCENTS[b.type] || '#4fe7ff';
     ctx.fillStyle = accent;
     ctx.globalAlpha *= 0.85;
     ctx.fillRect(px + w * 0.1, py + h * 0.05, w * 0.8, h * 0.08);
@@ -376,6 +378,8 @@ function drawUnits(ctx, state) {
 
     if (u.def.id === 'worker') {
       drawWorkerBot(ctx, px, py, r);
+    } else if (u.def.id === 'soldier') {
+      drawSpaceCowboy(ctx, px, py, r, u.facing);
     } else {
       ctx.beginPath();
       ctx.arc(px, py, r, 0, Math.PI * 2);
@@ -394,6 +398,12 @@ function drawUnits(ctx, state) {
     if (u.job && u.job.kind === 'gather') {
       ctx.font = `${Math.round(r)}px sans-serif`;
       ctx.fillText('⛏️', px + r * 1.1, py - r * 1.1);
+    } else if (u.job && u.job.kind === 'deliver' && u.carrying > 0) {
+      ctx.font = `${Math.round(r)}px sans-serif`;
+      ctx.fillText(RESOURCES[u.carryType].icon, px + r * 1.1, py - r * 1.1);
+    } else if (!u.job && u.idleAlerted) {
+      ctx.font = `${Math.round(r)}px sans-serif`;
+      ctx.fillText('💤', px + r * 1.1, py - r * 1.1);
     }
 
     if (u.hp < u.maxHp) drawHpBar(ctx, px - r, py - r * 1.8, r * 2, r * 0.35, u.hp / u.maxHp);
@@ -452,6 +462,101 @@ function drawWorkerBot(ctx, px, py, r) {
   ctx.shadowBlur = r * 0.55;
   ctx.fillRect(px - r * 0.26, py - r * 0.88, r * 0.52, r * 0.16);
   ctx.shadowBlur = 0;
+
+  ctx.restore();
+}
+
+// Astronaut cowboy: pressure suit + bubble helmet with amber visor, topped
+// with a felt cowboy hat, sidearm drawn on the trailing hand facing outward.
+function drawSpaceCowboy(ctx, px, py, r, facing) {
+  ctx.save();
+  const dir = facing >= 0 ? 1 : -1;
+
+  // legs
+  ctx.fillStyle = '#5c4023';
+  ctx.fillRect(px - r * 0.4, py + r * 0.15, r * 0.22, r * 0.6);
+  ctx.fillRect(px + r * 0.18, py + r * 0.15, r * 0.22, r * 0.6);
+  // boots
+  ctx.fillStyle = '#2c1f12';
+  ctx.fillRect(px - r * 0.44, py + r * 0.6, r * 0.28, r * 0.18);
+  ctx.fillRect(px + r * 0.16, py + r * 0.6, r * 0.28, r * 0.18);
+
+  // torso (pressure suit)
+  const bodyGrad = ctx.createLinearGradient(px, py - r * 0.55, px, py + r * 0.3);
+  bodyGrad.addColorStop(0, '#ffe3b8');
+  bodyGrad.addColorStop(1, '#c98f52');
+  ctx.fillStyle = bodyGrad;
+  roundedRect(ctx, px - r * 0.58, py - r * 0.55, r * 1.16, r * 0.9, r * 0.2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // bandolier strap
+  ctx.strokeStyle = 'rgba(70,45,20,0.75)';
+  ctx.lineWidth = r * 0.1;
+  ctx.beginPath();
+  ctx.moveTo(px - r * 0.5, py - r * 0.5);
+  ctx.lineTo(px + r * 0.32, py + r * 0.22);
+  ctx.stroke();
+
+  // sheriff badge
+  ctx.fillStyle = '#ffd24f';
+  ctx.beginPath();
+  ctx.arc(px + r * 0.12, py - r * 0.12, r * 0.09, 0, Math.PI * 2);
+  ctx.fill();
+
+  // shoulder nubs
+  ctx.fillStyle = '#8a5a2e';
+  ctx.fillRect(px - r * 0.74, py - r * 0.4, r * 0.18, r * 0.26);
+  ctx.fillRect(px + r * 0.56, py - r * 0.4, r * 0.18, r * 0.26);
+
+  // pistol, held out on the leading side
+  ctx.save();
+  ctx.translate(px + dir * r * 0.68, py - r * 0.02);
+  ctx.scale(dir, 1);
+  ctx.fillStyle = '#3a3a3d';
+  ctx.fillRect(0, -r * 0.06, r * 0.4, r * 0.12);
+  ctx.fillStyle = '#5c3a1f';
+  ctx.fillRect(-r * 0.03, 0, r * 0.14, r * 0.26);
+  ctx.restore();
+
+  // head (bubble helmet)
+  ctx.fillStyle = '#dfe6ea';
+  ctx.beginPath();
+  ctx.arc(px, py - r * 0.78, r * 0.34, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+  ctx.stroke();
+
+  // amber visor
+  ctx.fillStyle = '#ffb85e';
+  ctx.shadowColor = '#ffb85e';
+  ctx.shadowBlur = r * 0.4;
+  ctx.beginPath();
+  ctx.ellipse(px + dir * r * 0.02, py - r * 0.78, r * 0.24, r * 0.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // cowboy hat brim
+  ctx.fillStyle = '#7a4a24';
+  ctx.beginPath();
+  ctx.ellipse(px, py - r * 1.02, r * 0.5, r * 0.14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // hat crown
+  ctx.fillStyle = '#8a5a30';
+  roundedRect(ctx, px - r * 0.26, py - r * 1.28, r * 0.52, r * 0.32, r * 0.14);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  ctx.stroke();
+
+  // hat band
+  ctx.fillStyle = '#4a2e18';
+  ctx.fillRect(px - r * 0.26, py - r * 1.02, r * 0.52, r * 0.07);
 
   ctx.restore();
 }

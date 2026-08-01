@@ -14,7 +14,22 @@
       "Bash(command -v open)",
       "Bash(command -v python3)",
       "Bash(command -v osascript)",
-      "Bash(sw_vers)"
+      "Bash(sw_vers)",
+      "Bash(xargs ls -la)",
+      "Bash(ls /usr/local/bin 2>/dev/null | grep -i chrom; ls ~/.claude 2>/dev/null | grep -i chrom; find / -maxdepth 4 -iname \"*chromium-cli*\" 2>/dev/null | head -5)",
+      "Read(//usr/local/bin/**)",
+      "Read(//Users/riley/.claude/**)",
+      "Bash(node -e \"require.resolve\\('playwright'\\)\")",
+      "Bash(node -e \"require.resolve\\('puppeteer'\\)\")",
+      "Read(//Applications/**)",
+      "Bash(mdfind \"kMDItemFSName == 'Google Chrome.app'\")",
+      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless=new --disable-gpu --no-sandbox --screenshot=/private/tmp/claude-501/-Users-riley-VSCode/9ebd9f41-935c-474e-be54-189db8b85c77/scratchpad/desolation_check.png --window-size=1280,800 --virtual-time-budget=4000 http://localhost:8934/index.html)",
+      "Bash(python3 -c \"import websocket\")",
+      "Bash(python3 -c \"import websockets\")",
+      "Bash(python3 -m pip install --quiet --user websocket-client)",
+      "Bash(python3 -c \"import websocket; print\\('ok'\\)\")",
+      "Bash(PYTHONPATH=/Users/riley/Library/Python/3.9/lib/python/site-packages python3 cdp_test.py)",
+      "Bash(rm -rf /tmp/cdp_profile_desolation)"
     ],
     "additionalDirectories": [
       "/private/tmp"

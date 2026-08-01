@@ -27,4 +27,16 @@ const BUILDINGS = {
     produces: 'soldier',
     requires: 'factory',
   },
+  storage: {
+    id: 'storage',
+    name: 'Supply Depot',
+    icon: '📦',
+    size: { w: 2, h: 2 },
+    cost: {},
+    buildTime: 0,
+    hp: 200,
+    produces: null,
+    requires: null,
+    hidden: true, // pre-placed at game start, not buildable from the build bar
+  },
 };

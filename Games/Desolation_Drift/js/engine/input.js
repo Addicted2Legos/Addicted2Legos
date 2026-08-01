@@ -6,10 +6,8 @@
 function setupInput(canvas, state, callbacks) {
   function eventToTile(evt) {
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const px = (evt.clientX - rect.left) * scaleX;
-    const py = (evt.clientY - rect.top) * scaleY;
+    const px = evt.clientX - rect.left;
+    const py = evt.clientY - rect.top;
     return {
       col: Math.floor(px / state.tileSize),
       row: Math.floor(py / state.tileSize),
@@ -56,6 +54,7 @@ function setupInput(canvas, state, callbacks) {
       state.selectedUnitIds.forEach((id) => {
         const unit = state.units.find((u) => u.id === id);
         if (!unit) return;
+        unit.idleAlerted = false;
         if (tappedEnemy && unit.def.damage) {
           unit.job = { kind: 'attack', targetId: tappedEnemy.id };
         } else if (tappedNode && unit.def.gatherRate) {

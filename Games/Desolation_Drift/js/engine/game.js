@@ -35,6 +35,10 @@ function moveToward(entity, tx, ty, speed, dt) {
 
 function updateUnits(dt, state, callbacks) {
   state.units.forEach((u) => {
+    if (!u.job && u.def.damage) {
+      const nearestEnemy = findNearestEnemyInRange(u, state, AGGRO_RANGE);
+      if (nearestEnemy) u.job = { kind: 'attack', targetId: nearestEnemy.id };
+    }
     if (!u.job) return;
 
     if (u.job.kind === 'move') {
@@ -45,18 +49,46 @@ function updateUnits(dt, state, callbacks) {
 
     if (u.job.kind === 'gather') {
       const node = state.map.nodes.find((n) => n.id === u.job.nodeId);
-      if (!node || node.amount <= 0) { u.job = null; return; }
+      const resourceType = u.job.resourceType || (node && node.type);
+      if (!node || node.amount <= 0) { retryGatherOrIdle(u, state, resourceType); return; }
       const tx = node.col + 0.5;
       const ty = node.row + 0.5;
       const arrived = moveToward(u, tx, ty, u.def.speed, dt);
       if (arrived) {
-        const amt = Math.min(u.def.gatherRate * dt, node.amount);
+        const capacityLeft = u.def.carryCapacity - u.carrying;
+        const amt = Math.min(u.def.gatherRate * dt, node.amount, capacityLeft);
         node.amount -= amt;
-        state.resources[node.type] += amt;
-        if (node.amount <= 0) {
-          pushMessage(state, `${RESOURCES[node.type].name} node depleted`);
-          u.job = null;
+        u.carrying += amt;
+        u.carryType = node.type;
+        if (node.amount <= 0) pushMessage(state, `${RESOURCES[node.type].name} node depleted`);
+        if (u.carrying >= u.def.carryCapacity - 0.0001 || node.amount <= 0) {
+          const depot = findNearestStorage(state, u);
+          if (depot) {
+            u.job = { kind: 'deliver', buildingId: depot.id, resourceType: node.type };
+          } else {
+            u.job = null;
+            alertIdle(u, state, 'no supply depot to deliver to');
+          }
         }
+      }
+      return;
+    }
+
+    if (u.job.kind === 'deliver') {
+      let building = state.buildings.find((b) => b.id === u.job.buildingId && b.complete);
+      if (!building) building = findNearestStorage(state, u);
+      if (!building) { u.job = null; alertIdle(u, state, 'no supply depot to deliver to'); return; }
+      const tx = building.col + building.def.size.w / 2;
+      const ty = building.row + building.def.size.h + 0.2;
+      const arrived = moveToward(u, tx, ty, u.def.speed, dt);
+      if (arrived) {
+        const resourceType = u.carryType || u.job.resourceType;
+        if (u.carrying > 0) {
+          state.resources[u.carryType] += u.carrying;
+          u.carrying = 0;
+        }
+        u.carryType = null;
+        retryGatherOrIdle(u, state, resourceType);
       }
       return;
     }
@@ -96,6 +128,60 @@ function updateEnemies(dt, state, callbacks) {
     }
   });
   state.enemies = state.enemies.filter((e) => e.hp > 0);
+}
+
+function findNearestEnemyInRange(u, state, range) {
+  let nearest = null;
+  let nearestDist = Infinity;
+  state.enemies.forEach((e) => {
+    const d = Math.hypot(e.x - u.x, e.y - u.y);
+    if (d <= range && d < nearestDist) { nearestDist = d; nearest = e; }
+  });
+  return nearest;
+}
+
+function findNearestStorage(state, u) {
+  let nearest = null;
+  let nearestDist = Infinity;
+  state.buildings.forEach((b) => {
+    if (b.type !== 'storage' || !b.complete) return;
+    const cx = b.col + b.def.size.w / 2;
+    const cy = b.row + b.def.size.h / 2;
+    const d = Math.hypot(cx - u.x, cy - u.y);
+    if (d < nearestDist) { nearestDist = d; nearest = b; }
+  });
+  return nearest;
+}
+
+function findNearestNodeOfType(state, u, resourceType) {
+  let nearest = null;
+  let nearestDist = Infinity;
+  state.map.nodes.forEach((n) => {
+    if (n.type !== resourceType || n.amount <= 0) return;
+    const d = Math.hypot(n.col + 0.5 - u.x, n.row + 0.5 - u.y);
+    if (d < nearestDist) { nearestDist = d; nearest = n; }
+  });
+  return nearest;
+}
+
+// After a delivery (or losing the current node), send the worker back out
+// to gather more of the same resource type, or park it idle with a subtle
+// alert if nothing of that type is left to gather.
+function retryGatherOrIdle(u, state, resourceType) {
+  const node = resourceType ? findNearestNodeOfType(state, u, resourceType) : null;
+  if (node) {
+    u.job = { kind: 'gather', nodeId: node.id, resourceType };
+    u.idleAlerted = false;
+  } else {
+    u.job = null;
+    alertIdle(u, state, `no ${resourceType ? RESOURCES[resourceType].name.toLowerCase() : 'resources'} left nearby`);
+  }
+}
+
+function alertIdle(u, state, reason) {
+  if (u.idleAlerted) return;
+  u.idleAlerted = true;
+  pushMessage(state, `${u.def.name} is idle — ${reason}`);
 }
 
 function pickEnemyTarget(e, state) {

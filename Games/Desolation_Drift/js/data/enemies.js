@@ -33,7 +33,7 @@ const ENEMIES = {
  * wave every `waveInterval` ms, each wave slightly bigger.
  */
 const WAVE_CONFIG = {
-  firstWaveDelay: 45000,
+  firstWaveDelay: 150000,
   waveInterval: 35000,
   baseEnemyCount: 2,
   enemyCountGrowth: 1, // extra enemies added per wave

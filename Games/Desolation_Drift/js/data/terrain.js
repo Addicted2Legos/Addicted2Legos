@@ -5,10 +5,10 @@
  * MAPS at it (or add more maps to the MAPS registry).
  */
 const TILE_TYPES = {
-  sand: { id: 'sand', walkable: true, colors: ['#d98a4a', '#dc9552', '#d3833f', '#e0995a'] },
-  sandDark: { id: 'sandDark', walkable: true, colors: ['#c67a3e', '#c17638'] },
-  rock: { id: 'rock', walkable: false, colors: ['#8a5a3f', '#6e4530', '#7a4e35'] },
-  ruins: { id: 'ruins', walkable: false, colors: ['#c9a97e', '#b6976e'] },
+  sand: { id: 'sand', walkable: true, colors: ['#5b6472', '#616b79', '#535c68', '#697381'] },
+  sandDark: { id: 'sandDark', walkable: true, colors: ['#454e59', '#404850'] },
+  rock: { id: 'rock', walkable: false, colors: ['#3c434c', '#30363e', '#363d45'] },
+  ruins: { id: 'ruins', walkable: false, colors: ['#9aa4ac', '#8b95a0'] },
 };
 
 // Grid size, in tiles. Keep a 16:10-ish ratio to match a widescreen viewport.
