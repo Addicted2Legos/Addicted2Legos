@@ -7,7 +7,7 @@
 const BUILDINGS = {
   factory: {
     id: 'factory',
-    name: 'Ore-Tech Factory',
+    name: "Krezkit's Grubstake",
     icon: '🏭',
     size: { w: 2, h: 2 },
     cost: { minerals: 40, wood: 20 },

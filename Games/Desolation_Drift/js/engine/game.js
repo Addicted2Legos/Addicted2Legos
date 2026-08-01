@@ -25,11 +25,12 @@ function moveToward(entity, tx, ty, speed, dt) {
   const dx = tx - entity.x;
   const dy = ty - entity.y;
   const dist = Math.hypot(dx, dy);
-  if (dist < ARRIVE_EPS) return true;
+  if (dist < ARRIVE_EPS) { entity.moving = false; return true; }
   const step = Math.min(dist, speed * dt);
   entity.x += (dx / dist) * step;
   entity.y += (dy / dist) * step;
   entity.facing = dx >= 0 ? 1 : -1;
+  entity.moving = true;
   return dist <= step;
 }
 

@@ -6,7 +6,7 @@
 const UNITS = {
   worker: {
     id: 'worker',
-    name: 'Worker',
+    name: 'Krezkit',
     icon: '👷',
     color: '#cfe8ff',
     speed: 2.2, // tiles/sec

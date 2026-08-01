@@ -294,31 +294,38 @@ function drawBuildings(ctx, state) {
     ctx.save();
     if (!b.complete) ctx.globalAlpha = 0.6 + 0.3 * b.progress;
 
-    // base pad
-    ctx.fillStyle = '#3a3229';
-    ctx.fillRect(px + w * 0.05, py + h * 0.15, w * 0.9, h * 0.8);
-    // body
-    const grad = ctx.createLinearGradient(px, py, px, py + h);
-    grad.addColorStop(0, '#5b5148');
-    grad.addColorStop(1, '#332c25');
-    ctx.fillStyle = grad;
-    ctx.fillRect(px + w * 0.1, py + h * 0.05, w * 0.8, h * 0.75);
-    // trim / glow color by type
     const accent = BUILDING_ACCENTS[b.type] || '#4fe7ff';
-    ctx.fillStyle = accent;
-    ctx.globalAlpha *= 0.85;
-    ctx.fillRect(px + w * 0.1, py + h * 0.05, w * 0.8, h * 0.08);
-    ctx.globalAlpha = b.complete ? 1 : 0.6 + 0.3 * b.progress;
 
-    // icon
-    ctx.font = `${Math.round(h * 0.42)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#fff';
-    ctx.fillText(b.def.icon, px + w / 2, py + h * 0.52);
+    if (b.type === 'factory') {
+      drawWorkerOutpost(ctx, px, py, w, h, accent);
+    } else {
+      // base pad
+      ctx.fillStyle = '#3a3229';
+      ctx.fillRect(px + w * 0.05, py + h * 0.15, w * 0.9, h * 0.8);
+      // body
+      const grad = ctx.createLinearGradient(px, py, px, py + h);
+      grad.addColorStop(0, '#5b5148');
+      grad.addColorStop(1, '#332c25');
+      ctx.fillStyle = grad;
+      ctx.fillRect(px + w * 0.1, py + h * 0.05, w * 0.8, h * 0.75);
+      // trim / glow color by type
+      ctx.fillStyle = accent;
+      ctx.globalAlpha *= 0.85;
+      ctx.fillRect(px + w * 0.1, py + h * 0.05, w * 0.8, h * 0.08);
+      ctx.globalAlpha = b.complete ? 1 : 0.6 + 0.3 * b.progress;
+
+      // icon
+      ctx.font = `${Math.round(h * 0.42)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff';
+      ctx.fillText(b.def.icon, px + w / 2, py + h * 0.52);
+    }
 
     // label
     ctx.font = `700 ${Math.round(tileSize * 0.16)}px 'Rajdhani', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(0,0,0,0.7)';
     ctx.fillRect(px, py - tileSize * 0.22, w, tileSize * 0.2);
     ctx.fillStyle = accent;
@@ -335,6 +342,77 @@ function drawBuildings(ctx, state) {
       drawHpBar(ctx, px, py - tileSize * 0.06, w, tileSize * 0.08, b.hp / b.maxHp);
     }
   });
+}
+
+// Krezkit's Grubstake: an open-sided timber muster stall — corner posts, a
+// lean-to roof, and a service counter workers gather at, lit by a glowing
+// lantern instead of a signboard.
+function drawWorkerOutpost(ctx, px, py, w, h, accent) {
+  // sandy base pad
+  ctx.fillStyle = '#3a2f22';
+  ctx.fillRect(px + w * 0.04, py + h * 0.2, w * 0.92, h * 0.72);
+
+  // interior shadow
+  ctx.fillStyle = '#241c14';
+  ctx.fillRect(px + w * 0.14, py + h * 0.28, w * 0.72, h * 0.42);
+
+  // corner + center posts
+  ctx.fillStyle = '#5c4630';
+  const postW = w * 0.07;
+  ctx.fillRect(px + w * 0.08, py + h * 0.06, postW, h * 0.86);
+  ctx.fillRect(px + w * 0.92 - postW, py + h * 0.06, postW, h * 0.86);
+  ctx.fillRect(px + w * 0.5 - postW / 2, py + h * 0.02, postW, h * 0.3);
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(px + w * 0.08, py + h * 0.06, postW, h * 0.86);
+  ctx.strokeRect(px + w * 0.92 - postW, py + h * 0.06, postW, h * 0.86);
+
+  // lean-to roof slab
+  const roofGrad = ctx.createLinearGradient(px, py, px, py + h * 0.22);
+  roofGrad.addColorStop(0, '#8a6a44');
+  roofGrad.addColorStop(1, '#5c4630');
+  ctx.fillStyle = roofGrad;
+  ctx.beginPath();
+  ctx.moveTo(px + w * 0.02, py + h * 0.22);
+  ctx.lineTo(px + w * 0.98, py + h * 0.22);
+  ctx.lineTo(px + w * 0.88, py + h * 0.04);
+  ctx.lineTo(px + w * 0.12, py + h * 0.04);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+  ctx.stroke();
+
+  // roof edge trim, accent-colored
+  ctx.fillStyle = accent;
+  ctx.globalAlpha *= 0.85;
+  ctx.fillRect(px + w * 0.02, py + h * 0.2, w * 0.96, h * 0.035);
+  ctx.globalAlpha /= 0.85;
+
+  // service counter
+  ctx.fillStyle = '#7a5c3a';
+  ctx.fillRect(px + w * 0.1, py + h * 0.56, w * 0.8, h * 0.1);
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  ctx.strokeRect(px + w * 0.1, py + h * 0.56, w * 0.8, h * 0.1);
+
+  // open frame beneath the counter
+  ctx.fillStyle = '#3a2f22';
+  ctx.fillRect(px + w * 0.14, py + h * 0.66, w * 0.06, h * 0.24);
+  ctx.fillRect(px + w * 0.8, py + h * 0.66, w * 0.06, h * 0.24);
+
+  // crate on the counter
+  ctx.fillStyle = '#9c7a4a';
+  ctx.fillRect(px + w * 0.42, py + h * 0.44, w * 0.16, h * 0.14);
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  ctx.strokeRect(px + w * 0.42, py + h * 0.44, w * 0.16, h * 0.14);
+
+  // hanging lantern
+  ctx.beginPath();
+  ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = w * 0.08;
+  ctx.arc(px + w * 0.5, py + h * 0.34, w * 0.035, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
 }
 
 function drawProgressBar(ctx, x, y, w, h, pct, color) {
@@ -360,7 +438,9 @@ function drawUnits(ctx, state) {
     const px = u.x * tileSize;
     const py = u.y * tileSize;
     const selected = state.selectedUnitIds.includes(u.id);
-    const r = tileSize * 0.24;
+    const isWorker = u.def.id === 'worker';
+    const isSoldier = u.def.id === 'soldier';
+    const r = tileSize * 0.24 * (isWorker || isSoldier ? 1.2 : 1);
 
     if (selected) {
       ctx.beginPath();
@@ -376,10 +456,12 @@ function drawUnits(ctx, state) {
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.fill();
 
-    if (u.def.id === 'worker') {
-      drawWorkerBot(ctx, px, py, r);
-    } else if (u.def.id === 'soldier') {
-      drawSpaceCowboy(ctx, px, py, r, u.facing);
+    if (isWorker) {
+      const walkPhase = (state.elapsed / 130) + (u.walkSeed || 0);
+      drawWorkerBot(ctx, px, py, r, u.moving, walkPhase, u.facing || 1);
+    } else if (isSoldier) {
+      const walkPhase = (state.elapsed / 130) + (u.walkSeed || 0);
+      drawWastelandTrooper(ctx, px, py, r, u.moving, walkPhase, u.facing || 1);
     } else {
       ctx.beginPath();
       ctx.arc(px, py, r, 0, Math.PI * 2);
@@ -410,153 +492,254 @@ function drawUnits(ctx, state) {
   });
 }
 
-function drawWorkerBot(ctx, px, py, r) {
+// Prospector bot: domed head with a single glowing eye and antennae, rust-toned
+// articulated legs that swing through a walk cycle, one arm cradling a raw
+// crystal chunk and a simpler mechanical arm on the trailing side.
+function drawWorkerBot(ctx, px, py, r, moving, walkPhase, facing) {
   ctx.save();
+  const dir = facing >= 0 ? 1 : -1;
+  const swing = moving ? Math.sin(walkPhase) : 0;
+  const bob = moving ? Math.abs(Math.sin(walkPhase)) * r * 0.09 : 0;
+  const by = py - bob; // body reference y, bounces while walking
 
-  // legs
-  ctx.fillStyle = '#23282f';
-  ctx.fillRect(px - r * 0.42, py + r * 0.15, r * 0.24, r * 0.65);
-  ctx.fillRect(px + r * 0.18, py + r * 0.15, r * 0.24, r * 0.65);
-  ctx.fillStyle = '#4fe7ff';
-  ctx.shadowColor = '#4fe7ff';
-  ctx.shadowBlur = r * 0.5;
-  ctx.fillRect(px - r * 0.42, py + r * 0.62, r * 0.24, r * 0.12);
-  ctx.fillRect(px + r * 0.18, py + r * 0.62, r * 0.24, r * 0.12);
-  ctx.shadowBlur = 0;
+  // legs (drawn first so the torso overlaps the hip joints)
+  drawBotLeg(ctx, px - r * 0.28, by + r * 0.2, r * 0.24, r * 0.68, swing);
+  drawBotLeg(ctx, px + r * 0.28, by + r * 0.2, r * 0.24, r * 0.68, -swing);
 
   // torso
-  const bodyGrad = ctx.createLinearGradient(px, py - r * 0.55, px, py + r * 0.3);
-  bodyGrad.addColorStop(0, '#4a5561');
-  bodyGrad.addColorStop(1, '#20252b');
+  const bodyGrad = ctx.createLinearGradient(px, by - r * 0.55, px, by + r * 0.3);
+  bodyGrad.addColorStop(0, '#aeb5bd');
+  bodyGrad.addColorStop(1, '#767d87');
   ctx.fillStyle = bodyGrad;
-  roundedRect(ctx, px - r * 0.62, py - r * 0.55, r * 1.24, r * 0.9, r * 0.18);
+  roundedRect(ctx, px - r * 0.6, by - r * 0.55, r * 1.2, r * 0.85, r * 0.2);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.4)';
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // chest core glow
+  // chest vents
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+  ctx.lineWidth = Math.max(1, r * 0.05);
+  for (let i = -1; i <= 1; i++) {
+    ctx.beginPath();
+    ctx.moveTo(px - r * 0.22, by - r * 0.16 + i * r * 0.13);
+    ctx.lineTo(px + r * 0.04, by - r * 0.16 + i * r * 0.13);
+    ctx.stroke();
+  }
+
+  // trailing mechanical arm, swings opposite the legs
+  ctx.save();
+  ctx.translate(px - dir * r * 0.64, by - r * 0.3);
+  ctx.rotate(-dir * (0.3 + swing * 0.25));
+  ctx.fillStyle = '#5b616a';
+  ctx.fillRect(-r * 0.09, 0, r * 0.18, r * 0.5);
+  ctx.fillStyle = '#383e46';
   ctx.beginPath();
-  ctx.fillStyle = '#7ff2ff';
+  ctx.arc(0, r * 0.5, r * 0.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // leading arm cradling a raw crystal chunk
+  ctx.save();
+  ctx.translate(px + dir * r * 0.62, by - r * 0.26);
+  ctx.rotate(dir * 0.18);
+  ctx.fillStyle = '#5b616a';
+  ctx.fillRect(-r * 0.09, 0, r * 0.18, r * 0.4);
+  ctx.restore();
+
+  const crystalX = px + dir * r * 0.68;
+  const crystalY = by + r * 0.24;
+  ctx.beginPath();
+  ctx.fillStyle = '#5fe0ff';
   ctx.shadowColor = '#4fe7ff';
-  ctx.shadowBlur = r * 0.6;
-  ctx.arc(px, py - r * 0.08, r * 0.15, 0, Math.PI * 2);
+  ctx.shadowBlur = r * 0.55;
+  ctx.moveTo(crystalX, crystalY - r * 0.22);
+  ctx.lineTo(crystalX + r * 0.16, crystalY);
+  ctx.lineTo(crystalX, crystalY + r * 0.24);
+  ctx.lineTo(crystalX - r * 0.16, crystalY);
+  ctx.closePath();
   ctx.fill();
   ctx.shadowBlur = 0;
 
   // shoulder nubs
-  ctx.fillStyle = '#2c333b';
-  ctx.fillRect(px - r * 0.78, py - r * 0.4, r * 0.2, r * 0.28);
-  ctx.fillRect(px + r * 0.58, py - r * 0.4, r * 0.2, r * 0.28);
+  ctx.fillStyle = '#454b53';
+  ctx.fillRect(px - r * 0.76, by - r * 0.4, r * 0.2, r * 0.28);
+  ctx.fillRect(px + r * 0.56, by - r * 0.4, r * 0.2, r * 0.28);
 
-  // head
-  ctx.fillStyle = '#2c333b';
-  roundedRect(ctx, px - r * 0.36, py - r * 1.05, r * 0.72, r * 0.55, r * 0.14);
+  // domed head
+  ctx.fillStyle = '#5b616a';
+  ctx.beginPath();
+  ctx.arc(px, by - r * 0.8, r * 0.4, Math.PI, 0);
+  ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+  roundedRect(ctx, px - r * 0.4, by - r * 0.8, r * 0.8, r * 0.22, r * 0.05);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.4)';
   ctx.stroke();
 
-  // visor
+  // antennae
+  ctx.strokeStyle = '#454b53';
+  ctx.lineWidth = Math.max(1, r * 0.05);
+  ctx.beginPath();
+  ctx.moveTo(px - r * 0.18, by - r * 1.15);
+  ctx.lineTo(px - r * 0.26, by - r * 1.34);
+  ctx.moveTo(px + r * 0.18, by - r * 1.15);
+  ctx.lineTo(px + r * 0.26, by - r * 1.34);
+  ctx.stroke();
   ctx.fillStyle = '#8ff5ff';
+  ctx.beginPath();
+  ctx.arc(px - r * 0.26, by - r * 1.34, r * 0.05, 0, Math.PI * 2);
+  ctx.arc(px + r * 0.26, by - r * 1.34, r * 0.05, 0, Math.PI * 2);
+  ctx.fill();
+
+  // single glowing eye
+  ctx.beginPath();
+  ctx.fillStyle = '#0d3742';
+  ctx.arc(px, by - r * 0.8, r * 0.26, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.fillStyle = '#5fe0ff';
   ctx.shadowColor = '#4fe7ff';
-  ctx.shadowBlur = r * 0.55;
-  ctx.fillRect(px - r * 0.26, py - r * 0.88, r * 0.52, r * 0.16);
+  ctx.shadowBlur = r * 0.5;
+  ctx.arc(px + dir * r * 0.03, by - r * 0.8, r * 0.17, 0, Math.PI * 2);
+  ctx.fill();
   ctx.shadowBlur = 0;
 
   ctx.restore();
 }
 
-// Astronaut cowboy: pressure suit + bubble helmet with amber visor, topped
-// with a felt cowboy hat, sidearm drawn on the trailing hand facing outward.
-function drawSpaceCowboy(ctx, px, py, r, facing) {
+// One articulated leg: rust-toned upper segment pivots at the hip, lower
+// segment counter-rotates so the foot stays roughly under the body.
+function drawBotLeg(ctx, hipX, hipY, w, h, swing) {
+  const angle = swing * 0.45;
+  ctx.save();
+  ctx.translate(hipX, hipY);
+  ctx.rotate(angle);
+  ctx.fillStyle = '#c2652f';
+  ctx.fillRect(-w / 2, 0, w, h * 0.55);
+
+  ctx.translate(0, h * 0.55);
+  ctx.rotate(-angle * 0.6);
+  ctx.fillStyle = '#9c4d21';
+  ctx.fillRect(-w / 2, 0, w, h * 0.45);
+  ctx.fillStyle = '#2f353c';
+  ctx.fillRect(-w * 0.75, h * 0.42, w * 1.5, w * 0.5);
+
+  ctx.restore();
+}
+
+// Wasteland trooper: long duster coat over a domed helmet with a wrapped
+// collar/scarf, rifle held two-handed out front. Legs swing through the same
+// walk cycle as the worker bot.
+function drawWastelandTrooper(ctx, px, py, r, moving, walkPhase, facing) {
   ctx.save();
   const dir = facing >= 0 ? 1 : -1;
+  const swing = moving ? Math.sin(walkPhase) : 0;
+  const bob = moving ? Math.abs(Math.sin(walkPhase)) * r * 0.08 : 0;
+  const by = py - bob;
 
-  // legs
-  ctx.fillStyle = '#5c4023';
-  ctx.fillRect(px - r * 0.4, py + r * 0.15, r * 0.22, r * 0.6);
-  ctx.fillRect(px + r * 0.18, py + r * 0.15, r * 0.22, r * 0.6);
-  // boots
-  ctx.fillStyle = '#2c1f12';
-  ctx.fillRect(px - r * 0.44, py + r * 0.6, r * 0.28, r * 0.18);
-  ctx.fillRect(px + r * 0.16, py + r * 0.6, r * 0.28, r * 0.18);
+  // legs, glimpsed beneath the coat hem
+  drawTrooperLeg(ctx, px - r * 0.2, by + r * 0.32, r * 0.2, r * 0.6, swing);
+  drawTrooperLeg(ctx, px + r * 0.2, by + r * 0.32, r * 0.2, r * 0.6, -swing);
 
-  // torso (pressure suit)
-  const bodyGrad = ctx.createLinearGradient(px, py - r * 0.55, px, py + r * 0.3);
-  bodyGrad.addColorStop(0, '#ffe3b8');
-  bodyGrad.addColorStop(1, '#c98f52');
-  ctx.fillStyle = bodyGrad;
-  roundedRect(ctx, px - r * 0.58, py - r * 0.55, r * 1.16, r * 0.9, r * 0.2);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // bandolier strap
-  ctx.strokeStyle = 'rgba(70,45,20,0.75)';
-  ctx.lineWidth = r * 0.1;
+  // long coat
+  const coatGrad = ctx.createLinearGradient(px, by - r * 0.6, px, by + r * 0.5);
+  coatGrad.addColorStop(0, '#c9a06a');
+  coatGrad.addColorStop(1, '#8a663f');
+  ctx.fillStyle = coatGrad;
   ctx.beginPath();
-  ctx.moveTo(px - r * 0.5, py - r * 0.5);
-  ctx.lineTo(px + r * 0.32, py + r * 0.22);
-  ctx.stroke();
-
-  // sheriff badge
-  ctx.fillStyle = '#ffd24f';
-  ctx.beginPath();
-  ctx.arc(px + r * 0.12, py - r * 0.12, r * 0.09, 0, Math.PI * 2);
-  ctx.fill();
-
-  // shoulder nubs
-  ctx.fillStyle = '#8a5a2e';
-  ctx.fillRect(px - r * 0.74, py - r * 0.4, r * 0.18, r * 0.26);
-  ctx.fillRect(px + r * 0.56, py - r * 0.4, r * 0.18, r * 0.26);
-
-  // pistol, held out on the leading side
-  ctx.save();
-  ctx.translate(px + dir * r * 0.68, py - r * 0.02);
-  ctx.scale(dir, 1);
-  ctx.fillStyle = '#3a3a3d';
-  ctx.fillRect(0, -r * 0.06, r * 0.4, r * 0.12);
-  ctx.fillStyle = '#5c3a1f';
-  ctx.fillRect(-r * 0.03, 0, r * 0.14, r * 0.26);
-  ctx.restore();
-
-  // head (bubble helmet)
-  ctx.fillStyle = '#dfe6ea';
-  ctx.beginPath();
-  ctx.arc(px, py - r * 0.78, r * 0.34, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-  ctx.stroke();
-
-  // amber visor
-  ctx.fillStyle = '#ffb85e';
-  ctx.shadowColor = '#ffb85e';
-  ctx.shadowBlur = r * 0.4;
-  ctx.beginPath();
-  ctx.ellipse(px + dir * r * 0.02, py - r * 0.78, r * 0.24, r * 0.2, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-
-  // cowboy hat brim
-  ctx.fillStyle = '#7a4a24';
-  ctx.beginPath();
-  ctx.ellipse(px, py - r * 1.02, r * 0.5, r * 0.14, 0, 0, Math.PI * 2);
+  ctx.moveTo(px - r * 0.4, by - r * 0.58);
+  ctx.lineTo(px + r * 0.4, by - r * 0.58);
+  ctx.lineTo(px + r * 0.56, by + r * 0.48);
+  ctx.lineTo(px, by + r * 0.6);
+  ctx.lineTo(px - r * 0.56, by + r * 0.48);
+  ctx.closePath();
   ctx.fill();
   ctx.strokeStyle = 'rgba(0,0,0,0.35)';
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // hat crown
-  ctx.fillStyle = '#8a5a30';
-  roundedRect(ctx, px - r * 0.26, py - r * 1.28, r * 0.52, r * 0.32, r * 0.14);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  // coat center seam
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.moveTo(px, by - r * 0.52);
+  ctx.lineTo(px, by + r * 0.56);
   ctx.stroke();
 
-  // hat band
-  ctx.fillStyle = '#4a2e18';
-  ctx.fillRect(px - r * 0.26, py - r * 1.02, r * 0.52, r * 0.07);
+  // belt
+  ctx.fillStyle = '#4a3620';
+  ctx.fillRect(px - r * 0.4, by + r * 0.02, r * 0.8, r * 0.1);
+
+  // rifle, held two-handed out on the facing side
+  ctx.save();
+  ctx.translate(px, by - r * 0.16);
+  ctx.scale(dir, 1);
+  ctx.strokeStyle = '#8a663f';
+  ctx.lineWidth = r * 0.15;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(r * 0.08, r * 0.16);
+  ctx.lineTo(r * 0.5, -r * 0.02);
+  ctx.moveTo(r * 0.1, r * 0.05);
+  ctx.lineTo(r * 0.62, -r * 0.06);
+  ctx.stroke();
+  ctx.fillStyle = '#2b2d31';
+  ctx.fillRect(r * 0.15, -r * 0.11, r * 0.95, r * 0.1);
+  ctx.fillStyle = '#1c1d20';
+  ctx.fillRect(r * 0.98, -r * 0.14, r * 0.16, r * 0.06);
+  ctx.fillStyle = '#5c4023';
+  ctx.fillRect(-r * 0.06, -r * 0.09, r * 0.24, r * 0.15);
+  ctx.restore();
+
+  // wrapped collar / scarf
+  ctx.fillStyle = '#c98f3a';
+  ctx.beginPath();
+  ctx.ellipse(px, by - r * 0.58, r * 0.3, r * 0.14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // domed helmet
+  ctx.fillStyle = '#7d8790';
+  ctx.beginPath();
+  ctx.arc(px, by - r * 0.78, r * 0.32, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+  ctx.stroke();
+
+  // lens
+  ctx.fillStyle = '#2b3138';
+  ctx.beginPath();
+  ctx.ellipse(px + dir * r * 0.04, by - r * 0.78, r * 0.17, r * 0.13, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#8ff5ff';
+  ctx.shadowColor = '#4fe7ff';
+  ctx.shadowBlur = r * 0.3;
+  ctx.beginPath();
+  ctx.arc(px + dir * r * 0.08, by - r * 0.78, r * 0.05, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  ctx.restore();
+}
+
+// One leg: coat-colored upper segment pivots at the hip, dark boot segment
+// counter-rotates, mirroring the worker bot's walk cycle.
+function drawTrooperLeg(ctx, hipX, hipY, w, h, swing) {
+  const angle = swing * 0.4;
+  ctx.save();
+  ctx.translate(hipX, hipY);
+  ctx.rotate(angle);
+  ctx.fillStyle = '#6b4e2e';
+  ctx.fillRect(-w / 2, 0, w, h * 0.55);
+
+  ctx.translate(0, h * 0.55);
+  ctx.rotate(-angle * 0.5);
+  ctx.fillStyle = '#2a2a2c';
+  ctx.fillRect(-w / 2, 0, w, h * 0.45);
+  ctx.fillStyle = '#18181a';
+  ctx.fillRect(-w * 0.7, h * 0.38, w * 1.4, w * 0.5);
 
   ctx.restore();
 }

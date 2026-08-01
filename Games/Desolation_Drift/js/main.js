@@ -37,7 +37,6 @@
     state.tileSize = w / mapData.cols;
   }
   window.addEventListener('resize', resizeCanvas);
-  resizeCanvas();
 
   // ---------- HUD ----------
   function renderResourceBar() {
@@ -176,6 +175,13 @@
   });
 
   renderBuildBar();
+
+  // Sized last, once the resource/build bars have their real content and the
+  // stage has settled into its final flex layout — sizing earlier measures a
+  // taller #stage than the page ends up with, so the canvas gets locked to
+  // dimensions the CSS max-height then silently clips, leaving clicks
+  // misaligned with what's drawn.
+  resizeCanvas();
 
   // ---------- Loop ----------
   let last = performance.now();

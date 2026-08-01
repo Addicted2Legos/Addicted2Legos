@@ -78,6 +78,8 @@ function createUnit(typeId, x, y, state) {
     idleAlerted: false,
     lastAttack: 0,
     facing: 1,
+    moving: false,
+    walkSeed: Math.random() * Math.PI * 2,
   };
 }
 
