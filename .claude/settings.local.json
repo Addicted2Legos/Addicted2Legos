@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -)",
+      "Bash(lsof -ti:8931 -sTCP:LISTEN)",
+      "Bash(xargs -r kill)",
+      "Bash(python3 - *)",
+      "Bash(curl -sf http://localhost:8931/FireTown.html)",
+      "Bash(curl -sf http://localhost:8931/_verify_firetown.html)",
+      "Bash(node --check /Users/riley/VSCode/Games/Desolation_Drift/js/engine/render.js)",
+      "Bash(command -v chromium-cli)",
+      "Bash(find / -maxdepth 4 -iname \"*chromium-cli*\")",
+      "Bash(npm ls *)",
+      "Bash(command -v open)",
+      "Bash(command -v python3)",
+      "Bash(command -v osascript)",
+      "Bash(sw_vers)"
+    ],
+    "additionalDirectories": [
+      "/private/tmp"
+    ]
+  }
+}
