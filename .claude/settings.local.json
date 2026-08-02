@@ -29,10 +29,14 @@
       "Bash(python3 -m pip install --quiet --user websocket-client)",
       "Bash(python3 -c \"import websocket; print\\('ok'\\)\")",
       "Bash(PYTHONPATH=/Users/riley/Library/Python/3.9/lib/python/site-packages python3 cdp_test.py)",
-      "Bash(rm -rf /tmp/cdp_profile_desolation)"
+      "Bash(rm -rf /tmp/cdp_profile_desolation)",
+      "Bash(cd /Users/riley/VSCode/Games *)",
+      "Bash(echo \"diff exit: $?\")",
+      "Bash(echo \"diff -w exit: $?\")"
     ],
     "additionalDirectories": [
-      "/private/tmp"
+      "/private/tmp",
+      "/tmp"
     ]
   }
 }

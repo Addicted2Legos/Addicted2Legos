@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Level 3 - XB-70 Valkyrie</title>
+    <link rel="stylesheet" href="shared/style.css">
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud">
+        STAGE: 3 (XB-70 Valkyrie)<br>
+        SCORE: <span id="hudScore" class="score-highlight">0</span> PTS<br>
+        SPD: <span id="hudSpeed">0</span> kts | ALT: <span id="hudAlt">0</span> ft<br>
+        THR: <span id="hudThrottle">0</span>% | BANK: <span id="hudBank">0</span>°<br>
+        TRAILERS: <span id="hudTrailers">0</span>/3
+    </div>
+
+    <div id="controlsHint">
+        <b>KEYBOARD CONTROLS</b><br>
+        Arrow Keys: Pitch & Bank<br>
+        Shift / Space: Throttle Up/Down
+    </div>
+
+    <div id="statusMessage">STALL WARNING</div>
+    <button id="restartBtn" onclick="resetGame()">RESTART FLIGHT</button>
+
+    <!-- Bank Slider Left -->
+    <div id="bankContainer">
+        <div id="bankKnob"></div>
+    </div>
+
+    <!-- Throttle Slider Right -->
+    <div id="throttleContainer">
+        <div id="throttleLabel">THR</div>
+        <div id="throttleBar"></div>
+    </div>
+
+    <script src="shared/controls.js"></script>
+    <script src="shared/engine.js"></script>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Map Terrain Features
+        let runway, crossRunway, southRunway, hangar;
+        let lakebedPoly = [];
+        let hills = [];
+        let roads = [];
+        let trailers = [];
+        let scrub = [];
+
+        function initMap() {
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // Edwards AFB runway complex sits on a peninsula of land west of Rogers Dry Lake
+            const hubX = w * 0.40, hubY = h * 0.55;
+            runway = { x: hubX, y: hubY, length: 340, width: 55, angle: 0.55 };
+            crossRunway = { x: hubX, y: hubY, length: 200, width: 40, angle: 0.55 - 1.4 };
+            southRunway = { x: w * 0.46, y: h * 0.75, length: 220, width: 38, angle: 0.55 };
+            hangar = { x: w * 0.30, y: h * 0.50, width: 50, height: 36 };
+
+            // Rogers Dry Lake - the vast dry lakebed that gives Edwards AFB its extra-long runways
+            lakebedPoly = [
+                [0.46, 0.00], [0.60, 0.05], [0.68, 0.18], [0.60, 0.30],
+                [0.66, 0.40], [0.50, 0.50], [0.60, 0.60], [0.55, 0.72],
+                [0.66, 0.84], [0.58, 1.00], [1.10, 1.00], [1.10, 0.00]
+            ].map(p => ({ x: w * p[0], y: h * p[1] }));
+
+            // Desert mountains to the northwest, as seen around Edwards AFB in the Mojave Desert
+            hills = [
+                { x: w * 0.14, y: h * 0.17, radius: 85, label: "LEUHMAN RIDGE" },
+                { x: w * 0.05, y: h * 0.45, radius: 75, label: "ROSAMOND HILLS" },
+                { x: w * 0.35, y: h * 0.97, radius: 80, label: "SADDLEBACK BUTTE" }
+            ];
+
+            // Road Network - Lancaster Blvd & Rosamond Blvd converging near the base entrance
+            roads = [
+                { x1: w * 0.34, y1: 0, x2: w * 0.30, y2: h * 0.52, width: 14 },
+                { x1: 0, y1: h, x2: w * 0.30, y2: h * 0.52, width: 14 },
+                { x1: w * 0.30, y1: h * 0.52, x2: w * 0.55, y2: 0, width: 12 }
+            ];
+
+            // 3 Airplane Trailers (Gliders) placed around the map, including on the dry lake itself
+            trailers = [
+                { x: w * 0.30, y: h * 0.85, altitude: 0, heading: 0.2, isAttached: false, bankAngle: 0 },
+                { x: w * 0.78, y: h * 0.50, altitude: 0, heading: -1.2, isAttached: false, bankAngle: 0 },
+                { x: w * 0.15, y: h * 0.48, altitude: 0, heading: 1.8, isAttached: false, bankAngle: 0 }
+            ];
+
+            // Sparse Mojave scrub (creosote bush) scattered across the desert floor
+            scrub = [];
+            for (let i = 0; i < 55; i++) {
+                scrub.push({
+                    x: Math.random() * w,
+                    y: Math.random() * h,
+                    size: 3 + Math.random() * 4
+                });
+            }
+        }
+
+        // Game & Biplane State
+        let plane = {};
+        let attachedTrailers = [];
+        let isDead = false;
+        let score = 0;
+
+        // Collectibles State
+        let collectibles = [];
+        let floatingTexts = [];
+        let spawnTimer = 0;
+
+        function spawnCollectible() {
+            if (collectibles.length >= 30) return; // Cap maximum onscreen items
+
+            const margin = 60;
+            const x = margin + Math.random() * (canvas.width - margin * 2);
+            const y = margin + Math.random() * (canvas.height - margin * 2);
+
+            // Avoid spawning inside any hill
+            const inHill = hills.some(h => Math.hypot(x - h.x, y - h.y) < h.radius + 20);
+            if (inHill) return;
+
+            const isFuel = Math.random() < 0.5;
+
+            collectibles.push({
+                x: x,
+                y: y,
+                type: isFuel ? 'fuel' : 'flare',
+                points: isFuel ? 15 : 25,
+                pulse: Math.random() * Math.PI * 2,
+                minAlt: 50
+            });
+        }
+
+        function resetGame() {
+            initMap();
+
+            // Place the plane on the runway threshold, aligned with its heading for takeoff roll
+            const startOffset = runway.length / 2 - 30;
+            plane = {
+                x: runway.x - Math.sin(runway.angle) * startOffset,
+                y: runway.y + Math.cos(runway.angle) * startOffset,
+                altitude: 0,
+                heading: runway.angle,
+                speed: 0,
+                bankAngle: 0,
+                pitchAngle: 0,
+                throttle: 0.0,
+
+                weight: 1400,
+                maxThrust: 220,
+                stallSpeed: 28,
+                dragCoeff: 0.022,
+                liftCoeff: 0.14,
+                isStalled: false
+            };
+
+            attachedTrailers = [];
+            collectibles = [];
+            floatingTexts = [];
+            score = 0;
+            spawnTimer = 0;
+            isDead = false;
+
+            // Initial batch of collectibles
+            for (let i = 0; i < 5; i++) {
+                spawnCollectible();
+            }
+
+            document.getElementById('hudScore').innerText = score;
+            document.getElementById('statusMessage').style.display = 'none';
+            document.getElementById('restartBtn').style.display = 'none';
+        }
+
+        resize();
+        resetGame();
+
+        // --- Physics & Gameplay Loop ---
+        let lastTime = performance.now();
+
+        function updatePhysics(dt) {
+            if (isDead) return;
+
+            processKeyboardInputs();
+
+            // Spawning Mechanism: Exactly 1 item per second
+            spawnTimer += dt;
+            if (spawnTimer >= 1.0) {
+                spawnTimer -= 1.0;
+                spawnCollectible();
+            }
+
+            // Bank and Pitch handling
+            const targetBank = input.stickX * 1.35;
+            const targetPitch = -input.stickY * 0.60;
+
+            plane.bankAngle += (targetBank - plane.bankAngle) * 8.0 * dt;
+            plane.pitchAngle += (targetPitch - plane.pitchAngle) * 6.5 * dt;
+
+            // Thrust & Drag
+            const density = Math.max(0.4, 1.0 - (plane.altitude / 20000));
+            const dynamicPressure = 0.5 * density * Math.pow(plane.speed, 2);
+
+            const thrustForce = plane.throttle * plane.maxThrust;
+            const trailerDrag = attachedTrailers.length * 0.005;
+            const dragForce = plane.speed > 0.1 
+                ? ((plane.dragCoeff + trailerDrag) * dynamicPressure) + (Math.abs(plane.bankAngle) * 2.5) 
+                : 0;
+
+            const netForce = thrustForce - dragForce;
+            const accel = netForce / (plane.weight / 32.2);
+
+            plane.speed += accel * dt;
+            plane.speed = Math.max(0, plane.speed);
+
+            // Lift
+            const liftForce = plane.liftCoeff * dynamicPressure * (1 + plane.pitchAngle);
+            const requiredLift = plane.weight / Math.max(0.2, Math.cos(plane.bankAngle));
+
+            const msgEl = document.getElementById('statusMessage');
+
+            if (plane.altitude <= 0) {
+                plane.altitude = 0;
+                plane.bankAngle = 0;
+                
+                if (plane.speed > 2) {
+                    plane.heading += input.stickX * 1.8 * dt;
+                }
+
+                if (plane.speed > plane.stallSpeed && plane.pitchAngle > 0.05) {
+                    plane.altitude += 15 * dt;
+                }
+                msgEl.style.display = 'none';
+            } else {
+                if (plane.speed < plane.stallSpeed) {
+                    plane.isStalled = true;
+                    plane.pitchAngle -= 0.5 * dt;
+                    plane.altitude -= 140 * dt;
+                    msgEl.innerText = "STALL WARNING";
+                    msgEl.style.display = 'block';
+                } else {
+                    plane.isStalled = false;
+                    msgEl.style.display = 'none';
+                    const vertVelocity = (liftForce - requiredLift) * 0.15 + (plane.pitchAngle * plane.speed * 0.95);
+                    plane.altitude += vertVelocity * dt;
+                }
+
+                // Turning Rate
+                const g = 32.2;
+                const turnRate = (g * Math.tan(plane.bankAngle) * 2.8) / Math.max(12, plane.speed * 1.6878);
+                plane.heading += turnRate * dt;
+            }
+
+            // Position Translation
+            const speedFPS = plane.speed * 1.1;
+            plane.x += Math.sin(plane.heading) * speedFPS * dt * 2.0;
+            plane.y -= Math.cos(plane.heading) * speedFPS * dt * 2.0;
+
+            // Screen Wrapping
+            if (plane.x < 0) plane.x = canvas.width;
+            if (plane.x > canvas.width) plane.x = 0;
+            if (plane.y < 0) plane.y = canvas.height;
+            if (plane.y > canvas.height) plane.y = 0;
+
+            // --- Collectible Items Pickup Detection ---
+            for (let i = collectibles.length - 1; i >= 0; i--) {
+                const item = collectibles[i];
+                item.pulse += dt * 4.0; // Animate shine pulse
+
+                const pickupRadius = 36;
+                const planeHitX = plane.x;
+                const planeHitY = plane.y;
+                const dist = Math.hypot(planeHitX - item.x, planeHitY - item.y);
+
+                if (dist < pickupRadius) {
+                    score += item.points;
+                    document.getElementById('hudScore').innerText = score;
+
+                    floatingTexts.push({
+                        x: item.x,
+                        y: item.y,
+                        text: `+${item.points} PTS`,
+                        color: item.type === 'fuel' ? '#2ee6d6' : '#ff7a1a',
+                        alpha: 1.0,
+                        life: 1.0
+                    });
+
+                    collectibles.splice(i, 1);
+                }
+            }
+
+            // Update Floating Text Animations
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.y -= 25 * dt;
+                ft.life -= dt;
+                ft.alpha = Math.max(0, ft.life);
+                if (ft.life <= 0) floatingTexts.splice(i, 1);
+            }
+
+            // --- Trailer Bungee Pickup & Physics ---
+            const lastNode = attachedTrailers.length > 0 
+                ? attachedTrailers[attachedTrailers.length - 1] 
+                : plane;
+
+            if (plane.speed > 10) {
+                trailers.forEach(t => {
+                    if (!t.isAttached) {
+                        const dist = Math.hypot(lastNode.x - t.x, lastNode.y - t.y);
+                        if (dist < 120) {
+                            t.isAttached = true;
+                            attachedTrailers.push(t);
+                        }
+                    }
+                });
+            }
+
+            let leadNode = plane;
+            attachedTrailers.forEach((t) => {
+                const leadTailDist = 30;
+                const leadTailX = leadNode.x - Math.sin(leadNode.heading) * leadTailDist;
+                const leadTailY = leadNode.y + Math.cos(leadNode.heading) * leadTailDist;
+
+                const dx = leadTailX - t.x;
+                const dy = leadTailY - t.y;
+                const dist = Math.hypot(dx, dy);
+
+                const desiredRopeLen = 45;
+
+                if (dist > desiredRopeLen) {
+                    const springForce = (dist - desiredRopeLen) * 11.0 * dt;
+                    t.x += (dx / dist) * springForce;
+                    t.y += (dy / dist) * springForce;
+                }
+
+                const targetAlt = Math.max(300, leadNode.altitude);
+                t.altitude += (targetAlt - t.altitude) * 5.0 * dt;
+
+                const targetAngle = Math.atan2(dx, -dy);
+                let diff = targetAngle - t.heading;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                t.heading += diff * 8.5 * dt;
+                t.bankAngle = diff * 1.5;
+
+                leadNode = t;
+            });
+
+            // Collision Check across all Hills
+            for (let h of hills) {
+                const distToHill = Math.hypot(plane.x - h.x, plane.y - h.y);
+                if (distToHill < h.radius && plane.altitude < 1200) {
+                    isDead = true;
+                    msgEl.innerText = "CRASHED INTO THE HILL!\nYOU DIED";
+                    msgEl.style.display = 'block';
+                    document.getElementById('restartBtn').style.display = 'block';
+                    break;
+                }
+            }
+
+            // HUD Readouts
+            updateHUD();
+        }
+
+        // Draws a paved runway strip rotated around its own center
+        function drawRunwayStrip(r) {
+            ctx.save();
+            ctx.translate(r.x, r.y);
+            ctx.rotate(r.angle);
+            ctx.fillStyle = "#4d463c";
+            ctx.fillRect(-r.width / 2, -r.length / 2, r.width, r.length);
+            ctx.fillStyle = "#f2ead0";
+            for (let i = -r.length / 2 + 20; i < r.length / 2 - 20; i += 42) {
+                ctx.fillRect(-2, i, 4, 16);
+            }
+            ctx.restore();
+        }
+
+        // --- Render Engine ---
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Base Terrain Ground - Mojave Desert Sand
+            const groundGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            groundGrad.addColorStop(0, "#d9c191");
+            groundGrad.addColorStop(1, "#b6935f");
+            ctx.fillStyle = groundGrad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Subtle Dune / Wash Line Details
+            ctx.strokeStyle = "rgba(140, 110, 70, 0.35)";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height * 0.25);
+            ctx.quadraticCurveTo(canvas.width * 0.3, canvas.height * 0.15, canvas.width * 0.6, canvas.height * 0.3);
+            ctx.quadraticCurveTo(canvas.width * 0.85, canvas.height * 0.4, canvas.width, canvas.height * 0.2);
+            ctx.stroke();
+
+            // Scattered Mojave Scrub Brush
+            scrub.forEach(s => {
+                ctx.beginPath();
+                ctx.fillStyle = "#7a7a4e";
+                ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // 1. Draw Roads Off the Edges
+            roads.forEach(r => {
+                ctx.strokeStyle = "#3e4247"; // Asphalt Road
+                ctx.lineWidth = r.width;
+                ctx.lineCap = "square";
+                ctx.beginPath();
+                ctx.moveTo(r.x1, r.y1);
+                ctx.lineTo(r.x2, r.y2);
+                ctx.stroke();
+
+                // Dashed Centerline
+                ctx.strokeStyle = "#e5c158";
+                ctx.lineWidth = 2;
+                ctx.setLineDash([8, 8]);
+                ctx.beginPath();
+                ctx.moveTo(r.x1, r.y1);
+                ctx.lineTo(r.x2, r.y2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            });
+
+            // 2. Draw Rogers Dry Lake
+            ctx.beginPath();
+            lakebedPoly.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+            ctx.closePath();
+            ctx.fillStyle = "#e8ddbe";
+            ctx.fill();
+            ctx.strokeStyle = "#c9b98a";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Faint mud-crack texture across the dry lakebed
+            ctx.save();
+            ctx.clip();
+            ctx.strokeStyle = "rgba(150, 130, 95, 0.35)";
+            ctx.lineWidth = 1;
+            for (let i = -canvas.height; i < canvas.width; i += 22) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i + canvas.height, canvas.height);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // Edwards AFB Runway Complex (main runway, crosswind runway, and South Base/Birk runway)
+            drawRunwayStrip(runway);
+            drawRunwayStrip(crossRunway);
+            drawRunwayStrip(southRunway);
+
+            ctx.fillStyle = "#8a8574";
+            ctx.fillRect(hangar.x - hangar.width/2, hangar.y - hangar.height/2, hangar.width, hangar.height);
+            ctx.fillStyle = "#3f3c33";
+            ctx.fillRect(hangar.x - hangar.width/2 + 4, hangar.y - 3, hangar.width - 8, 6);
+
+            // 3. Draw Desert Mountains
+            hills.forEach(h => {
+                const hillGrad = ctx.createRadialGradient(h.x, h.y, 5, h.x, h.y, h.radius);
+                hillGrad.addColorStop(0, "#b89a72");
+                hillGrad.addColorStop(0.55, "#8a6f4e");
+                hillGrad.addColorStop(1, "#5c4530");
+
+                ctx.beginPath();
+                ctx.arc(h.x, h.y, h.radius, 0, Math.PI * 2);
+                ctx.fillStyle = hillGrad;
+                ctx.fill();
+                ctx.strokeStyle = "#4a3524";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = "#3b2a1a";
+                ctx.font = "bold 11px monospace";
+                ctx.textAlign = "center";
+                ctx.fillText(h.label, h.x, h.y + 4);
+            });
+
+            // --- Draw Collectibles ---
+            collectibles.forEach(item => {
+                const scale = 1 + Math.sin(item.pulse) * 0.15;
+                ctx.save();
+                ctx.translate(item.x, item.y);
+                ctx.scale(scale, scale);
+
+                if (item.type === 'fuel') {
+                    // Fuel canister - cyan, 15 PTS
+                    ctx.shadowColor = "#2ee6d6";
+                    ctx.shadowBlur = 10;
+                    ctx.fillStyle = "#2ee6d6";
+                    ctx.strokeStyle = "#0f7a70";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -11);
+                    ctx.lineTo(8, 0);
+                    ctx.lineTo(0, 11);
+                    ctx.lineTo(-8, 0);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(-6, 0); ctx.lineTo(6, 0);
+                    ctx.moveTo(0, -7); ctx.lineTo(0, 7);
+                    ctx.strokeStyle = "rgba(230, 255, 252, 0.9)";
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                } else {
+                    // Signal flare - orange, 25 PTS
+                    ctx.shadowColor = "#ff7a1a";
+                    ctx.shadowBlur = 10;
+                    ctx.fillStyle = "#ff7a1a";
+                    ctx.strokeStyle = "#a34b00";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 9, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(-4, -3);
+                    ctx.lineTo(4, -3);
+                    ctx.moveTo(-4, 3);
+                    ctx.lineTo(4, 3);
+                    ctx.strokeStyle = "rgba(255, 245, 230, 0.9)";
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
+                }
+                ctx.restore();
+            });
+
+            // Ground Unattached Trailers
+            trailers.forEach(t => {
+                if (!t.isAttached) {
+                    ctx.beginPath();
+                    ctx.arc(t.x, t.y, 45, 0, Math.PI * 2);
+                    ctx.strokeStyle = "rgba(255, 204, 0, 0.4)";
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([6, 6]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    ctx.save();
+                    ctx.translate(t.x, t.y);
+                    ctx.rotate(t.heading);
+                    drawTrailerGlider(ctx, true);
+                    ctx.restore();
+                }
+            });
+
+            // Bungee Lines
+            let leadNode = plane;
+            attachedTrailers.forEach(t => {
+                const leadTailDist = 22 * (1 + leadNode.altitude / 1800);
+                const leadTailX = leadNode.x - Math.sin(leadNode.heading) * leadTailDist;
+                const leadTailY = leadNode.y + Math.cos(leadNode.heading) * leadTailDist;
+
+                const trailerNoseDist = 18 * (1 + t.altitude / 1800);
+                const trailerNoseX = t.x + Math.sin(t.heading) * trailerNoseDist;
+                const trailerNoseY = t.y - Math.cos(t.heading) * trailerNoseDist;
+
+                ctx.beginPath();
+                ctx.moveTo(leadTailX, leadTailY);
+                ctx.lineTo(trailerNoseX, trailerNoseY);
+                ctx.strokeStyle = "#ffcc00";
+                ctx.lineWidth = 3;
+                ctx.setLineDash([5, 3]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                leadNode = t;
+            });
+
+            // Flying Trailers
+            attachedTrailers.forEach(t => {
+                const altScale = 1 + (t.altitude / 1800);
+                const shadowOffsetX = 8 + (t.altitude / 18);
+                const shadowOffsetY = 12 + (t.altitude / 14);
+                const shadowAlpha = Math.max(0.15, 0.45 - (t.altitude / 5000));
+
+                ctx.save();
+                ctx.translate(t.x + shadowOffsetX, t.y + shadowOffsetY);
+                ctx.rotate(t.heading);
+                ctx.rotate(t.bankAngle * 0.3);
+                ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
+                drawTrailerGlider(ctx, false);
+                ctx.restore();
+
+                ctx.save();
+                ctx.translate(t.x, t.y);
+                ctx.rotate(t.heading);
+                ctx.scale(altScale, altScale);
+                ctx.rotate(t.bankAngle * 0.45);
+                drawTrailerGlider(ctx, true);
+                ctx.restore();
+            });
+
+            // Main Plane & Shadow
+            if (!isDead) {
+                const altScale = 1 + (plane.altitude / 1800);
+                const shadowOffsetX = 8 + (plane.altitude / 18);
+                const shadowOffsetY = 12 + (plane.altitude / 14);
+                const shadowAlpha = Math.max(0.15, 0.45 - (plane.altitude / 5000));
+
+                // Ground Shadow
+                ctx.save();
+                ctx.translate(plane.x + shadowOffsetX, plane.y + shadowOffsetY);
+                ctx.rotate(plane.heading);
+                ctx.rotate(plane.bankAngle * 0.3);
+                ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
+                drawXB70Valkyrie(ctx, false);
+                ctx.restore();
+
+                // Airplane Body
+                ctx.save();
+                ctx.translate(plane.x, plane.y);
+                ctx.rotate(plane.heading);
+                ctx.scale(altScale, altScale);
+                ctx.rotate(plane.bankAngle * 0.45);
+                drawXB70Valkyrie(ctx, true);
+                ctx.restore();
+            }
+
+            // Floating Text Popups
+            floatingTexts.forEach(ft => {
+                ctx.save();
+                ctx.font = "bold 15px monospace";
+                ctx.fillStyle = ft.color;
+                ctx.globalAlpha = ft.alpha;
+                ctx.textAlign = "center";
+                ctx.shadowColor = "#000";
+                ctx.shadowBlur = 4;
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.restore();
+            });
+        }
+
+        // --- Airplane Rendering: XB-70 Valkyrie ---
+        function drawXB70Valkyrie(ctx, isMainBody) {
+            if (!isMainBody) return;
+
+            ctx.strokeStyle = "#2b3238";
+            ctx.lineWidth = 1.5;
+
+            // Main Delta Wing (large sweep, root-to-tip)
+            ctx.fillStyle = "#c7ccd1";
+            ctx.beginPath();
+            ctx.moveTo(0, -4);
+            ctx.lineTo(70, 38);
+            ctx.lineTo(50, 45);
+            ctx.lineTo(6, 22);
+            ctx.lineTo(-6, 22);
+            ctx.lineTo(-50, 45);
+            ctx.lineTo(-70, 38);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Drooped outer wingtip panels (hinged, distinct shading)
+            ctx.fillStyle = "#9aa0a6";
+            ctx.beginPath();
+            ctx.moveTo(55, 25);
+            ctx.lineTo(70, 38);
+            ctx.lineTo(50, 45);
+            ctx.lineTo(42, 35);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(-55, 25);
+            ctx.lineTo(-70, 38);
+            ctx.lineTo(-50, 45);
+            ctx.lineTo(-42, 35);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Forward Canards
+            ctx.fillStyle = "#b7bcc1";
+            ctx.beginPath();
+            ctx.moveTo(0, -32);
+            ctx.lineTo(16, -19);
+            ctx.lineTo(9, -15);
+            ctx.lineTo(0, -21);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(0, -32);
+            ctx.lineTo(-16, -19);
+            ctx.lineTo(-9, -15);
+            ctx.lineTo(0, -21);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Long, slender Fuselage
+            ctx.fillStyle = "#dde1e5";
+            ctx.beginPath();
+            ctx.moveTo(0, -50);
+            ctx.quadraticCurveTo(5, -32, 5, 0);
+            ctx.quadraticCurveTo(5, 30, 3, 50);
+            ctx.quadraticCurveTo(0, 54, -3, 50);
+            ctx.quadraticCurveTo(-5, 30, -5, 0);
+            ctx.quadraticCurveTo(-5, -32, 0, -50);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Cockpit Windshield
+            ctx.fillStyle = "#1e293b";
+            ctx.beginPath();
+            ctx.moveTo(0, -36);
+            ctx.lineTo(3, -29);
+            ctx.lineTo(2, -25);
+            ctx.lineTo(0, -27);
+            ctx.lineTo(-2, -25);
+            ctx.lineTo(-3, -29);
+            ctx.closePath();
+            ctx.fill();
+
+            // Twin outward-canted Vertical Tails
+            ctx.fillStyle = "#9aa0a6";
+            ctx.beginPath();
+            ctx.moveTo(4, 27);
+            ctx.lineTo(20, 31);
+            ctx.lineTo(16, 49);
+            ctx.lineTo(4, 47);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(-4, 27);
+            ctx.lineTo(-20, 31);
+            ctx.lineTo(-16, 49);
+            ctx.lineTo(-4, 47);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Six Engine Nacelles in a row under the rear fuselage
+            ctx.fillStyle = "#4a5157";
+            ctx.strokeStyle = "#22272b";
+            ctx.lineWidth = 1.0;
+            const engineXs = [-9, -5.4, -1.8, 1.8, 5.4, 9];
+            engineXs.forEach(ex => {
+                ctx.beginPath();
+                ctx.ellipse(ex, 43, 1.6, 6, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            });
+
+            // Engine Exhaust Glow
+            if (plane.speed > 0.5) {
+                ctx.fillStyle = "#f59e0b";
+                engineXs.forEach(ex => {
+                    ctx.fillRect(ex - 1, 48, 2, 3);
+                });
+            }
+        }
+
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>

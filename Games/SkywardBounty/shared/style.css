@@ -1,0 +1,145 @@
+* {
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-user-select: none;
+    margin: 0;
+    padding: 0;
+}
+body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #111;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+#gameCanvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+/* UI Overlay Elements */
+#hud {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    color: #e0d0b0;
+    font-family: monospace;
+    font-size: 14px;
+    background: rgba(30, 20, 10, 0.85);
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(212, 163, 89, 0.4);
+    pointer-events: none;
+    line-height: 1.5;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+.score-highlight {
+    color: #00ffff;
+    font-weight: bold;
+    font-size: 16px;
+}
+#controlsHint {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    color: #d4a359;
+    font-family: monospace;
+    font-size: 12px;
+    background: rgba(30, 20, 10, 0.85);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(212, 163, 89, 0.3);
+    pointer-events: none;
+    text-align: right;
+}
+/* Bank Slider Control */
+#bankContainer {
+    position: absolute;
+    bottom: 25px;
+    left: 25px;
+    width: 160px;
+    height: 50px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(212, 163, 89, 0.4);
+    border-radius: 25px;
+    touch-action: none;
+}
+#bankKnob {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 38px;
+    height: 38px;
+    margin-top: -19px;
+    margin-left: -19px;
+    border-radius: 50%;
+    background: rgba(212, 163, 89, 0.6);
+    border: 2px solid #d4a359;
+    box-shadow: 0 0 10px rgba(212, 163, 89, 0.5);
+    pointer-events: none;
+}
+/* Throttle Control */
+#throttleContainer {
+    position: absolute;
+    bottom: 25px;
+    right: 25px;
+    width: 50px;
+    height: 160px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(212, 163, 89, 0.4);
+    border-radius: 25px;
+    touch-action: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 5px;
+}
+#throttleBar {
+    width: 38px;
+    height: 0%;
+    background: linear-gradient(to top, #b83b1d, #d4a359);
+    border-radius: 19px;
+    pointer-events: none;
+    transition: height 0.05s linear;
+}
+#throttleLabel {
+    position: absolute;
+    top: -22px;
+    color: #d4a359;
+    font-size: 11px;
+    font-family: monospace;
+}
+#statusMessage {
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #ff3333;
+    font-family: monospace;
+    font-weight: bold;
+    font-size: 26px;
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px #ff0000;
+    display: none;
+    pointer-events: none;
+    text-align: center;
+    line-height: 1.4;
+}
+#restartBtn {
+    position: absolute;
+    top: 55%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 12px 24px;
+    background: #b83b1d;
+    color: #fff;
+    border: 2px solid #d4a359;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    display: none;
+    box-shadow: 0 0 15px rgba(0,0,0,0.7);
+}

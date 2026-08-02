@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Level 4 - Boeing 747</title>
+    <link rel="stylesheet" href="shared/style.css">
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud">
+        STAGE: 4 (Boeing 747)<br>
+        SCORE: <span id="hudScore" class="score-highlight">0</span> PTS<br>
+        SPD: <span id="hudSpeed">0</span> kts | ALT: <span id="hudAlt">0</span> ft<br>
+        THR: <span id="hudThrottle">0</span>% | BANK: <span id="hudBank">0</span>°<br>
+        TRAILERS: <span id="hudTrailers">0</span>/3
+    </div>
+
+    <div id="controlsHint">
+        <b>KEYBOARD CONTROLS</b><br>
+        Arrow Keys: Pitch & Bank<br>
+        Shift / Space: Throttle Up/Down
+    </div>
+
+    <div id="statusMessage">STALL WARNING</div>
+    <button id="restartBtn" onclick="resetGame()">RESTART FLIGHT</button>
+
+    <!-- Bank Slider Left -->
+    <div id="bankContainer">
+        <div id="bankKnob"></div>
+    </div>
+
+    <!-- Throttle Slider Right -->
+    <div id="throttleContainer">
+        <div id="throttleLabel">THR</div>
+        <div id="throttleBar"></div>
+    </div>
+
+    <script src="shared/controls.js"></script>
+    <script src="shared/engine.js"></script>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Map Terrain Features
+        let runway, crossRunway, southRunway, terminal;
+        let coastPoints = [];
+        let hills = [];
+        let roads = [];
+        let trailers = [];
+        let scrub = [];
+
+        // Coastline runs roughly north-south; the ocean lies west (lower x) of it.
+        // yf/xf are fractions of canvas height/width - interpolated for a jagged, natural shoreline.
+        const COAST_PROFILE = [
+            { yf: 0.00, xf: 0.34 }, { yf: 0.10, xf: 0.40 }, { yf: 0.22, xf: 0.30 },
+            { yf: 0.34, xf: 0.42 }, { yf: 0.46, xf: 0.32 }, { yf: 0.58, xf: 0.44 },
+            { yf: 0.70, xf: 0.34 }, { yf: 0.82, xf: 0.40 }, { yf: 0.92, xf: 0.30 },
+            { yf: 1.00, xf: 0.36 }
+        ];
+
+        function coastX(y) {
+            const h = canvas.height;
+            const yf = y / h;
+            for (let i = 0; i < COAST_PROFILE.length - 1; i++) {
+                const a = COAST_PROFILE[i], b = COAST_PROFILE[i + 1];
+                if (yf >= a.yf && yf <= b.yf) {
+                    const t = (yf - a.yf) / (b.yf - a.yf || 1);
+                    return canvas.width * (a.xf + (b.xf - a.xf) * t);
+                }
+            }
+            return canvas.width * COAST_PROFILE[COAST_PROFILE.length - 1].xf;
+        }
+
+        function isLand(x, y) {
+            return x >= coastX(y);
+        }
+
+        // Adds a smoothed curve (quadratic corner-cutting) through a series of points to the
+        // current path. Assumes the pen is already at pts[0] (via a prior moveTo/lineTo).
+        function curveThroughPoints(ctx, pts) {
+            for (let i = 0; i < pts.length - 1; i++) {
+                const cur = pts[i], next = pts[i + 1];
+                ctx.quadraticCurveTo(cur.x, cur.y, (cur.x + next.x) / 2, (cur.y + next.y) / 2);
+            }
+            ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+        }
+
+        function coastlinePoints() {
+            return COAST_PROFILE.map(p => ({ x: canvas.width * p.xf, y: canvas.height * p.yf }));
+        }
+
+        // Traces just the smoothed shoreline (used for the beach stroke)
+        function traceCoastline(ctx) {
+            const coastPts = coastlinePoints();
+            ctx.moveTo(coastPts[0].x, coastPts[0].y);
+            curveThroughPoints(ctx, coastPts);
+        }
+
+        // Traces the full ocean fill polygon: top edge -> smoothed shoreline -> bottom-left -> closed along x=0
+        function traceOceanPoly(ctx) {
+            const coastPts = coastlinePoints();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(coastPts[0].x, coastPts[0].y);
+            curveThroughPoints(ctx, coastPts);
+            ctx.lineTo(0, canvas.height);
+            ctx.closePath();
+        }
+
+        function initMap() {
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // LAX-style parallel runway complex, set back from the coast for the approach over water
+            runway = { x: w * 0.66, y: h * 0.36, length: 380, width: 55, angle: 1.50 };
+            crossRunway = { x: w * 0.66, y: h * 0.48, length: 380, width: 42, angle: 1.50 };
+            southRunway = { x: w * 0.64, y: h * 0.74, length: 340, width: 46, angle: 1.48 };
+
+            // Central terminal complex (horseshoe terminals + control tower), between the runway pairs
+            terminal = { x: w * 0.52, y: h * 0.55, width: 90, height: 60 };
+
+            // Coastal bluffs and the airport control tower - collision hazards
+            hills = [
+                { x: w * 0.40, y: h * 0.15, radius: 50, label: "WESTCHESTER BLUFFS" },
+                { x: w * 0.38, y: h * 0.90, radius: 55, label: "EL SEGUNDO DUNES" },
+                { x: w * 0.60, y: h * 0.55, radius: 30, label: "CONTROL TOWER" }
+            ];
+
+            // Road Network - Sepulveda Blvd along the field, Century Blvd feeding the terminals, Vista Del Mar along the coast
+            roads = [
+                { x1: w * 0.80, y1: 0, x2: w * 0.80, y2: h, width: 14 },
+                { x1: w * 1.05, y1: h * 0.85, x2: w * 0.45, y2: h * 0.85, width: 14 },
+                { x1: coastX(0), y1: 0, x2: coastX(h), y2: h, width: 10 }
+            ];
+
+            // 3 Airplane Trailers (small aircraft to tow) placed on land around the terminal ramps
+            trailers = [
+                { x: w * 0.50, y: h * 0.80, altitude: 0, heading: 0.2, isAttached: false, bankAngle: 0 },
+                { x: w * 0.85, y: h * 0.45, altitude: 0, heading: -1.2, isAttached: false, bankAngle: 0 },
+                { x: w * 0.45, y: h * 0.28, altitude: 0, heading: 1.8, isAttached: false, bankAngle: 0 }
+            ];
+
+            // Sparse coastal ice-plant / dune grass, scattered only across the land
+            scrub = [];
+            for (let i = 0; i < 55; i++) {
+                const x = Math.random() * w;
+                const y = Math.random() * h;
+                if (!isLand(x, y)) continue;
+                scrub.push({ x, y, size: 3 + Math.random() * 4 });
+            }
+        }
+
+        // The 747 airframe is drawn large; scale it down so more coastline/ocean stays visible
+        const PLANE_VISUAL_SCALE = 0.62;
+
+        // Game & Biplane State
+        let plane = {};
+        let attachedTrailers = [];
+        let isDead = false;
+        let score = 0;
+
+        // Collectibles State
+        let collectibles = [];
+        let floatingTexts = [];
+        let spawnTimer = 0;
+
+        function spawnCollectible() {
+            if (collectibles.length >= 30) return; // Cap maximum onscreen items
+
+            const margin = 60;
+            const x = margin + Math.random() * (canvas.width - margin * 2);
+            const y = margin + Math.random() * (canvas.height - margin * 2);
+
+            // Avoid spawning inside any hill
+            const inHill = hills.some(h => Math.hypot(x - h.x, y - h.y) < h.radius + 20);
+            if (inHill) return;
+
+            const isFuel = Math.random() < 0.5;
+
+            collectibles.push({
+                x: x,
+                y: y,
+                type: isFuel ? 'fuel' : 'flare',
+                points: isFuel ? 15 : 25,
+                pulse: Math.random() * Math.PI * 2,
+                minAlt: 50
+            });
+        }
+
+        function resetGame() {
+            initMap();
+
+            // Place the plane on the runway threshold, aligned with its heading for takeoff roll
+            const startOffset = runway.length / 2 - 30;
+            plane = {
+                x: runway.x - Math.sin(runway.angle) * startOffset,
+                y: runway.y + Math.cos(runway.angle) * startOffset,
+                altitude: 0,
+                heading: runway.angle,
+                speed: 0,
+                bankAngle: 0,
+                pitchAngle: 0,
+                throttle: 0.0,
+
+                weight: 1800,
+                maxThrust: 260,
+                stallSpeed: 34,
+                dragCoeff: 0.020,
+                liftCoeff: 0.15,
+                isStalled: false
+            };
+
+            attachedTrailers = [];
+            collectibles = [];
+            floatingTexts = [];
+            score = 0;
+            spawnTimer = 0;
+            isDead = false;
+
+            // Initial batch of collectibles
+            for (let i = 0; i < 5; i++) {
+                spawnCollectible();
+            }
+
+            document.getElementById('hudScore').innerText = score;
+            document.getElementById('statusMessage').style.display = 'none';
+            document.getElementById('restartBtn').style.display = 'none';
+        }
+
+        resize();
+        resetGame();
+
+        // --- Physics & Gameplay Loop ---
+        let lastTime = performance.now();
+
+        function updatePhysics(dt) {
+            if (isDead) return;
+
+            processKeyboardInputs();
+
+            // Spawning Mechanism: Exactly 1 item per second
+            spawnTimer += dt;
+            if (spawnTimer >= 1.0) {
+                spawnTimer -= 1.0;
+                spawnCollectible();
+            }
+
+            // Bank and Pitch handling
+            const targetBank = input.stickX * 1.35;
+            const targetPitch = -input.stickY * 0.60;
+
+            plane.bankAngle += (targetBank - plane.bankAngle) * 8.0 * dt;
+            plane.pitchAngle += (targetPitch - plane.pitchAngle) * 6.5 * dt;
+
+            // Thrust & Drag
+            const density = Math.max(0.4, 1.0 - (plane.altitude / 20000));
+            const dynamicPressure = 0.5 * density * Math.pow(plane.speed, 2);
+
+            const thrustForce = plane.throttle * plane.maxThrust;
+            const trailerDrag = attachedTrailers.length * 0.005;
+            const dragForce = plane.speed > 0.1 
+                ? ((plane.dragCoeff + trailerDrag) * dynamicPressure) + (Math.abs(plane.bankAngle) * 2.5) 
+                : 0;
+
+            const netForce = thrustForce - dragForce;
+            const accel = netForce / (plane.weight / 32.2);
+
+            plane.speed += accel * dt;
+            plane.speed = Math.max(0, plane.speed);
+
+            // Lift
+            const liftForce = plane.liftCoeff * dynamicPressure * (1 + plane.pitchAngle);
+            const requiredLift = plane.weight / Math.max(0.2, Math.cos(plane.bankAngle));
+
+            const msgEl = document.getElementById('statusMessage');
+
+            if (plane.altitude <= 0) {
+                plane.altitude = 0;
+                plane.bankAngle = 0;
+                
+                if (plane.speed > 2) {
+                    plane.heading += input.stickX * 1.8 * dt;
+                }
+
+                if (plane.speed > plane.stallSpeed && plane.pitchAngle > 0.05) {
+                    plane.altitude += 15 * dt;
+                }
+                msgEl.style.display = 'none';
+            } else {
+                if (plane.speed < plane.stallSpeed) {
+                    plane.isStalled = true;
+                    plane.pitchAngle -= 0.5 * dt;
+                    plane.altitude -= 140 * dt;
+                    msgEl.innerText = "STALL WARNING";
+                    msgEl.style.display = 'block';
+                } else {
+                    plane.isStalled = false;
+                    msgEl.style.display = 'none';
+                    const vertVelocity = (liftForce - requiredLift) * 0.15 + (plane.pitchAngle * plane.speed * 0.95);
+                    plane.altitude += vertVelocity * dt;
+                }
+
+                // Turning Rate
+                const g = 32.2;
+                const turnRate = (g * Math.tan(plane.bankAngle) * 2.8) / Math.max(12, plane.speed * 1.6878);
+                plane.heading += turnRate * dt;
+            }
+
+            // Position Translation
+            const speedFPS = plane.speed * 1.1;
+            plane.x += Math.sin(plane.heading) * speedFPS * dt * 2.0;
+            plane.y -= Math.cos(plane.heading) * speedFPS * dt * 2.0;
+
+            // Screen Wrapping
+            if (plane.x < 0) plane.x = canvas.width;
+            if (plane.x > canvas.width) plane.x = 0;
+            if (plane.y < 0) plane.y = canvas.height;
+            if (plane.y > canvas.height) plane.y = 0;
+
+            // --- Collectible Items Pickup Detection ---
+            for (let i = collectibles.length - 1; i >= 0; i--) {
+                const item = collectibles[i];
+                item.pulse += dt * 4.0; // Animate shine pulse
+
+                const pickupRadius = 36;
+                const planeHitX = plane.x;
+                const planeHitY = plane.y;
+                const dist = Math.hypot(planeHitX - item.x, planeHitY - item.y);
+
+                if (dist < pickupRadius) {
+                    score += item.points;
+                    document.getElementById('hudScore').innerText = score;
+
+                    floatingTexts.push({
+                        x: item.x,
+                        y: item.y,
+                        text: `+${item.points} PTS`,
+                        color: item.type === 'fuel' ? '#2ee6d6' : '#ff7a1a',
+                        alpha: 1.0,
+                        life: 1.0
+                    });
+
+                    collectibles.splice(i, 1);
+                }
+            }
+
+            // Update Floating Text Animations
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.y -= 25 * dt;
+                ft.life -= dt;
+                ft.alpha = Math.max(0, ft.life);
+                if (ft.life <= 0) floatingTexts.splice(i, 1);
+            }
+
+            // --- Trailer Bungee Pickup & Physics ---
+            const lastNode = attachedTrailers.length > 0 
+                ? attachedTrailers[attachedTrailers.length - 1] 
+                : plane;
+
+            if (plane.speed > 10) {
+                trailers.forEach(t => {
+                    if (!t.isAttached) {
+                        const dist = Math.hypot(lastNode.x - t.x, lastNode.y - t.y);
+                        if (dist < 120) {
+                            t.isAttached = true;
+                            attachedTrailers.push(t);
+                        }
+                    }
+                });
+            }
+
+            let leadNode = plane;
+            attachedTrailers.forEach((t) => {
+                const leadTailDist = 30;
+                const leadTailX = leadNode.x - Math.sin(leadNode.heading) * leadTailDist;
+                const leadTailY = leadNode.y + Math.cos(leadNode.heading) * leadTailDist;
+
+                const dx = leadTailX - t.x;
+                const dy = leadTailY - t.y;
+                const dist = Math.hypot(dx, dy);
+
+                const desiredRopeLen = 45;
+
+                if (dist > desiredRopeLen) {
+                    const springForce = (dist - desiredRopeLen) * 11.0 * dt;
+                    t.x += (dx / dist) * springForce;
+                    t.y += (dy / dist) * springForce;
+                }
+
+                const targetAlt = Math.max(300, leadNode.altitude);
+                t.altitude += (targetAlt - t.altitude) * 5.0 * dt;
+
+                const targetAngle = Math.atan2(dx, -dy);
+                let diff = targetAngle - t.heading;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                t.heading += diff * 8.5 * dt;
+                t.bankAngle = diff * 1.5;
+
+                leadNode = t;
+            });
+
+            // Collision Check across all Hills
+            for (let h of hills) {
+                const distToHill = Math.hypot(plane.x - h.x, plane.y - h.y);
+                if (distToHill < h.radius && plane.altitude < 1200) {
+                    isDead = true;
+                    msgEl.innerText = "CRASHED INTO THE HILL!\nYOU DIED";
+                    msgEl.style.display = 'block';
+                    document.getElementById('restartBtn').style.display = 'block';
+                    break;
+                }
+            }
+
+            // HUD Readouts
+            updateHUD();
+        }
+
+        // Draws a paved runway strip rotated around its own center
+        function drawRunwayStrip(r) {
+            ctx.save();
+            ctx.translate(r.x, r.y);
+            ctx.rotate(r.angle);
+            ctx.fillStyle = "#4d463c";
+            ctx.fillRect(-r.width / 2, -r.length / 2, r.width, r.length);
+            ctx.fillStyle = "#f2ead0";
+            for (let i = -r.length / 2 + 20; i < r.length / 2 - 20; i += 42) {
+                ctx.fillRect(-2, i, 4, 16);
+            }
+            ctx.restore();
+        }
+
+        // --- Render Engine ---
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Base Terrain Ground - LA coastal plain
+            const groundGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            groundGrad.addColorStop(0, "#c7c2a3");
+            groundGrad.addColorStop(1, "#a8a67f");
+            ctx.fillStyle = groundGrad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Pacific Ocean, filling everything west of the coastline
+            const oceanGrad = ctx.createLinearGradient(0, 0, canvas.width * 0.45, 0);
+            oceanGrad.addColorStop(0, "#0d4f6b");
+            oceanGrad.addColorStop(1, "#3ea6c4");
+            ctx.beginPath();
+            traceOceanPoly(ctx);
+            ctx.fillStyle = oceanGrad;
+            ctx.fill();
+
+            // Sandy beach strip right along the coastline
+            ctx.strokeStyle = "#e3d3a3";
+            ctx.lineWidth = 10;
+            ctx.beginPath();
+            traceCoastline(ctx);
+            ctx.stroke();
+
+            // Rolling wave crests out on the water
+            ctx.save();
+            ctx.beginPath();
+            traceOceanPoly(ctx);
+            ctx.clip();
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+            ctx.lineWidth = 2;
+            for (let i = -canvas.height; i < canvas.width; i += 34) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.quadraticCurveTo(i + canvas.height * 0.25, canvas.height * 0.5, i, canvas.height);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // Scattered coastal ice-plant / dune grass on the land
+            scrub.forEach(s => {
+                ctx.beginPath();
+                ctx.fillStyle = "#5f8a4e";
+                ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // 1. Draw Roads Off the Edges
+            roads.forEach(r => {
+                ctx.strokeStyle = "#3e4247"; // Asphalt Road
+                ctx.lineWidth = r.width;
+                ctx.lineCap = "square";
+                ctx.beginPath();
+                ctx.moveTo(r.x1, r.y1);
+                ctx.lineTo(r.x2, r.y2);
+                ctx.stroke();
+
+                // Dashed Centerline
+                ctx.strokeStyle = "#e5c158";
+                ctx.lineWidth = 2;
+                ctx.setLineDash([8, 8]);
+                ctx.beginPath();
+                ctx.moveTo(r.x1, r.y1);
+                ctx.lineTo(r.x2, r.y2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            });
+
+            // LAX-style Runway Complex (north pair, and South Airfield runway)
+            drawRunwayStrip(runway);
+            drawRunwayStrip(crossRunway);
+            drawRunwayStrip(southRunway);
+
+            // Central terminal complex with a control tower
+            ctx.fillStyle = "#8a8574";
+            ctx.fillRect(terminal.x - terminal.width/2, terminal.y - terminal.height/2, terminal.width, terminal.height);
+            ctx.fillStyle = "#3f3c33";
+            ctx.fillRect(terminal.x - terminal.width/2 + 6, terminal.y - 4, terminal.width - 12, 8);
+            ctx.beginPath();
+            ctx.arc(terminal.x, terminal.y - terminal.height/2 - 10, 6, 0, Math.PI * 2);
+            ctx.fillStyle = "#c9432e";
+            ctx.fill();
+
+            // 3. Draw Coastal Bluffs / Dunes / Control Tower Hazards
+            hills.forEach(h => {
+                const hillGrad = ctx.createRadialGradient(h.x, h.y, 5, h.x, h.y, h.radius);
+                hillGrad.addColorStop(0, "#9fae7d");
+                hillGrad.addColorStop(0.55, "#77835a");
+                hillGrad.addColorStop(1, "#4c5537");
+
+                ctx.beginPath();
+                ctx.arc(h.x, h.y, h.radius, 0, Math.PI * 2);
+                ctx.fillStyle = hillGrad;
+                ctx.fill();
+                ctx.strokeStyle = "#3a4029";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = "#2a2e1e";
+                ctx.font = "bold 11px monospace";
+                ctx.textAlign = "center";
+                ctx.fillText(h.label, h.x, h.y + 4);
+            });
+
+            // --- Draw Collectibles ---
+            collectibles.forEach(item => {
+                const scale = 1 + Math.sin(item.pulse) * 0.15;
+                ctx.save();
+                ctx.translate(item.x, item.y);
+                ctx.scale(scale, scale);
+
+                if (item.type === 'fuel') {
+                    // Fuel canister - cyan, 15 PTS
+                    ctx.shadowColor = "#2ee6d6";
+                    ctx.shadowBlur = 10;
+                    ctx.fillStyle = "#2ee6d6";
+                    ctx.strokeStyle = "#0f7a70";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -11);
+                    ctx.lineTo(8, 0);
+                    ctx.lineTo(0, 11);
+                    ctx.lineTo(-8, 0);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(-6, 0); ctx.lineTo(6, 0);
+                    ctx.moveTo(0, -7); ctx.lineTo(0, 7);
+                    ctx.strokeStyle = "rgba(230, 255, 252, 0.9)";
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                } else {
+                    // Signal flare - orange, 25 PTS
+                    ctx.shadowColor = "#ff7a1a";
+                    ctx.shadowBlur = 10;
+                    ctx.fillStyle = "#ff7a1a";
+                    ctx.strokeStyle = "#a34b00";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 9, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(-4, -3);
+                    ctx.lineTo(4, -3);
+                    ctx.moveTo(-4, 3);
+                    ctx.lineTo(4, 3);
+                    ctx.strokeStyle = "rgba(255, 245, 230, 0.9)";
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
+                }
+                ctx.restore();
+            });
+
+            // Ground Unattached Trailers
+            trailers.forEach(t => {
+                if (!t.isAttached) {
+                    ctx.beginPath();
+                    ctx.arc(t.x, t.y, 45, 0, Math.PI * 2);
+                    ctx.strokeStyle = "rgba(255, 204, 0, 0.4)";
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([6, 6]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    ctx.save();
+                    ctx.translate(t.x, t.y);
+                    ctx.rotate(t.heading);
+                    drawTrailerGlider(ctx, true);
+                    ctx.restore();
+                }
+            });
+
+            // Bungee Lines
+            let leadNode = plane;
+            attachedTrailers.forEach(t => {
+                const leadTailDist = 22 * (1 + leadNode.altitude / 1800);
+                const leadTailX = leadNode.x - Math.sin(leadNode.heading) * leadTailDist;
+                const leadTailY = leadNode.y + Math.cos(leadNode.heading) * leadTailDist;
+
+                const trailerNoseDist = 18 * (1 + t.altitude / 1800);
+                const trailerNoseX = t.x + Math.sin(t.heading) * trailerNoseDist;
+                const trailerNoseY = t.y - Math.cos(t.heading) * trailerNoseDist;
+
+                ctx.beginPath();
+                ctx.moveTo(leadTailX, leadTailY);
+                ctx.lineTo(trailerNoseX, trailerNoseY);
+                ctx.strokeStyle = "#ffcc00";
+                ctx.lineWidth = 3;
+                ctx.setLineDash([5, 3]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                leadNode = t;
+            });
+
+            // Flying Trailers
+            attachedTrailers.forEach(t => {
+                const altScale = 1 + (t.altitude / 1800);
+                const shadowOffsetX = 8 + (t.altitude / 18);
+                const shadowOffsetY = 12 + (t.altitude / 14);
+                const shadowAlpha = Math.max(0.15, 0.45 - (t.altitude / 5000));
+
+                ctx.save();
+                ctx.translate(t.x + shadowOffsetX, t.y + shadowOffsetY);
+                ctx.rotate(t.heading);
+                ctx.rotate(t.bankAngle * 0.3);
+                ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
+                drawTrailerGlider(ctx, false);
+                ctx.restore();
+
+                ctx.save();
+                ctx.translate(t.x, t.y);
+                ctx.rotate(t.heading);
+                ctx.scale(altScale, altScale);
+                ctx.rotate(t.bankAngle * 0.45);
+                drawTrailerGlider(ctx, true);
+                ctx.restore();
+            });
+
+            // Main Plane & Shadow
+            if (!isDead) {
+                // The 747 is a big airframe - render it at reduced scale so more of the map stays visible
+                const altScale = (1 + (plane.altitude / 1800)) * PLANE_VISUAL_SCALE;
+                const shadowOffsetX = 8 + (plane.altitude / 18);
+                const shadowOffsetY = 12 + (plane.altitude / 14);
+                const shadowAlpha = Math.max(0.15, 0.45 - (plane.altitude / 5000));
+
+                // Ground Shadow
+                ctx.save();
+                ctx.translate(plane.x + shadowOffsetX, plane.y + shadowOffsetY);
+                ctx.rotate(plane.heading);
+                ctx.rotate(plane.bankAngle * 0.3);
+                ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
+                drawBoeing747(ctx, false);
+                ctx.restore();
+
+                // Airplane Body
+                ctx.save();
+                ctx.translate(plane.x, plane.y);
+                ctx.rotate(plane.heading);
+                ctx.scale(altScale, altScale);
+                ctx.rotate(plane.bankAngle * 0.45);
+                drawBoeing747(ctx, true);
+                ctx.restore();
+            }
+
+            // Floating Text Popups
+            floatingTexts.forEach(ft => {
+                ctx.save();
+                ctx.font = "bold 15px monospace";
+                ctx.fillStyle = ft.color;
+                ctx.globalAlpha = ft.alpha;
+                ctx.textAlign = "center";
+                ctx.shadowColor = "#000";
+                ctx.shadowBlur = 4;
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.restore();
+            });
+        }
+
+        // --- Airplane Rendering: Boeing 747 ---
+        function drawBoeing747(ctx, isMainBody) {
+            if (!isMainBody) return;
+
+            ctx.strokeStyle = "#2b3238";
+            ctx.lineWidth = 1.5;
+
+            // Main swept wing (root-to-tip)
+            ctx.fillStyle = "#d5d9dc";
+            ctx.beginPath();
+            ctx.moveTo(0, -2);
+            ctx.lineTo(58, 30);
+            ctx.lineTo(50, 38);
+            ctx.lineTo(7, 16);
+            ctx.lineTo(-7, 16);
+            ctx.lineTo(-50, 38);
+            ctx.lineTo(-58, 30);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Long fuselage with the distinctive 747 upper-deck hump near the nose
+            ctx.fillStyle = "#e8ebee";
+            ctx.beginPath();
+            ctx.moveTo(0, -52);
+            ctx.quadraticCurveTo(6, -30, 6, 0);
+            ctx.quadraticCurveTo(6, 30, 4, 50);
+            ctx.quadraticCurveTo(0, 55, -4, 50);
+            ctx.quadraticCurveTo(-6, 30, -6, 0);
+            ctx.quadraticCurveTo(-6, -30, 0, -52);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = "#c7ccd1";
+            ctx.beginPath();
+            ctx.moveTo(0, -48);
+            ctx.quadraticCurveTo(3.5, -40, 3.5, -26);
+            ctx.quadraticCurveTo(0, -22, -3.5, -26);
+            ctx.quadraticCurveTo(-3.5, -40, 0, -48);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Cockpit Windshield
+            ctx.fillStyle = "#1e293b";
+            ctx.beginPath();
+            ctx.moveTo(0, -46);
+            ctx.lineTo(2.5, -41);
+            ctx.lineTo(1.5, -38);
+            ctx.lineTo(0, -39.5);
+            ctx.lineTo(-1.5, -38);
+            ctx.lineTo(-2.5, -41);
+            ctx.closePath();
+            ctx.fill();
+
+            // Horizontal tail stabilizers
+            ctx.fillStyle = "#b7bcc1";
+            ctx.beginPath();
+            ctx.moveTo(2, 38);
+            ctx.lineTo(20, 48);
+            ctx.lineTo(16, 53);
+            ctx.lineTo(2, 46);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(-2, 38);
+            ctx.lineTo(-20, 48);
+            ctx.lineTo(-16, 53);
+            ctx.lineTo(-2, 46);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Single vertical tail fin
+            ctx.fillStyle = "#9aa0a6";
+            ctx.beginPath();
+            ctx.moveTo(0, 30);
+            ctx.lineTo(5, 36);
+            ctx.lineTo(3, 54);
+            ctx.lineTo(-3, 54);
+            ctx.lineTo(-5, 36);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Four Engine Nacelles, two hung beneath each wing
+            ctx.fillStyle = "#4a5157";
+            ctx.strokeStyle = "#22272b";
+            ctx.lineWidth = 1.0;
+            const engines = [
+                { x: -40, y: 27 }, { x: -22, y: 20 },
+                { x: 22, y: 20 }, { x: 40, y: 27 }
+            ];
+            engines.forEach(e => {
+                ctx.beginPath();
+                ctx.ellipse(e.x, e.y, 2.4, 8, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            });
+
+            // Engine Exhaust Glow
+            if (plane.speed > 0.5) {
+                ctx.fillStyle = "#f59e0b";
+                engines.forEach(e => {
+                    ctx.fillRect(e.x - 1.5, e.y + 6, 3, 4);
+                });
+            }
+        }
+
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
