@@ -11,6 +11,7 @@ body, html {
     overflow: hidden;
     background-color: #111;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    touch-action: manipulation;
 }
 #gameCanvas {
     width: 100%;
