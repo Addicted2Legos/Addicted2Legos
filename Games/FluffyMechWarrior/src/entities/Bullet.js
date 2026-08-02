@@ -1,4 +1,4 @@
-export class Bullet {
+class Bullet {
     constructor() {
         this.type = 'bullet';
         this.x = 0;

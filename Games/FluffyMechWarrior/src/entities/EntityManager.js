@@ -1,7 +1,4 @@
-import { Bullet } from './Bullet.js';
-import { Enemy } from './Enemy.js';
-
-export class EntityManager {
+class EntityManager {
     constructor(game) {
         this.game = game;
         this.entities = []; // For non-pooled items if needed later

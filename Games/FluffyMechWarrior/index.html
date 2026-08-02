@@ -20,8 +20,17 @@
         <canvas id="gameCanvas"></canvas>
     </div>
 
-    <!-- Script bootstrapper loaded as an ES Module -->
-    <script type="module" src="./src/main.js"></script>
+    <!-- Loaded as plain scripts (not ES modules) so the game also
+         works when index.html is opened directly from disk, where
+         browsers block module imports over the file:// protocol -->
+    <script src="./src/AssetLoader.js"></script>
+    <script src="./src/data/gameConfig.js"></script>
+    <script src="./src/entities/Bullet.js"></script>
+    <script src="./src/entities/Enemy.js"></script>
+    <script src="./src/entities/Player.js"></script>
+    <script src="./src/entities/EntityManager.js"></script>
+    <script src="./src/Game.js"></script>
+    <script src="./src/main.js"></script>
     
 </body>
 </html>

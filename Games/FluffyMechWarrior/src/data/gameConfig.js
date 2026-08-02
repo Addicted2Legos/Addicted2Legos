@@ -1,4 +1,4 @@
-export const GAME_CONFIG = {
+const GAME_CONFIG = {
     world: {
         chunkSize: 500, // Size of environmental partitions
         gravity: 0

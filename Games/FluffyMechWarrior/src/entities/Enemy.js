@@ -1,4 +1,4 @@
-export class Enemy {
+class Enemy {
     constructor() {
         this.type = 'enemy';
         this.x = 0;

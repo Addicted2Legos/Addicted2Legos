@@ -1,9 +1,4 @@
-import { AssetLoader } from './AssetLoader.js';
-import { Player } from './entities/Player.js';
-import { EntityManager } from './entities/EntityManager.js';
-import { GAME_CONFIG } from './data/gameConfig.js';
-
-export class Game {
+class Game {
 constructor(canvas, ctx) {
     this.canvas = canvas;
     this.ctx = ctx;

@@ -1,4 +1,4 @@
-export class Player {
+class Player {
     constructor(x, y, speed) {
         this.type = 'player';
         this.x = x;

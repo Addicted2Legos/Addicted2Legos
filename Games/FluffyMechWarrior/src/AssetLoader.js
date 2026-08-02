@@ -1,4 +1,4 @@
-export class AssetLoader {
+class AssetLoader {
     constructor() {
         this.images = {};
         this.totalAssets = 0;
