@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Dot Magnetic Sandbox</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.75);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --text-color: #f8fafc;
+            --accent-color: #38bdf8;
+            --btn-hover: rgba(255, 255, 255, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            padding: 20px;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        header {
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        p.subtitle {
+            font-size: 0.875rem;
+            color: #94a3b8;
+        }
+
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            max-width: 700px;
+            aspect-ratio: 1 / 1;
+            background: #020617;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), inset 0 0 0 1px var(--border-color);
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            width: 100%;
+            max-width: 700px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            padding: 16px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 6px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .group-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #94a3b8;
+            margin-right: 4px;
+            font-weight: 600;
+        }
+
+        button {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        button:hover {
+            background: var(--btn-hover);
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .directional-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 32px);
+            grid-template-rows: repeat(2, 32px);
+            gap: 4px;
+        }
+
+        .directional-pad button {
+            padding: 0;
+            justify-content: center;
+            align-items: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+        }
+
+        .btn-up { grid-column: 2; grid-row: 1; }
+        .btn-left { grid-column: 1; grid-row: 2; }
+        .btn-right { grid-column: 3; grid-row: 2; }
+        .btn-down { grid-column: 2; grid-row: 2; }
+
+        .color-picker-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            background: transparent;
+        }
+
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        input[type="color"]::-webkit-color-swatch {
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(0,0,0,0.3);
+        }
+
+        .btn-isolate {
+            background: rgba(56, 189, 248, 0.15);
+            border-color: rgba(56, 189, 248, 0.4);
+            color: #38bdf8;
+        }
+
+        .btn-isolate:hover {
+            background: rgba(56, 189, 248, 0.25);
+        }
+
+        .btn-reset {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #f87171;
+        }
+
+        .btn-reset:hover {
+            background: rgba(239, 68, 68, 0.25);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Dot Sorting Sandbox</h1>
+            <p class="subtitle">Satisfying physics, color isolation, and magnetic forces</p>
+        </header>
+
+        <div id="canvas-container">
+            <canvas id="sandbox"></canvas>
+        </div>
+
+        <div class="controls">
+            <!-- Magnetic Directional Controls -->
+            <div class="control-group">
+                <span class="group-label">Magnet</span>
+                <div class="directional-pad">
+                    <button class="btn-up" onclick="applyForce('up')" title="Pull Up">▲</button>
+                    <button class="btn-left" onclick="applyForce('left')" title="Pull Left">◄</button>
+                    <button class="btn-right" onclick="applyForce('right')" title="Pull Right">►</button>
+                    <button class="btn-down" onclick="applyForce('down')" title="Pull Down">▼</button>
+                </div>
+            </div>
+
+            <!-- Spatial Sorting Controls -->
+            <div class="control-group">
+                <span class="group-label">Position</span>
+                <button onclick="applyForce('center')">Center</button>
+                <button onclick="applyForce('edges')">Edges</button>
+            </div>
+
+            <!-- Color Extraction Control -->
+            <div class="control-group">
+                <span class="group-label">Filter</span>
+                <div class="color-picker-wrapper">
+                    <input type="color" id="targetColor" value="#ff3b30" title="Select color hue to extract">
+                    <button class="btn-isolate" onclick="isolateColor()">Isolate Hue</button>
+                </div>
+            </div>
+
+            <!-- Reset Control -->
+            <div class="control-group">
+                <button class="btn-reset" onclick="resetDots()">Shuffle All</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('sandbox');
+        const ctx = canvas.getContext('2d');
+        const colorInput = document.getElementById('targetColor');
+
+        const NUM_DOTS = 100;
+        const DOT_RADIUS = 10;
+        let dots = [];
+        let width, height;
+
+        // Ensure crisp rendering on high-DPI screens
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+            width = canvas.width;
+            height = canvas.height;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+
+        class Dot {
+            constructor(x, y, hue) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = (Math.random() - 0.5) * 2;
+                this.radius = DOT_RADIUS;
+                this.hue = hue; // Hue value from 0 to 360
+                this.color = `hsl(${hue}, 85%, 60%)`;
+                this.targetVx = 0;
+                this.targetVy = 0;
+            }
+
+            update(boundsWidth, boundsHeight) {
+                // Apply smooth velocity toward targeted magnetic velocity
+                this.vx += (this.targetVx - this.vx) * 0.05;
+                this.vy += (this.targetVy - this.vy) * 0.05;
+
+                // Natural deceleration/friction
+                this.vx *= 0.98;
+                this.vy *= 0.98;
+
+                // Position update
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Boundary collision handling with rebound
+                const r = this.radius;
+                if (this.x - r < 0) {
+                    this.x = r;
+                    this.vx *= -0.5;
+                }
+                if (this.x + r > boundsWidth) {
+                    this.x = boundsWidth - r;
+                    this.vx *= -0.5;
+                }
+                if (this.y - r < 0) {
+                    this.y = r;
+                    this.vy *= -0.5;
+                }
+                if (this.y + r > boundsHeight) {
+                    this.y = boundsHeight - r;
+                    this.vy *= -0.5;
+                }
+            }
+
+            draw(context) {
+                context.beginPath();
+                context.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                context.fillStyle = this.color;
+                
+                // Add subtle glowing halo for visual pleasure
+                context.shadowColor = this.color;
+                context.shadowBlur = 8;
+                
+                context.fill();
+                context.closePath();
+                context.shadowBlur = 0; // Reset shadow for performance
+            }
+        }
+
+        function initDots() {
+            dots = [];
+            const logicalWidth = width / window.devicePixelRatio;
+            const logicalHeight = height / window.devicePixelRatio;
+
+            for (let i = 0; i < NUM_DOTS; i++) {
+                // Distribute hues evenly across the color spectrum
+                const hue = (i * (360 / NUM_DOTS)) % 360;
+                const padding = 30;
+                const x = padding + Math.random() * (logicalWidth - padding * 2);
+                const y = padding + Math.random() * (logicalHeight - padding * 2);
+                dots.push(new Dot(x, y, hue));
+            }
+        }
+
+        function resetDots() {
+            dots.forEach(dot => {
+                dot.targetVx = (Math.random() - 0.5) * 10;
+                dot.targetVy = (Math.random() - 0.5) * 10;
+            });
+        }
+
+        function applyForce(type) {
+            const logicalWidth = width / window.devicePixelRatio;
+            const logicalHeight = height / window.devicePixelRatio;
+            const centerX = logicalWidth / 2;
+            const centerY = logicalHeight / 2;
+
+            dots.forEach(dot => {
+                const strength = 12;
+
+                switch (type) {
+                    case 'up':
+                        dot.targetVx = (Math.random() - 0.5) * 2;
+                        dot.targetVy = -strength - Math.random() * 4;
+                        break;
+                    case 'down':
+                        dot.targetVx = (Math.random() - 0.5) * 2;
+                        dot.targetVy = strength + Math.random() * 4;
+                        break;
+                    case 'left':
+                        dot.targetVx = -strength - Math.random() * 4;
+                        dot.targetVy = (Math.random() - 0.5) * 2;
+                        break;
+                    case 'right':
+                        dot.targetVx = strength + Math.random() * 4;
+                        dot.targetVy = (Math.random() - 0.5) * 2;
+                        break;
+                    case 'center': {
+                        const dx = centerX - dot.x;
+                        const dy = centerY - dot.y;
+                        const dist = Math.hypot(dx, dy) || 1;
+                        dot.targetVx = (dx / dist) * strength;
+                        dot.targetVy = (dy / dist) * strength;
+                        break;
+                    }
+                    case 'edges': {
+                        const dx = dot.x - centerX;
+                        const dy = dot.y - centerY;
+                        const dist = Math.hypot(dx, dy) || 1;
+                        dot.targetVx = (dx / dist) * strength;
+                        dot.targetVy = (dy / dist) * strength;
+                        break;
+                    }
+                }
+            });
+        }
+
+        // Convert HEX color input to HSL Hue value
+        function hexToHue(hex) {
+            let r = parseInt(hex.slice(1, 3), 16) / 255;
+            let g = parseInt(hex.slice(3, 5), 16) / 255;
+            let b = parseInt(hex.slice(5, 7), 16) / 255;
+
+            let max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let h = 0;
+
+            if (max !== min) {
+                let d = max - min;
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
+            }
+            return h * 360;
+        }
+
+        function isolateColor() {
+            const targetHue = hexToHue(colorInput.value);
+            const logicalWidth = width / window.devicePixelRatio;
+            const logicalHeight = height / window.devicePixelRatio;
+            const centerX = logicalWidth / 2;
+            const centerY = logicalHeight / 2;
+
+            dots.forEach(dot => {
+                // Calculate hue difference taking circular wrap-around into account (0° == 360°)
+                let hueDiff = Math.abs(dot.hue - targetHue);
+                if (hueDiff > 180) hueDiff = 360 - hueDiff;
+
+                const strength = 14;
+
+                // Dots close in hue go to the center, others move to the edges
+                if (hueDiff < 30) {
+                    const dx = centerX - dot.x;
+                    const dy = centerY - dot.y;
+                    const dist = Math.hypot(dx, dy) || 1;
+                    dot.targetVx = (dx / dist) * strength;
+                    dot.targetVy = (dy / dist) * strength;
+                } else {
+                    const dx = dot.x - centerX;
+                    const dy = dot.y - centerY;
+                    const dist = Math.hypot(dx, dy) || 1;
+                    dot.targetVx = (dx / dist) * strength;
+                    dot.targetVy = (dy / dist) * strength;
+                }
+            });
+        }
+
+        // Main animation loop
+        function animate() {
+            const logicalWidth = width / window.devicePixelRatio;
+            const logicalHeight = height / window.devicePixelRatio;
+
+            ctx.clearRect(0, 0, logicalWidth, logicalHeight);
+
+            // Simple soft visual grid in the background
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
+            ctx.lineWidth = 1;
+            const gridSize = 40;
+            for (let x = 0; x < logicalWidth; x += gridSize) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, logicalHeight); ctx.stroke();
+            }
+            for (let y = 0; y < logicalHeight; y += gridSize) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(logicalWidth, y); ctx.stroke();
+            }
+
+            // Update and render dots
+            dots.forEach(dot => {
+                dot.update(logicalWidth, logicalHeight);
+                dot.draw(ctx);
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        // Initialization
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('DOMContentLoaded', () => {
+            resizeCanvas();
+            initDots();
+            animate();
+        });
+    </script>
+</body>
+</html>
