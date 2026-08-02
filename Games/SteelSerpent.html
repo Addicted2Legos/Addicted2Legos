@@ -16,6 +16,14 @@
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
 
+    /* HUD sits beside the canvas, not on top of it, so the whole ride is visible */
+    .app-layout {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
     .canvas-container {
       position: relative;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
@@ -26,9 +34,6 @@
 
     /* Cash, Passenger & Upgrade HUD */
     .hud {
-      position: absolute;
-      top: 15px;
-      left: 15px;
       background: rgba(15, 23, 42, 0.92);
       border: 2px solid #eab308; /* Theme matching yellow border */
       border-radius: 8px;
@@ -43,7 +48,7 @@
       flex-direction: column;
       gap: 3px;
       width: 210px;
-      z-index: 10;
+      flex-shrink: 0;
     }
 
     .hud-sub {
@@ -115,7 +120,7 @@
 </head>
 <body>
 
-  <div class="canvas-container">
+  <div class="app-layout">
     <div class="hud">
       <div id="cashText">Cash: $500</div>
       <div class="hud-sub" id="queueText">In Line: 0</div>
@@ -131,7 +136,9 @@
         <button class="buy-btn" id="btnLoop" onclick="selectTrack('loop', 2000)">Track 4: Vertical Loop ($2,000)</button>
       </div>
     </div>
-    <canvas id="trackCanvas" width="700" height="600"></canvas>
+    <div class="canvas-container">
+      <canvas id="trackCanvas" width="700" height="600"></canvas>
+    </div>
   </div>
 
   <script>
@@ -167,8 +174,49 @@
     let currentTrackType = 'classic';
     let progress = 0;
     let prevProgress = 0;
-    const speed = 0.003;
+    const speed = 0.0045; // base angular rate; actual speed is modulated by gravity (see getSpeedFactor)
     let cash = 500;
+
+    // Physics/layout profile per track: a chain-lift hill up front, then a train
+    // of hills each shorter than the last (real coasters never crest higher than
+    // the lift hill after the first drop), and a magnetic-brake run into the station.
+    const TRACK_CONFIG = {
+      classic: { liftEnd: 0.15, liftHeight: 80, hillFreq: 2, liftSpeed: 0.35, baseKE: 20, minKE: 8 },
+      zigzag: { liftEnd: 0.12, liftHeight: 100, hillFreq: 3, liftSpeed: 0.35, baseKE: 20, minKE: 8 },
+      hills: { liftEnd: 0.15, liftHeight: 120, hillFreq: 3, liftSpeed: 0.3, baseKE: 15, minKE: 6 },
+      loop: { liftEnd: 0.15, liftHeight: 110, hillFreq: 2, liftSpeed: 0.35, baseKE: 20, minKE: 8, loopStart: 0.22, loopEnd: 0.34, loopRadius: 45 }
+    };
+
+    // Ground-level queue area, positioned entirely outside the loop's widest
+    // point (max ~180 units from center across all tracks) so it never crosses
+    // under the elevated structure.
+    const QUEUE_X = 215;
+    const QUEUE_TOP_Y = 15;
+    const QUEUE_BOTTOM_Y = -75;
+
+    // Storage siding: a flat (ground-level) track that runs parallel to the
+    // main line along its upper arc, offset radially outward from the loop's
+    // center in world space, rather than a straight line dropped somewhere
+    // arbitrary. u=0 is the far end, u=1 is the near end where the siding
+    // merges back onto the mainline. Offsetting radially (rather than
+    // perpendicular to the main track's own tangent) keeps it cleanly outside
+    // the loop regardless of how the main track's height wiggles through
+    // this stretch.
+    const YARD_T_START = 0.44;
+    const YARD_T_END = 0.70;
+    const YARD_OFFSET = 70;
+
+    function getYardWorldPoint(u) {
+      const t = YARD_T_START + (YARD_T_END - YARD_T_START) * u;
+      const pt = get3DPoint(t);
+      const r = Math.hypot(pt.x, pt.y) || 1;
+      return { x: pt.x + (pt.x / r) * YARD_OFFSET, y: pt.y + (pt.y / r) * YARD_OFFSET, z: 0 };
+    }
+
+    function getYardScreenPoint(u) {
+      const w = getYardWorldPoint(u);
+      return project3D(w.x, w.y, w.z);
+    }
 
     let numCarts = 1;
     let pendingCarts = 0;
@@ -266,40 +314,108 @@
       }
     }
 
+    // Smoothstep: eases in and out with zero slope at both ends (no kinks).
+    function smoothstep(x) {
+      const c = Math.max(0, Math.min(1, x));
+      return c * c * (3 - 2 * c);
+    }
+
+    // Height profile shared by every layout: a chain-lift climb that eases out
+    // of the flat station and eases into a smooth crest (zero vertical slope at
+    // both ends, like a real hill), then a decaying train of hills that eases
+    // back down to a flat stop at the station. Every segment boundary — including
+    // the wrap from the end of the lap back to t=0 — has matching slope, so
+    // there are no sharp kinks in the 3D geometry anywhere on the circuit.
+    function heightProfile(t, cfg) {
+      if (t < cfg.liftEnd) {
+        return cfg.liftHeight * smoothstep(t / cfg.liftEnd);
+      }
+      const t2 = (t - cfg.liftEnd) / (1 - cfg.liftEnd);
+      const envelope = 1 - smoothstep(t2); // eases from 1 (crest) to 0 (station), zero slope at both ends
+      const bump = 0.55 + 0.45 * Math.cos(2 * Math.PI * cfg.hillFreq * t2); // hillFreq is always an integer, so this also has zero slope at t2=0 and t2=1
+      return cfg.liftHeight * envelope * bump;
+    }
+
+    // For tracks with an inserted loop element, plan-view progress freezes at
+    // loopStart's angle for the duration of the loop (the loop has its own
+    // compact circular footprint instead of dragging along the main ellipse),
+    // then picks back up exactly where it left off, rescaled so a full lap
+    // still ends at angle 2π. Without this, the loop's t-window advances the
+    // main ellipse by tens of degrees while also looping, smearing it into a
+    // long hairpin instead of a compact, recognizable loop.
+    function effectiveT(t, cfg) {
+      if (cfg.loopStart === undefined) return t;
+      if (t <= cfg.loopStart) return t;
+      if (t < cfg.loopEnd) return cfg.loopStart;
+      return cfg.loopStart + (t - cfg.loopEnd) * (1 - cfg.loopStart) / (1 - cfg.loopEnd);
+    }
+
     // Parametric 3D Track Layouts
     function get3DPoint(t, trackType = currentTrackType) {
-      const angle = t * Math.PI * 2;
+      const cfg = TRACK_CONFIG[trackType];
+      const et = effectiveT(t, cfg);
+      const angle = et * Math.PI * 2;
       let x = 0, y = 0, z = 0, roll = 0; // roll angle for upside-down loops
+      let radX = 0, radY = 0;
 
       if (trackType === 'classic') {
-        x = Math.cos(angle) * 180;
-        y = Math.sin(angle) * 120;
-        z = 15;
+        radX = 180; radY = 120;
       } else if (trackType === 'zigzag') {
-        const baseR = 150 + Math.sin(angle * 8) * 35;
-        x = Math.cos(angle) * baseR;
-        y = Math.sin(angle) * baseR;
-        z = Math.cos(angle * 4) * 20 + 15;
+        // Gentle, wide S-curves — real twister coasters bank through broad
+        // sweeping turns, not tight cusps.
+        const baseR = 160 + Math.sin(angle * 3) * 20;
+        radX = baseR; radY = baseR;
       } else if (trackType === 'hills') {
-        x = Math.cos(angle) * 170;
-        y = Math.sin(angle) * 130;
-        z = Math.sin(angle * 3) * 60 + 35;
+        radX = 170; radY = 130;
       } else if (trackType === 'loop') {
-        x = Math.cos(angle) * 160;
-        y = Math.sin(angle) * 110;
-        z = 15;
+        radX = 160; radY = 110;
+      }
+      x = Math.cos(angle) * radX;
+      y = Math.sin(angle) * radY;
+      z = heightProfile(et, cfg);
 
-        // Loop section with upside-down roll rotation
-        if (t > 0.35 && t < 0.65) {
-          const normT = (t - 0.35) / 0.3;
-          const loopA = normT * Math.PI * 2;
-          z = (1 - Math.cos(loopA)) * 75 + 15;
-          x += Math.sin(loopA) * 20;
-          roll = loopA; // Rotates car upside down
-        }
+      if (trackType === 'loop' && t > cfg.loopStart && t < cfg.loopEnd) {
+        // Self-contained vertical loop anchored at the point it's entered: the
+        // car flies in, circles up and over in a plane aligned with its entry
+        // direction, rolling upside-down through the top, and lands back on
+        // the exact same spot before continuing along the main track.
+        const anchorX = x, anchorY = y, anchorZ = z;
+        const entryAngle = cfg.loopStart * Math.PI * 2;
+        const dx = -Math.sin(entryAngle) * radX;
+        const dy = Math.cos(entryAngle) * radY;
+        const dLen = Math.hypot(dx, dy) || 1;
+        const fx = dx / dLen, fy = dy / dLen; // entry direction, unit vector
+
+        const normT = (t - cfg.loopStart) / (cfg.loopEnd - cfg.loopStart);
+        const loopA = normT * Math.PI * 2;
+        const R = cfg.loopRadius;
+        x = anchorX + fx * R * Math.sin(loopA);
+        y = anchorY + fy * R * Math.sin(loopA);
+        z = anchorZ + R * (1 - Math.cos(loopA));
+        roll = loopA; // Rotates car upside down
       }
 
       return { x, y, z, roll };
+    }
+
+    // How fast the train should be moving at parametric position t, driven by
+    // gravity (fast on drops, slow near crests) with a slow constant chain-lift
+    // climb and a magnetic-brake taper into the station.
+    function getSpeedFactor(t, trackType = currentTrackType) {
+      const cfg = TRACK_CONFIG[trackType];
+      if (t < cfg.liftEnd) {
+        return cfg.liftSpeed;
+      }
+      const t2 = (t - cfg.liftEnd) / (1 - cfg.liftEnd);
+      const z = get3DPoint(t, trackType).z;
+      const energyHead = cfg.liftHeight + cfg.baseKE;
+      let factor = Math.sqrt(Math.max(cfg.minKE, energyHead - z) / energyHead);
+
+      if (t2 > 0.9) {
+        const brakeProgress = (t2 - 0.9) / 0.1;
+        factor = factor * (1 - brakeProgress) + 0.12 * brakeProgress;
+      }
+      return factor;
     }
 
     function get3DTangentAngle(t) {
@@ -363,6 +479,7 @@
       const dt = 1.0 / numSamples;
 
       // 1. Bright Yellow Frame Supports (A-Frames & Columns like reference photo)
+      let prevTopP = null, prevBotP = null;
       for (let i = 0; i < numSamples; i += 6) {
         const t = i * dt;
         const pt = get3DPoint(t);
@@ -391,6 +508,20 @@
           ctx.lineTo(leg2.x, leg2.y);
           ctx.stroke();
         }
+
+        // X cross-bracing between neighboring towers, like a real lattice support
+        if (prevTopP && pt.z > 20) {
+          ctx.strokeStyle = '#334155';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(prevBotP.x, prevBotP.y);
+          ctx.lineTo(topP.x, topP.y);
+          ctx.moveTo(prevTopP.x, prevTopP.y);
+          ctx.lineTo(botP.x, botP.y);
+          ctx.stroke();
+        }
+        prevTopP = topP;
+        prevBotP = botP;
       }
 
       // 2. Steel Cross-Trusses (Triangular / Ladder Ties like reference photo)
@@ -415,7 +546,49 @@
       drawTubularRailOffset(-4);
       drawTubularRailOffset(4);
 
+      drawChainLift();
+      drawBrakeRun();
       drawSideTrack();
+    }
+
+    // Chain-lift teeth running up the center of the first hill, like the
+    // anti-rollback chain that hauls the train to the top before gravity takes over.
+    function drawChainLift() {
+      const cfg = TRACK_CONFIG[currentTrackType];
+      const numTeeth = 26;
+      ctx.fillStyle = '#94a3b8';
+      for (let i = 0; i < numTeeth; i++) {
+        const t = (i / numTeeth) * cfg.liftEnd;
+        const pt = get3DPoint(t);
+        const tangent = get3DTangentAngle(t);
+        const p = project3D(pt.x, pt.y, pt.z);
+        const dx = Math.cos(tangent) * 3;
+        const dy = Math.sin(tangent) * 3;
+        ctx.beginPath();
+        ctx.moveTo(p.x - dy, p.y + dx);
+        ctx.lineTo(p.x + dy, p.y - dx);
+        ctx.lineTo(p.x, p.y + 4);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    // Red magnetic-brake fins straddling the rails just before the station,
+    // where the train sheds its remaining speed to a crawl.
+    function drawBrakeRun() {
+      const cfg = TRACK_CONFIG[currentTrackType];
+      const numFins = 10;
+      ctx.fillStyle = '#dc2626';
+      for (let i = 0; i < numFins; i++) {
+        const t = cfg.liftEnd + (1 - cfg.liftEnd) * (0.9 + (i / numFins) * 0.1);
+        const pt = get3DPoint(t % 1.0);
+        const tangent = get3DTangentAngle(t % 1.0);
+        const p = project3D(pt.x, pt.y, pt.z);
+        const perpX = Math.cos(tangent + Math.PI / 2) * 7;
+        const perpY = Math.sin(tangent + Math.PI / 2) * 7;
+        ctx.fillRect(p.x - perpX - 1, p.y - perpY - 1, 2, 2);
+        ctx.fillRect(p.x + perpX - 1, p.y + perpY - 1, 2, 2);
+      }
     }
 
     function drawTubularRailOffset(offsetPixels) {
@@ -446,42 +619,68 @@
       ctx.stroke();
     }
 
-    // Storage Yard Track
+    // Storage Yard Track — a siding that runs parallel to the main line's upper
+    // arc, merging back onto the mainline near the station end, so spare cars
+    // can be parked and coupled up without the running train needing to stop.
     function drawSideTrack() {
-      const pStart = project3D(80, 100, 0);
-      const pEnd = project3D(200, 100, 0);
-
-      ctx.strokeStyle = '#eab308';
-      ctx.lineWidth = 3;
-      for (let x = 80; x <= 200; x += 30) {
-        const topP = project3D(x, 100, 0);
-        const botP = project3D(x, 100, -15);
-        ctx.beginPath();
-        ctx.moveTo(topP.x, topP.y);
-        ctx.lineTo(botP.x, botP.y);
-        ctx.stroke();
-      }
+      const numSamples = 40;
 
       ctx.strokeStyle = '#475569';
       ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.moveTo(pStart.x, pStart.y);
-      ctx.lineTo(pEnd.x, pEnd.y);
+      for (let i = 0; i <= numSamples; i++) {
+        const p = getYardScreenPoint(i / numSamples);
+        if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+
+      ctx.strokeStyle = '#eab308';
+      ctx.lineWidth = 3;
+      for (let i = 0; i <= numSamples; i += 4) {
+        const p = getYardScreenPoint(i / numSamples);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y - 6);
+        ctx.lineTo(p.x, p.y + 6);
+        ctx.stroke();
+      }
+
+      // Merge connector linking the siding's near end back onto the mainline
+      const mergeTrack = project3D(get3DPoint(YARD_T_END).x, get3DPoint(YARD_T_END).y, get3DPoint(YARD_T_END).z);
+      const mergeYard = getYardScreenPoint(1);
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(mergeYard.x, mergeYard.y);
+      ctx.lineTo(mergeTrack.x, mergeTrack.y);
       ctx.stroke();
     }
 
+    // Every car slot the park could ever have sits somewhere: on the main train
+    // (numCarts), parked in the yard after being bought (pendingCarts, solid),
+    // or still un-bought and waiting as a ghost outline. Buying fills a ghost
+    // in; a station stop clears solid cars out as they join the train.
     function drawPendingCarsInYard() {
-      if (pendingCarts <= 0) return;
+      const yardSlots = maxCarts - numCarts;
+      if (yardSlots <= 0) return;
 
-      for (let i = 0; i < pendingCarts; i++) {
-        const x = 100 + (i * 14);
-        const p = project3D(x, 100, 0);
+      const margin = 0.08;
+      for (let i = 0; i < yardSlots; i++) {
+        const u = 1 - margin - (i * (1 - 2 * margin) / Math.max(1, maxCarts - 1));
+        const p = getYardScreenPoint(u);
+        const purchased = i < pendingCarts;
 
-        // Crimson burgundy cart bodies
-        ctx.fillStyle = '#881337';
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
-        ctx.fill();
+        if (purchased) {
+          ctx.fillStyle = '#881337';
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.strokeStyle = 'rgba(148, 163, 184, 0.55)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       }
     }
 
@@ -506,17 +705,24 @@
       ctx.lineTo(p.x + 18, p.y - 18);
       ctx.stroke();
 
-      // Station Sidewalk
-      const sP = project3D(pt.x, pt.y - 35, pt.z);
-      ctx.fillStyle = '#94a3b8';
-      ctx.fillRect(sP.x - 50, sP.y - 5, 100, 10);
+      // Queue walkway: runs alongside the track, offset past the loop's widest
+      // point so it never crosses under the elevated structure.
+      const qTop = project3D(QUEUE_X, QUEUE_TOP_Y, 0);
+      const qBottom = project3D(QUEUE_X, QUEUE_BOTTOM_Y, 0);
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 14;
+      ctx.beginPath();
+      ctx.moveTo(qTop.x, qTop.y);
+      ctx.lineTo(qBottom.x, qBottom.y);
+      ctx.stroke();
 
-      // Passengers Line
+      // Passengers queued along the walkway
       for (let i = 0; i < queueCount; i++) {
-        const px = sP.x - 40 + (i * 4);
+        const qy = QUEUE_TOP_Y - i * 3.2;
+        const qp = project3D(QUEUE_X, qy, 0);
         ctx.fillStyle = passengerColors[i % passengerColors.length];
         ctx.beginPath();
-        ctx.arc(px, sP.y, 2, 0, Math.PI * 2);
+        ctx.arc(qp.x, qp.y, 2, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -533,7 +739,7 @@
 
       ctx.save();
       ctx.translate(p.x, p.y);
-      ctx.rotate(tangent + (pt.roll || 0)); // Rotates upside down along loops!
+      ctx.rotate(tangent + (pt.roll || 0)); // Follows the rail centerline exactly; only rotates upside-down through the loop
 
       // Wheel Chassis Assemblies (Clamping onto rails like reference)
       ctx.fillStyle = '#0f172a';
@@ -606,7 +812,9 @@
       checkStationStop(deltaTime);
 
       if (!isStoppedAtStation) {
-        progress = (progress + speed) % 1.0;
+        const frameScale = deltaTime / 16.6667; // normalize to a ~60fps baseline
+        const speedFactor = getSpeedFactor(progress);
+        progress = (progress + speed * speedFactor * frameScale) % 1.0;
       }
 
       requestAnimationFrame(animate);
