@@ -91,6 +91,10 @@
         const MAP_SIZE = 21; // 6x6 blocks
         const GRID_CELLS = 6;
         const CELL_SIZE = MAP_SIZE / GRID_CELLS;
+        const RING_ROAD_GAP = 1.75; // grass buffer between the city block grid and the ring road
+        const RING_ROAD_WIDTH = 1.1; // width of the loop road that circles the whole city
+        const RING_ROAD_CENTER = MAP_SIZE / 2 + RING_ROAD_GAP; // distance from map center to the ring road's centerline
+        const WORLD_SIZE = (RING_ROAD_CENTER + RING_ROAD_WIDTH / 2 + 1.0) * 2; // full ground plane, with a strip of grass past the ring road
         const HYDRANT_RANGE = 2.2;
         const BUILDING_FOOTPRINT_FRACTION = 0.6;
         const TRUCK_COLLISION_BUFFER = 0.32;
@@ -141,39 +145,71 @@
             ctx.fillStyle = '#7cb769';
             ctx.fillRect(0, 0, size, size);
 
-            const cellPx = size / GRID_CELLS;
+            // World-unit -> canvas-pixel mapping (canvas covers the whole WORLD_SIZE plane,
+            // with world (0,0) at the canvas center)
+            const pxPerUnit = size / WORLD_SIZE;
+            const wx = u => size / 2 + u * pxPerUnit;
+
+            const cellPx = CELL_SIZE * pxPerUnit;
             const roadWidth = cellPx * 0.22;
+            const gridStart = wx(-MAP_SIZE / 2);
+            const gridSpan = MAP_SIZE * pxPerUnit;
 
             ctx.strokeStyle = '#bbbbbb';
             ctx.lineWidth = 4;
             for (let i = 0; i <= GRID_CELLS; i++) {
-                const pos = i * cellPx;
-                ctx.strokeRect(pos - roadWidth / 2 - 3, 0, roadWidth + 6, size);
-                ctx.strokeRect(0, pos - roadWidth / 2 - 3, size, roadWidth + 6);
+                const pos = gridStart + i * cellPx;
+                ctx.strokeRect(pos - roadWidth / 2 - 3, gridStart, roadWidth + 6, gridSpan);
+                ctx.strokeRect(gridStart, pos - roadWidth / 2 - 3, gridSpan, roadWidth + 6);
             }
 
             ctx.fillStyle = '#4a4a4a';
             for (let i = 0; i <= GRID_CELLS; i++) {
-                const pos = i * cellPx;
-                ctx.fillRect(pos - roadWidth / 2, 0, roadWidth, size);
-                ctx.fillRect(0, pos - roadWidth / 2, size, roadWidth);
+                const pos = gridStart + i * cellPx;
+                ctx.fillRect(pos - roadWidth / 2, gridStart, roadWidth, gridSpan);
+                ctx.fillRect(gridStart, pos - roadWidth / 2, gridSpan, roadWidth);
             }
 
             ctx.strokeStyle = '#ffcc00';
             ctx.lineWidth = 2;
             ctx.setLineDash([10, 10]);
             for (let i = 0; i <= GRID_CELLS; i++) {
-                const pos = i * cellPx;
-                ctx.beginPath(); ctx.moveTo(pos, 0); ctx.lineTo(pos, size); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(0, pos); ctx.lineTo(size, pos); ctx.stroke();
+                const pos = gridStart + i * cellPx;
+                ctx.beginPath(); ctx.moveTo(pos, gridStart); ctx.lineTo(pos, gridStart + gridSpan); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(gridStart, pos); ctx.lineTo(gridStart + gridSpan, pos); ctx.stroke();
             }
+            ctx.setLineDash([]);
+
+            // Outer ring road: a paved loop that circles the whole city so the truck can drive
+            // all the way around the outside edge without cutting through the block grid
+            const outerHalf = RING_ROAD_CENTER + RING_ROAD_WIDTH / 2;
+            const innerHalf = RING_ROAD_CENTER - RING_ROAD_WIDTH / 2;
+            const outerSpan = outerHalf * 2 * pxPerUnit;
+            const innerSpan = innerHalf * 2 * pxPerUnit;
+
+            ctx.strokeStyle = '#bbbbbb';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(wx(-outerHalf), wx(-outerHalf), outerSpan, outerSpan);
+            ctx.strokeRect(wx(-innerHalf), wx(-innerHalf), innerSpan, innerSpan);
+
+            ctx.fillStyle = '#4a4a4a';
+            ctx.fillRect(wx(-outerHalf), wx(-outerHalf), outerSpan, wx(-innerHalf) - wx(-outerHalf)); // top
+            ctx.fillRect(wx(-outerHalf), wx(innerHalf), outerSpan, wx(outerHalf) - wx(innerHalf)); // bottom
+            ctx.fillRect(wx(-outerHalf), wx(-innerHalf), wx(-innerHalf) - wx(-outerHalf), innerSpan); // left
+            ctx.fillRect(wx(innerHalf), wx(-innerHalf), wx(outerHalf) - wx(innerHalf), innerSpan); // right
+
+            ctx.strokeStyle = '#ffcc00';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([10, 10]);
+            ctx.strokeRect(wx(-RING_ROAD_CENTER), wx(-RING_ROAD_CENTER), RING_ROAD_CENTER * 2 * pxPerUnit, RING_ROAD_CENTER * 2 * pxPerUnit);
+            ctx.setLineDash([]);
 
             const texture = new THREE.CanvasTexture(canvas);
             if ('colorSpace' in texture) texture.colorSpace = THREE.SRGBColorSpace;
             return texture;
         };
 
-        const groundGeometry = new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE);
+        const groundGeometry = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE);
         const groundMaterial = new THREE.MeshPhongMaterial({ map: createGroundTexture(), depthWrite: false });
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
@@ -1079,7 +1115,7 @@
         });
 
         // --- THE GAME LOOP (Update and Render) ---
-        const halfMap = MAP_SIZE / 2 - 0.6;
+        const halfMap = RING_ROAD_CENTER + RING_ROAD_WIDTH / 2 + 0.4; // lets the truck loop all the way around the outer ring road
         function animate() {
             requestAnimationFrame(animate);
 
