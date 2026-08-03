@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Splat Divert: Animal Rescue Fan!</title>
+  <title>Critter Corners: Animal Rescue Whack!</title>
   <style>
     * {
       box-sizing: border-box;
@@ -76,59 +76,141 @@
       border-radius: 4px;
       animation: dripAnim 2s ease-in forwards;
     }
-    /* Fan Cursor */
-    #fan {
+    /* Fluffy Whacking Stick (cursor weapon) */
+    #stick {
       position: absolute;
-      width: 120px;
-      height: 120px;
-      margin-left: -60px;
-      margin-top: -60px;
+      width: 110px;
+      height: 200px;
+      margin-left: -55px;
+      margin-top: -190px;
       pointer-events: none;
       z-index: 100;
-      transition: transform 0.05s ease-out;
     }
-    .fan-blade {
+    .stick-swing {
+      position: relative;
       width: 100%;
       height: 100%;
-      background: radial-gradient(circle, #38bdf8 0%, #0284c7 70%);
+      transform-origin: 50% 95%;
+    }
+    .stick-swing.swing {
+      animation: stickSwing 0.22s ease-out;
+    }
+    @keyframes stickSwing {
+      0% { transform: rotate(0deg); }
+      35% { transform: rotate(-52deg); }
+      65% { transform: rotate(30deg); }
+      100% { transform: rotate(0deg); }
+    }
+    .stick-shaft {
+      position: absolute;
+      bottom: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 16px;
+      height: 120px;
+      background: linear-gradient(180deg, #c68a4e, #7c4a24);
+      border-radius: 10px;
+      box-shadow: inset -4px 0 6px rgba(0,0,0,0.35), 2px 2px 6px rgba(0,0,0,0.4);
+    }
+    .stick-fluff {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 108px;
+      height: 108px;
       border-radius: 50%;
-      border: 4px solid #ffffff;
-      box-shadow: 0 0 20px rgba(56, 189, 248, 0.6), inset 0 0 15px rgba(255, 255, 255, 0.8);
+      background: radial-gradient(circle at 32% 30%, #ffffff, #fbe4ff 45%, #f0aef7 75%, #dd8bec 100%);
+      box-shadow:
+        -32px -6px 0 -8px #ffffffcc,
+        34px -10px 0 -10px #ffffffbb,
+        -22px 24px 0 -12px #ffffffaa,
+        26px 26px 0 -8px #ffffffcc,
+        2px -34px 0 -14px #ffffffbb,
+        -8px 34px 0 -16px #ffffffaa;
+    }
+    .stick-impact {
+      position: absolute;
+      inset: -20px;
+      border-radius: 50%;
+      border: 3px dashed rgba(255,255,255,0);
+      opacity: 0;
+    }
+    .stick-swing.swing .stick-impact {
+      animation: impactPulse 0.3s ease-out;
+    }
+    @keyframes impactPulse {
+      0% { transform: scale(0.5); opacity: 0.9; border-color: rgba(255,255,255,0.8); }
+      100% { transform: scale(1.9); opacity: 0; border-color: rgba(255,255,255,0); }
+    }
+    /* Sorting corner zones */
+    .corner-zone {
+      position: absolute;
+      width: 116px;
+      height: 116px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-radius: 20px;
+      background: rgba(15, 23, 42, 0.55);
+      border: 3px dashed rgba(255,255,255,0.25);
+      backdrop-filter: blur(6px);
+      z-index: 40;
+    }
+    .corner-zone .corner-icon {
+      font-size: 42px;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.4));
+    }
+    .corner-zone .corner-label {
+      font-size: 11px;
+      color: #cbd5e1;
+      font-weight: 700;
+      margin-top: 2px;
+      text-align: center;
+      letter-spacing: 0.3px;
+    }
+    .corner-zone .corner-count {
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      background: #38bdf8;
+      color: #0f172a;
+      font-weight: 800;
+      font-size: 14px;
+      min-width: 26px;
+      height: 26px;
+      border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 60px;
-      animation: spin 0.2s linear infinite;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     }
-    .fan-wind {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 200px;
-      height: 200px;
-      margin-left: -100px;
-      margin-top: -100px;
-      border: 2px dashed rgba(56, 189, 248, 0.4);
-      border-radius: 50%;
-      animation: windPulse 0.5s ease-out infinite;
-      pointer-events: none;
+    .corner-zone.flash {
+      animation: cornerFlash 0.4s ease;
     }
-    @keyframes spin {
-      100% { transform: rotate(360deg); }
+    @keyframes cornerFlash {
+      0% { transform: scale(1); border-color: rgba(255,255,255,0.25); }
+      40% { transform: scale(1.15); border-color: #4ade80; box-shadow: 0 0 25px rgba(74,222,128,0.6); }
+      100% { transform: scale(1); border-color: rgba(255,255,255,0.25); }
     }
-    @keyframes windPulse {
-      0% { transform: scale(0.6); opacity: 0.8; }
-      100% { transform: scale(1.4); opacity: 0; }
+    .corner-tl { top: 20px; left: 20px; }
+    .corner-tr { top: 20px; right: 20px; }
+    .corner-bl { bottom: 20px; left: 20px; }
+    .corner-br { bottom: 20px; right: 20px; }
+    @media (max-width: 640px) {
+      .corner-zone { width: 84px; height: 84px; border-radius: 14px; }
+      .corner-zone .corner-icon { font-size: 30px; }
+      .corner-zone .corner-label { font-size: 8px; }
     }
     /* HUD */
     #hud {
       position: absolute;
       top: 20px;
-      left: 20px;
-      right: 20px;
+      left: 50%;
+      transform: translateX(-50%);
       display: flex;
-      justify-content: space-between;
-      align-items: center;
+      gap: 14px;
       z-index: 150;
       color: #f8fafc;
       font-weight: 700;
@@ -137,11 +219,30 @@
       background: rgba(15, 23, 42, 0.75);
       backdrop-filter: blur(8px);
       border: 1px solid rgba(255,255,255,0.1);
-      padding: 12px 24px;
+      padding: 10px 20px;
       border-radius: 16px;
-      font-size: 20px;
+      font-size: 18px;
       box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+      white-space: nowrap;
     }
+    /* Hint */
+    #hint {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #f8fafc;
+      background: rgba(15, 23, 42, 0.75);
+      padding: 10px 20px;
+      border-radius: 999px;
+      font-size: 15px;
+      font-weight: 600;
+      z-index: 150;
+      border: 1px solid rgba(255,255,255,0.15);
+      transition: opacity 0.6s ease;
+      pointer-events: none;
+    }
+    #hint.hidden { opacity: 0; }
     /* Game Over Overlay */
     #game-over {
       position: absolute;
@@ -196,36 +297,70 @@
 
   <div id="game-container">
     <div id="hud">
-      <div class="stat-card">Saved: <span id="score" style="color: #38bdf8;">0</span></div>
+      <div class="stat-card">Sorted: <span id="score" style="color: #38bdf8;">0</span></div>
       <div class="stat-card">Splats: <span id="splats" style="color: #ef4444;">0 / 5</span></div>
     </div>
 
-    <div id="fan">
-      <div class="fan-wind"></div>
-      <div class="fan-blade">🌀</div>
+    <div class="corner-zone corner-tl" data-corner="tl">
+      <div class="corner-icon">🐱</div>
+      <div class="corner-label">Kitten Corner</div>
+      <div class="corner-count" id="count-tl">0</div>
+    </div>
+    <div class="corner-zone corner-tr" data-corner="tr">
+      <div class="corner-icon">🦆</div>
+      <div class="corner-label">Duck Pond</div>
+      <div class="corner-count" id="count-tr">0</div>
+    </div>
+    <div class="corner-zone corner-bl" data-corner="bl">
+      <div class="corner-icon">🦫</div>
+      <div class="corner-label">Capybara Spa</div>
+      <div class="corner-count" id="count-bl">0</div>
+    </div>
+    <div class="corner-zone corner-br" data-corner="br">
+      <div class="corner-icon">🐰</div>
+      <div class="corner-label">Bunny Burrow</div>
+      <div class="corner-count" id="count-br">0</div>
+    </div>
+
+    <div id="hint">Click or tap near an animal to whack it into its matching corner!</div>
+
+    <div id="stick">
+      <div class="stick-swing" id="stick-swing">
+        <div class="stick-shaft"></div>
+        <div class="stick-fluff">
+          <div class="stick-impact"></div>
+        </div>
+      </div>
     </div>
 
     <div id="game-over">
       <h1>SCREEN CLEANING NEEDED!</h1>
-      <p>Final Score: <span id="final-score">0</span> animals redirected</p>
+      <p>Final Score: <span id="final-score">0</span> animals sorted</p>
       <button class="btn" onclick="resetGame()">PLAY AGAIN</button>
     </div>
   </div>
 
   <script>
     const container = document.getElementById('game-container');
-    const fan = document.getElementById('fan');
+    const stick = document.getElementById('stick');
+    const stickSwing = document.getElementById('stick-swing');
     const scoreEl = document.getElementById('score');
     const splatsEl = document.getElementById('splats');
     const gameOverEl = document.getElementById('game-over');
     const finalScoreEl = document.getElementById('final-score');
+    const hintEl = document.getElementById('hint');
 
-    // Types of flying animals
+    // Types of incoming animals, each assigned to a home corner with its own gait style
     const TYPES = [
-      { emoji: '🐱', name: 'kitten', size: 100 },
-      { emoji: '🦆', name: 'duck', size: 90 },
-      { emoji: '🦫', name: 'capybara', size: 120 } // Capybara emoji fallback
+      { emoji: '🐱', name: 'kitten',    size: 90,  corner: 'tl', gait: { style: 'run',    speed: 0.35, bob: 6,  sway: 3,  rot: 6  } },
+      { emoji: '🦆', name: 'duck',      size: 82,  corner: 'tr', gait: { style: 'waddle', speed: 0.25, bob: 5,  sway: 10, rot: 14 } },
+      { emoji: '🦫', name: 'capybara',  size: 110, corner: 'bl', gait: { style: 'waddle', speed: 0.15, bob: 8,  sway: 6,  rot: 8  } },
+      { emoji: '🐰', name: 'bunny',     size: 88,  corner: 'br', gait: { style: 'hop',    speed: 0.3,  bob: 14, sway: 2,  rot: 4  } }
     ];
+
+    const HIT_RADIUS = 150;
+    const WHACK_MIN_Z = -900;
+    const TIP_OFFSET_Y = 135; // distance from cursor to the fluffy tip of the stick
 
     let score = 0;
     let splatCount = 0;
@@ -234,21 +369,79 @@
     let mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
     let isGameOver = false;
     let spawnTimer = 0;
+    let isPointerDown = false;
+    let lastSwingTime = 0;
+    let hasWhackedOnce = false;
 
-    // Track cursor movement
-    window.addEventListener('mousemove', (e) => {
-      mouse.x = e.clientX;
-      mouse.y = e.clientY;
-      fan.style.transform = `translate3d(${mouse.x}px, ${mouse.y}px, 0)`;
-    });
+    const cornerPos = {};
+    function computeCornerPositions() {
+      document.querySelectorAll('.corner-zone').forEach(el => {
+        const r = el.getBoundingClientRect();
+        cornerPos[el.dataset.corner] = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      });
+    }
+    computeCornerPositions();
+    window.addEventListener('resize', computeCornerPositions);
 
-    window.addEventListener('touchmove', (e) => {
-      if(e.touches.length > 0) {
-        mouse.x = e.touches[0].clientX;
-        mouse.y = e.touches[0].clientY;
-        fan.style.transform = `translate3d(${mouse.x}px, ${mouse.y}px, 0)`;
+    function updatePointer(x, y) {
+      mouse.x = x;
+      mouse.y = y;
+      stick.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    }
+    updatePointer(mouse.x, mouse.y);
+
+    function triggerSwingAnim() {
+      stickSwing.classList.remove('swing');
+      void stickSwing.offsetWidth; // restart animation
+      stickSwing.classList.add('swing');
+    }
+
+    function attemptWhack() {
+      if (isGameOver) return;
+      triggerSwingAnim();
+      if (!hasWhackedOnce) {
+        hasWhackedOnce = true;
+        hintEl.classList.add('hidden');
       }
+      const tipX = mouse.x;
+      const tipY = mouse.y - TIP_OFFSET_Y;
+      entities.forEach(entity => entity.tryWhack(tipX, tipY));
+    }
+
+    function throttledSwing() {
+      const now = performance.now();
+      if (now - lastSwingTime > 160) {
+        lastSwingTime = now;
+        attemptWhack();
+      }
+    }
+
+    // Pointer tracking
+    window.addEventListener('mousemove', (e) => {
+      updatePointer(e.clientX, e.clientY);
+      if (isPointerDown) throttledSwing();
     });
+    container.addEventListener('mousedown', (e) => {
+      isPointerDown = true;
+      updatePointer(e.clientX, e.clientY);
+      attemptWhack();
+    });
+    window.addEventListener('mouseup', () => { isPointerDown = false; });
+
+    window.addEventListener('touchstart', (e) => {
+      if (e.touches.length > 0) {
+        isPointerDown = true;
+        updatePointer(e.touches[0].clientX, e.touches[0].clientY);
+        attemptWhack();
+      }
+    }, { passive: true });
+    window.addEventListener('touchmove', (e) => {
+      if (e.touches.length > 0) {
+        updatePointer(e.touches[0].clientX, e.touches[0].clientY);
+        if (isPointerDown) throttledSwing();
+      }
+    }, { passive: true });
+    window.addEventListener('touchend', () => { isPointerDown = false; });
 
     // Create warp speed lines for depth effect
     for (let i = 0; i < 30; i++) {
@@ -264,34 +457,33 @@
       container.appendChild(line);
     }
 
+    function lerp(a, b, t) { return a + (b - a) * t; }
+
     class Entity {
       constructor() {
         const type = TYPES[Math.floor(Math.random() * TYPES.length)];
+        this.type = type;
         this.emoji = type.emoji;
-        this.baseSize = type.size;
-        
+        this.gait = type.gait;
+        this.gaitPhase = Math.random() * 10;
+
         // 3D coordinates (z runs from -2000 deep to 0 at the screen)
         this.z = -2000;
         // Target near screen center with slight variance
         this.targetX = (Math.random() - 0.5) * (window.innerWidth * 0.6);
         this.targetY = (Math.random() - 0.5) * (window.innerHeight * 0.6);
-        
-        this.x = this.targetX * 0.1; 
-        this.y = this.targetY * 0.1;
-        
-        // Speed accelerates as it approaches
-        this.speed = 12 + Math.random() * 8 + (score * 0.2); 
-        this.rotX = Math.random() * 360;
-        this.rotY = Math.random() * 360;
-        this.rotZ = Math.random() * 360;
-        
-        this.rotSpeedX = (Math.random() - 0.5) * 4;
-        this.rotSpeedY = (Math.random() - 0.5) * 4;
 
-        // Velocity for when blown by fan
-        this.vx = 0;
-        this.vy = 0;
-        this.vz = 0;
+        this.startX = this.targetX * 0.1;
+        this.startY = this.targetY * 0.1;
+
+        this.screenX = window.innerWidth / 2 + this.startX;
+        this.screenY = window.innerHeight / 2 + this.startY;
+        this.currentScale = 0.1;
+
+        // Speed accelerates as the game progresses
+        this.speed = 12 + Math.random() * 8 + (score * 0.2);
+
+        this.rotZ = 0;
         this.blown = false;
 
         // DOM Element
@@ -299,75 +491,102 @@
         this.el.className = 'entity';
         this.inner = document.createElement('div');
         this.inner.className = 'entity-inner';
+        this.inner.style.fontSize = `${type.size}px`;
         this.inner.textContent = this.emoji;
         this.el.appendChild(this.inner);
         container.appendChild(this.el);
       }
 
+      tryWhack(tipX, tipY) {
+        if (this.blown || this.z <= WHACK_MIN_Z) return;
+        const dx = this.screenX - tipX;
+        const dy = this.screenY - tipY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < HIT_RADIUS) {
+          this.startBlown();
+        }
+      }
+
+      startBlown() {
+        this.blown = true;
+        const corner = cornerPos[this.type.corner] || { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+        this.blownFromX = this.screenX;
+        this.blownFromY = this.screenY;
+        this.blownFromScale = this.currentScale;
+        this.blownTargetX = corner.x;
+        this.blownTargetY = corner.y;
+        this.blownT = 0;
+        this.blownDuration = 18 + Math.random() * 8;
+      }
+
       update() {
         if (this.blown) {
-          // Diverted motion dynamics
-          this.x += this.vx;
-          this.y += this.vy;
-          this.z += this.vz;
-          this.rotZ += 15;
-          
-          // Remove once safely off screen
-          if (this.z > 200 || Math.abs(this.x) > window.innerWidth || Math.abs(this.y) > window.innerHeight) {
+          this.blownT++;
+          const p = Math.min(1, this.blownT / this.blownDuration);
+          const ease = 1 - Math.pow(1 - p, 3);
+          const curX = lerp(this.blownFromX, this.blownTargetX, ease);
+          const curY = lerp(this.blownFromY, this.blownTargetY, ease);
+          const curScale = Math.max(0.15, this.blownFromScale * (1 - 0.65 * ease));
+          this.rotZ += 22;
+
+          this.el.style.opacity = `${1 - ease * 0.6}`;
+          this.el.style.transform = `translate3d(${curX - 50}px, ${curY - 50}px, ${this.z}px) rotateZ(${this.rotZ}deg) scale(${curScale})`;
+
+          if (p >= 1) {
+            registerSort(this.type.corner);
             this.destroy();
             return false;
           }
         } else {
           // Fly toward screen
           this.z += this.speed;
-          
-          // Interpolate XY toward target screen position as Z increases
+
           const progress = (this.z + 2000) / 2000;
-          const currentTargetX = (window.innerWidth / 2) + this.targetX;
-          const currentTargetY = (window.innerHeight / 2) + this.targetY;
-          
-          const screenX = (window.innerWidth / 2) + (this.x * (1 - progress) + this.targetX * progress);
-          const screenY = (window.innerHeight / 2) + (this.y * (1 - progress) + this.targetY * progress);
 
-          this.rotX += this.rotSpeedX;
-          this.rotY += this.rotSpeedY;
+          const screenX = (window.innerWidth / 2) + (this.startX * (1 - progress) + this.targetX * progress);
+          const screenY = (window.innerHeight / 2) + (this.startY * (1 - progress) + this.targetY * progress);
+          this.screenX = screenX;
+          this.screenY = screenY;
 
-          // Check interaction with Fan (when entity gets close to screen)
-          if (this.z > -400) {
-            const dx = screenX - mouse.x;
-            const dy = screenY - mouse.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            
-            // Fan field of effect radius ~130px
-            if (dist < 130) {
-              this.blown = true;
-              const angle = Math.atan2(dy, dx);
-              const blowForce = 25 + Math.random() * 15;
-              this.vx = Math.cos(angle) * blowForce;
-              this.vy = Math.sin(angle) * blowForce;
-              this.vz = -10 + Math.random() * 20; // Repel backward/sideways
-              
-              score++;
-              scoreEl.textContent = score;
-            }
-          }
-
-          // Check Splat on Screen (Hit Z threshold)
+          // Check Splat on Screen (Hit Z threshold) - missed animal
           if (this.z >= 0) {
             createSplat(screenX, screenY, this.emoji);
             this.destroy();
             splatCount++;
             splatsEl.textContent = `${splatCount} / ${MAX_SPLATS}`;
-            
+
             if (splatCount >= MAX_SPLATS) {
               triggerGameOver();
             }
             return false;
           }
 
+          // Locomotion animation so the animal looks like it's moving, not tumbling
+          this.gaitPhase += this.gait.speed;
+          const g = this.gait;
+          let sway = 0, bobY = 0, rot = 0, scaleX = 1, scaleY = 1;
+          if (g.style === 'hop') {
+            const hop = Math.max(0, Math.sin(this.gaitPhase));
+            bobY = -hop * g.bob;
+            sway = Math.sin(this.gaitPhase * 0.5) * g.sway;
+            rot = -hop * g.rot;
+            scaleY = 1 + hop * 0.18;
+            scaleX = 1 - hop * 0.12;
+          } else if (g.style === 'waddle') {
+            sway = Math.sin(this.gaitPhase) * g.sway;
+            bobY = -Math.abs(Math.sin(this.gaitPhase * 2)) * g.bob;
+            rot = Math.sin(this.gaitPhase) * g.rot;
+          } else {
+            bobY = -Math.abs(Math.sin(this.gaitPhase * 2)) * g.bob;
+            sway = Math.sin(this.gaitPhase) * g.sway;
+            rot = Math.sin(this.gaitPhase * 2) * g.rot;
+          }
+          this.inner.style.transform = `translate(${sway}px, ${bobY}px) rotate(${rot}deg) scale(${scaleX}, ${scaleY})`;
+
           // Screen positioning via CSS 3D Transforms
           const scale = Math.max(0.1, (this.z + 2000) / 2000);
-          this.el.style.transform = `translate3d(${screenX - 50}px, ${screenY - 50}px, ${this.z}px) rotateX(${this.rotX}deg) rotateY(${this.rotY}deg) rotateZ(${this.rotZ}deg) scale(${scale})`;
+          this.currentScale = scale;
+          this.el.style.transform = `translate3d(${screenX - 50}px, ${screenY - 50}px, ${this.z}px) scale(${scale})`;
         }
 
         return true;
@@ -377,6 +596,21 @@
         if (this.el && this.el.parentNode) {
           this.el.parentNode.removeChild(this.el);
         }
+      }
+    }
+
+    function registerSort(cornerKey) {
+      score++;
+      scoreEl.textContent = score;
+
+      const countEl = document.getElementById(`count-${cornerKey}`);
+      if (countEl) countEl.textContent = parseInt(countEl.textContent, 10) + 1;
+
+      const zoneEl = document.querySelector(`.corner-zone[data-corner="${cornerKey}"]`);
+      if (zoneEl) {
+        zoneEl.classList.remove('flash');
+        void zoneEl.offsetWidth;
+        zoneEl.classList.add('flash');
       }
     }
 
@@ -394,7 +628,7 @@
       // Add a liquid drip effect to the splat
       const drip = document.createElement('div');
       drip.className = 'splat-drip';
-      
+
       splat.appendChild(text);
       splat.appendChild(drip);
       container.appendChild(splat);
@@ -423,6 +657,7 @@
       splatCount = 0;
       scoreEl.textContent = score;
       splatsEl.textContent = `${splatCount} / ${MAX_SPLATS}`;
+      document.querySelectorAll('.corner-count').forEach(el => el.textContent = '0');
       isGameOver = false;
       gameOverEl.classList.remove('active');
     }
@@ -433,21 +668,24 @@
         // Spawn rate speeds up over time
         spawnTimer++;
         const spawnInterval = Math.max(15, 60 - Math.floor(score / 3));
-        
+
         if (spawnTimer >= spawnInterval) {
           entities.push(new Entity());
           spawnTimer = 0;
         }
 
-        // Update all flying animals
+        // Update all incoming animals
         entities = entities.filter(entity => entity.update());
       }
-      
+
       requestAnimationFrame(loop);
     }
 
     // Start loop
     loop();
+
+    // Fade the hint automatically after a few seconds even if untouched
+    setTimeout(() => hintEl.classList.add('hidden'), 6000);
   </script>
 </body>
 </html>

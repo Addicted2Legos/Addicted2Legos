@@ -35,6 +35,82 @@
             padding: 20px;
         }
 
+        .app-shell {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+            max-width: 1100px;
+        }
+
+        .game-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 180px;
+            flex-shrink: 0;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            padding: 16px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            position: sticky;
+            top: 20px;
+        }
+
+        .menu-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #94a3b8;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .menu-link {
+            display: block;
+            padding: 10px 12px;
+            border-radius: 8px;
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .menu-link:hover {
+            background: var(--btn-hover);
+        }
+
+        .menu-link.active {
+            background: rgba(56, 189, 248, 0.15);
+            border-color: rgba(56, 189, 248, 0.4);
+            color: var(--accent-color);
+        }
+
+        @media (max-width: 720px) {
+            .app-shell {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .game-menu {
+                flex-direction: row;
+                width: 100%;
+                max-width: 700px;
+                overflow-x: auto;
+                position: static;
+                justify-content: center;
+            }
+
+            .menu-title {
+                display: none;
+            }
+        }
+
         .container {
             display: flex;
             flex-direction: column;
@@ -200,7 +276,17 @@
 </head>
 <body>
 
-    <div class="container">
+    <div class="app-shell">
+        <nav class="game-menu" aria-label="Minigame versions">
+            <span class="menu-title">Polar Pixel</span>
+            <a href="FreePlay.html" class="menu-link active">Free Play</a>
+            <a href="Maze.html" class="menu-link">Maze</a>
+            <a href="MiniGolf.html" class="menu-link">Mini Golf</a>
+            <a href="FollowTheLeader.html" class="menu-link">Follow the Leader</a>
+            <a href="ShapeShifter.html" class="menu-link">Shape Shifter</a>
+        </nav>
+
+        <div class="container">
         <header>
             <h1>Dot Sorting Sandbox</h1>
             <p class="subtitle">Satisfying physics, color isolation, and magnetic forces</p>
@@ -239,6 +325,7 @@
             <div class="control-group">
                 <button class="btn-reset" onclick="resetDots()">Shuffle All</button>
             </div>
+        </div>
         </div>
     </div>
 

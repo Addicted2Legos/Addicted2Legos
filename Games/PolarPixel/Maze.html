@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Color Dot Magnetic Sandbox</title>
+    <title>Polar Pixel – Maze</title>
     <style>
       html, body { touch-action: manipulation; }
         :root {
@@ -33,6 +33,82 @@
             overflow-y: auto;
             overflow-x: hidden;
             padding: 20px;
+        }
+
+        .app-shell {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+            max-width: 1100px;
+        }
+
+        .game-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 180px;
+            flex-shrink: 0;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            padding: 16px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            position: sticky;
+            top: 20px;
+        }
+
+        .menu-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #94a3b8;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .menu-link {
+            display: block;
+            padding: 10px 12px;
+            border-radius: 8px;
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .menu-link:hover {
+            background: var(--btn-hover);
+        }
+
+        .menu-link.active {
+            background: rgba(56, 189, 248, 0.15);
+            border-color: rgba(56, 189, 248, 0.4);
+            color: var(--accent-color);
+        }
+
+        @media (max-width: 720px) {
+            .app-shell {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .game-menu {
+                flex-direction: row;
+                width: 100%;
+                max-width: 700px;
+                overflow-x: auto;
+                position: static;
+                justify-content: center;
+            }
+
+            .menu-title {
+                display: none;
+            }
         }
 
         .container {
@@ -106,6 +182,11 @@
             letter-spacing: 1px;
             color: #94a3b8;
             margin-right: 4px;
+            font-weight: 600;
+        }
+
+        #stats {
+            font-size: 0.875rem;
             font-weight: 600;
         }
 
@@ -200,44 +281,67 @@
 </head>
 <body>
 
-    <div class="container">
-        <header>
-            <h1>Dot Sorting Sandbox</h1>
-            <p class="subtitle">Satisfying physics, color isolation, and magnetic forces</p>
-        </header>
+    <div class="app-shell">
+        <nav class="game-menu" aria-label="Minigame versions">
+            <span class="menu-title">Polar Pixel</span>
+            <a href="FreePlay.html" class="menu-link">Free Play</a>
+            <a href="Maze.html" class="menu-link active">Maze</a>
+            <a href="MiniGolf.html" class="menu-link">Mini Golf</a>
+            <a href="FollowTheLeader.html" class="menu-link">Follow the Leader</a>
+            <a href="ShapeShifter.html" class="menu-link">Shape Shifter</a>
+        </nav>
 
-        <div id="canvas-container">
-            <canvas id="sandbox"></canvas>
-        </div>
+        <div class="container">
+            <header>
+                <h1>Polar Pixel — Maze</h1>
+                <p class="subtitle">Steer the dots through the maze and drop them into the pit near the corner</p>
+            </header>
 
-        <div class="controls">
-            <!-- Magnetic Directional Controls -->
-            <div class="control-group">
-                <span class="group-label">Magnet</span>
-                <div class="directional-pad">
-                    <button class="btn-up" onclick="applyForce('up')" title="Pull Up">▲</button>
-                    <button class="btn-left" onclick="applyForce('left')" title="Pull Left">◄</button>
-                    <button class="btn-right" onclick="applyForce('right')" title="Pull Right">►</button>
-                    <button class="btn-down" onclick="applyForce('down')" title="Pull Down">▼</button>
+            <div id="canvas-container">
+                <canvas id="sandbox"></canvas>
+            </div>
+
+            <div class="controls">
+                <!-- Magnetic Directional Controls -->
+                <div class="control-group">
+                    <span class="group-label">Magnet</span>
+                    <div class="directional-pad">
+                        <button class="btn-up" onclick="applyForce('up')" title="Pull Up">▲</button>
+                        <button class="btn-left" onclick="applyForce('left')" title="Pull Left">◄</button>
+                        <button class="btn-right" onclick="applyForce('right')" title="Pull Right">►</button>
+                        <button class="btn-down" onclick="applyForce('down')" title="Pull Down">▼</button>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Spatial Sorting Controls -->
-            <div class="control-group">
-                <span class="group-label">Position</span>
-                <button onclick="applyForce('center')">Center</button>
-                <button onclick="applyForce('edges')">Edges</button>
-            </div>
+                <!-- Spatial Sorting Controls -->
+                <div class="control-group">
+                    <span class="group-label">Position</span>
+                    <button onclick="applyForce('center')">Center</button>
+                    <button onclick="applyForce('edges')">Edges</button>
+                </div>
 
-            <!-- Color Extraction Control -->
-            <div class="control-group">
-                <span class="group-label">Filter</span>
-                <div class="color-swatches" id="colorSwatches"></div>
-            </div>
+                <!-- Color Extraction Control -->
+                <div class="control-group">
+                    <span class="group-label">Filter</span>
+                    <div class="color-swatches" id="colorSwatches"></div>
+                </div>
 
-            <!-- Reset Control -->
-            <div class="control-group">
-                <button class="btn-reset" onclick="resetDots()">Shuffle All</button>
+                <!-- Maze Control -->
+                <div class="control-group">
+                    <span class="group-label">Maze</span>
+                    <button class="btn-isolate" onclick="newMaze()">New Layout</button>
+                </div>
+
+                <!-- Progress Readout -->
+                <div class="control-group">
+                    <span class="group-label">Progress</span>
+                    <span id="stats">0 / 100 dropped in</span>
+                </div>
+
+                <!-- Reset Control -->
+                <div class="control-group">
+                    <button class="btn-reset" onclick="resetDots()">Shuffle All</button>
+                </div>
             </div>
         </div>
     </div>
@@ -248,6 +352,7 @@
 
         const NUM_DOTS = 100;
         const DOT_RADIUS = 10;
+        const WALL_THICKNESS = 6;
         // Exactly 12 selectable colors, evenly spaced around the hue wheel
         const PALETTE = Array.from({ length: 12 }, (_, i) => i * 30);
         let dots = [];
@@ -259,6 +364,11 @@
         let currentMode = null;
         let isolateHue = null;
 
+        // Maze layout state: a grid of cells with per-side walls, plus the
+        // corner pit dots fall into once captured.
+        let mazeCols, mazeRows, cellW, cellH, mazeCells, wallSegments, hole;
+        let collectedCount = 0;
+
         // Ensure crisp rendering on high-DPI screens
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -267,6 +377,192 @@
             width = canvas.width;
             height = canvas.height;
             ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+
+        // Carve a perfect maze with a recursive backtracker, then knock down
+        // extra interior walls (braiding) so multiple paths exist instead of
+        // one strict corridor — keeps the free-flowing sandbox feel while
+        // still giving the dots walls to bump around.
+        function generateMaze(logicalWidth, logicalHeight) {
+            const targetCellSize = 72;
+            mazeCols = Math.max(6, Math.round(logicalWidth / targetCellSize));
+            mazeRows = Math.max(6, Math.round(logicalHeight / targetCellSize));
+            cellW = logicalWidth / mazeCols;
+            cellH = logicalHeight / mazeRows;
+
+            mazeCells = [];
+            for (let r = 0; r < mazeRows; r++) {
+                const row = [];
+                for (let c = 0; c < mazeCols; c++) {
+                    row.push({ top: true, right: true, bottom: true, left: true, visited: false });
+                }
+                mazeCells.push(row);
+            }
+
+            const OPPOSITE = { top: 'bottom', right: 'left', bottom: 'top', left: 'right' };
+            const stack = [{ c: 0, r: 0 }];
+            mazeCells[0][0].visited = true;
+            while (stack.length) {
+                const { c, r } = stack[stack.length - 1];
+                const neighbors = [];
+                if (r > 0 && !mazeCells[r - 1][c].visited) neighbors.push({ c, r: r - 1, dir: 'top' });
+                if (c < mazeCols - 1 && !mazeCells[r][c + 1].visited) neighbors.push({ c: c + 1, r, dir: 'right' });
+                if (r < mazeRows - 1 && !mazeCells[r + 1][c].visited) neighbors.push({ c, r: r + 1, dir: 'bottom' });
+                if (c > 0 && !mazeCells[r][c - 1].visited) neighbors.push({ c: c - 1, r, dir: 'left' });
+
+                if (neighbors.length === 0) { stack.pop(); continue; }
+
+                const next = neighbors[Math.floor(Math.random() * neighbors.length)];
+                mazeCells[r][c][next.dir] = false;
+                mazeCells[next.r][next.c][OPPOSITE[next.dir]] = false;
+                mazeCells[next.r][next.c].visited = true;
+                stack.push({ c: next.c, r: next.r });
+            }
+
+            const BRAID_CHANCE = 0.35;
+            for (let r = 0; r < mazeRows; r++) {
+                for (let c = 0; c < mazeCols; c++) {
+                    if (c < mazeCols - 1 && mazeCells[r][c].right && Math.random() < BRAID_CHANCE) {
+                        mazeCells[r][c].right = false;
+                        mazeCells[r][c + 1].left = false;
+                    }
+                    if (r < mazeRows - 1 && mazeCells[r][c].bottom && Math.random() < BRAID_CHANCE) {
+                        mazeCells[r][c].bottom = false;
+                        mazeCells[r + 1][c].top = false;
+                    }
+                }
+            }
+
+            // The pit sits a cell in from the top-left corner — "just off"
+            // the corner rather than sealed into it.
+            hole = {
+                x: 1.5 * cellW,
+                y: 1.5 * cellH,
+                radius: Math.min(cellW, cellH) * 0.38
+            };
+
+            buildWallSegments();
+        }
+
+        // Flatten the per-cell wall flags into a de-duplicated list of line
+        // segments for drawing (each interior wall only stroked once).
+        function buildWallSegments() {
+            wallSegments = [];
+            for (let r = 0; r < mazeRows; r++) {
+                for (let c = 0; c < mazeCols; c++) {
+                    const cell = mazeCells[r][c];
+                    const x0 = c * cellW, y0 = r * cellH;
+                    const x1 = x0 + cellW, y1 = y0 + cellH;
+                    if (cell.top) wallSegments.push({ x1: x0, y1: y0, x2: x1, y2: y0 });
+                    if (cell.left) wallSegments.push({ x1: x0, y1: y0, x2: x0, y2: y1 });
+                    if (c === mazeCols - 1 && cell.right) wallSegments.push({ x1: x1, y1: y0, x2: x1, y2: y1 });
+                    if (r === mazeRows - 1 && cell.bottom) wallSegments.push({ x1: x0, y1: y1, x2: x1, y2: y1 });
+                }
+            }
+        }
+
+        function drawMaze(context) {
+            context.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+            context.lineWidth = WALL_THICKNESS;
+            context.lineCap = 'round';
+            wallSegments.forEach(seg => {
+                context.beginPath();
+                context.moveTo(seg.x1, seg.y1);
+                context.lineTo(seg.x2, seg.y2);
+                context.stroke();
+            });
+
+            const gradient = context.createRadialGradient(hole.x, hole.y, 0, hole.x, hole.y, hole.radius);
+            gradient.addColorStop(0, '#000000');
+            gradient.addColorStop(0.7, '#0a0a12');
+            gradient.addColorStop(1, 'rgba(56, 189, 248, 0.45)');
+            context.beginPath();
+            context.arc(hole.x, hole.y, hole.radius, 0, Math.PI * 2);
+            context.fillStyle = gradient;
+            context.fill();
+        }
+
+        // Push a dot back out along the closest point of a wall segment,
+        // and cancel the velocity component driving it into the wall.
+        function resolveSegmentCollision(dot, x1, y1, x2, y2) {
+            const dx = x2 - x1, dy = y2 - y1;
+            const lenSq = dx * dx + dy * dy;
+            let t = lenSq === 0 ? 0 : ((dot.x - x1) * dx + (dot.y - y1) * dy) / lenSq;
+            t = Math.max(0, Math.min(1, t));
+            const closestX = x1 + t * dx;
+            const closestY = y1 + t * dy;
+            const distX = dot.x - closestX;
+            const distY = dot.y - closestY;
+            const dist = Math.hypot(distX, distY);
+            const minDist = dot.radius + WALL_THICKNESS / 2;
+            if (dist === 0 || dist >= minDist) return;
+
+            const nx = distX / dist, ny = distY / dist;
+            const overlap = minDist - dist;
+            dot.x += nx * overlap;
+            dot.y += ny * overlap;
+
+            const vDotN = dot.vx * nx + dot.vy * ny;
+            if (vDotN < 0) {
+                dot.vx -= vDotN * nx * 1.3;
+                dot.vy -= vDotN * ny * 1.3;
+            }
+        }
+
+        // Only test the walls of the cell a dot is currently in (plus its
+        // neighbors) rather than every wall in the maze.
+        function resolveWallCollisions(dot) {
+            const col = Math.floor(dot.x / cellW);
+            const row = Math.floor(dot.y / cellH);
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    const r = row + dr, c = col + dc;
+                    if (r < 0 || r >= mazeRows || c < 0 || c >= mazeCols) continue;
+                    const cell = mazeCells[r][c];
+                    const x0 = c * cellW, y0 = r * cellH, x1 = x0 + cellW, y1 = y0 + cellH;
+                    if (cell.top) resolveSegmentCollision(dot, x0, y0, x1, y0);
+                    if (cell.bottom) resolveSegmentCollision(dot, x0, y1, x1, y1);
+                    if (cell.left) resolveSegmentCollision(dot, x0, y0, x0, y1);
+                    if (cell.right) resolveSegmentCollision(dot, x1, y0, x1, y1);
+                }
+            }
+        }
+
+        // Once a dot wanders close enough to the pit it gets sucked in and
+        // shrunk away, counting toward the completed total.
+        function updateHoleCapture() {
+            for (let i = dots.length - 1; i >= 0; i--) {
+                const dot = dots[i];
+                if (!dot.capturing) {
+                    const dist = Math.hypot(dot.x - hole.x, dot.y - hole.y);
+                    if (dist < hole.radius * 0.7) dot.capturing = true;
+                }
+                if (dot.capturing) {
+                    dot.x += (hole.x - dot.x) * 0.25;
+                    dot.y += (hole.y - dot.y) * 0.25;
+                    dot.radius *= 0.85;
+                    if (dot.radius < 1) {
+                        dots.splice(i, 1);
+                        collectedCount++;
+                        updateStats();
+                    }
+                }
+            }
+        }
+
+        function updateStats() {
+            const statsEl = document.getElementById('stats');
+            if (!statsEl) return;
+            statsEl.textContent = collectedCount >= NUM_DOTS
+                ? 'All balls dropped in! 🎉'
+                : `${collectedCount} / ${NUM_DOTS} dropped in`;
+        }
+
+        function newMaze() {
+            const logicalWidth = width / window.devicePixelRatio;
+            const logicalHeight = height / window.devicePixelRatio;
+            generateMaze(logicalWidth, logicalHeight);
+            resetDots();
         }
 
         class Dot {
@@ -280,6 +576,7 @@
                 this.color = `hsl(${hue}, 85%, 60%)`;
                 this.targetVx = 0;
                 this.targetVy = 0;
+                this.capturing = false;
             }
 
             // Steer toward a fixed point with a proportional controller: speed
@@ -324,6 +621,10 @@
             }
 
             update(boundsWidth, boundsHeight, mode, isolateTargetHue) {
+                // Captured dots are animated separately (sucked toward the
+                // hole and shrunk), so skip normal steering/physics for them.
+                if (this.capturing) return;
+
                 const centerX = boundsWidth / 2;
                 const centerY = boundsHeight / 2;
                 const margin = this.radius + 4;
@@ -403,11 +704,11 @@
                 context.beginPath();
                 context.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
                 context.fillStyle = this.color;
-                
+
                 // Add subtle glowing halo for visual pleasure
                 context.shadowColor = this.color;
                 context.shadowBlur = 8;
-                
+
                 context.fill();
                 context.closePath();
                 context.shadowBlur = 0; // Reset shadow for performance
@@ -430,14 +731,14 @@
         }
 
         function resetDots() {
-            // Idle mode so dots aren't steered anywhere, then give them a
-            // random burst that decays via friction into a natural scatter.
+            // Idle mode, no active isolation, full respawn of every dot
+            // (including ones already dropped in the hole) and progress
+            // reset — a clean slate to solve the maze again.
             currentMode = null;
             isolateHue = null;
-            dots.forEach(dot => {
-                dot.vx = (Math.random() - 0.5) * 10;
-                dot.vy = (Math.random() - 0.5) * 10;
-            });
+            collectedCount = 0;
+            initDots();
+            updateStats();
         }
 
         function applyForce(type) {
@@ -533,8 +834,12 @@
             // Update positions/velocities first...
             dots.forEach(dot => dot.update(logicalWidth, logicalHeight, currentMode, isolateHue));
 
-            // ...then resolve any overlaps so dots never sit on top of each other
-            for (let iter = 0; iter < 3; iter++) resolveCollisions();
+            // ...then resolve any overlaps (dot-dot and dot-wall) so dots
+            // never sit on top of each other or clip through maze walls
+            for (let iter = 0; iter < 3; iter++) {
+                resolveCollisions();
+                dots.forEach(dot => { if (!dot.capturing) resolveWallCollisions(dot); });
+            }
 
             // Collision push-apart can shove a dot past the wall; clamp back in
             dots.forEach(dot => {
@@ -545,7 +850,11 @@
                 if (dot.y + r > logicalHeight) dot.y = logicalHeight - r;
             });
 
-            // Finally render
+            // Suck in any dots that wandered into the pit
+            updateHoleCapture();
+
+            // Draw the maze background, then the dots on top of it
+            drawMaze(ctx);
             dots.forEach(dot => dot.draw(ctx));
 
             requestAnimationFrame(animate);
@@ -569,8 +878,12 @@
         window.addEventListener('resize', resizeCanvas);
         window.addEventListener('DOMContentLoaded', () => {
             resizeCanvas();
+            const logicalWidth = width / window.devicePixelRatio;
+            const logicalHeight = height / window.devicePixelRatio;
+            generateMaze(logicalWidth, logicalHeight);
             initDots();
             buildColorSwatches();
+            updateStats();
             animate();
         });
     </script>

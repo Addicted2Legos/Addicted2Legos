@@ -35,6 +35,82 @@
             padding: 20px;
         }
 
+        .app-shell {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+            max-width: 1100px;
+        }
+
+        .game-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 180px;
+            flex-shrink: 0;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            padding: 16px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            position: sticky;
+            top: 20px;
+        }
+
+        .menu-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #94a3b8;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .menu-link {
+            display: block;
+            padding: 10px 12px;
+            border-radius: 8px;
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .menu-link:hover {
+            background: var(--btn-hover);
+        }
+
+        .menu-link.active {
+            background: rgba(56, 189, 248, 0.15);
+            border-color: rgba(56, 189, 248, 0.4);
+            color: var(--accent-color);
+        }
+
+        @media (max-width: 720px) {
+            .app-shell {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .game-menu {
+                flex-direction: row;
+                width: 100%;
+                max-width: 700px;
+                overflow-x: auto;
+                position: static;
+                justify-content: center;
+            }
+
+            .menu-title {
+                display: none;
+            }
+        }
+
         .container {
             display: flex;
             flex-direction: column;
@@ -200,15 +276,27 @@
 </head>
 <body>
 
-    <div class="container">
+    <div class="app-shell">
+        <nav class="game-menu" aria-label="Minigame versions">
+            <span class="menu-title">Polar Pixel</span>
+            <a href="FreePlay.html" class="menu-link">Free Play</a>
+            <a href="Maze.html" class="menu-link">Maze</a>
+            <a href="MiniGolf.html" class="menu-link active">Mini Golf</a>
+            <a href="FollowTheLeader.html" class="menu-link">Follow the Leader</a>
+            <a href="ShapeShifter.html" class="menu-link">Shape Shifter</a>
+        </nav>
+
+        <div class="container">
         <header>
-            <h1>Dot Sorting Sandbox</h1>
-            <p class="subtitle">Satisfying physics, color isolation, and magnetic forces</p>
+            <h1>Dot Sorting Mini Golf</h1>
+            <p class="subtitle">Steer every dot through the obstacles and sink them all in the hole</p>
         </header>
 
         <div id="canvas-container">
             <canvas id="sandbox"></canvas>
         </div>
+
+        <p class="subtitle" id="holeStatus">0 / 100 balls in the hole</p>
 
         <div class="controls">
             <!-- Magnetic Directional Controls -->
@@ -240,6 +328,7 @@
                 <button class="btn-reset" onclick="resetDots()">Shuffle All</button>
             </div>
         </div>
+        </div>
     </div>
 
     <script>
@@ -259,6 +348,53 @@
         let currentMode = null;
         let isolateHue = null;
 
+        // The course layout (hole, walls, sand traps) is described as
+        // fractions of the play area so it rescales cleanly whenever the
+        // canvas resizes. Pixel versions are recomputed into `hole`,
+        // `obstacles`, and `sandTraps` by layoutCourse().
+        const OBSTACLE_LAYOUT = [
+            { x: 0.15, y: 0.30, w: 0.30, h: 0.05 },
+            { x: 0.65, y: 0.15, w: 0.05, h: 0.30 },
+            { x: 0.55, y: 0.65, w: 0.30, h: 0.05 },
+            { x: 0.30, y: 0.55, w: 0.05, h: 0.30 }
+        ];
+        const SAND_TRAP_LAYOUT = [
+            { cx: 0.85, cy: 0.15, rx: 0.12, ry: 0.09 },
+            { cx: 0.15, cy: 0.85, rx: 0.12, ry: 0.09 }
+        ];
+        let hole = { x: 0, y: 0, r: 18 };
+        let obstacles = [];
+        let sandTraps = [];
+        let sunkCount = 0;
+
+        function layoutCourse(boundsWidth, boundsHeight) {
+            hole = {
+                x: boundsWidth / 2,
+                y: boundsHeight / 2,
+                r: Math.max(14, Math.min(boundsWidth, boundsHeight) * 0.035)
+            };
+            obstacles = OBSTACLE_LAYOUT.map(o => ({
+                x: o.x * boundsWidth,
+                y: o.y * boundsHeight,
+                w: o.w * boundsWidth,
+                h: o.h * boundsHeight
+            }));
+            sandTraps = SAND_TRAP_LAYOUT.map(s => ({
+                x: s.cx * boundsWidth,
+                y: s.cy * boundsHeight,
+                rx: s.rx * boundsWidth,
+                ry: s.ry * boundsHeight
+            }));
+        }
+
+        function isInSandTrap(x, y) {
+            return sandTraps.some(s => {
+                const dx = (x - s.x) / s.rx;
+                const dy = (y - s.y) / s.ry;
+                return dx * dx + dy * dy <= 1;
+            });
+        }
+
         // Ensure crisp rendering on high-DPI screens
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -267,6 +403,7 @@
             width = canvas.width;
             height = canvas.height;
             ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            layoutCourse(rect.width, rect.height);
         }
 
         class Dot {
@@ -280,6 +417,46 @@
                 this.color = `hsl(${hue}, 85%, 60%)`;
                 this.targetVx = 0;
                 this.targetVy = 0;
+                this.sunk = false;
+                this.scale = 1;
+            }
+
+            // Push the dot back out of any wall obstacle it has driven into,
+            // and reflect its velocity off the wall's nearest edge so it
+            // bounces like a real ball hitting a course barrier.
+            resolveObstacles(obstacleList) {
+                for (const rect of obstacleList) {
+                    const closestX = Math.max(rect.x, Math.min(this.x, rect.x + rect.w));
+                    const closestY = Math.max(rect.y, Math.min(this.y, rect.y + rect.h));
+                    const dx = this.x - closestX;
+                    const dy = this.y - closestY;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist === 0) {
+                        // Center is inside the rect: push out along the shortest side
+                        const pushLeft = this.x - rect.x;
+                        const pushRight = rect.x + rect.w - this.x;
+                        const pushTop = this.y - rect.y;
+                        const pushBottom = rect.y + rect.h - this.y;
+                        const minPush = Math.min(pushLeft, pushRight, pushTop, pushBottom);
+                        if (minPush === pushLeft) { this.x = rect.x - this.radius; this.vx *= -0.5; }
+                        else if (minPush === pushRight) { this.x = rect.x + rect.w + this.radius; this.vx *= -0.5; }
+                        else if (minPush === pushTop) { this.y = rect.y - this.radius; this.vy *= -0.5; }
+                        else { this.y = rect.y + rect.h + this.radius; this.vy *= -0.5; }
+                        continue;
+                    }
+                    if (dist < this.radius) {
+                        const nx = dx / dist;
+                        const ny = dy / dist;
+                        const overlap = this.radius - dist;
+                        this.x += nx * overlap;
+                        this.y += ny * overlap;
+                        const dot = this.vx * nx + this.vy * ny;
+                        if (dot < 0) {
+                            this.vx -= dot * nx * 1.5;
+                            this.vy -= dot * ny * 1.5;
+                        }
+                    }
+                }
             }
 
             // Steer toward a fixed point with a proportional controller: speed
@@ -324,6 +501,17 @@
             }
 
             update(boundsWidth, boundsHeight, mode, isolateTargetHue) {
+                if (this.sunk) {
+                    // Ease into the cup and shrink away instead of continuing
+                    // to be steered around the course.
+                    this.vx *= 0.85;
+                    this.vy *= 0.85;
+                    this.x += (hole.x - this.x) * 0.15;
+                    this.y += (hole.y - this.y) * 0.15;
+                    this.scale = Math.max(0, this.scale - 0.06);
+                    return;
+                }
+
                 const centerX = boundsWidth / 2;
                 const centerY = boundsHeight / 2;
                 const margin = this.radius + 4;
@@ -370,13 +558,18 @@
                 this.vx += (this.targetVx - this.vx) * 0.08;
                 this.vy += (this.targetVy - this.vy) * 0.08;
 
-                // Natural deceleration/friction
-                this.vx *= 0.96;
-                this.vy *= 0.96;
+                // Natural deceleration/friction, with extra drag while
+                // sitting in a sand trap so balls bog down there
+                const sandDrag = isInSandTrap(this.x, this.y) ? 0.88 : 0.96;
+                this.vx *= sandDrag;
+                this.vy *= sandDrag;
 
                 // Position update
                 this.x += this.vx;
                 this.y += this.vy;
+
+                // Bounce off any wall obstacles in the way
+                this.resolveObstacles(obstacles);
 
                 // Boundary collision handling with rebound (safety clamp for
                 // any momentum overshoot past the steering target)
@@ -397,21 +590,48 @@
                     this.y = boundsHeight - r;
                     this.vy *= -0.5;
                 }
+
+                // Sink once the ball has drifted mostly over the cup
+                const distToHole = Math.hypot(this.x - hole.x, this.y - hole.y);
+                if (distToHole < hole.r - this.radius * 0.3) {
+                    this.sunk = true;
+                }
             }
 
             draw(context) {
+                if (this.scale <= 0) return;
                 context.beginPath();
-                context.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                context.arc(this.x, this.y, this.radius * this.scale, 0, Math.PI * 2);
                 context.fillStyle = this.color;
-                
+
                 // Add subtle glowing halo for visual pleasure
                 context.shadowColor = this.color;
                 context.shadowBlur = 8;
-                
+
                 context.fill();
                 context.closePath();
                 context.shadowBlur = 0; // Reset shadow for performance
             }
+        }
+
+        // True if a spawn point would land inside a wall obstacle or the hole
+        function isBlockedSpawn(x, y) {
+            if (Math.hypot(x - hole.x, y - hole.y) < hole.r + DOT_RADIUS * 2) return true;
+            return obstacles.some(o =>
+                x > o.x - DOT_RADIUS && x < o.x + o.w + DOT_RADIUS &&
+                y > o.y - DOT_RADIUS && y < o.y + o.h + DOT_RADIUS
+            );
+        }
+
+        function randomSpawnPoint(logicalWidth, logicalHeight) {
+            const padding = 30;
+            let x, y, attempts = 0;
+            do {
+                x = padding + Math.random() * (logicalWidth - padding * 2);
+                y = padding + Math.random() * (logicalHeight - padding * 2);
+                attempts++;
+            } while (isBlockedSpawn(x, y) && attempts < 20);
+            return { x, y };
         }
 
         function initDots() {
@@ -422,9 +642,7 @@
             for (let i = 0; i < NUM_DOTS; i++) {
                 // Cycle evenly through the 12-color palette
                 const hue = PALETTE[i % PALETTE.length];
-                const padding = 30;
-                const x = padding + Math.random() * (logicalWidth - padding * 2);
-                const y = padding + Math.random() * (logicalHeight - padding * 2);
+                const { x, y } = randomSpawnPoint(logicalWidth, logicalHeight);
                 dots.push(new Dot(x, y, hue));
             }
         }
@@ -432,9 +650,19 @@
         function resetDots() {
             // Idle mode so dots aren't steered anywhere, then give them a
             // random burst that decays via friction into a natural scatter.
+            // Any ball that had sunk gets pulled back out onto the course.
             currentMode = null;
             isolateHue = null;
+            const logicalWidth = width / window.devicePixelRatio;
+            const logicalHeight = height / window.devicePixelRatio;
             dots.forEach(dot => {
+                if (dot.sunk) {
+                    dot.sunk = false;
+                    dot.scale = 1;
+                    const { x, y } = randomSpawnPoint(logicalWidth, logicalHeight);
+                    dot.x = x;
+                    dot.y = y;
+                }
                 dot.vx = (Math.random() - 0.5) * 10;
                 dot.vy = (Math.random() - 0.5) * 10;
             });
@@ -469,8 +697,10 @@
         function resolveCollisions() {
             for (let i = 0; i < dots.length; i++) {
                 const a = dots[i];
+                if (a.sunk) continue;
                 for (let j = i + 1; j < dots.length; j++) {
                     const b = dots[j];
+                    if (b.sunk) continue;
                     const dx = b.x - a.x;
                     const dy = b.y - a.y;
                     let dist = Math.hypot(dx, dy);
@@ -512,23 +742,77 @@
             }
         }
 
+        // Draws the grass course background: mowed stripes, sand traps,
+        // wall obstacles, and the hole with its flag.
+        function drawCourse(logicalWidth, logicalHeight) {
+            // Mowed-stripe grass field
+            const stripeWidth = 36;
+            for (let x = -stripeWidth, i = 0; x < logicalWidth; x += stripeWidth, i++) {
+                ctx.fillStyle = i % 2 === 0 ? '#1f8a3d' : '#1c7d37';
+                ctx.fillRect(x, 0, stripeWidth, logicalHeight);
+            }
+
+            // Sand traps
+            ctx.fillStyle = '#d9c07a';
+            sandTraps.forEach(s => {
+                ctx.beginPath();
+                ctx.ellipse(s.x, s.y, s.rx, s.ry, 0, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Wall obstacles
+            obstacles.forEach(o => {
+                ctx.fillStyle = '#8b5a2b';
+                ctx.fillRect(o.x, o.y, o.w, o.h);
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(o.x, o.y, o.w, o.h);
+            });
+
+            // Hole (dark cup with soft rim shadow)
+            ctx.beginPath();
+            ctx.arc(hole.x, hole.y, hole.r + 4, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2);
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fill();
+
+            // Flag
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(hole.x, hole.y);
+            ctx.lineTo(hole.x, hole.y - hole.r * 3.2);
+            ctx.stroke();
+
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.moveTo(hole.x, hole.y - hole.r * 3.2);
+            ctx.lineTo(hole.x + hole.r * 1.6, hole.y - hole.r * 2.7);
+            ctx.lineTo(hole.x, hole.y - hole.r * 2.2);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function updateHoleStatus() {
+            const statusEl = document.getElementById('holeStatus');
+            if (!statusEl) return;
+            sunkCount = dots.filter(d => d.sunk).length;
+            statusEl.textContent = sunkCount >= dots.length
+                ? `All ${dots.length} balls are in the hole!`
+                : `${sunkCount} / ${dots.length} balls in the hole`;
+        }
+
         // Main animation loop
         function animate() {
             const logicalWidth = width / window.devicePixelRatio;
             const logicalHeight = height / window.devicePixelRatio;
 
             ctx.clearRect(0, 0, logicalWidth, logicalHeight);
-
-            // Simple soft visual grid in the background
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
-            ctx.lineWidth = 1;
-            const gridSize = 40;
-            for (let x = 0; x < logicalWidth; x += gridSize) {
-                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, logicalHeight); ctx.stroke();
-            }
-            for (let y = 0; y < logicalHeight; y += gridSize) {
-                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(logicalWidth, y); ctx.stroke();
-            }
+            drawCourse(logicalWidth, logicalHeight);
 
             // Update positions/velocities first...
             dots.forEach(dot => dot.update(logicalWidth, logicalHeight, currentMode, isolateHue));
@@ -538,6 +822,7 @@
 
             // Collision push-apart can shove a dot past the wall; clamp back in
             dots.forEach(dot => {
+                if (dot.sunk) return;
                 const r = dot.radius;
                 if (dot.x - r < 0) dot.x = r;
                 if (dot.x + r > logicalWidth) dot.x = logicalWidth - r;
@@ -547,6 +832,7 @@
 
             // Finally render
             dots.forEach(dot => dot.draw(ctx));
+            updateHoleStatus();
 
             requestAnimationFrame(animate);
         }

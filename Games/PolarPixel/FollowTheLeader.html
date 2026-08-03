@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Follow the Leader — Marble Swarm</title>
+    <style>
+      html, body { touch-action: manipulation; }
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.75);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --text-color: #f8fafc;
+            --accent-color: #38bdf8;
+            --btn-hover: rgba(255, 255, 255, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px;
+        }
+
+        .app-shell {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+            max-width: 1100px;
+        }
+
+        .game-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 180px;
+            flex-shrink: 0;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            padding: 16px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            position: sticky;
+            top: 20px;
+        }
+
+        .menu-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #94a3b8;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .menu-link {
+            display: block;
+            padding: 10px 12px;
+            border-radius: 8px;
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .menu-link:hover {
+            background: var(--btn-hover);
+        }
+
+        .menu-link.active {
+            background: rgba(56, 189, 248, 0.15);
+            border-color: rgba(56, 189, 248, 0.4);
+            color: var(--accent-color);
+        }
+
+        @media (max-width: 720px) {
+            .app-shell {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .game-menu {
+                flex-direction: row;
+                width: 100%;
+                max-width: 700px;
+                overflow-x: auto;
+                position: static;
+                justify-content: center;
+            }
+
+            .menu-title {
+                display: none;
+            }
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        header {
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        p.subtitle {
+            font-size: 0.875rem;
+            color: #94a3b8;
+        }
+
+        .hud {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .hud-stat {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 6px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .hud-label {
+            color: #94a3b8;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        #canvas-container {
+            position: relative;
+            width: min(100%, 700px, 55vh);
+            aspect-ratio: 1 / 1;
+            background: #020617;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), inset 0 0 0 1px var(--border-color);
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .end-banner {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 24px;
+            font-size: 1.15rem;
+            font-weight: 600;
+            line-height: 1.5;
+            background: rgba(2, 6, 23, 0.78);
+            backdrop-filter: blur(4px);
+        }
+
+        .end-banner.win { color: #4ade80; }
+        .end-banner.lose { color: #f87171; }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            width: 100%;
+            max-width: 700px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            padding: 16px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 6px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .group-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #94a3b8;
+            margin-right: 4px;
+            font-weight: 600;
+        }
+
+        button {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        button:hover {
+            background: var(--btn-hover);
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .directional-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 32px);
+            grid-template-rows: repeat(2, 32px);
+            gap: 4px;
+        }
+
+        .directional-pad button {
+            padding: 0;
+            justify-content: center;
+            align-items: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            touch-action: none;
+        }
+
+        .btn-up { grid-column: 2; grid-row: 1; }
+        .btn-left { grid-column: 1; grid-row: 2; }
+        .btn-right { grid-column: 3; grid-row: 2; }
+        .btn-down { grid-column: 2; grid-row: 2; }
+
+        .btn-reset {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #f87171;
+        }
+
+        .btn-reset:hover {
+            background: rgba(239, 68, 68, 0.25);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-shell">
+        <nav class="game-menu" aria-label="Minigame versions">
+            <span class="menu-title">Polar Pixel</span>
+            <a href="FreePlay.html" class="menu-link">Free Play</a>
+            <a href="Maze.html" class="menu-link">Maze</a>
+            <a href="MiniGolf.html" class="menu-link">Mini Golf</a>
+            <a href="FollowTheLeader.html" class="menu-link active">Follow the Leader</a>
+            <a href="ShapeShifter.html" class="menu-link">Shape Shifter</a>
+        </nav>
+
+        <div class="container">
+        <header>
+            <h1>Follow the Leader</h1>
+            <p class="subtitle">Lead a rolling marble swarm through hazards to the exit portal</p>
+        </header>
+
+        <div class="hud">
+            <div class="hud-stat"><span class="hud-label">Marbles</span><span id="marbleCount">0 / 100</span></div>
+            <div class="hud-stat"><span class="hud-label">Plate Weight</span><span id="plateWeight">0 / 75</span></div>
+        </div>
+        <p class="subtitle" id="objectiveText">Roll 75+ marbles onto the pressure plate to open the gate.</p>
+
+        <div id="canvas-container">
+            <canvas id="sandbox"></canvas>
+            <div id="endBanner" class="end-banner" style="display:none;"></div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <span class="group-label">Move</span>
+                <div class="directional-pad">
+                    <button class="btn-up" id="btn-up" title="Move Up">▲</button>
+                    <button class="btn-left" id="btn-left" title="Move Left">◄</button>
+                    <button class="btn-right" id="btn-right" title="Move Right">►</button>
+                    <button class="btn-down" id="btn-down" title="Move Down">▼</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <button class="btn-reset" id="resetBtn">Reset Level</button>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('sandbox');
+        const ctx = canvas.getContext('2d');
+
+        const MAX_MARBLES = 100;
+        const START_MARBLES = 20;
+        const MARBLE_RADIUS = 6;
+        const FOLLOW_SPACING = 4;
+        const HISTORY_LENGTH = FOLLOW_SPACING * MAX_MARBLES + 20;
+        const REQUIRED_WEIGHT = 75;
+        const EXTRACTION_TIME = 25;
+        const BASE_ACCEL = 0.5;
+        const BASE_MAX_SPEED = 4.5;
+        const CRUSHER_TIMINGS = { up: 1800, warning: 600, down: 500 };
+
+        let width, height;
+        let marbles = [];
+        let history = [];
+        let phase = 'playing'; // 'playing' | 'won' | 'lost'
+        let statusMessage = '';
+        let lastLoseReason = '';
+        let gateOpened = false;
+        let timeLeft = 0;
+        let plateWeight = 0;
+        let puzzleSolved = false;
+        let lastFrameTime = 0;
+
+        const keysDown = new Set();
+        const padDirection = { x: 0, y: 0 };
+
+        // Level geometry, described as fractions of the play area and expanded
+        // to pixel coordinates by layoutLevel() on load, resize, and reset.
+        let walls = [];
+        let gateWall = null;
+        let puzzleGate = null;
+        let tarZones = [];
+        let iceZones = [];
+        let plate = null;
+        let portal = null;
+        let laser = null;
+        let crusher = null;
+        let chokeZone = null;
+        let magnet = null;
+        let pickupCrates = [];
+        let orbitPickups = [];
+        let puzzleCrate = null;
+        let switchPad = null;
+        let bonusCrate = null;
+
+        function rectFrac(x, y, w, h, W, H) {
+            return { x: x * W, y: y * H, w: w * W, h: h * H };
+        }
+
+        function ellipseFrac(cx, cy, rx, ry, W, H) {
+            return { x: cx * W, y: cy * H, rx: rx * W, ry: ry * H };
+        }
+
+        function rectContains(rect, x, y) {
+            return x > rect.x && x < rect.x + rect.w && y > rect.y && y < rect.y + rect.h;
+        }
+
+        function isInRectList(x, y, list) {
+            return list.some(r => rectContains(r, x, y));
+        }
+
+        function isInEllipseList(x, y, list) {
+            return list.some(e => {
+                const dx = (x - e.x) / e.rx;
+                const dy = (y - e.y) / e.ry;
+                return dx * dx + dy * dy <= 1;
+            });
+        }
+
+        function layoutLevel(w, h) {
+            // Serpentine 3-band course: band 1 (top) left-to-right, band 2
+            // (middle) right-to-left, band 3 (bottom) left-to-right to the
+            // pressure plate, gate, and exit portal.
+            const dividerA = rectFrac(0.00, 0.30, 0.75, 0.06, w, h);
+            const dividerB = rectFrac(0.20, 0.62, 0.80, 0.06, w, h);
+            const chokeTop = rectFrac(0.60, 0.68, 0.08, 0.10, w, h);
+            const chokeBottom = rectFrac(0.60, 0.85, 0.08, 0.10, w, h);
+            gateWall = rectFrac(0.92, 0.68, 0.03, 0.27, w, h);
+
+            // Bonus alcove: a pocket flush against the top edge, sealed on
+            // both sides and (until solved) on the bottom by puzzleGate —
+            // the only way in is pushing the gate open from below.
+            const pocketLeft = rectFrac(0.615, 0.00, 0.015, 0.16, w, h);
+            const pocketRight = rectFrac(0.70, 0.00, 0.015, 0.16, w, h);
+            puzzleGate = rectFrac(0.615, 0.14, 0.10, 0.02, w, h);
+
+            walls = [dividerA, dividerB, chokeTop, chokeBottom, gateWall, pocketLeft, pocketRight, puzzleGate];
+
+            tarZones = [ellipseFrac(0.30, 0.49, 0.10, 0.12, w, h)];
+            iceZones = [rectFrac(0.65, 0.36, 0.20, 0.26, w, h)];
+
+            laser = {
+                x: 0.50 * w, y1: 0.36 * h, y2: 0.62 * h, halfWidth: Math.max(3, 0.006 * w),
+                period: 2000, onDuration: 800, timer: 0, isOn: false
+            };
+
+            crusher = {
+                x: 0.47 * w, y: 0.68 * h, w: 0.06 * w, h: 0.27 * h,
+                state: 'up', timer: 0
+            };
+
+            chokeZone = { x1: 0.60 * w, x2: 0.68 * w, y1: 0.68 * h, y2: 0.95 * h, safeSpeed: 3.2 };
+
+            magnet = { x: 0.28 * w, y: 0.90 * h, pullRadius: 0.09 * w, captureRadius: 0.028 * w, capturedMarbles: [] };
+
+            plate = rectFrac(0.78, 0.70, 0.12, 0.23, w, h);
+            portal = { x: 0.975 * w, y: 0.815 * h, r: 0.025 * w };
+
+            pickupCrates = [
+                { x: 0.24 * w, y: 0.12 * h, size: 18, collected: false, yield: 20 },
+                { x: 0.24 * w, y: 0.22 * h, size: 18, collected: false, yield: 20 },
+                { x: 0.45 * w, y: 0.49 * h, size: 18, collected: false, yield: 20 }
+            ];
+
+            orbitPickups = Array.from({ length: 5 }, (_, i) => ({
+                centerX: 0.42 * w, centerY: 0.17 * h, orbitRadius: 0.05 * w,
+                angle: (i / 5) * Math.PI * 2, speed: 0.02, collected: false, x: 0, y: 0
+            }));
+
+            puzzleCrate = { x: 0.58 * w, y: 0.20 * h, vx: 0, vy: 0, size: 22, radius: 13 };
+            switchPad = rectFrac(0.50, 0.22, 0.07, 0.05, w, h);
+            bonusCrate = { x: 0.67 * w, y: 0.11 * h, size: 18, collected: false, yield: 20 };
+        }
+
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+            width = canvas.width;
+            height = canvas.height;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            layoutLevel(rect.width, rect.height);
+        }
+
+        class Marble {
+            constructor(x, y, isLead) {
+                this.x = x;
+                this.y = y;
+                this.vx = 0;
+                this.vy = 0;
+                this.radius = MARBLE_RADIUS;
+                this.isLead = !!isLead;
+                this.hue = Math.random() * 360;
+                this.alive = true;
+                this.stuckToMagnet = false;
+            }
+
+            draw(context) {
+                if (!this.alive) return;
+                context.beginPath();
+                context.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                context.fillStyle = this.isLead ? '#ffd700' : `hsl(${this.hue}, 80%, 60%)`;
+                context.shadowColor = context.fillStyle;
+                context.shadowBlur = this.isLead ? 14 : 6;
+                context.fill();
+                context.shadowBlur = 0;
+            }
+        }
+
+        // Push an entity {x,y,vx,vy,radius} out of any wall it has driven
+        // into and reflect its velocity off the wall's nearest edge.
+        function resolveObstacles(entity, wallList) {
+            for (const rect of wallList) {
+                const closestX = Math.max(rect.x, Math.min(entity.x, rect.x + rect.w));
+                const closestY = Math.max(rect.y, Math.min(entity.y, rect.y + rect.h));
+                const dx = entity.x - closestX;
+                const dy = entity.y - closestY;
+                const dist = Math.hypot(dx, dy);
+                if (dist === 0) continue;
+                if (dist < entity.radius) {
+                    const nx = dx / dist;
+                    const ny = dy / dist;
+                    const overlap = entity.radius - dist;
+                    entity.x += nx * overlap;
+                    entity.y += ny * overlap;
+                    const vdot = entity.vx * nx + entity.vy * ny;
+                    if (vdot < 0) {
+                        entity.vx -= vdot * nx * 1.4;
+                        entity.vy -= vdot * ny * 1.4;
+                    }
+                }
+            }
+        }
+
+        function resolveCollisions() {
+            for (let i = 0; i < marbles.length; i++) {
+                const a = marbles[i];
+                if (!a.alive || a.stuckToMagnet) continue;
+                for (let j = i + 1; j < marbles.length; j++) {
+                    const b = marbles[j];
+                    if (!b.alive || b.stuckToMagnet) continue;
+                    const dx = b.x - a.x;
+                    const dy = b.y - a.y;
+                    const dist = Math.hypot(dx, dy);
+                    const minDist = a.radius + b.radius;
+                    if (dist >= minDist) continue;
+
+                    if (dist === 0) {
+                        const angle = Math.random() * Math.PI * 2;
+                        a.x -= Math.cos(angle) * 0.5; a.y -= Math.sin(angle) * 0.5;
+                        b.x += Math.cos(angle) * 0.5; b.y += Math.sin(angle) * 0.5;
+                        continue;
+                    }
+
+                    const nx = dx / dist, ny = dy / dist;
+                    const overlap = minDist - dist;
+                    a.x -= nx * overlap * 0.5; a.y -= ny * overlap * 0.5;
+                    b.x += nx * overlap * 0.5; b.y += ny * overlap * 0.5;
+
+                    const relVx = b.vx - a.vx, relVy = b.vy - a.vy;
+                    const closingSpeed = relVx * nx + relVy * ny;
+                    if (closingSpeed < 0) {
+                        a.vx += closingSpeed * nx; a.vy += closingSpeed * ny;
+                        b.vx -= closingSpeed * nx; b.vy -= closingSpeed * ny;
+                    }
+                }
+            }
+        }
+
+        function currentAliveCount() {
+            return marbles.filter(m => m.alive).length;
+        }
+
+        function addMarbles(n) {
+            const followers = marbles.filter(m => !m.isLead);
+            const spawnPoint = followers.length ? followers[followers.length - 1] : marbles[0];
+            for (let i = 0; i < n && marbles.length < MAX_MARBLES; i++) {
+                marbles.push(new Marble(
+                    spawnPoint.x + (Math.random() - 0.5) * 10,
+                    spawnPoint.y + (Math.random() - 0.5) * 10,
+                    false
+                ));
+            }
+        }
+
+        function updateLead(logicalWidth, logicalHeight) {
+            const lead = marbles[0];
+            const followerCount = currentAliveCount() - 1;
+            const massFactor = 1 + followerCount / 45;   // more marbles => slower acceleration
+            const speedFactor = 1 + followerCount / 160;  // more marbles => lower top speed
+
+            let ix = padDirection.x, iy = padDirection.y;
+            if (keysDown.has('ArrowUp') || keysDown.has('w') || keysDown.has('W')) iy -= 1;
+            if (keysDown.has('ArrowDown') || keysDown.has('s') || keysDown.has('S')) iy += 1;
+            if (keysDown.has('ArrowLeft') || keysDown.has('a') || keysDown.has('A')) ix -= 1;
+            if (keysDown.has('ArrowRight') || keysDown.has('d') || keysDown.has('D')) ix += 1;
+            const mag = Math.hypot(ix, iy);
+            if (mag > 0) { ix /= mag; iy /= mag; }
+
+            const onIce = isInRectList(lead.x, lead.y, iceZones);
+            const inTar = isInEllipseList(lead.x, lead.y, tarZones);
+            const accel = (BASE_ACCEL / massFactor) * (onIce ? 0.35 : 1);
+
+            lead.vx += ix * accel;
+            lead.vy += iy * accel;
+
+            const maxSpeed = BASE_MAX_SPEED / speedFactor;
+            const speed = Math.hypot(lead.vx, lead.vy);
+            if (speed > maxSpeed) {
+                lead.vx = (lead.vx / speed) * maxSpeed;
+                lead.vy = (lead.vy / speed) * maxSpeed;
+            }
+
+            const friction = inTar ? 0.80 : (onIce ? 0.995 : 0.90);
+            lead.vx *= friction;
+            lead.vy *= friction;
+
+            lead.x += lead.vx;
+            lead.y += lead.vy;
+
+            const r = lead.radius;
+            if (lead.x - r < 0) { lead.x = r; lead.vx = 0; }
+            if (lead.x + r > logicalWidth) { lead.x = logicalWidth - r; lead.vx = 0; }
+            if (lead.y - r < 0) { lead.y = r; lead.vy = 0; }
+            if (lead.y + r > logicalHeight) { lead.y = logicalHeight - r; lead.vy = 0; }
+        }
+
+        function recordHistory(lead) {
+            history.unshift({ x: lead.x, y: lead.y });
+            if (history.length > HISTORY_LENGTH) history.length = HISTORY_LENGTH;
+        }
+
+        function updateFollowers() {
+            const followers = marbles.slice(1);
+            followers.forEach((f, idx) => {
+                if (!f.alive) return;
+                if (f.stuckToMagnet) {
+                    f.vx *= 0.8; f.vy *= 0.8;
+                    f.x += f.vx; f.y += f.vy;
+                    return;
+                }
+                const histIndex = Math.min((idx + 1) * FOLLOW_SPACING, history.length - 1);
+                const target = histIndex >= 0 ? history[histIndex] : null;
+                if (!target) return;
+
+                const dx = target.x - f.x, dy = target.y - f.y;
+                const inTar = isInEllipseList(f.x, f.y, tarZones);
+                const onIce = isInRectList(f.x, f.y, iceZones);
+                const springK = inTar ? 0.05 : 0.14;
+                f.vx += dx * springK;
+                f.vy += dy * springK;
+                const damp = onIce ? 0.99 : (inTar ? 0.75 : 0.82);
+                f.vx *= damp; f.vy *= damp;
+                f.x += f.vx; f.y += f.vy;
+            });
+        }
+
+        function updateLaser(dt) {
+            laser.timer += dt;
+            if (laser.isOn) {
+                if (laser.timer >= laser.onDuration) { laser.isOn = false; laser.timer = 0; }
+            } else if (laser.timer >= laser.period - laser.onDuration) {
+                laser.isOn = true; laser.timer = 0;
+            }
+        }
+
+        function laserHits(m) {
+            return laser.isOn && Math.abs(m.x - laser.x) < laser.halfWidth + m.radius &&
+                m.y > laser.y1 && m.y < laser.y2;
+        }
+
+        function updateCrusher(dt) {
+            crusher.timer += dt;
+            const limit = CRUSHER_TIMINGS[crusher.state];
+            if (crusher.timer >= limit) {
+                crusher.timer = 0;
+                crusher.state = crusher.state === 'up' ? 'warning' : crusher.state === 'warning' ? 'down' : 'up';
+            }
+        }
+
+        function crusherHits(m) {
+            return crusher.state === 'down' &&
+                m.x > crusher.x - m.radius && m.x < crusher.x + crusher.w + m.radius &&
+                m.y > crusher.y - m.radius && m.y < crusher.y + crusher.h + m.radius;
+        }
+
+        function inChoke(x, y) {
+            return x > chokeZone.x1 && x < chokeZone.x2 && y > chokeZone.y1 && y < chokeZone.y2;
+        }
+
+        function updateChokepoint(lead) {
+            if (!inChoke(lead.x, lead.y)) return;
+            if (Math.hypot(lead.vx, lead.vy) <= chokeZone.safeSpeed) return;
+            marbles.forEach(m => {
+                if (m.isLead || !m.alive || m.stuckToMagnet) return;
+                if (inChoke(m.x, m.y) && Math.random() < 0.02) m.alive = false;
+            });
+        }
+
+        function updateMagnet(lead) {
+            marbles.forEach(m => {
+                if (m.isLead || !m.alive || m.stuckToMagnet) return;
+                const d = Math.hypot(m.x - magnet.x, m.y - magnet.y);
+                if (d < magnet.captureRadius) {
+                    m.stuckToMagnet = true;
+                    magnet.capturedMarbles.push(m);
+                } else if (d < magnet.pullRadius) {
+                    const pull = 0.4 * (1 - d / magnet.pullRadius);
+                    m.vx += (magnet.x - m.x) / d * pull;
+                    m.vy += (magnet.y - m.y) / d * pull;
+                }
+            });
+
+            // Rescue: steering the lead itself back near the pillar breaks its pull
+            const dLead = Math.hypot(lead.x - magnet.x, lead.y - magnet.y);
+            if (dLead < magnet.pullRadius && magnet.capturedMarbles.length) {
+                magnet.capturedMarbles.forEach(m => { m.stuckToMagnet = false; });
+                magnet.capturedMarbles = [];
+            }
+        }
+
+        function updatePuzzleCrate() {
+            if (puzzleSolved) return;
+            marbles.forEach(m => {
+                if (!m.alive || m.stuckToMagnet) return;
+                const dx = m.x - puzzleCrate.x, dy = m.y - puzzleCrate.y;
+                const dist = Math.hypot(dx, dy);
+                const minDist = m.radius + puzzleCrate.radius;
+                if (dist > 0 && dist < minDist) {
+                    const nx = dx / dist, ny = dy / dist;
+                    const overlap = minDist - dist;
+                    m.x += nx * overlap * 0.5; m.y += ny * overlap * 0.5;
+                    puzzleCrate.vx -= nx * 0.03;
+                    puzzleCrate.vy -= ny * 0.03;
+                }
+            });
+            puzzleCrate.vx *= 0.90; puzzleCrate.vy *= 0.90;
+            puzzleCrate.x += puzzleCrate.vx;
+            puzzleCrate.y += puzzleCrate.vy;
+            resolveObstacles(puzzleCrate, walls);
+
+            if (rectContains(switchPad, puzzleCrate.x, puzzleCrate.y)) {
+                puzzleSolved = true;
+                walls = walls.filter(w => w !== puzzleGate);
+            }
+        }
+
+        function checkCratePickup(crate) {
+            if (crate.collected) return;
+            const hit = marbles.some(m => m.alive && !m.stuckToMagnet &&
+                Math.hypot(m.x - crate.x, m.y - crate.y) < crate.size * 0.8 + m.radius);
+            if (hit) {
+                crate.collected = true;
+                addMarbles(crate.yield);
+            }
+        }
+
+        function updateOrbitPickups() {
+            orbitPickups.forEach(p => {
+                if (p.collected) return;
+                p.angle += p.speed;
+                p.x = p.centerX + Math.cos(p.angle) * p.orbitRadius;
+                p.y = p.centerY + Math.sin(p.angle) * p.orbitRadius;
+                const hit = marbles.some(m => m.alive && !m.stuckToMagnet &&
+                    Math.hypot(m.x - p.x, m.y - p.y) < 10 + m.radius);
+                if (hit) { p.collected = true; addMarbles(1); }
+            });
+        }
+
+        function computePlateWeight() {
+            return marbles.filter(m => m.alive && !m.stuckToMagnet && rectContains(plate, m.x, m.y)).length;
+        }
+
+        function drawBackground(context, w, h) {
+            context.fillStyle = '#111827';
+            context.fillRect(0, 0, w, h);
+            context.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+            context.lineWidth = 1;
+            const gridSize = 30;
+            for (let x = 0; x < w; x += gridSize) { context.beginPath(); context.moveTo(x, 0); context.lineTo(x, h); context.stroke(); }
+            for (let y = 0; y < h; y += gridSize) { context.beginPath(); context.moveTo(0, y); context.lineTo(w, y); context.stroke(); }
+        }
+
+        function drawZones(context) {
+            context.fillStyle = 'rgba(146, 64, 14, 0.55)';
+            tarZones.forEach(z => {
+                context.beginPath();
+                context.ellipse(z.x, z.y, z.rx, z.ry, 0, 0, Math.PI * 2);
+                context.fill();
+            });
+
+            context.fillStyle = 'rgba(125, 211, 252, 0.25)';
+            context.strokeStyle = 'rgba(224, 242, 254, 0.4)';
+            iceZones.forEach(z => { context.fillRect(z.x, z.y, z.w, z.h); context.strokeRect(z.x, z.y, z.w, z.h); });
+
+            context.fillStyle = 'rgba(248, 113, 113, 0.08)';
+            context.fillRect(chokeZone.x1, chokeZone.y1, chokeZone.x2 - chokeZone.x1, chokeZone.y2 - chokeZone.y1);
+        }
+
+        function drawWalls(context) {
+            context.fillStyle = '#475569';
+            context.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+            context.lineWidth = 2;
+            walls.forEach(w => {
+                if (w === gateWall || w === puzzleGate) return;
+                context.fillRect(w.x, w.y, w.w, w.h);
+                context.strokeRect(w.x, w.y, w.w, w.h);
+            });
+            if (walls.includes(gateWall)) {
+                context.fillStyle = '#eab308';
+                context.fillRect(gateWall.x, gateWall.y, gateWall.w, gateWall.h);
+                context.strokeRect(gateWall.x, gateWall.y, gateWall.w, gateWall.h);
+            }
+            if (walls.includes(puzzleGate)) {
+                context.fillStyle = '#64748b';
+                context.fillRect(puzzleGate.x, puzzleGate.y, puzzleGate.w, puzzleGate.h);
+            }
+        }
+
+        function drawHazards(context) {
+            // Laser
+            context.strokeStyle = laser.isOn ? '#ef4444' : 'rgba(148, 163, 184, 0.35)';
+            context.lineWidth = laser.halfWidth * 2;
+            context.beginPath();
+            context.moveTo(laser.x, laser.y1);
+            context.lineTo(laser.x, laser.y2);
+            context.stroke();
+
+            // Crusher (shaft + head)
+            const headColor = crusher.state === 'up' ? '#64748b' : crusher.state === 'warning' ? '#f59e0b' : '#dc2626';
+            context.fillStyle = 'rgba(100, 116, 139, 0.3)';
+            context.fillRect(crusher.x + crusher.w * 0.3, crusher.y, crusher.w * 0.4, crusher.h);
+            const headHeight = crusher.h * (crusher.state === 'down' ? 1 : 0.25);
+            context.fillStyle = headColor;
+            context.fillRect(crusher.x, crusher.y, crusher.w, headHeight);
+
+            // Magnet pillar
+            context.fillStyle = 'rgba(168, 85, 247, 0.15)';
+            context.beginPath();
+            context.arc(magnet.x, magnet.y, magnet.pullRadius, 0, Math.PI * 2);
+            context.fill();
+            context.fillStyle = '#a855f7';
+            context.beginPath();
+            context.arc(magnet.x, magnet.y, magnet.captureRadius, 0, Math.PI * 2);
+            context.fill();
+        }
+
+        function drawPickups(context) {
+            [...pickupCrates, bonusCrate].forEach(c => {
+                if (c.collected) return;
+                context.fillStyle = '#8b5a2b';
+                context.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+                context.fillRect(c.x - c.size / 2, c.y - c.size / 2, c.size, c.size);
+                context.strokeRect(c.x - c.size / 2, c.y - c.size / 2, c.size, c.size);
+            });
+
+            orbitPickups.forEach(p => {
+                if (p.collected) return;
+                context.beginPath();
+                context.arc(p.x, p.y, 5, 0, Math.PI * 2);
+                context.fillStyle = '#38bdf8';
+                context.shadowColor = '#38bdf8';
+                context.shadowBlur = 8;
+                context.fill();
+                context.shadowBlur = 0;
+            });
+
+            // Puzzle crate + switch
+            context.fillStyle = puzzleSolved ? 'rgba(74, 222, 128, 0.3)' : 'rgba(56, 189, 248, 0.2)';
+            context.fillRect(switchPad.x, switchPad.y, switchPad.w, switchPad.h);
+            if (!puzzleSolved) {
+                context.fillStyle = '#94a3b8';
+                context.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+                context.fillRect(puzzleCrate.x - puzzleCrate.size / 2, puzzleCrate.y - puzzleCrate.size / 2, puzzleCrate.size, puzzleCrate.size);
+                context.strokeRect(puzzleCrate.x - puzzleCrate.size / 2, puzzleCrate.y - puzzleCrate.size / 2, puzzleCrate.size, puzzleCrate.size);
+            }
+        }
+
+        function drawPlateAndPortal(context) {
+            context.fillStyle = plateWeight >= REQUIRED_WEIGHT ? 'rgba(74, 222, 128, 0.25)' : 'rgba(56, 189, 248, 0.15)';
+            context.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            context.fillRect(plate.x, plate.y, plate.w, plate.h);
+            context.strokeRect(plate.x, plate.y, plate.w, plate.h);
+
+            const glow = gateOpened ? '#4ade80' : '#334155';
+            context.beginPath();
+            context.arc(portal.x, portal.y, portal.r, 0, Math.PI * 2);
+            context.fillStyle = glow;
+            context.shadowColor = glow;
+            context.shadowBlur = gateOpened ? 20 : 6;
+            context.fill();
+            context.shadowBlur = 0;
+        }
+
+        function updateHUD() {
+            document.getElementById('marbleCount').textContent = `${currentAliveCount()} / ${MAX_MARBLES}`;
+            document.getElementById('plateWeight').textContent = `${plateWeight} / ${REQUIRED_WEIGHT}`;
+            document.getElementById('objectiveText').textContent = statusMessage;
+
+            const banner = document.getElementById('endBanner');
+            if (phase === 'won') {
+                banner.textContent = 'You made it through! Press Reset Level to play again.';
+                banner.className = 'end-banner win';
+                banner.style.display = 'flex';
+            } else if (phase === 'lost') {
+                banner.textContent = `${lastLoseReason} Press Reset Level to try again.`;
+                banner.className = 'end-banner lose';
+                banner.style.display = 'flex';
+            } else {
+                banner.style.display = 'none';
+            }
+        }
+
+        function stepPlaying(dt, logicalWidth, logicalHeight) {
+            updateLaser(dt);
+            updateCrusher(dt);
+            updateLead(logicalWidth, logicalHeight);
+            recordHistory(marbles[0]);
+            updateFollowers();
+
+            for (let i = 0; i < 2; i++) resolveCollisions();
+            marbles.forEach(m => { if (m.alive && !m.stuckToMagnet) resolveObstacles(m, walls); });
+
+            marbles.forEach(m => {
+                if (!m.alive) return;
+                const r = m.radius;
+                if (m.x - r < 0) m.x = r;
+                if (m.x + r > logicalWidth) m.x = logicalWidth - r;
+                if (m.y - r < 0) m.y = r;
+                if (m.y + r > logicalHeight) m.y = logicalHeight - r;
+            });
+
+            updateMagnet(marbles[0]);
+            updateChokepoint(marbles[0]);
+            updatePuzzleCrate();
+            pickupCrates.forEach(checkCratePickup);
+            checkCratePickup(bonusCrate);
+            updateOrbitPickups();
+
+            marbles.forEach(m => {
+                if (!m.alive || m.isLead) return;
+                if (laserHits(m) || crusherHits(m)) m.alive = false;
+            });
+            marbles = [marbles[0], ...marbles.slice(1).filter(m => m.alive)];
+
+            if (laserHits(marbles[0]) || crusherHits(marbles[0])) {
+                phase = 'lost';
+                lastLoseReason = 'Your lead marble was destroyed!';
+                return;
+            }
+
+            plateWeight = computePlateWeight();
+            if (!gateOpened && plateWeight >= REQUIRED_WEIGHT) {
+                gateOpened = true;
+                walls = walls.filter(w => w !== gateWall);
+                timeLeft = EXTRACTION_TIME;
+            } else if (!gateOpened) {
+                statusMessage = `Roll ${REQUIRED_WEIGHT}+ marbles onto the pressure plate to open the gate. (${currentAliveCount()} collected)`;
+            }
+
+            if (gateOpened) {
+                timeLeft -= dt / 1000;
+                statusMessage = `Gate open! Get to the exit — ${Math.max(0, timeLeft).toFixed(1)}s left.`;
+                if (timeLeft <= 0) {
+                    phase = 'lost';
+                    lastLoseReason = 'Time ran out before you reached the exit.';
+                    return;
+                }
+                if (Math.hypot(marbles[0].x - portal.x, marbles[0].y - portal.y) < portal.r) {
+                    phase = 'won';
+                }
+            }
+        }
+
+        function animate(now) {
+            const dt = lastFrameTime ? Math.min(50, now - lastFrameTime) : 16.7;
+            lastFrameTime = now;
+            const logicalWidth = width / window.devicePixelRatio;
+            const logicalHeight = height / window.devicePixelRatio;
+
+            ctx.clearRect(0, 0, logicalWidth, logicalHeight);
+            drawBackground(ctx, logicalWidth, logicalHeight);
+            drawZones(ctx);
+            drawWalls(ctx);
+            drawHazards(ctx);
+            drawPickups(ctx);
+            drawPlateAndPortal(ctx);
+
+            if (phase === 'playing') {
+                stepPlaying(dt, logicalWidth, logicalHeight);
+            }
+
+            marbles.forEach(m => m.draw(ctx));
+            updateHUD();
+
+            requestAnimationFrame(animate);
+        }
+
+        function resetLevel() {
+            const logicalWidth = width / window.devicePixelRatio;
+            const logicalHeight = height / window.devicePixelRatio;
+            layoutLevel(logicalWidth, logicalHeight);
+
+            history = [];
+            gateOpened = false;
+            timeLeft = 0;
+            plateWeight = 0;
+            puzzleSolved = false;
+            phase = 'playing';
+            lastLoseReason = '';
+            statusMessage = `Roll ${REQUIRED_WEIGHT}+ marbles onto the pressure plate to open the gate.`;
+
+            marbles = [new Marble(0.05 * logicalWidth, 0.17 * logicalHeight, true)];
+            addMarbles(START_MARBLES - 1);
+        }
+
+        function bindPadButton(id, dx, dy) {
+            const btn = document.getElementById(id);
+            const start = (e) => { e.preventDefault(); padDirection.x = dx; padDirection.y = dy; };
+            const end = () => { padDirection.x = 0; padDirection.y = 0; };
+            btn.addEventListener('pointerdown', start);
+            btn.addEventListener('pointerup', end);
+            btn.addEventListener('pointerleave', end);
+            btn.addEventListener('pointercancel', end);
+        }
+
+        const MOVE_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D']);
+        window.addEventListener('keydown', (e) => {
+            if (!MOVE_KEYS.has(e.key)) return;
+            e.preventDefault();
+            keysDown.add(e.key);
+        });
+        window.addEventListener('keyup', (e) => { keysDown.delete(e.key); });
+
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('DOMContentLoaded', () => {
+            resizeCanvas();
+            bindPadButton('btn-up', 0, -1);
+            bindPadButton('btn-down', 0, 1);
+            bindPadButton('btn-left', -1, 0);
+            bindPadButton('btn-right', 1, 0);
+            document.getElementById('resetBtn').addEventListener('click', resetLevel);
+            resetLevel();
+            requestAnimationFrame(animate);
+        });
+    </script>
+</body>
+</html>

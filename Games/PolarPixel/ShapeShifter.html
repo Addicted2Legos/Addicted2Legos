@@ -35,6 +35,82 @@
             padding: 20px;
         }
 
+        .app-shell {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+            max-width: 1100px;
+        }
+
+        .game-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 180px;
+            flex-shrink: 0;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            padding: 16px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            position: sticky;
+            top: 20px;
+        }
+
+        .menu-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #94a3b8;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .menu-link {
+            display: block;
+            padding: 10px 12px;
+            border-radius: 8px;
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .menu-link:hover {
+            background: var(--btn-hover);
+        }
+
+        .menu-link.active {
+            background: rgba(56, 189, 248, 0.15);
+            border-color: rgba(56, 189, 248, 0.4);
+            color: var(--accent-color);
+        }
+
+        @media (max-width: 720px) {
+            .app-shell {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .game-menu {
+                flex-direction: row;
+                width: 100%;
+                max-width: 700px;
+                overflow-x: auto;
+                position: static;
+                justify-content: center;
+            }
+
+            .menu-title {
+                display: none;
+            }
+        }
+
         .container {
             display: flex;
             flex-direction: column;
@@ -200,7 +276,17 @@
 </head>
 <body>
 
-    <div class="container">
+    <div class="app-shell">
+        <nav class="game-menu" aria-label="Minigame versions">
+            <span class="menu-title">Polar Pixel</span>
+            <a href="FreePlay.html" class="menu-link">Free Play</a>
+            <a href="Maze.html" class="menu-link">Maze</a>
+            <a href="MiniGolf.html" class="menu-link">Mini Golf</a>
+            <a href="FollowTheLeader.html" class="menu-link">Follow the Leader</a>
+            <a href="ShapeShifter.html" class="menu-link active">Shape Shifter</a>
+        </nav>
+
+        <div class="container">
         <header>
             <h1>Dot Sorting Sandbox</h1>
             <p class="subtitle">Satisfying physics, color isolation, and magnetic forces</p>
@@ -229,6 +315,19 @@
                 <button onclick="applyForce('edges')">Edges</button>
             </div>
 
+            <!-- Shape Morphing Controls -->
+            <div class="control-group">
+                <span class="group-label">Shapes</span>
+                <button onclick="setShape('line')">Line</button>
+                <button onclick="setShape('circle')">Circle</button>
+                <button onclick="setShape('triangle')">Triangle</button>
+                <button onclick="setShape('square')">Square</button>
+                <button onclick="setShape('smiley')">😊 Smiley</button>
+                <button onclick="setShape('kitten')">🐱 Kitten</button>
+                <button onclick="setShape('dolphin')">🐬 Dolphin</button>
+                <button onclick="setShape('banana')">🍌 Banana</button>
+            </div>
+
             <!-- Color Extraction Control -->
             <div class="control-group">
                 <span class="group-label">Filter</span>
@@ -239,6 +338,7 @@
             <div class="control-group">
                 <button class="btn-reset" onclick="resetDots()">Shuffle All</button>
             </div>
+        </div>
         </div>
     </div>
 
@@ -254,8 +354,8 @@
         let width, height;
 
         // Currently active steering behavior ('center', 'edges', 'up', 'down',
-        // 'left', 'right', 'isolate', or null for idle). Recomputed every frame
-        // so dots decelerate into place instead of drifting forever.
+        // 'left', 'right', 'isolate', 'shape', or null for idle). Recomputed
+        // every frame so dots decelerate into place instead of drifting forever.
         let currentMode = null;
         let isolateHue = null;
 
@@ -280,6 +380,14 @@
                 this.color = `hsl(${hue}, 85%, 60%)`;
                 this.targetVx = 0;
                 this.targetVy = 0;
+                // Fractional (0-1) position within the canvas this dot steers
+                // toward while in 'shape' mode, so shapes stay correct if the
+                // canvas is resized.
+                this.shapeXFrac = 0.5;
+                this.shapeYFrac = 0.5;
+                // Whether this dot is one of the ones claimed by the current
+                // shape (some shapes use fewer than NUM_DOTS dots).
+                this.inShape = false;
             }
 
             // Steer toward a fixed point with a proportional controller: speed
@@ -323,6 +431,24 @@
                 }
             }
 
+            // Steer toward whichever of the 4 corners is currently closest.
+            // Used to tuck away dots that a shape isn't using.
+            steerToNearestCorner(boundsWidth, boundsHeight, margin) {
+                const corners = [
+                    [margin, margin],
+                    [boundsWidth - margin, margin],
+                    [margin, boundsHeight - margin],
+                    [boundsWidth - margin, boundsHeight - margin]
+                ];
+                let closest = corners[0];
+                let closestDist = Infinity;
+                for (const [cx, cy] of corners) {
+                    const d = Math.hypot(cx - this.x, cy - this.y);
+                    if (d < closestDist) { closestDist = d; closest = [cx, cy]; }
+                }
+                this.steerTo(closest[0], closest[1]);
+            }
+
             update(boundsWidth, boundsHeight, mode, isolateTargetHue) {
                 const centerX = boundsWidth / 2;
                 const centerY = boundsHeight / 2;
@@ -346,6 +472,16 @@
                         break;
                     case 'right':
                         this.steerTo(boundsWidth - margin, this.y);
+                        break;
+                    case 'shape':
+                        if (this.inShape) {
+                            this.steerTo(this.shapeXFrac * boundsWidth, this.shapeYFrac * boundsHeight);
+                        } else {
+                            // Not part of this shape (shapes that use fewer
+                            // than NUM_DOTS dots) - tuck it into a corner
+                            // instead of leaving it in the middle of the shape.
+                            this.steerToNearestCorner(boundsWidth, boundsHeight, margin);
+                        }
                         break;
                     case 'isolate': {
                         let hueDiff = Math.abs(this.hue - isolateTargetHue);
@@ -447,6 +583,253 @@
         function isolateColor(hue) {
             isolateHue = hue;
             currentMode = 'isolate';
+        }
+
+        // --- Shape morphing ---------------------------------------------
+        // Every shape is described as a set of "loops" (open or closed
+        // polylines) in an arbitrary local coordinate space. To turn that
+        // into exactly NUM_DOTS target points we distribute points across
+        // loops proportional to their arc length, then space them evenly
+        // along each loop. This lets simple shapes (line, circle) and
+        // multi-part shapes (a smiley's face + eyes + mouth) share the same
+        // machinery.
+
+        function polyLoop(points, closed = true) {
+            return { points, closed };
+        }
+
+        function polygonLoop(sides, radius, cx = 0, cy = 0, rotationDeg = -90) {
+            const points = [];
+            for (let i = 0; i < sides; i++) {
+                const angle = (rotationDeg + (i * 360) / sides) * Math.PI / 180;
+                points.push([cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)]);
+            }
+            return polyLoop(points, true);
+        }
+
+        function circleLoop(radius, cx = 0, cy = 0, segments = 48) {
+            return polygonLoop(segments, radius, cx, cy, 0);
+        }
+
+        function lineLoop(x1, y1, x2, y2) {
+            return polyLoop([[x1, y1], [x2, y2]], false);
+        }
+
+        // Arc using standard math angles (0deg = right, CCW), with y flipped
+        // so it reads naturally on a y-down canvas.
+        function arcLoop(cx, cy, radius, startDeg, endDeg, segments = 24) {
+            const points = [];
+            for (let i = 0; i <= segments; i++) {
+                const t = i / segments;
+                const angle = (startDeg + (endDeg - startDeg) * t) * Math.PI / 180;
+                points.push([cx + radius * Math.cos(angle), cy - radius * Math.sin(angle)]);
+            }
+            return polyLoop(points, false);
+        }
+
+        const SHAPES = {
+            line: () => [lineLoop(-100, 0, 100, 0)],
+
+            circle: () => [circleLoop(100, 0, 0, 64)],
+
+            triangle: () => [polyLoop([[0, -100], [87, 50], [-87, 50]], true)],
+
+            square: () => [polyLoop([[-90, -90], [90, -90], [90, 90], [-90, 90]], true)],
+
+            smiley: () => [
+                circleLoop(100, 0, 0, 48),           // face outline
+                circleLoop(12, -35, -25, 16),         // left eye
+                circleLoop(12, 35, -25, 16),          // right eye
+                arcLoop(0, -10, 65, 200, 340, 24)     // smiling mouth
+            ],
+
+            kitten: () => [
+                circleLoop(85, 0, 15, 40),                              // head
+                polyLoop([[-75, -30], [-95, -110], [-25, -50]], true),  // left ear
+                polyLoop([[75, -30], [95, -110], [25, -50]], true),     // right ear
+                circleLoop(10, -32, 5, 12),                             // left eye
+                circleLoop(10, 32, 5, 12),                              // right eye
+                polyLoop([[-8, 35], [8, 35], [0, 45]], true)            // nose
+            ],
+
+            dolphin: () => [
+                polyLoop([
+                    [90, 10], [68, -12], [48, -26], [28, -36], [18, -58],
+                    [8, -36], [-22, -26], [-52, -14], [-72, 2],
+                    [-96, -20], [-76, 4], [-96, 28], [-64, 16],
+                    [-38, 26], [-8, 30], [22, 24], [50, 14], [70, 20]
+                ], true),
+                circleLoop(6, 62, -8, 10) // eye
+            ],
+
+            banana: () => [
+                polyLoop([
+                    ...Array.from({ length: 21 }, (_, i) => {
+                        const t = i / 20;
+                        return [-90 + 180 * t, -70 * Math.sin(Math.PI * t)];
+                    }),
+                    ...Array.from({ length: 21 }, (_, i) => {
+                        const t = 1 - i / 20;
+                        return [-90 + 180 * t, -28 * Math.sin(Math.PI * t) + 12];
+                    })
+                ], true)
+            ]
+        };
+
+        // Optional per-shape recoloring. When a shape has an entry here, the
+        // dots that morph into it are recolored by cycling through these
+        // hues (instead of keeping whatever color they already had).
+        const SHAPE_COLOR_SCHEMES = {
+            // Three color slots (stem/body/spots) reserved for a future
+            // multi-tone banana - all set to the same yellow hue for now.
+            banana: [50, 50, 50],
+            // Dolphins should read as a single-tone animal, so only use
+            // half of the 12-color palette instead of the full rainbow.
+            dolphin: PALETTE.filter((_, i) => i % 2 === 0)
+        };
+
+        function getShapeColorHues(name, count) {
+            const scheme = SHAPE_COLOR_SCHEMES[name];
+            if (!scheme) return null;
+            return Array.from({ length: count }, (_, i) => scheme[i % scheme.length]);
+        }
+
+        function loopLength(loop) {
+            const pts = loop.points;
+            let len = 0;
+            for (let i = 0; i < pts.length - 1; i++) {
+                len += Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]);
+            }
+            if (loop.closed) {
+                len += Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]);
+            }
+            return len;
+        }
+
+        function pointAtDistance(loop, dist) {
+            const pts = loop.points;
+            const segs = loop.closed ? pts.length : pts.length - 1;
+            for (let i = 0; i < segs; i++) {
+                const a = pts[i];
+                const b = pts[(i + 1) % pts.length];
+                const segLen = Math.hypot(b[0] - a[0], b[1] - a[1]);
+                if (dist <= segLen || i === segs - 1) {
+                    const t = segLen === 0 ? 0 : dist / segLen;
+                    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+                }
+                dist -= segLen;
+            }
+            return pts[0];
+        }
+
+        // Distribute `totalPoints` across the loops (proportional to arc
+        // length, largest-remainder rounding) and space them evenly within
+        // each loop.
+        function sampleShapePoints(loops, totalPoints) {
+            const lengths = loops.map(loopLength);
+            const totalLength = lengths.reduce((a, b) => a + b, 0) || 1;
+
+            const raw = lengths.map(l => (l / totalLength) * totalPoints);
+            const counts = raw.map(r => Math.max(1, Math.floor(r)));
+            let allocated = counts.reduce((a, b) => a + b, 0);
+
+            const remainders = raw
+                .map((r, i) => ({ i, rem: r - Math.floor(r) }))
+                .sort((a, b) => b.rem - a.rem);
+
+            let idx = 0;
+            while (allocated < totalPoints) {
+                counts[remainders[idx % remainders.length].i]++;
+                allocated++;
+                idx++;
+            }
+            while (allocated > totalPoints) {
+                const maxIdx = counts.indexOf(Math.max(...counts));
+                if (counts[maxIdx] <= 1) break;
+                counts[maxIdx]--;
+                allocated--;
+            }
+
+            const result = [];
+            loops.forEach((loop, li) => {
+                const n = counts[li];
+                const len = lengths[li];
+                for (let k = 0; k < n; k++) {
+                    const dist = n === 1 ? len / 2 : (k / n) * len;
+                    result.push(pointAtDistance(loop, dist));
+                }
+            });
+            return result;
+        }
+
+        // Some shapes only use a subset of the dots (the rest stay put
+        // wherever they are). Anything not listed here uses all NUM_DOTS.
+        const SHAPE_DOT_COUNTS = {
+            banana: 30,
+            dolphin: 30
+        };
+
+        // Fit a shape's local-space points into the canvas as (0-1)
+        // fractional coordinates, preserving aspect ratio and centering.
+        function shapeToFractionalPoints(shapeName, count) {
+            const loops = SHAPES[shapeName]();
+            const rawPoints = sampleShapePoints(loops, count);
+
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            rawPoints.forEach(([x, y]) => {
+                minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+                minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+            });
+            const shapeWidth = maxX - minX || 1;
+            const shapeHeight = maxY - minY || 1;
+            const shapeCx = (minX + maxX) / 2;
+            const shapeCy = (minY + maxY) / 2;
+
+            const marginFrac = 0.12; // keep the shape off the canvas edges
+            const scale = (1 - marginFrac * 2) / Math.max(shapeWidth, shapeHeight);
+
+            return rawPoints.map(([x, y]) => [
+                0.5 + (x - shapeCx) * scale,
+                0.5 + (y - shapeCy) * scale
+            ]);
+        }
+
+        function setShape(name) {
+            const shapeCount = SHAPE_DOT_COUNTS[name] || NUM_DOTS;
+            const targets = shapeToFractionalPoints(name, shapeCount);
+            const colorHues = getShapeColorHues(name, targets.length);
+            const logicalWidth = width / window.devicePixelRatio;
+            const logicalHeight = height / window.devicePixelRatio;
+
+            // Dots not claimed below (only relevant when shapeCount <
+            // NUM_DOTS) simply idle in place rather than joining the shape.
+            dots.forEach(dot => { dot.inShape = false; });
+
+            // For each target point, claim whichever unclaimed dot is
+            // closest to it, so the shape forms from nearby dots along
+            // short, mostly non-crossing paths.
+            const availableDots = dots.map((_, i) => i);
+            targets.forEach((target, targetIdx) => {
+                const tx = target[0] * logicalWidth;
+                const ty = target[1] * logicalHeight;
+                let bestSlot = -1, bestDist = Infinity;
+                for (let k = 0; k < availableDots.length; k++) {
+                    const dot = dots[availableDots[k]];
+                    const d = Math.hypot(tx - dot.x, ty - dot.y);
+                    if (d < bestDist) { bestDist = d; bestSlot = k; }
+                }
+                const dot = dots[availableDots.splice(bestSlot, 1)[0]];
+                dot.inShape = true;
+                dot.shapeXFrac = target[0];
+                dot.shapeYFrac = target[1];
+
+                if (colorHues) {
+                    dot.hue = colorHues[targetIdx];
+                    dot.color = `hsl(${dot.hue}, 85%, 60%)`;
+                }
+            });
+
+            currentMode = 'shape';
         }
 
         // Build the 12 fixed color swatch buttons used to pick an isolation hue
