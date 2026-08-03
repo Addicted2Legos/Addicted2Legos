@@ -7,7 +7,7 @@
       "Bash(python3 - *)",
       "Bash(curl -sf http://localhost:8931/FireTown.html)",
       "Bash(curl -sf http://localhost:8931/_verify_firetown.html)",
-      "Bash(node --check /Users/riley/VSCode/Games/Desolation_Drift/js/engine/render.js)",
+      "Bash(node --check /Users/riley/VSCode/Games/DesolationDrift/js/engine/render.js)",
       "Bash(command -v chromium-cli)",
       "Bash(find / -maxdepth 4 -iname \"*chromium-cli*\")",
       "Bash(npm ls *)",

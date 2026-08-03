@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Dot Magnetic Sandbox</title>
+    <style>
+      html, body { touch-action: manipulation; }
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.75);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --text-color: #f8fafc;
+            --accent-color: #38bdf8;
+            --btn-hover: rgba(255, 255, 255, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        header {
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        p.subtitle {
+            font-size: 0.875rem;
+            color: #94a3b8;
+        }
+
+        #canvas-container {
+            position: relative;
+            width: min(100%, 700px, 55vh);
+            aspect-ratio: 1 / 1;
+            background: #020617;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), inset 0 0 0 1px var(--border-color);
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            width: 100%;
+            max-width: 700px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            padding: 16px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 6px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .group-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #94a3b8;
+            margin-right: 4px;
+            font-weight: 600;
+        }
+
+        button {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        button:hover {
+            background: var(--btn-hover);
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .directional-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 32px);
+            grid-template-rows: repeat(2, 32px);
+            gap: 4px;
+        }
+
+        .directional-pad button {
+            padding: 0;
+            justify-content: center;
+            align-items: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+        }
+
+        .btn-up { grid-column: 2; grid-row: 1; }
+        .btn-left { grid-column: 1; grid-row: 2; }
+        .btn-right { grid-column: 3; grid-row: 2; }
+        .btn-down { grid-column: 2; grid-row: 2; }
+
+        .color-swatches {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            max-width: 180px;
+        }
+
+        .color-swatch {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            cursor: pointer;
+            padding: 0;
+            transition: transform 0.15s ease, border-color 0.15s ease;
+        }
+
+        .color-swatch:hover {
+            transform: scale(1.15);
+            border-color: #ffffff;
+        }
+
+        .btn-isolate {
+            background: rgba(56, 189, 248, 0.15);
+            border-color: rgba(56, 189, 248, 0.4);
+            color: #38bdf8;
+        }
+
+        .btn-isolate:hover {
+            background: rgba(56, 189, 248, 0.25);
+        }
+
+        .btn-reset {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #f87171;
+        }
+
+        .btn-reset:hover {
+            background: rgba(239, 68, 68, 0.25);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Dot Sorting Sandbox</h1>
+            <p class="subtitle">Satisfying physics, color isolation, and magnetic forces</p>
+        </header>
+
+        <div id="canvas-container">
+            <canvas id="sandbox"></canvas>
+        </div>
+
+        <div class="controls">
+            <!-- Magnetic Directional Controls -->
+            <div class="control-group">
+                <span class="group-label">Magnet</span>
+                <div class="directional-pad">
+                    <button class="btn-up" onclick="applyForce('up')" title="Pull Up">▲</button>
+                    <button class="btn-left" onclick="applyForce('left')" title="Pull Left">◄</button>
+                    <button class="btn-right" onclick="applyForce('right')" title="Pull Right">►</button>
+                    <button class="btn-down" onclick="applyForce('down')" title="Pull Down">▼</button>
+                </div>
+            </div>
+
+            <!-- Spatial Sorting Controls -->
+            <div class="control-group">
+                <span class="group-label">Position</span>
+                <button onclick="applyForce('center')">Center</button>
+                <button onclick="applyForce('edges')">Edges</button>
+            </div>
+
+            <!-- Color Extraction Control -->
+            <div class="control-group">
+                <span class="group-label">Filter</span>
+                <div class="color-swatches" id="colorSwatches"></div>
+            </div>
+
+            <!-- Reset Control -->
+            <div class="control-group">
+                <button class="btn-reset" onclick="resetDots()">Shuffle All</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('sandbox');
+        const ctx = canvas.getContext('2d');
+
+        const NUM_DOTS = 100;
+        const DOT_RADIUS = 10;
+        // Exactly 12 selectable colors, evenly spaced around the hue wheel
+        const PALETTE = Array.from({ length: 12 }, (_, i) => i * 30);
+        let dots = [];
+        let width, height;
+
+        // Currently active steering behavior ('center', 'edges', 'up', 'down',
+        // 'left', 'right', 'isolate', or null for idle). Recomputed every frame
+        // so dots decelerate into place instead of drifting forever.
+        let currentMode = null;
+        let isolateHue = null;
+
+        // Ensure crisp rendering on high-DPI screens
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+            width = canvas.width;
+            height = canvas.height;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+
+        class Dot {
+            constructor(x, y, hue) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = (Math.random() - 0.5) * 2;
+                this.radius = DOT_RADIUS;
+                this.hue = hue; // Hue value from 0 to 360
+                this.color = `hsl(${hue}, 85%, 60%)`;
+                this.targetVx = 0;
+                this.targetVy = 0;
+            }
+
+            // Steer toward a fixed point with a proportional controller: speed
+            // shrinks as distance shrinks, so the dot settles at the target
+            // instead of overshooting and bouncing back.
+            steerTo(targetX, targetY) {
+                const dx = targetX - this.x;
+                const dy = targetY - this.y;
+                const dist = Math.hypot(dx, dy);
+                const maxSpeed = 8;
+                const gain = 0.15;
+
+                if (dist < 0.75) {
+                    this.targetVx = 0;
+                    this.targetVy = 0;
+                } else {
+                    const speed = Math.min(maxSpeed, dist * gain);
+                    this.targetVx = (dx / dist) * speed;
+                    this.targetVy = (dy / dist) * speed;
+                }
+            }
+
+            // Steer toward whichever wall is currently closest, moving along
+            // that single axis only. This keeps dots spread along the nearest
+            // side instead of drifting diagonally into corners.
+            steerToNearestEdge(boundsWidth, boundsHeight, margin) {
+                const distLeft = this.x;
+                const distRight = boundsWidth - this.x;
+                const distTop = this.y;
+                const distBottom = boundsHeight - this.y;
+                const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+
+                if (minDist === distLeft) {
+                    this.steerTo(margin, this.y);
+                } else if (minDist === distRight) {
+                    this.steerTo(boundsWidth - margin, this.y);
+                } else if (minDist === distTop) {
+                    this.steerTo(this.x, margin);
+                } else {
+                    this.steerTo(this.x, boundsHeight - margin);
+                }
+            }
+
+            update(boundsWidth, boundsHeight, mode, isolateTargetHue) {
+                const centerX = boundsWidth / 2;
+                const centerY = boundsHeight / 2;
+                const margin = this.radius + 4;
+
+                switch (mode) {
+                    case 'center':
+                        this.steerTo(centerX, centerY);
+                        break;
+                    case 'edges':
+                        this.steerToNearestEdge(boundsWidth, boundsHeight, margin);
+                        break;
+                    case 'up':
+                        this.steerTo(this.x, margin);
+                        break;
+                    case 'down':
+                        this.steerTo(this.x, boundsHeight - margin);
+                        break;
+                    case 'left':
+                        this.steerTo(margin, this.y);
+                        break;
+                    case 'right':
+                        this.steerTo(boundsWidth - margin, this.y);
+                        break;
+                    case 'isolate': {
+                        let hueDiff = Math.abs(this.hue - isolateTargetHue);
+                        if (hueDiff > 180) hueDiff = 360 - hueDiff;
+                        if (hueDiff < 15) {
+                            this.steerTo(centerX, centerY);
+                        } else {
+                            // Leave non-matching colors where they are
+                            this.targetVx = 0;
+                            this.targetVy = 0;
+                        }
+                        break;
+                    }
+                    default:
+                        // Idle: let velocity relax to zero rather than holding
+                        // a stale target, so dots simply coast to a stop.
+                        this.targetVx = 0;
+                        this.targetVy = 0;
+                }
+
+                // Apply smooth velocity toward targeted velocity
+                this.vx += (this.targetVx - this.vx) * 0.08;
+                this.vy += (this.targetVy - this.vy) * 0.08;
+
+                // Natural deceleration/friction
+                this.vx *= 0.96;
+                this.vy *= 0.96;
+
+                // Position update
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Boundary collision handling with rebound (safety clamp for
+                // any momentum overshoot past the steering target)
+                const r = this.radius;
+                if (this.x - r < 0) {
+                    this.x = r;
+                    this.vx *= -0.5;
+                }
+                if (this.x + r > boundsWidth) {
+                    this.x = boundsWidth - r;
+                    this.vx *= -0.5;
+                }
+                if (this.y - r < 0) {
+                    this.y = r;
+                    this.vy *= -0.5;
+                }
+                if (this.y + r > boundsHeight) {
+                    this.y = boundsHeight - r;
+                    this.vy *= -0.5;
+                }
+            }
+
+            draw(context) {
+                context.beginPath();
+                context.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                context.fillStyle = this.color;
+                
+                // Add subtle glowing halo for visual pleasure
+                context.shadowColor = this.color;
+                context.shadowBlur = 8;
+                
+                context.fill();
+                context.closePath();
+                context.shadowBlur = 0; // Reset shadow for performance
+            }
+        }
+
+        function initDots() {
+            dots = [];
+            const logicalWidth = width / window.devicePixelRatio;
+            const logicalHeight = height / window.devicePixelRatio;
+
+            for (let i = 0; i < NUM_DOTS; i++) {
+                // Cycle evenly through the 12-color palette
+                const hue = PALETTE[i % PALETTE.length];
+                const padding = 30;
+                const x = padding + Math.random() * (logicalWidth - padding * 2);
+                const y = padding + Math.random() * (logicalHeight - padding * 2);
+                dots.push(new Dot(x, y, hue));
+            }
+        }
+
+        function resetDots() {
+            // Idle mode so dots aren't steered anywhere, then give them a
+            // random burst that decays via friction into a natural scatter.
+            currentMode = null;
+            isolateHue = null;
+            dots.forEach(dot => {
+                dot.vx = (Math.random() - 0.5) * 10;
+                dot.vy = (Math.random() - 0.5) * 10;
+            });
+        }
+
+        function applyForce(type) {
+            currentMode = type;
+        }
+
+        function isolateColor(hue) {
+            isolateHue = hue;
+            currentMode = 'isolate';
+        }
+
+        // Build the 12 fixed color swatch buttons used to pick an isolation hue
+        function buildColorSwatches() {
+            const container = document.getElementById('colorSwatches');
+            PALETTE.forEach(hue => {
+                const swatch = document.createElement('button');
+                swatch.className = 'color-swatch';
+                swatch.style.background = `hsl(${hue}, 85%, 60%)`;
+                swatch.title = 'Isolate this color';
+                swatch.onclick = () => isolateColor(hue);
+                container.appendChild(swatch);
+            });
+        }
+
+        // Push any overlapping dot pairs apart so they can touch and bump
+        // but never sit on top of one another. Run a few iterations per
+        // frame so clusters (e.g. dots piling up at the center) settle
+        // into a stable, non-overlapping arrangement.
+        function resolveCollisions() {
+            for (let i = 0; i < dots.length; i++) {
+                const a = dots[i];
+                for (let j = i + 1; j < dots.length; j++) {
+                    const b = dots[j];
+                    const dx = b.x - a.x;
+                    const dy = b.y - a.y;
+                    let dist = Math.hypot(dx, dy);
+                    const minDist = a.radius + b.radius;
+                    if (dist >= minDist) continue;
+
+                    if (dist === 0) {
+                        // Perfectly coincident: nudge apart in a random direction
+                        const angle = Math.random() * Math.PI * 2;
+                        a.x -= Math.cos(angle) * 0.5;
+                        a.y -= Math.sin(angle) * 0.5;
+                        b.x += Math.cos(angle) * 0.5;
+                        b.y += Math.sin(angle) * 0.5;
+                        continue;
+                    }
+
+                    const nx = dx / dist;
+                    const ny = dy / dist;
+                    const overlap = minDist - dist;
+
+                    // Separate positions so they no longer overlap
+                    a.x -= nx * overlap * 0.5;
+                    a.y -= ny * overlap * 0.5;
+                    b.x += nx * overlap * 0.5;
+                    b.y += ny * overlap * 0.5;
+
+                    // Cancel the closing velocity along the contact normal so
+                    // they bump rather than keep pushing into each other
+                    const relVx = b.vx - a.vx;
+                    const relVy = b.vy - a.vy;
+                    const closingSpeed = relVx * nx + relVy * ny;
+                    if (closingSpeed < 0) {
+                        a.vx += closingSpeed * nx;
+                        a.vy += closingSpeed * ny;
+                        b.vx -= closingSpeed * nx;
+                        b.vy -= closingSpeed * ny;
+                    }
+                }
+            }
+        }
+
+        // Main animation loop
+        function animate() {
+            const logicalWidth = width / window.devicePixelRatio;
+            const logicalHeight = height / window.devicePixelRatio;
+
+            ctx.clearRect(0, 0, logicalWidth, logicalHeight);
+
+            // Simple soft visual grid in the background
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
+            ctx.lineWidth = 1;
+            const gridSize = 40;
+            for (let x = 0; x < logicalWidth; x += gridSize) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, logicalHeight); ctx.stroke();
+            }
+            for (let y = 0; y < logicalHeight; y += gridSize) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(logicalWidth, y); ctx.stroke();
+            }
+
+            // Update positions/velocities first...
+            dots.forEach(dot => dot.update(logicalWidth, logicalHeight, currentMode, isolateHue));
+
+            // ...then resolve any overlaps so dots never sit on top of each other
+            for (let iter = 0; iter < 3; iter++) resolveCollisions();
+
+            // Collision push-apart can shove a dot past the wall; clamp back in
+            dots.forEach(dot => {
+                const r = dot.radius;
+                if (dot.x - r < 0) dot.x = r;
+                if (dot.x + r > logicalWidth) dot.x = logicalWidth - r;
+                if (dot.y - r < 0) dot.y = r;
+                if (dot.y + r > logicalHeight) dot.y = logicalHeight - r;
+            });
+
+            // Finally render
+            dots.forEach(dot => dot.draw(ctx));
+
+            requestAnimationFrame(animate);
+        }
+
+        // Arrow keys mirror the directional pad buttons
+        const ARROW_KEY_TO_FORCE = {
+            ArrowUp: 'up',
+            ArrowDown: 'down',
+            ArrowLeft: 'left',
+            ArrowRight: 'right'
+        };
+        window.addEventListener('keydown', (e) => {
+            const type = ARROW_KEY_TO_FORCE[e.key];
+            if (!type) return;
+            e.preventDefault(); // stop the page itself from scrolling
+            applyForce(type);
+        });
+
+        // Initialization
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('DOMContentLoaded', () => {
+            resizeCanvas();
+            initDots();
+            buildColorSwatches();
+            animate();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Splat Divert: Animal Rescue Fan!</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+    }
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0f172a;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    #game-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      perspective: 800px;
+      overflow: hidden;
+      cursor: none;
+    }
+    /* Dynamic background warp lines */
+    .warp-line {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.05);
+      pointer-events: none;
+    }
+    /* Flying Entities */
+    .entity {
+      position: absolute;
+      transform-style: preserve-3d;
+      will-change: transform, opacity;
+      pointer-events: none;
+      filter: drop-shadow(0px 10px 15px rgba(0,0,0,0.4));
+    }
+    .entity-inner {
+      font-size: 80px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+    }
+    /* Splats on Screen */
+    .splat {
+      position: absolute;
+      pointer-events: none;
+      z-index: 50;
+      transform: translate(-50%, -50%) scale(0);
+      animation: splatAnim 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+    @keyframes splatAnim {
+      0% { transform: translate(-50%, -50%) scale(0.2) rotate(0deg); opacity: 0.2; }
+      100% { transform: translate(-50%, -50%) scale(1) rotate(var(--rand-rot)); opacity: 0.9; }
+    }
+    .splat-text {
+      font-size: 110px;
+      filter: blur(1px) contrast(1.5);
+      opacity: 0.85;
+    }
+    .splat-drip {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 8px;
+      height: 40px;
+      background: currentColor;
+      border-radius: 4px;
+      animation: dripAnim 2s ease-in forwards;
+    }
+    /* Fan Cursor */
+    #fan {
+      position: absolute;
+      width: 120px;
+      height: 120px;
+      margin-left: -60px;
+      margin-top: -60px;
+      pointer-events: none;
+      z-index: 100;
+      transition: transform 0.05s ease-out;
+    }
+    .fan-blade {
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle, #38bdf8 0%, #0284c7 70%);
+      border-radius: 50%;
+      border: 4px solid #ffffff;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.6), inset 0 0 15px rgba(255, 255, 255, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 60px;
+      animation: spin 0.2s linear infinite;
+    }
+    .fan-wind {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 200px;
+      height: 200px;
+      margin-left: -100px;
+      margin-top: -100px;
+      border: 2px dashed rgba(56, 189, 248, 0.4);
+      border-radius: 50%;
+      animation: windPulse 0.5s ease-out infinite;
+      pointer-events: none;
+    }
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes windPulse {
+      0% { transform: scale(0.6); opacity: 0.8; }
+      100% { transform: scale(1.4); opacity: 0; }
+    }
+    /* HUD */
+    #hud {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 150;
+      color: #f8fafc;
+      font-weight: 700;
+    }
+    .stat-card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 12px 24px;
+      border-radius: 16px;
+      font-size: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    /* Game Over Overlay */
+    #game-over {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      color: white;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    #game-over.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    #game-over h1 {
+      font-size: 56px;
+      margin: 0 0 10px 0;
+      color: #ef4444;
+      text-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+    }
+    #game-over p {
+      font-size: 24px;
+      margin-bottom: 30px;
+      color: #94a3b8;
+    }
+    .btn {
+      background: #38bdf8;
+      color: #0f172a;
+      border: none;
+      padding: 16px 36px;
+      font-size: 22px;
+      font-weight: 800;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+    }
+    .btn:hover {
+      transform: scale(1.05);
+      background: #7dd3fc;
+      box-shadow: 0 0 30px rgba(56, 189, 248, 0.7);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="game-container">
+    <div id="hud">
+      <div class="stat-card">Saved: <span id="score" style="color: #38bdf8;">0</span></div>
+      <div class="stat-card">Splats: <span id="splats" style="color: #ef4444;">0 / 5</span></div>
+    </div>
+
+    <div id="fan">
+      <div class="fan-wind"></div>
+      <div class="fan-blade">🌀</div>
+    </div>
+
+    <div id="game-over">
+      <h1>SCREEN CLEANING NEEDED!</h1>
+      <p>Final Score: <span id="final-score">0</span> animals redirected</p>
+      <button class="btn" onclick="resetGame()">PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <script>
+    const container = document.getElementById('game-container');
+    const fan = document.getElementById('fan');
+    const scoreEl = document.getElementById('score');
+    const splatsEl = document.getElementById('splats');
+    const gameOverEl = document.getElementById('game-over');
+    const finalScoreEl = document.getElementById('final-score');
+
+    // Types of flying animals
+    const TYPES = [
+      { emoji: '🐱', name: 'kitten', size: 100 },
+      { emoji: '🦆', name: 'duck', size: 90 },
+      { emoji: '🦫', name: 'capybara', size: 120 } // Capybara emoji fallback
+    ];
+
+    let score = 0;
+    let splatCount = 0;
+    const MAX_SPLATS = 5;
+    let entities = [];
+    let mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    let isGameOver = false;
+    let spawnTimer = 0;
+
+    // Track cursor movement
+    window.addEventListener('mousemove', (e) => {
+      mouse.x = e.clientX;
+      mouse.y = e.clientY;
+      fan.style.transform = `translate3d(${mouse.x}px, ${mouse.y}px, 0)`;
+    });
+
+    window.addEventListener('touchmove', (e) => {
+      if(e.touches.length > 0) {
+        mouse.x = e.touches[0].clientX;
+        mouse.y = e.touches[0].clientY;
+        fan.style.transform = `translate3d(${mouse.x}px, ${mouse.y}px, 0)`;
+      }
+    });
+
+    // Create warp speed lines for depth effect
+    for (let i = 0; i < 30; i++) {
+      const line = document.createElement('div');
+      line.className = 'warp-line';
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 200 + Math.random() * 600;
+      line.style.left = `${window.innerWidth / 2 + Math.cos(angle) * dist}px`;
+      line.style.top = `${window.innerHeight / 2 + Math.sin(angle) * dist}px`;
+      line.style.width = `${2 + Math.random() * 3}px`;
+      line.style.height = `${20 + Math.random() * 50}px`;
+      line.style.transform = `rotate(${angle + Math.PI/2}rad)`;
+      container.appendChild(line);
+    }
+
+    class Entity {
+      constructor() {
+        const type = TYPES[Math.floor(Math.random() * TYPES.length)];
+        this.emoji = type.emoji;
+        this.baseSize = type.size;
+        
+        // 3D coordinates (z runs from -2000 deep to 0 at the screen)
+        this.z = -2000;
+        // Target near screen center with slight variance
+        this.targetX = (Math.random() - 0.5) * (window.innerWidth * 0.6);
+        this.targetY = (Math.random() - 0.5) * (window.innerHeight * 0.6);
+        
+        this.x = this.targetX * 0.1; 
+        this.y = this.targetY * 0.1;
+        
+        // Speed accelerates as it approaches
+        this.speed = 12 + Math.random() * 8 + (score * 0.2); 
+        this.rotX = Math.random() * 360;
+        this.rotY = Math.random() * 360;
+        this.rotZ = Math.random() * 360;
+        
+        this.rotSpeedX = (Math.random() - 0.5) * 4;
+        this.rotSpeedY = (Math.random() - 0.5) * 4;
+
+        // Velocity for when blown by fan
+        this.vx = 0;
+        this.vy = 0;
+        this.vz = 0;
+        this.blown = false;
+
+        // DOM Element
+        this.el = document.createElement('div');
+        this.el.className = 'entity';
+        this.inner = document.createElement('div');
+        this.inner.className = 'entity-inner';
+        this.inner.textContent = this.emoji;
+        this.el.appendChild(this.inner);
+        container.appendChild(this.el);
+      }
+
+      update() {
+        if (this.blown) {
+          // Diverted motion dynamics
+          this.x += this.vx;
+          this.y += this.vy;
+          this.z += this.vz;
+          this.rotZ += 15;
+          
+          // Remove once safely off screen
+          if (this.z > 200 || Math.abs(this.x) > window.innerWidth || Math.abs(this.y) > window.innerHeight) {
+            this.destroy();
+            return false;
+          }
+        } else {
+          // Fly toward screen
+          this.z += this.speed;
+          
+          // Interpolate XY toward target screen position as Z increases
+          const progress = (this.z + 2000) / 2000;
+          const currentTargetX = (window.innerWidth / 2) + this.targetX;
+          const currentTargetY = (window.innerHeight / 2) + this.targetY;
+          
+          const screenX = (window.innerWidth / 2) + (this.x * (1 - progress) + this.targetX * progress);
+          const screenY = (window.innerHeight / 2) + (this.y * (1 - progress) + this.targetY * progress);
+
+          this.rotX += this.rotSpeedX;
+          this.rotY += this.rotSpeedY;
+
+          // Check interaction with Fan (when entity gets close to screen)
+          if (this.z > -400) {
+            const dx = screenX - mouse.x;
+            const dy = screenY - mouse.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            // Fan field of effect radius ~130px
+            if (dist < 130) {
+              this.blown = true;
+              const angle = Math.atan2(dy, dx);
+              const blowForce = 25 + Math.random() * 15;
+              this.vx = Math.cos(angle) * blowForce;
+              this.vy = Math.sin(angle) * blowForce;
+              this.vz = -10 + Math.random() * 20; // Repel backward/sideways
+              
+              score++;
+              scoreEl.textContent = score;
+            }
+          }
+
+          // Check Splat on Screen (Hit Z threshold)
+          if (this.z >= 0) {
+            createSplat(screenX, screenY, this.emoji);
+            this.destroy();
+            splatCount++;
+            splatsEl.textContent = `${splatCount} / ${MAX_SPLATS}`;
+            
+            if (splatCount >= MAX_SPLATS) {
+              triggerGameOver();
+            }
+            return false;
+          }
+
+          // Screen positioning via CSS 3D Transforms
+          const scale = Math.max(0.1, (this.z + 2000) / 2000);
+          this.el.style.transform = `translate3d(${screenX - 50}px, ${screenY - 50}px, ${this.z}px) rotateX(${this.rotX}deg) rotateY(${this.rotY}deg) rotateZ(${this.rotZ}deg) scale(${scale})`;
+        }
+
+        return true;
+      }
+
+      destroy() {
+        if (this.el && this.el.parentNode) {
+          this.el.parentNode.removeChild(this.el);
+        }
+      }
+    }
+
+    function createSplat(x, y, emoji) {
+      const splat = document.createElement('div');
+      splat.className = 'splat';
+      splat.style.left = `${x}px`;
+      splat.style.top = `${y}px`;
+      splat.style.setProperty('--rand-rot', `${(Math.random() - 0.5) * 60}deg`);
+
+      const text = document.createElement('div');
+      text.className = 'splat-text';
+      text.textContent = emoji;
+
+      // Add a liquid drip effect to the splat
+      const drip = document.createElement('div');
+      drip.className = 'splat-drip';
+      
+      splat.appendChild(text);
+      splat.appendChild(drip);
+      container.appendChild(splat);
+
+      // Fade out splat after a while
+      setTimeout(() => {
+        splat.style.transition = 'opacity 2s ease';
+        splat.style.opacity = '0';
+        setTimeout(() => splat.remove(), 2000);
+      }, 4000);
+    }
+
+    function triggerGameOver() {
+      isGameOver = true;
+      finalScoreEl.textContent = score;
+      gameOverEl.classList.add('active');
+    }
+
+    function resetGame() {
+      // Clear entities & splats
+      entities.forEach(e => e.destroy());
+      entities = [];
+      document.querySelectorAll('.splat').forEach(s => s.remove());
+
+      score = 0;
+      splatCount = 0;
+      scoreEl.textContent = score;
+      splatsEl.textContent = `${splatCount} / ${MAX_SPLATS}`;
+      isGameOver = false;
+      gameOverEl.classList.remove('active');
+    }
+
+    // Main Game Loop
+    function loop() {
+      if (!isGameOver) {
+        // Spawn rate speeds up over time
+        spawnTimer++;
+        const spawnInterval = Math.max(15, 60 - Math.floor(score / 3));
+        
+        if (spawnTimer >= spawnInterval) {
+          entities.push(new Entity());
+          spawnTimer = 0;
+        }
+
+        // Update all flying animals
+        entities = entities.filter(entity => entity.update());
+      }
+      
+      requestAnimationFrame(loop);
+    }
+
+    // Start loop
+    loop();
+  </script>
+</body>
+</html>
