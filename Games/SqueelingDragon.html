@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Dragon Island Hopper!</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0b0326;
+            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Fredoka One', cursive, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            color: #fff;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #hud {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud-card {
+            background: rgba(11, 3, 38, 0.75);
+            border: 3px solid #00ffcc;
+            box-shadow: 0 0 15px #00ffcc;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #ffff00;
+            text-shadow: 2px 2px #ff007f;
+        }
+
+        canvas {
+            background: #120038;
+            border: 4px solid #ff007f;
+            box-shadow: 0 0 25px #ff007f;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+            aspect-ratio: 4 / 3;
+            display: block;
+        }
+
+        /* On-Screen Mobile Controls */
+        #controls {
+            width: 100%;
+            max-width: 800px;
+            margin-top: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+            gap: 15px;
+        }
+
+        .slider-container {
+            flex: 1;
+            background: rgba(255, 0, 127, 0.2);
+            border: 2px solid #ff007f;
+            border-radius: 30px;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 0 10px #ff007f;
+        }
+
+        .slider-label {
+            font-weight: bold;
+            color: #00ffcc;
+            text-shadow: 1px 1px #000;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type=range]:focus {
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 14px;
+            cursor: pointer;
+            background: #00ffcc;
+            border-radius: 7px;
+            box-shadow: 0 0 8px #00ffcc;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            height: 28px;
+            width: 28px;
+            border-radius: 50%;
+            background: #ffff00;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -7px;
+            box-shadow: 0 0 10px #ffff00;
+            border: 2px solid #ff007f;
+        }
+
+        #flap-btn {
+            background: linear-gradient(135deg, #ff007f, #7900ff);
+            border: 3px solid #ffff00;
+            border-radius: 50px;
+            color: #ffff00;
+            font-size: 22px;
+            font-weight: 900;
+            padding: 15px 35px;
+            cursor: pointer;
+            box-shadow: 0 0 20px #ff007f;
+            text-shadow: 2px 2px #000;
+            transition: transform 0.05s, box-shadow 0.05s;
+        }
+
+        #flap-btn:active {
+            transform: scale(0.92);
+            box-shadow: 0 0 30px #ffff00;
+            background: linear-gradient(135deg, #ffff00, #ff007f);
+            color: #000;
+        }
+
+        /* Overlay Screens */
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(11, 3, 38, 0.85);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            z-index: 20;
+        }
+
+        .overlay h1 {
+            font-size: 42px;
+            color: #00ffcc;
+            text-shadow: 3px 3px #ff007f, 0 0 20px #00ffcc;
+            margin-bottom: 10px;
+        }
+
+        .overlay p {
+            font-size: 18px;
+            color: #ffff00;
+            max-width: 500px;
+            line-height: 1.5;
+            margin-bottom: 20px;
+            text-shadow: 1px 1px #000;
+        }
+
+        .btn-start {
+            background: #00ffcc;
+            color: #0b0326;
+            border: 3px solid #ffff00;
+            padding: 12px 30px;
+            font-size: 24px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 0 15px #00ffcc;
+        }
+
+        .btn-start:hover {
+            transform: scale(1.05);
+            background: #ffff00;
+            box-shadow: 0 0 20px #ffff00;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="hud">
+            <div class="hud-card">Pigs Eaten: <span id="score">0</span> 🐷</div>
+            <div class="hud-card">Status: <span id="status">Flying</span></div>
+        </div>
+
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+        <div id="start-screen" class="overlay">
+            <h1>DRAGON ISLE HOPPER</h1>
+            <p>Fly from city island to city island! Catch cute pigs to feed your appetite and rest on city roofs when you get tired.<br><br>
+               <strong>Desktop:</strong> Arrow Keys / A-D to steer, Spacebar to flap.<br>
+               <strong>Mobile:</strong> Use the slider below to steer and tap FLAP!
+            </p>
+            <button class="btn-start" onclick="startGame()">FLY NOW!</button>
+        </div>
+
+        <div id="game-over-screen" class="overlay" style="display: none;">
+            <h1 style="color: #ff007f; text-shadow: 3px 3px #00ffcc;">SPLASH!</h1>
+            <p>Your wings got wet in the ocean gap! You ate <span id="final-score">0</span> pigs.</p>
+            <button class="btn-start" onclick="startGame()">TRY AGAIN</button>
+        </div>
+
+        <!-- Controls -->
+        <div id="controls">
+            <div class="slider-container">
+                <span class="slider-label">STEER</span>
+                <input type="range" id="steerSlider" min="-1" max="1" step="0.05" value="0">
+            </div>
+            <button id="flap-btn">FLAP! 🪽</button>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // DOM Elements
+    const scoreEl = document.getElementById('score');
+    const statusEl = document.getElementById('status');
+    const finalScoreEl = document.getElementById('final-score');
+    const startScreen = document.getElementById('start-screen');
+    const gameOverScreen = document.getElementById('game-over-screen');
+    const steerSlider = document.getElementById('steerSlider');
+    const flapBtn = document.getElementById('flap-btn');
+
+    // Game Variables
+    let gameLoopId;
+    let isPlaying = false;
+    let score = 0;
+    let cameraY = 0;
+
+    // Keys state
+    const keys = { left: false, right: false, flap: false };
+
+    // --- GAME OBJECTS ---
+    const dragon = {
+        x: 400,
+        y: 400,
+        vx: 0,
+        vy: 0,
+        width: 50,
+        height: 40,
+        wingAngle: 0,
+        isFlapping: false,
+        isLanded: false,
+        landedBuilding: null,
+        
+        reset() {
+            this.x = 400;
+            this.y = 400;
+            this.vx = 0;
+            this.vy = 0;
+            this.isLanded = false;
+            this.landedBuilding = null;
+        },
+
+        flap() {
+            this.vy = -8.5;
+            this.isFlapping = true;
+            this.isLanded = false;
+            this.landedBuilding = null;
+        },
+
+        update() {
+            if (this.isLanded) {
+                this.vx = 0;
+                this.vy = 0;
+                return;
+            }
+
+            // Gravity
+            this.vy += 0.35;
+            
+            // Apply movement
+            this.x += this.vx;
+            this.y += this.vy;
+
+            // Drag
+            this.vx *= 0.92;
+
+            // Boundaries
+            if (this.x < 20) { this.x = 20; this.vx = 0; }
+            if (this.x > canvas.width - 20) { this.x = canvas.width - 20; this.vx = 0; }
+
+            // Wing animation
+            if (this.vy < 0) {
+                this.wingAngle = Math.sin(Date.now() * 0.02) * 0.8;
+            } else {
+                this.wingAngle = Math.sin(Date.now() * 0.005) * 0.2 + 0.3;
+            }
+        },
+
+        draw() {
+            ctx.save();
+            ctx.translate(this.x, this.y - cameraY);
+
+            // Tilt based on horizontal velocity
+            let tilt = this.vx * 0.05;
+            ctx.rotate(tilt);
+
+            // Wings (Behind)
+            ctx.fillStyle = '#ff007f';
+            ctx.strokeStyle = '#ffff00';
+            ctx.lineWidth = 2;
+
+            // Left Wing
+            ctx.save();
+            ctx.rotate(-this.wingAngle - 0.2);
+            ctx.beginPath();
+            ctx.ellipse(-15, -5, 25, 10, -0.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+
+            // Right Wing
+            ctx.save();
+            ctx.rotate(this.wingAngle + 0.2);
+            ctx.beginPath();
+            ctx.ellipse(15, -5, 25, 10, 0.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+
+            // Body (Neon Green)
+            ctx.fillStyle = '#00ff66';
+            ctx.strokeStyle = '#0b0326';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 20, 25, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Belly (Neon Yellow)
+            ctx.fillStyle = '#ffff00';
+            ctx.beginPath();
+            ctx.ellipse(0, 5, 12, 15, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Head
+            ctx.fillStyle = '#00ff66';
+            ctx.beginPath();
+            ctx.arc(0, -22, 14, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Cute Eyes
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(-5, -25, 5, 0, Math.PI * 2);
+            ctx.arc(5, -25, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.arc(-4, -25, 2, 0, Math.PI * 2);
+            ctx.arc(6, -25, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Snout / Horns
+            ctx.fillStyle = '#ff007f';
+            // Horns
+            ctx.beginPath();
+            ctx.moveTo(-8, -32); ctx.lineTo(-14, -42); ctx.lineTo(-4, -34);
+            ctx.moveTo(8, -32); ctx.lineTo(14, -42); ctx.lineTo(4, -34);
+            ctx.fill();
+
+            ctx.restore();
+        }
+    };
+
+    let islands = [];
+    let pigs = [];
+
+    // --- WORLD GENERATION ---
+    function generateWorld() {
+        islands = [];
+        pigs = [];
+        
+        let currentY = 550;
+
+        // Generate stacked islands stretching upwards
+        for (let i = 0; i < 40; i++) {
+            let width = Math.random() * 250 + 200; // Close together, reasonable size
+            let x = Math.random() * (canvas.width - width - 60) + 30;
+
+            let buildings = [];
+            let numBuildings = Math.floor(Math.random() * 3) + 2;
+            let bWidth = width / numBuildings;
+
+            for (let j = 0; j < numBuildings; j++) {
+                let bHeight = Math.random() * 60 + 40;
+                let bX = x + (j * bWidth) + 5;
+                buildings.push({
+                    x: bX,
+                    y: currentY - bHeight,
+                    width: bWidth - 10,
+                    height: bHeight,
+                    color: ['#ff007f', '#7900ff', '#00d4ff', '#ff9900'][Math.floor(Math.random() * 4)]
+                });
+            }
+
+            islands.push({
+                x: x,
+                y: currentY,
+                width: width,
+                height: 40,
+                buildings: buildings
+            });
+
+            // Spawn pigs on roofs or floating nearby
+            if (i > 0) {
+                let pigX = x + Math.random() * width;
+                let pigY = currentY - 80 - (Math.random() * 50);
+                pigs.push({
+                    x: pigX,
+                    y: pigY,
+                    radius: 14,
+                    collected: false,
+                    bobOffset: Math.random() * Math.PI * 2
+                });
+            }
+
+            // Move up for next island (distance creates water gap)
+            currentY -= Math.random() * 80 + 170;
+        }
+    }
+
+    // --- GAME INPUT HANDLERS ---
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+        if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+        if (e.code === 'Space') {
+            e.preventDefault();
+            if (!keys.flap && isPlaying) {
+                dragon.flap();
+            }
+            keys.flap = true;
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+        if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+        if (e.code === 'Space') keys.flap = false;
+    });
+
+    // Touch / On-screen controls
+    flapBtn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        if (isPlaying) dragon.flap();
+    });
+
+    steerSlider.addEventListener('input', () => {
+        // Slider value smoothly influences velocity
+    });
+
+    steerSlider.addEventListener('pointerup', () => {
+        steerSlider.value = 0; // Reset thumb on release
+    });
+
+    // --- GAME LOGIC ---
+    function startGame() {
+        score = 0;
+        scoreEl.innerText = score;
+        statusEl.innerText = "Flying";
+        statusEl.style.color = "#00ffcc";
+
+        dragon.reset();
+        generateWorld();
+
+        // Place dragon safely on first building
+        let firstBldg = islands[0].buildings[0];
+        dragon.x = firstBldg.x + firstBldg.width / 2;
+        dragon.y = firstBldg.y - dragon.height / 2;
+        dragon.isLanded = true;
+        dragon.landedBuilding = firstBldg;
+
+        cameraY = dragon.y - 400;
+
+        startScreen.style.display = 'none';
+        gameOverScreen.style.display = 'none';
+        isPlaying = true;
+
+        if (gameLoopId) cancelAnimationFrame(gameLoopId);
+        gameLoop();
+    }
+
+    function gameOver() {
+        isPlaying = false;
+        finalScoreEl.innerText = score;
+        gameOverScreen.style.display = 'flex';
+    }
+
+    function update() {
+        // 1. Process Steering Input
+        let steerVal = parseFloat(steerSlider.value);
+        if (keys.left) steerVal = -1;
+        if (keys.right) steerVal = 1;
+
+        if (!dragon.isLanded) {
+            dragon.vx += steerVal * 0.6;
+        } else if (Math.abs(steerVal) > 0.2) {
+            // Take off if steering while landed
+            dragon.flap();
+            dragon.vx = steerVal * 4;
+        }
+
+        // 2. Update Dragon Position
+        dragon.update();
+
+        // 3. Smooth Camera Tracking (Follow Dragon Upwards)
+        let targetCameraY = dragon.y - 350;
+        cameraY += (targetCameraY - cameraY) * 0.1;
+
+        // 4. Landing & Collision Logic with Roofs
+        statusEl.innerText = dragon.isLanded ? "Resting 💤" : "Flying 🪽";
+        statusEl.style.color = dragon.isLanded ? "#ffff00" : "#00ffcc";
+
+        if (dragon.vy > 0) { // Only land while falling
+            islands.forEach(island => {
+                island.buildings.forEach(bldg => {
+                    // Check if dragon feet are right at roof level
+                    if (dragon.x >= bldg.x - 10 && 
+                        dragon.x <= bldg.x + bldg.width + 10 &&
+                        dragon.y + 20 >= bldg.y && 
+                        dragon.y + 20 <= bldg.y + 15) {
+                        
+                        dragon.isLanded = true;
+                        dragon.landedBuilding = bldg;
+                        dragon.y = bldg.y - 20;
+                        dragon.vy = 0;
+                    }
+                });
+            });
+        }
+
+        // 5. Collect Pigs
+        pigs.forEach(pig => {
+            if (!pig.collected) {
+                let dx = dragon.x - pig.x;
+                let dy = (dragon.y - 10) - pig.y;
+                let dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < pig.radius + 20) {
+                    pig.collected = true;
+                    score += 1;
+                    scoreEl.innerText = score;
+                }
+            }
+        });
+
+        // 6. Water / Fall Check
+        // If dragon falls below lower screen bound or drops past the lowest island camera view
+        if (dragon.y - cameraY > canvas.height + 50) {
+            gameOver();
+        }
+    }
+
+    // --- DRAWING FUNCTIONS ---
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // A. Draw Fluorescent Water Background
+        ctx.fillStyle = '#001133';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Animated Neon Waves
+        ctx.fillStyle = '#00ffff';
+        ctx.globalAlpha = 0.3;
+        for (let i = 0; i < canvas.height; i += 40) {
+            let waveOffset = Math.sin((Date.now() * 0.003) + i) * 15;
+            ctx.fillRect(0, i + waveOffset, canvas.width, 4);
+        }
+        ctx.globalAlpha = 1.0;
+
+        // B. Draw Islands and City Buildings
+        islands.forEach(island => {
+            let screenY = island.y - cameraY;
+
+            // Only render if visible on screen
+            if (screenY > -200 && screenY < canvas.height + 200) {
+                
+                // Draw Sand/Island Base (Neon Yellow/Green Glow)
+                ctx.fillStyle = '#ccff00';
+                ctx.shadowColor = '#ccff00';
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.roundRect(island.x, screenY, island.width, island.height, [15]);
+                ctx.fill();
+                ctx.shadowBlur = 0; // Reset shadow
+
+                // Dirt under island
+                ctx.fillStyle = '#ff007f';
+                ctx.beginPath();
+                ctx.roundRect(island.x + 5, screenY + 15, island.width - 10, island.height, [5]);
+                ctx.fill();
+
+                // Buildings
+                island.buildings.forEach(bldg => {
+                    let bldgScreenY = bldg.y - cameraY;
+
+                    // Building Body
+                    ctx.fillStyle = bldg.color;
+                    ctx.strokeStyle = '#ffff00';
+                    ctx.lineWidth = 2;
+                    ctx.fillRect(bldg.x, bldgScreenY, bldg.width, bldg.height);
+                    ctx.strokeRect(bldg.x, bldgScreenY, bldg.width, bldg.height);
+
+                    // Glow Roof (Landing Pad Target)
+                    ctx.fillStyle = '#00ffcc';
+                    ctx.shadowColor = '#00ffcc';
+                    ctx.shadowBlur = 8;
+                    ctx.fillRect(bldg.x - 3, bldgScreenY, bldg.width + 6, 6);
+                    ctx.shadowBlur = 0;
+
+                    // Windows
+                    ctx.fillStyle = '#ffff00';
+                    for (let wx = bldg.x + 8; wx < bldg.x + bldg.width - 8; wx += 12) {
+                        for (let wy = bldgScreenY + 12; wy < bldgScreenY + bldg.height - 8; wy += 15) {
+                            ctx.fillRect(wx, wy, 6, 8);
+                        }
+                    }
+                });
+            }
+        });
+
+        // C. Draw Pigs 🐷
+        pigs.forEach(pig => {
+            if (!pig.collected) {
+                let pigScreenY = (pig.y + Math.sin(Date.now() * 0.005 + pig.bobOffset) * 6) - cameraY;
+
+                if (pigScreenY > -50 && pigScreenY < canvas.height + 50) {
+                    ctx.save();
+                    ctx.translate(pig.x, pigScreenY);
+
+                    // Pig Body (Bright Neon Pink)
+                    ctx.fillStyle = '#ff66cc';
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, pig.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Ears
+                    ctx.beginPath();
+                    ctx.moveTo(-10, -10); ctx.lineTo(-14, -18); ctx.lineTo(-4, -12);
+                    ctx.moveTo(10, -10); ctx.lineTo(14, -18); ctx.lineTo(4, -12);
+                    ctx.fill();
+
+                    // Snout
+                    ctx.fillStyle = '#ff007f';
+                    ctx.beginPath();
+                    ctx.ellipse(0, 2, 6, 4, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Eyes
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath();
+                    ctx.arc(-4, -4, 2, 0, Math.PI * 2);
+                    ctx.arc(4, -4, 2, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.restore();
+                }
+            }
+        });
+
+        // D. Draw Dragon
+        dragon.draw();
+    }
+
+    // --- MAIN GAME LOOP ---
+    function gameLoop() {
+        if (isPlaying) {
+            update();
+            draw();
+            gameLoopId = requestAnimationFrame(gameLoop);
+        }
+    }
+</script>
+</body>
+</html>
