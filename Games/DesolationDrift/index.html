@@ -21,23 +21,26 @@
   <main id="stage">
     <canvas id="game-canvas"></canvas>
     <div id="toast-anchor"></div>
-  </main>
 
-  <!-- Contextual panel: shown when a building is selected (train units) -->
-  <div id="building-panel" class="hidden">
-    <div class="panel-header">
-      <span id="bp-icon"></span>
-      <span id="bp-name"></span>
-      <button id="bp-close" class="icon-btn">✕</button>
+    <!-- Action panel, top-right of the viewport: shown when a building is
+         selected (train units) or while placing one. -->
+    <div id="building-panel" class="hidden">
+      <div class="panel-header">
+        <span id="bp-icon"></span>
+        <span id="bp-name"></span>
+        <button id="bp-close" class="icon-btn">✕</button>
+      </div>
+      <!-- Caption sits outside the button on purpose: text baked into a
+           clickable element is what made this button unreliable to tap. -->
+      <div id="bp-train-caption" class="btn-caption"></div>
+      <button id="bp-train" class="action-btn"><span id="bp-train-icon" class="btn-icon"></span></button>
     </div>
-    <button id="bp-train" class="action-btn"></button>
-  </div>
 
-  <!-- Placement helper bar -->
-  <div id="placement-bar" class="hidden">
-    <span>Tap the map to place <b id="placement-name"></b></span>
-    <button id="placement-cancel" class="action-btn secondary">Cancel</button>
-  </div>
+    <div id="placement-bar" class="hidden">
+      <span>Tap the map to place <b id="placement-name"></b></span>
+      <button id="placement-cancel" class="action-btn secondary">Cancel</button>
+    </div>
+  </main>
 
   <!-- Bottom build bar -->
   <footer id="build-bar"></footer>

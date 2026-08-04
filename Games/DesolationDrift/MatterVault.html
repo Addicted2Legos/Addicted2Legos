@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Matter Vault - 60° Top-Down View</title>
+  <style>
+    :root {
+      --bg-desert: #8a3f25;
+      --bg-sky: #1a2a3a;
+      --metal-dark: #3a454d;
+      --metal-rust: #6e4b38;
+      --metal-light: #5a6975;
+      --cyan-glow: #00f3ff;
+      --orange-glow: #ff9d00;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: #0d131a;
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    .container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: radial-gradient(circle at 50% 40%, #1c2b38 0%, #0a0e14 100%);
+    }
+
+    .viewport {
+      position: relative;
+      width: 850px;
+      height: 650px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    svg {
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 25px 35px rgba(0,0,0,0.8));
+    }
+
+    /* Glow Effects */
+    .glow-cyan {
+      filter: drop-shadow(0 0 10px var(--cyan-glow));
+    }
+
+    .glow-orange {
+      filter: drop-shadow(0 0 8px var(--orange-glow));
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="viewport">
+      <svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <!-- Terrain Gradient -->
+          <radialGradient id="groundGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#b25332" />
+            <stop offset="70%" stop-color="#732f1a" />
+            <stop offset="100%" stop-color="#361309" />
+          </radialGradient>
+
+          <!-- Metallic Wall Gradients -->
+          <linearGradient id="wallMetal" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#52616d" />
+            <stop offset="50%" stop-color="#37424a" />
+            <stop offset="100%" stop-color="#1e242a" />
+          </linearGradient>
+
+          <linearGradient id="rustOverlay" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#8c4e33" />
+            <stop offset="60%" stop-color="#5e3321" />
+            <stop offset="100%" stop-color="#2a3036" />
+          </linearGradient>
+
+          <!-- Tube Glow Gradient -->
+          <linearGradient id="cyanTube" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#005b66" />
+            <stop offset="50%" stop-color="#00f3ff" />
+            <stop offset="100%" stop-color="#005b66" />
+          </linearGradient>
+
+          <!-- Roof Top Gradients (Highlighting High Top-Down Lighting) -->
+          <linearGradient id="roofTop" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#7a8c9e" />
+            <stop offset="100%" stop-color="#475460" />
+          </linearGradient>
+
+          <linearGradient id="roofTopRust" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#a66144" />
+            <stop offset="100%" stop-color="#523122" />
+          </linearGradient>
+        </defs>
+
+        <!-- ================= GROUND TERRAIN ================= -->
+        <!-- 60 Degree Top-Down Flatter Ground Ellipse -->
+        <ellipse cx="400" cy="350" rx="380" ry="220" fill="url(#groundGrad)" />
+        
+        <!-- Ground Details -->
+        <ellipse cx="280" cy="380" rx="140" ry="50" fill="#4d1c0e" opacity="0.6"/>
+        <ellipse cx="530" cy="310" rx="160" ry="60" fill="#4d1c0e" opacity="0.5"/>
+        
+        <!-- Fencing / Perimeter Lines -->
+        <path d="M 100 320 L 250 210 L 580 210 L 700 320" fill="none" stroke="#5a3829" stroke-width="3" stroke-dasharray="6,4"/>
+
+        <!-- ================= BUILDING DROP SHADOW ================= -->
+        <polygon points="180,390 400,490 620,410 650,300 480,210 220,250" fill="#120604" opacity="0.75" />
+
+        <!-- ================= BUILDING (60° TOP-DOWN VIEW) ================= -->
+        <g id="matter-vault-building">
+
+          <!-- REAR BASE STRUCTURE & SILOS -->
+          <!-- Left Silo Base & Capsule (Visible Top) -->
+          <rect x="210" y="220" width="50" height="70" fill="url(#wallMetal)" />
+          <ellipse cx="235" cy="220" rx="25" ry="16" fill="url(#roofTop)" />
+          <!-- Cyan Tube Top Cap -->
+          <ellipse cx="235" cy="200" rx="18" ry="22" fill="url(#cyanTube)" class="glow-cyan" />
+          <ellipse cx="235" cy="188" rx="14" ry="8" fill="#e0f8ff" class="glow-cyan" />
+
+          <!-- Right Cylinder Tank (Rusted, High Top Visibility) -->
+          <ellipse cx="580" cy="280" rx="38" ry="22" fill="#1b1d20" />
+          <rect x="542" y="280" width="76" height="60" fill="url(#rustOverlay)" />
+          <ellipse cx="580" cy="280" rx="38" ry="22" fill="url(#roofTopRust)" stroke="#2d1910" stroke-width="2" />
+          <!-- Top Cap Cone/Vents -->
+          <ellipse cx="580" cy="265" rx="22" ry="12" fill="url(#wallMetal)" />
+          <ellipse cx="580" cy="255" rx="10" ry="6" fill="url(#cyanTube)" class="glow-cyan" />
+
+          <!-- LOWER TIER BASE (Flattened height, expanded roof for 60° angle) -->
+          <!-- Left Side Wall -->
+          <polygon points="230,340 380,420 380,360 230,290" fill="url(#rustOverlay)" stroke="#1a2126" stroke-width="1.5"/>
+          <!-- Right Side Wall -->
+          <polygon points="380,420 570,340 570,280 380,360" fill="url(#wallMetal)" stroke="#1a2126" stroke-width="1.5"/>
+          
+          <!-- Large Lower Roof Surface (Prominent in Top-Down) -->
+          <polygon points="230,290 380,360 570,280 420,220" fill="url(#roofTopRust)" stroke="#2c353d" stroke-width="2"/>
+
+          <!-- UPPER TIER ROOF & STRUCTURE (Factory Core) -->
+          <!-- Left Upper Wall -->
+          <polygon points="280,240 380,290 380,240 280,200" fill="url(#wallMetal)"/>
+          <!-- Right Upper Wall -->
+          <polygon points="380,290 510,235 510,190 380,240" fill="url(#rustOverlay)"/>
+          
+          <!-- Roof Surface (Upper Core - Main Top View Area) -->
+          <polygon points="280,200 380,240 510,190 410,160" fill="url(#roofTop)" stroke="#1a2126" stroke-width="2"/>
+
+          <!-- ROOF VENTILATION & EXHAUST SYSTEMS (Detailed Top-Down View) -->
+          <!-- Primary Exhaust Stacks -->
+          <ellipse cx="350" cy="195" rx="12" ry="7" fill="#111"/>
+          <rect x="338" y="180" width="24" height="15" fill="url(#wallMetal)"/>
+          <ellipse cx="350" cy="180" rx="12" ry="7" fill="url(#roofTop)"/>
+          <ellipse cx="350" cy="180" rx="8" ry="4" fill="#090d12"/>
+
+          <ellipse cx="380" cy="205" rx="9" ry="5" fill="#111"/>
+          <rect x="371" y="193" width="18" height="12" fill="url(#rustOverlay)"/>
+          <ellipse cx="380" cy="193" rx="9" ry="5" fill="url(#roofTopRust)"/>
+          <ellipse cx="380" cy="193" rx="5" ry="3" fill="#090d12"/>
+
+          <!-- Roof Air Intake Grids -->
+          <polygon points="420,200 460,185 480,193 440,208" fill="#222b33" stroke="#455463" stroke-width="1.5"/>
+          <line x1="430" y1="200" x2="450" y2="192" stroke="#00f3ff" stroke-width="1" class="glow-cyan"/>
+          <line x1="435" y1="202" x2="455" y2="194" stroke="#00f3ff" stroke-width="1" class="glow-cyan"/>
+          <line x1="440" y1="204" x2="460" y2="196" stroke="#00f3ff" stroke-width="1" class="glow-cyan"/>
+
+          <!-- PIPING & DUCTWORK (Routing across the roofs) -->
+          <!-- Heavy Rusted Pipeline running from roof to ground -->
+          <path d="M 235 230 C 235 280, 180 300, 140 310" fill="none" stroke="#222" stroke-width="12" stroke-linecap="round"/>
+          <path d="M 235 230 C 235 280, 180 300, 140 310" fill="none" stroke="#6e4b38" stroke-width="8" stroke-linecap="round"/>
+
+          <!-- Glowing Energy Conduit -->
+          <path d="M 510 210 L 545 225 L 545 270 L 580 280" fill="none" stroke="#1b2228" stroke-width="7"/>
+          <path d="M 510 210 L 545 225 L 545 270 L 580 280" fill="none" stroke="#00f3ff" stroke-width="3" class="glow-cyan"/>
+
+          <!-- Roof Ribs / Structural Supports (Upper Roof Top) -->
+          <line x1="310" y1="212" x2="410" y2="172" stroke="#2e3842" stroke-width="3"/>
+          <line x1="330" y1="220" x2="430" y2="180" stroke="#2e3842" stroke-width="3"/>
+          <line x1="350" y1="228" x2="450" y2="188" stroke="#2e3842" stroke-width="3"/>
+
+          <!-- ================= VAULT ENTRANCE (FLATTENED ISOMETRIC) ================= -->
+          <!-- Archway Base Frame -->
+          <polygon points="250,350 320,388 320,340 250,305" fill="#1d242a" stroke="#37434f"/>
+          <!-- Inner Vault Portal Interior Glow -->
+          <polygon points="260,355 310,382 310,348 260,322" fill="#0d1114"/>
+          <polygon points="265,352 305,374 305,352 265,332" fill="#ff7700" opacity="0.35" class="glow-orange"/>
+          
+          <!-- Entrance Ramp Pad & Light Track -->
+          <polygon points="235,360 265,350 310,375 280,388" fill="#ffaa00" opacity="0.8" class="glow-orange"/>
+          <polygon points="225,365 260,352 315,380 275,395" fill="none" stroke="#ff9d00" stroke-width="2" class="glow-orange"/>
+
+          <!-- Door Status Light Arc -->
+          <path d="M 255 310 L 315 342" stroke="#ff9d00" stroke-width="4" stroke-linecap="round" class="glow-orange"/>
+
+          <!-- ================= GROUND DETAILS & LANDING PADS ================= -->
+          <!-- Mech Pad 1 (Top-Down Ellipse Projection) -->
+          <ellipse cx="440" cy="410" rx="38" ry="18" fill="none" stroke="#00f3ff" stroke-width="2.5" class="glow-cyan"/>
+          <ellipse cx="440" cy="410" rx="28" ry="13" fill="#00f3ff" opacity="0.12"/>
+          <!-- Crosshairs on Pad -->
+          <line x1="440" y1="390" x2="440" y2="430" stroke="#00f3ff" stroke-width="1" opacity="0.6"/>
+          <line x1="400" y1="410" x2="480" y2="410" stroke="#00f3ff" stroke-width="1" opacity="0.6"/>
+
+          <!-- Mech Pad 2 -->
+          <ellipse cx="530" cy="375" rx="38" ry="18" fill="none" stroke="#00f3ff" stroke-width="2.5" class="glow-cyan"/>
+          <ellipse cx="530" cy="375" rx="28" ry="13" fill="#00f3ff" opacity="0.12"/>
+          <!-- Crosshairs on Pad -->
+          <line x1="530" y1="355" x2="530" y2="395" stroke="#00f3ff" stroke-width="1" opacity="0.6"/>
+          <line x1="490" y1="375" x2="570" y2="375" stroke="#00f3ff" stroke-width="1" opacity="0.6"/>
+
+          <!-- Small Sentinel Drone Ground Unit -->
+          <ellipse cx="190" cy="390" rx="10" ry="5" fill="#222b33"/>
+          <circle cx="190" cy="387" r="6" fill="#3a454d" stroke="#00f3ff" stroke-width="1.5"/>
+          <circle cx="190" cy="387" r="2.5" fill="#ff9d00" class="glow-orange"/>
+        </g>
+      </svg>
+    </div>
+  </div>
+
+</body>
+</html>

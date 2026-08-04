@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alien Stand-On Skid-Steer Demo</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #120935;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        canvas {
+            background-color: #21242d;
+            box-shadow: 0 12px 60px rgba(0, 0, 0, 0.7);
+            border-radius: 12px;
+            border: 2px solid #363b4a;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas" width="900" height="500"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Main State
+        let vehicleX = 450;
+        const startY = 320;
+        let speed = 2.0;
+        let direction = 1; // 1 = right, -1 = left
+        let frameTime = 0;
+
+        // Boundaries
+        const minX = 180;
+        const maxX = canvas.width - 180;
+
+        // Color Palette
+        const V_YELLOW = '#ffd700'; // Vermeer Yellow
+        const V_BLACK  = '#1e2024'; // Chassis & Arms Black
+        const A_SKIN   = '#94e8b4'; // Alien Skin
+        const ALIEN_V  = '#d4ff00'; // Safety Vest
+        const P_MUSH   = '#cc99ff'; // Mushroom caps
+        const P_CRYSTAL= '#a288e3'; // Crystal glow
+
+        function drawBackground() {
+            // Space Sky
+            ctx.fillStyle = '#170c3a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height * 0.4);
+
+            // Large Purple Planet
+            ctx.fillStyle = '#26154e';
+            ctx.beginPath();
+            ctx.arc(150, 80, 50, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Background Alien Hills
+            ctx.fillStyle = '#3a216e';
+            ctx.beginPath();
+            ctx.moveTo(0, 180);
+            ctx.quadraticCurveTo(200, 140, 400, 200);
+            ctx.quadraticCurveTo(600, 160, 900, 220);
+            ctx.lineTo(900, 300);
+            ctx.lineTo(0, 300);
+            ctx.closePath();
+            ctx.fill();
+
+            // Foreground Ground
+            ctx.fillStyle = '#b38f5c';
+            ctx.fillRect(0, 300, canvas.width, canvas.height - 300);
+
+            // Isometric Grid Overlay
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+            ctx.lineWidth = 1;
+            const step = 40;
+            ctx.save();
+            ctx.scale(1, 0.5);
+            for (let x = -canvas.width; x < canvas.width * 2; x += step) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x + canvas.height * 2, canvas.height * 2);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x - canvas.height * 2, canvas.height * 2);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function drawEnvironmentDetails() {
+            // Crystals (Bottom Right)
+            ctx.save();
+            ctx.translate(750, 400);
+            ctx.shadowColor = P_CRYSTAL;
+            ctx.shadowBlur = 15;
+            ctx.fillStyle = '#c5b3e6';
+            ctx.beginPath();
+            ctx.moveTo(0,0); ctx.lineTo(-15,-40); ctx.lineTo(10,-60); ctx.lineTo(25,-30); ctx.closePath(); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(-10,-5); ctx.lineTo(-30,-30); ctx.lineTo(-15,-50); ctx.lineTo(0,-35); ctx.closePath(); ctx.fill();
+            ctx.restore();
+
+            // Mushrooms (Bottom Left)
+            ctx.save();
+            ctx.translate(150, 420);
+            ctx.shadowColor = P_MUSH;
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = '#e6ccff';
+            ctx.fillRect(-4, 0, 8, -40);
+            ctx.fillStyle = P_MUSH;
+            ctx.beginPath();
+            ctx.ellipse(0, -40, 25, 15, 0, 0, Math.PI, true);
+            ctx.fill();
+            ctx.fillStyle = 'white';
+            ctx.beginPath(); ctx.arc(-10, -45, 3, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(10, -42, 4, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+        }
+
+        function drawWheel(x, y, rotationAngle) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            // Shadow under wheel
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.beginPath();
+            ctx.ellipse(0, 16, 16, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Rubber Tire
+            ctx.fillStyle = '#1c1e22';
+            ctx.beginPath();
+            ctx.arc(0, 0, 16, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#333842';
+            ctx.stroke();
+
+            // Wheel Rim
+            ctx.fillStyle = V_YELLOW;
+            ctx.beginPath();
+            ctx.arc(0, 0, 9, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Lug Nuts & Rotating Spoke Detail
+            ctx.rotate(rotationAngle);
+            ctx.fillStyle = '#222';
+            ctx.fillRect(-6, -2, 12, 4);
+            ctx.fillRect(-2, -6, 4, 12);
+            ctx.beginPath();
+            ctx.arc(0, 0, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawStandOnSkidSteer(x, y, dir, time) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            // Isometric View Compression
+            ctx.scale(1, 0.866);
+
+            // Flip horizontally based on direction
+            if (dir === -1) {
+                ctx.scale(-1, 1);
+            }
+
+            // Engine vibration
+            const vib = Math.sin(time * 0.5) * 0.8;
+            ctx.translate(0, vib);
+
+            const wheelRotation = (x * 0.1) * dir;
+
+            // 1. REAR OPERATOR STANDING PLATFORM
+            ctx.fillStyle = V_BLACK;
+            ctx.fillRect(-65, 12, 22, 5);
+            ctx.fillRect(-63, 5, 4, 8);
+
+            // 2. MAIN CHASSIS (Yellow Body & Black Frame)
+            ctx.fillStyle = V_YELLOW;
+            ctx.beginPath();
+            ctx.moveTo(-45, -28);
+            ctx.lineTo(15, -28);
+            ctx.lineTo(28, -5);
+            ctx.lineTo(28, 8);
+            ctx.lineTo(-45, 8);
+            ctx.closePath();
+            ctx.fill();
+
+            // Black side accent panels & logo placement
+            ctx.fillStyle = V_BLACK;
+            ctx.fillRect(-45, -12, 70, 10);
+
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 7px sans-serif';
+            ctx.fillText("VERMEER", -22, -5);
+
+            // Control Console Tower
+            ctx.fillStyle = V_YELLOW;
+            ctx.beginPath();
+            ctx.moveTo(-45, -28);
+            ctx.lineTo(-30, -42);
+            ctx.lineTo(-20, -42);
+            ctx.lineTo(-20, -28);
+            ctx.closePath();
+            ctx.fill();
+
+            // Control Handles / Joysticks
+            ctx.strokeStyle = '#888';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(-28, -42);
+            ctx.lineTo(-28, -48);
+            ctx.stroke();
+
+            ctx.fillStyle = '#cc0000'; // Red Joystick Knob
+            ctx.beginPath(); ctx.arc(-28, -49, 2.5, 0, Math.PI * 2); ctx.fill();
+
+            // 3. FOUR WHEELS
+            drawWheel(-32, 10, wheelRotation);
+            drawWheel(12, 10, wheelRotation);
+
+            // 4. STANDING ALIEN OPERATOR (Positioned & Scaled directly on the platform)
+            ctx.save();
+            // Anchor origin directly on the platform surface (-55, 12)
+            ctx.translate(-55, 12); 
+
+            // Scale whole alien 1.8x width and 2.0x height relative to platform
+            ctx.scale(1.8, 2.0); 
+
+            // Feet (flat on the platform surface)
+            ctx.fillStyle = '#111';
+            ctx.beginPath(); ctx.ellipse(-2, 0, 3, 1.2, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(3, 0, 3, 1.2, 0, 0, Math.PI * 2); ctx.fill();
+
+            // Legs standing upright from feet
+            ctx.fillStyle = A_SKIN;
+            ctx.fillRect(-3, -16, 2.5, 16);
+            ctx.fillRect(2, -16, 2.5, 16);
+
+            // Body / Safety Vest
+            ctx.translate(0, -16);
+            ctx.fillStyle = ALIEN_V;
+            ctx.beginPath(); 
+            ctx.roundRect(-7, -14, 14, 14, 3); 
+            ctx.fill();
+
+            // Vest Stripes
+            ctx.fillStyle = 'white';
+            ctx.fillRect(-7, -11, 14, 1.5);
+            ctx.fillRect(-7, -5, 14, 1.5);
+
+            // Arms reaching forward to hold joystick
+            ctx.strokeStyle = A_SKIN;
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            ctx.moveTo(2, -8);
+            ctx.lineTo(15, -17);
+            ctx.stroke();
+
+            // Alien Head
+            ctx.translate(0, -14);
+            ctx.fillStyle = A_SKIN;
+            ctx.beginPath(); 
+            ctx.ellipse(0, -5, 7.5, 9.5, 0, 0, Math.PI * 2); 
+            ctx.fill();
+
+            // Large Black Alien Eyes
+            ctx.fillStyle = 'black';
+            ctx.beginPath(); ctx.ellipse(-3, -5, 2.5, 4, 0.1, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(3, -5, 2.5, 4, -0.1, 0, Math.PI * 2); ctx.fill();
+
+            // Construction Hard Hat
+            ctx.translate(0, -12);
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(0, 0, 8.5, Math.PI, 0);
+            ctx.lineTo(10, 0); ctx.lineTo(-10, 0);
+            ctx.fill();
+            ctx.strokeStyle = '#bbb';
+            ctx.stroke();
+
+            ctx.restore(); // End Alien rendering
+
+            // 5. FRONT LIFT ARMS AND BUCKET
+            ctx.strokeStyle = V_BLACK;
+            ctx.lineWidth = 5;
+            ctx.lineCap = 'round';
+            
+            // Curved Lift Arm
+            ctx.beginPath();
+            ctx.moveTo(-40, -22);
+            ctx.quadraticCurveTo(-5, -55, 38, -10);
+            ctx.stroke();
+            
+            // Hinge Pins
+            ctx.fillStyle = V_YELLOW;
+            ctx.beginPath(); ctx.arc(-40, -22, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(38, -10, 3, 0, Math.PI * 2); ctx.fill();
+
+            // Bucket (Loaded with Purple Dirt)
+            ctx.translate(42, -10);
+            ctx.rotate(0.15);
+
+            // Dirt Payload
+            ctx.fillStyle = '#8e44ad';
+            ctx.beginPath();
+            ctx.ellipse(6, -6, 14, 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Steel Bucket
+            ctx.fillStyle = V_BLACK;
+            ctx.beginPath();
+            ctx.moveTo(-4, -6);
+            ctx.lineTo(20, -1);
+            ctx.lineTo(18, 18);
+            ctx.lineTo(-4, 14);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#444';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawBackground();
+            drawEnvironmentDetails();
+
+            // Drive back and forth
+            vehicleX += speed * direction;
+            frameTime += 1;
+
+            if (vehicleX >= maxX) {
+                direction = -1;
+            } else if (vehicleX <= minX) {
+                direction = 1;
+            }
+
+            drawStandOnSkidSteer(vehicleX, startY, direction, frameTime);
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>

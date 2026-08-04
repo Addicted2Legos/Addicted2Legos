@@ -94,6 +94,7 @@ function createEnemy(typeId, x, y) {
     maxHp: def.hp,
     lastAttack: 0,
     targetId: null,
+    frozenUntil: 0, // ms timestamp; while state.elapsed < this, can't move or attack
   };
 }
 
@@ -111,6 +112,7 @@ function createBuilding(typeId, col, row) {
     buildStarted: performance.now(),
     productionQueue: 0, // number of units queued
     productionProgress: 0, // ms into current unit
+    lastAttack: 0, // ms timestamp, used by towers (def.attack) to pace shots
   };
 }
 

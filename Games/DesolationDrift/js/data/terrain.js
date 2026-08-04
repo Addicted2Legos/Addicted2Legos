@@ -47,15 +47,18 @@ function generateFrontierMap() {
   decor.forEach(([c, r, t]) => { tiles[r][c] = t; });
 
   const nodes = [
-    { id: 'min1', type: 'minerals', col: 2, row: 4, amount: 400, maxAmount: 400 },
-    { id: 'min2', type: 'minerals', col: 1, row: 6, amount: 400, maxAmount: 400 },
-    { id: 'min3', type: 'minerals', col: 3, row: 7, amount: 300, maxAmount: 300 },
+    { id: 'oil1', type: 'crudeOil', col: 2, row: 4, amount: 400, maxAmount: 400 },
+    { id: 'oil2', type: 'crudeOil', col: 1, row: 6, amount: 400, maxAmount: 400 },
+    { id: 'oil3', type: 'crudeOil', col: 3, row: 7, amount: 300, maxAmount: 300 },
     { id: 'eng1', type: 'energy', col: 13, row: 3, amount: 300, maxAmount: 300 },
     { id: 'eng2', type: 'energy', col: 14, row: 6, amount: 300, maxAmount: 300 },
     { id: 'wood1', type: 'wood', col: 5, row: 1, amount: 150, maxAmount: 150 },
     { id: 'wood2', type: 'wood', col: 6, row: 1, amount: 150, maxAmount: 150 },
     { id: 'wood3', type: 'wood', col: 9, row: 8, amount: 150, maxAmount: 150 },
     { id: 'wood4', type: 'wood', col: 10, row: 8, amount: 150, maxAmount: 150 },
+    { id: 'metal1', type: 'metal', col: 12, row: 1, amount: 350, maxAmount: 350 },
+    { id: 'metal2', type: 'metal', col: 2, row: 1, amount: 350, maxAmount: 350 },
+    { id: 'metal3', type: 'metal', col: 11, row: 8, amount: 300, maxAmount: 300 },
   ];
 
   // Enemies walk in from the right-hand desert horizon.

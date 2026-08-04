@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alien Worker Walk Cycle</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #12151c;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: sans-serif;
+        }
+        canvas {
+            background-color: #1a1e29;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            border: 1px solid #2a3245;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Worker Position & Movement Configuration
+        let workerX = -50;
+        let workerY = 220;
+        const speed = 1.5;
+        let animTime = 0;
+
+        function drawAlienWorker(x, y, time) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            // Apply 60-degree top-down perspective transform
+            // Scaling Y down simulates the overhead angled viewing angle
+            const isoYScale = Math.sin(60 * Math.PI / 180); // ~0.866
+            ctx.scale(1, isoYScale);
+
+            // Calculate walk cycle animation variables
+            const walkSpeed = 0.12;
+            const stride = Math.sin(time * walkSpeed);
+            const bounce = Math.abs(Math.sin(time * walkSpeed * 2)) * 3;
+
+            // Colors
+            const skinColor = '#00e5a3';       // Bioluminescent teal
+            const armorColor = '#2b3a4e';      // Dark suit
+            const crystalColor = '#00c3ff';    // Glowing blue crystal
+
+            // 1. SHADOW (Projected flat on the ground)
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+            ctx.beginPath();
+            ctx.ellipse(0, 10, 22, 10, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Offset for vertical bounce during walking
+            ctx.translate(0, -bounce);
+
+            // 2. LEGS & FEET
+            const legOffset = stride * 12;
+
+            // Left Leg (Back/Behind)
+            ctx.fillStyle = armorColor;
+            ctx.beginPath();
+            ctx.ellipse(-6 - legOffset * 0.5, 0, 5, 10, -0.2, 0, Math.PI * 2);
+            ctx.fill();
+            // Left Foot (Underwater webbed pod)
+            ctx.fillStyle = skinColor;
+            ctx.beginPath();
+            ctx.ellipse(-8 - legOffset, 8, 6, 4, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Right Leg (Front)
+            ctx.fillStyle = armorColor;
+            ctx.beginPath();
+            ctx.ellipse(6 + legOffset * 0.5, 0, 5, 10, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            // Right Foot
+            ctx.fillStyle = skinColor;
+            ctx.beginPath();
+            ctx.ellipse(8 + legOffset, 8, 6, 4, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 3. TORSO / SUIT
+            ctx.fillStyle = armorColor;
+            ctx.beginPath();
+            ctx.ellipse(0, -18, 14, 16, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Bioluminescent Chest Vents (Alien Theme)
+            ctx.fillStyle = skinColor;
+            ctx.beginPath();
+            ctx.ellipse(0, -16, 6, 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 4. ALIEN HEAD (Top-down view visible dome)
+            // Head Base
+            ctx.fillStyle = armorColor;
+            ctx.beginPath();
+            ctx.ellipse(0, -38, 16, 12, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Glass Visor / Bioluminescent Eye
+            ctx.fillStyle = skinColor;
+            ctx.beginPath();
+            ctx.ellipse(4, -38, 10, 6, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Head Tendril/Fin (Alien detail)
+            ctx.strokeStyle = skinColor;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(-10, -42);
+            ctx.quadraticCurveTo(-20, -48, -16, -35);
+            ctx.stroke();
+
+            // 5. ARMS & CARRIED CRYSTAL
+            const armSwing = Math.cos(time * walkSpeed) * 3;
+
+            // Carried Crystal (Floating/held in front)
+            ctx.fillStyle = crystalColor;
+            ctx.shadowColor = crystalColor;
+            ctx.shadowBlur = 12;
+
+            // Draw sharp crystal cluster
+            ctx.beginPath();
+            ctx.moveTo(12 + armSwing, -28);
+            ctx.lineTo(22 + armSwing, -38);
+            ctx.lineTo(26 + armSwing, -26);
+            ctx.lineTo(18 + armSwing, -16);
+            ctx.closePath();
+            ctx.fill();
+
+            // Reset glow effect for remaining elements
+            ctx.shadowBlur = 0;
+
+            // Arms holding the crystal
+            ctx.strokeStyle = skinColor;
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+
+            // Left Arm
+            ctx.beginPath();
+            ctx.moveTo(-8, -22);
+            ctx.lineTo(8 + armSwing, -22);
+            ctx.stroke();
+
+            // Right Arm
+            ctx.beginPath();
+            ctx.moveTo(4, -18);
+            ctx.lineTo(16 + armSwing, -20);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function animate() {
+            // Clear Frame
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Terrain Grid Line to anchor perspective
+            ctx.strokeStyle = '#252d3d';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < canvas.width; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i - 100, canvas.height);
+                ctx.stroke();
+            }
+
+            // Update Worker Position
+            workerX += speed;
+            animTime += 1;
+
+            // Loop worker when he walks off-screen
+            if (workerX > canvas.width + 60) {
+                workerX = -60;
+            }
+
+            // Draw Character Frame
+            drawAlienWorker(workerX, workerY, animTime);
+
+            requestAnimationFrame(animate);
+        }
+
+        // Start Animation Loop
+        animate();
+    </script>
+</body>
+</html>

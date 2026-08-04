@@ -67,13 +67,30 @@
     buildBarEl.innerHTML = '';
     Object.values(BUILDINGS).forEach((def) => {
       if (def.hidden) return;
+      const costStr = Object.entries(def.cost).map(([k, v]) => `${RESOURCES[k].icon}${v}`).join(' ');
+
+      // Name/cost sit outside the button as plain (non-clickable) captions —
+      // the button itself is just the icon, so a tap always lands on a big
+      // blank target instead of possibly landing on a text glyph.
+      const item = document.createElement('div');
+      item.className = 'build-item';
+
+      const label = document.createElement('span');
+      label.className = 'bb-label';
+      label.textContent = def.name;
+
       const btn = document.createElement('button');
       btn.className = 'build-btn';
       btn.id = `build-${def.id}`;
-      const costStr = Object.entries(def.cost).map(([k, v]) => `${RESOURCES[k].icon}${v}`).join(' ');
-      btn.innerHTML = `<span class="bb-icon">${def.icon}</span><span class="bb-label">${def.name}</span><span class="bb-cost">${costStr}</span>`;
+      btn.innerHTML = `<span class="bb-icon">${def.icon}</span>`;
       btn.addEventListener('click', () => handleBuildTap(def.id));
-      buildBarEl.appendChild(btn);
+
+      const cost = document.createElement('span');
+      cost.className = 'bb-cost';
+      cost.textContent = costStr;
+
+      item.append(label, btn, cost);
+      buildBarEl.appendChild(item);
     });
     refreshBuildBarState();
   }
@@ -120,27 +137,44 @@
   function refreshBuildingPanel() {
     if (!selectedBuilding) return;
     const btn = document.getElementById('bp-train');
+    const caption = document.getElementById('bp-train-caption');
+    const icon = document.getElementById('bp-train-icon');
     if (!selectedBuilding.complete) {
-      btn.textContent = `Building… ${Math.round(selectedBuilding.progress * 100)}%`;
+      caption.textContent = `Building… ${Math.round(selectedBuilding.progress * 100)}%`;
+      icon.textContent = '⏳';
       btn.disabled = true;
+      btn.style.opacity = '';
       return;
     }
     if (!selectedBuilding.def.produces) {
-      btn.textContent = 'Nothing to train here';
+      caption.textContent = 'Nothing to train here';
+      icon.textContent = '—';
       btn.disabled = true;
+      btn.style.opacity = '';
       return;
     }
     const unitDef = UNITS[selectedBuilding.def.produces];
     const costStr = Object.entries(unitDef.cost).map(([k, v]) => `${RESOURCES[k].icon}${v}`).join(' ');
-    const queued = selectedBuilding.productionQueue > 0 ? ` (queue: ${selectedBuilding.productionQueue})` : '';
-    btn.textContent = `Train ${unitDef.name} — ${costStr}${queued}`;
-    btn.disabled = !canAfford(state, unitDef.cost);
+    const queued = selectedBuilding.productionQueue > 0 ? ` · queued ${selectedBuilding.productionQueue}` : '';
+    caption.textContent = `Train ${unitDef.name} — ${costStr}${queued}`;
+    icon.textContent = unitDef.icon;
+    // Stay clickable even when unaffordable — a native `disabled` button
+    // eats the click before it ever reaches the handler below, so the
+    // "Not enough resources" toast never has a chance to fire and tapping
+    // it just looks broken. Dim it instead, same as the build bar does.
+    btn.disabled = false;
+    btn.style.opacity = canAfford(state, unitDef.cost) ? '' : '0.55';
   }
   document.getElementById('bp-close').addEventListener('click', hideBuildingPanel);
   document.getElementById('bp-train').addEventListener('click', () => {
     if (!selectedBuilding) return;
     const result = queueTraining(state, selectedBuilding);
+    // Every click needs an immediate, unmistakable reaction — training
+    // takes several seconds to actually produce a unit, so without this a
+    // successful click looks identical to a dropped one and invites
+    // repeat-clicking (which silently queues/pays for extras).
     if (!result.ok) toast(result.reason);
+    else toast(`Training ${UNITS[selectedBuilding.def.produces].name}…`);
     refreshBuildingPanel();
   });
 

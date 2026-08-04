@@ -13,7 +13,10 @@ function update(dt, state, callbacks) {
 
   updateUnits(dt, state, callbacks);
   updateEnemies(dt, state, callbacks);
+  resolveSeparation(state.units);
+  resolveSeparation(state.enemies);
   updateBuildings(dt, state, callbacks);
+  updateTowerAttacks(state);
   updateProjectiles(dt, state);
   updateWaves(dt, state, callbacks);
   state.messages = state.messages.filter((m) => m.expires > state.elapsed);
@@ -21,17 +24,152 @@ function update(dt, state, callbacks) {
   checkGameOver(state, callbacks);
 }
 
-function moveToward(entity, tx, ty, speed, dt) {
+// `neighbors` (optional) is the full same-group entity list (state.units or
+// state.enemies) to steer around on the way to (tx, ty) — see
+// avoidanceVector. Without it this is a plain straight-line seek.
+function moveToward(entity, tx, ty, speed, dt, neighbors) {
   const dx = tx - entity.x;
   const dy = ty - entity.y;
   const dist = Math.hypot(dx, dy);
   if (dist < ARRIVE_EPS) { entity.moving = false; return true; }
+
+  let dirX = dx / dist;
+  let dirY = dy / dist;
+  if (neighbors) {
+    const avoid = avoidanceVector(entity, neighbors);
+    if (avoid) {
+      dirX += avoid.x * 1.1;
+      dirY += avoid.y * 1.1;
+      const len = Math.hypot(dirX, dirY);
+      if (len > 0.0001) { dirX /= len; dirY /= len; }
+    }
+  }
+
   const step = Math.min(dist, speed * dt);
-  entity.x += (dx / dist) * step;
-  entity.y += (dy / dist) * step;
-  entity.facing = dx >= 0 ? 1 : -1;
+  entity.x += dirX * step;
+  entity.y += dirY * step;
+  entity.facing = dirX >= 0 ? 1 : -1;
   entity.moving = true;
   return dist <= step;
+}
+
+// Steers an entity gently around nearby same-group neighbors it's about to
+// walk into, instead of walking straight through them and relying on
+// resolveSeparation to shove overlapping bodies apart after the fact — that
+// after-the-move correction is what made units visibly fight each other and
+// stall out when several wanted to pass the same way. Returns null when
+// nothing nearby needs avoiding.
+function avoidanceVector(entity, neighbors) {
+  const myR = collisionRadiusOf(entity);
+  let ax = 0;
+  let ay = 0;
+  for (let i = 0; i < neighbors.length; i++) {
+    const other = neighbors[i];
+    if (other === entity) continue;
+    const ox = entity.x - other.x;
+    const oy = entity.y - other.y;
+    const oDist = Math.hypot(ox, oy);
+    const clearance = myR + collisionRadiusOf(other) + 0.2;
+    if (oDist <= 0 || oDist >= clearance) continue;
+    const strength = (clearance - oDist) / clearance;
+    ax += (ox / oDist) * strength;
+    ay += (oy / oDist) * strength;
+  }
+  const len = Math.hypot(ax, ay);
+  if (len < 0.0001) return null;
+  return { x: ax / len, y: ay / len };
+}
+
+// Roughly matches each unit type's drawn footprint (render.js scales a base
+// 0.24-tile radius by the same multipliers when picking sprite size) — used
+// only for keeping bodies apart, not for gameplay math like range/damage.
+const UNIT_COLLISION_RADIUS = {
+  worker: 0.36, soldier: 0.288, laserRover: 0.408, frostTrike: 0.288,
+};
+function collisionRadiusOf(entity) {
+  return (entity.def && UNIT_COLLISION_RADIUS[entity.def.id]) || 0.24;
+}
+
+// A spot on a ring of the given radius around `target`, at an angle picked
+// from the unit's stable position within `squad` — so everyone in the squad
+// gets a distinct spot spread around the target instead of converging on
+// one point. Shared by combat formation and delivery queueing below.
+function ringSlot(squad, unit, target, radius) {
+  const ids = squad.map((u) => u.id).sort();
+  const idx = Math.max(0, ids.indexOf(unit.id));
+  const count = ids.length || 1;
+  const angle = (idx / count) * Math.PI * 2 + 0.4;
+  return { x: target.x + Math.cos(angle) * radius, y: target.y + Math.sin(angle) * radius };
+}
+
+// Where a unit should stand to attack `target`: on a ring at its own attack
+// range (so melee units crowd in close while ranged units hang back — a
+// "second row" falls out of that naturally).
+function formationSlot(squad, unit, target) {
+  const radius = Math.max(collisionRadiusOf(unit) + 0.15, unit.def.range * 0.88);
+  return ringSlot(squad, unit, target, radius);
+}
+
+// Stable creation-order key (older units first) — used to decide who's
+// "next in line" at a busy drop-off point without the pick flickering
+// between units frame to frame the way sorting by live distance would.
+function unitOrderKey(u) {
+  const n = parseInt(String(u.id).split('_')[1], 10);
+  return Number.isNaN(n) ? 0 : n;
+}
+
+const DELIVERY_HOLD_RADIUS = 0.65; // tiles — how far back waiting workers queue from the door
+
+// Any of the building's four sides works as a drop-off — pick whichever
+// side's midpoint is nearest to the worker when the trip starts, so
+// deliveries arrive from all around the vault instead of funneling to one
+// fixed spot behind it.
+function pickDropoffPoint(building, fromX, fromY) {
+  const { col, row, def } = building;
+  const w = def.size.w;
+  const h = def.size.h;
+  const cx = col + w / 2;
+  const cy = row + h / 2;
+  const margin = 0.25;
+  const sides = [
+    { x: cx, y: row - margin },
+    { x: cx, y: row + h + margin },
+    { x: col - margin, y: cy },
+    { x: col + w + margin, y: cy },
+  ];
+  let best = sides[0];
+  let bestDist = Infinity;
+  sides.forEach((s) => {
+    const d = Math.hypot(s.x - fromX, s.y - fromY);
+    if (d < bestDist) { bestDist = d; best = s; }
+  });
+  return best;
+}
+
+// Nudges apart any two same-group entities (units-vs-units, enemies-vs-
+// enemies) standing closer than their combined body size allows, so bodies
+// stop visibly overlapping. O(n^2) but n is small (tens, not hundreds).
+function resolveSeparation(entities) {
+  for (let i = 0; i < entities.length; i++) {
+    for (let j = i + 1; j < entities.length; j++) {
+      const a = entities[i];
+      const b = entities[j];
+      const minDist = (collisionRadiusOf(a) + collisionRadiusOf(b)) * 1.05;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist >= minDist) continue;
+      if (dist < 0.0001) {
+        a.x -= 0.01; b.x += 0.01;
+        continue;
+      }
+      const push = (minDist - dist) / 2;
+      const nx = dx / dist;
+      const ny = dy / dist;
+      a.x -= nx * push; a.y -= ny * push;
+      b.x += nx * push; b.y += ny * push;
+    }
+  }
 }
 
 function updateUnits(dt, state, callbacks) {
@@ -40,10 +178,33 @@ function updateUnits(dt, state, callbacks) {
       const nearestEnemy = findNearestEnemyInRange(u, state, AGGRO_RANGE);
       if (nearestEnemy) u.job = { kind: 'attack', targetId: nearestEnemy.id };
     }
+  });
+
+  // Squads of units currently attacking the same enemy, precomputed once so
+  // formationSlot doesn't have to re-scan every unit for every attacker.
+  const squadsByTarget = new Map();
+  // Same idea for workers converging on the same drop-off point — grouped
+  // by each job's already-resolved (tx, ty), which is only ever assigned
+  // once per trip (see the 'deliver' branch below), so this reflects last
+  // frame's stable groups even though a unit starting a delivery THIS frame
+  // hasn't picked its point yet (it'll show up here starting next frame).
+  const deliverGroupsByPoint = new Map();
+  state.units.forEach((u) => {
+    if (u.job && u.job.kind === 'attack') {
+      if (!squadsByTarget.has(u.job.targetId)) squadsByTarget.set(u.job.targetId, []);
+      squadsByTarget.get(u.job.targetId).push(u);
+    } else if (u.job && u.job.kind === 'deliver' && u.job.tx !== undefined) {
+      const key = `${u.job.tx.toFixed(1)}_${u.job.ty.toFixed(1)}`;
+      if (!deliverGroupsByPoint.has(key)) deliverGroupsByPoint.set(key, []);
+      deliverGroupsByPoint.get(key).push(u);
+    }
+  });
+
+  state.units.forEach((u) => {
     if (!u.job) return;
 
     if (u.job.kind === 'move') {
-      const arrived = moveToward(u, u.targetX, u.targetY, u.def.speed, dt);
+      const arrived = moveToward(u, u.targetX, u.targetY, u.def.speed, dt, state.units);
       if (arrived) u.job = null;
       return;
     }
@@ -54,7 +215,7 @@ function updateUnits(dt, state, callbacks) {
       if (!node || node.amount <= 0) { retryGatherOrIdle(u, state, resourceType); return; }
       const tx = node.col + 0.5;
       const ty = node.row + 0.5;
-      const arrived = moveToward(u, tx, ty, u.def.speed, dt);
+      const arrived = moveToward(u, tx, ty, u.def.speed, dt, state.units);
       if (arrived) {
         const capacityLeft = u.def.carryCapacity - u.carrying;
         const amt = Math.min(u.def.gatherRate * dt, node.amount, capacityLeft);
@@ -79,10 +240,34 @@ function updateUnits(dt, state, callbacks) {
       let building = state.buildings.find((b) => b.id === u.job.buildingId && b.complete);
       if (!building) building = findNearestStorage(state, u);
       if (!building) { u.job = null; alertIdle(u, state, 'no supply depot to deliver to'); return; }
-      const tx = building.col + building.def.size.w / 2;
-      const ty = building.row + building.def.size.h + 0.2;
-      const arrived = moveToward(u, tx, ty, u.def.speed, dt);
-      if (arrived) {
+
+      // Pick (once per trip) whichever side of the building is nearest —
+      // resets if a mid-trip building swap sends the worker somewhere else.
+      if (u.job.buildingId !== building.id || u.job.tx === undefined) {
+        const spot = pickDropoffPoint(building, u.x, u.y);
+        u.job.buildingId = building.id;
+        u.job.tx = spot.x;
+        u.job.ty = spot.y;
+      }
+
+      // If someone else is already headed for this exact spot, only the
+      // longest-waiting one goes all the way in — everyone else backs off
+      // to a holding ring and takes their turn once the door clears.
+      const key = `${u.job.tx.toFixed(1)}_${u.job.ty.toFixed(1)}`;
+      const queue = deliverGroupsByPoint.get(key) || [u];
+      const inLine = [...queue].sort((a, b) => unitOrderKey(a) - unitOrderKey(b));
+      const isActive = inLine[0] === u || inLine.length <= 1;
+
+      let tx = u.job.tx;
+      let ty = u.job.ty;
+      if (!isActive) {
+        const waiters = inLine.slice(1);
+        const slot = ringSlot(waiters, u, { x: u.job.tx, y: u.job.ty }, DELIVERY_HOLD_RADIUS);
+        tx = slot.x; ty = slot.y;
+      }
+
+      const arrived = moveToward(u, tx, ty, u.def.speed, dt, state.units);
+      if (arrived && isActive) {
         const resourceType = u.carryType || u.job.resourceType;
         if (u.carrying > 0) {
           state.resources[u.carryType] += u.carrying;
@@ -99,11 +284,14 @@ function updateUnits(dt, state, callbacks) {
       if (!target) { u.job = null; return; }
       const dist = Math.hypot(target.x - u.x, target.y - u.y);
       if (dist > u.def.range) {
-        moveToward(u, target.x, target.y, u.def.speed, dt);
+        const squad = squadsByTarget.get(u.job.targetId) || [u];
+        const slot = formationSlot(squad, u, target);
+        moveToward(u, slot.x, slot.y, u.def.speed, dt, state.units);
       } else if (state.elapsed - u.lastAttack >= u.def.attackInterval) {
         u.lastAttack = state.elapsed;
         target.hp -= u.def.damage;
-        state.projectiles.push(makeTracer(u, target, '#8fe8ff'));
+        state.projectiles.push(makeTracer(u, target, u.def.projectileColor || '#8fe8ff', u.def.projectileKind));
+        if (u.def.freezeMs) target.frozenUntil = state.elapsed + u.def.freezeMs;
         if (target.hp <= 0) {
           state.enemies = state.enemies.filter((e) => e.id !== target.id);
           u.job = null;
@@ -114,13 +302,30 @@ function updateUnits(dt, state, callbacks) {
 }
 
 function updateEnemies(dt, state, callbacks) {
+  // Precompute every live enemy's current target once, then group them by
+  // target so formationSlot can spread enemies attacking the same thing
+  // around it instead of letting them all pile onto the same point.
+  const targets = new Map();
+  const squadsByRef = new Map();
   state.enemies.forEach((e) => {
+    if (e.frozenUntil > state.elapsed) return;
     const target = pickEnemyTarget(e, state);
+    if (!target) return;
+    targets.set(e.id, target);
+    if (!squadsByRef.has(target.ref)) squadsByRef.set(target.ref, []);
+    squadsByRef.get(target.ref).push(e);
+  });
+
+  state.enemies.forEach((e) => {
+    if (e.frozenUntil > state.elapsed) return; // frozen: can't move or attack
+    const target = targets.get(e.id);
     if (!target) return; // nothing left to attack, just idle
     const { x: tx, y: ty, ref } = target;
     const dist = Math.hypot(tx - e.x, ty - e.y);
     if (dist > e.def.range) {
-      moveToward(e, tx, ty, e.def.speed, dt);
+      const squad = squadsByRef.get(ref) || [e];
+      const slot = formationSlot(squad, e, target);
+      moveToward(e, slot.x, slot.y, e.def.speed, dt, state.enemies);
     } else if (state.elapsed - e.lastAttack >= e.def.attackInterval) {
       e.lastAttack = state.elapsed;
       ref.hp -= e.def.damage;
@@ -237,8 +442,10 @@ function removeDeadTarget(state, ref, callbacks) {
   if (callbacks && callbacks.onStateChanged) callbacks.onStateChanged();
 }
 
-function makeTracer(from, to, color) {
-  return { x1: from.x, y1: from.y, x2: to.x, y2: to.y, color, born: performance.now() };
+function makeTracer(from, to, color, kind) {
+  return {
+    x1: from.x, y1: from.y, x2: to.x, y2: to.y, color, born: performance.now(), kind: kind || 'bolt',
+  };
 }
 
 function updateProjectiles(dt, state) {
@@ -272,6 +479,28 @@ function updateBuildings(dt, state, callbacks) {
     }
   });
 }
+
+// Static defenses (buildings with an `attack` def, e.g. the arrow tower):
+// each complete one independently picks the nearest enemy in range and
+// fires on its own interval, same shape as a unit's 'attack' job but with
+// no movement — a tower never chases.
+function updateTowerAttacks(state) {
+  state.buildings.forEach((b) => {
+    const atk = b.def.attack;
+    if (!atk || !b.complete) return;
+    const origin = { x: b.col + b.def.size.w / 2, y: b.row + b.def.size.h / 2 };
+    const target = findNearestEnemyInRange(origin, state, atk.range);
+    if (!target) return;
+    if (state.elapsed - b.lastAttack < atk.attackInterval) return;
+    b.lastAttack = state.elapsed;
+    target.hp -= atk.damage;
+    state.projectiles.push(makeTracer(origin, target, '#d9a55c', 'arrow'));
+    if (target.hp <= 0) {
+      state.enemies = state.enemies.filter((e) => e.id !== target.id);
+    }
+  });
+}
+
 
 function spawnUnitNear(state, building, unitType) {
   const spawnCol = building.col + building.def.size.w / 2;
