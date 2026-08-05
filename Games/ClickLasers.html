@@ -104,7 +104,7 @@
 
         #auth-bar {
             position: absolute;
-            top: 10px;
+            top: 50px;
             right: 20px;
             z-index: 20;
             display: flex;
@@ -269,6 +269,10 @@
                 if (this.life >= this.maxLife) {
                     this.active = false; // reached destination
                 }
+                // Deactivate once it exits the visible canvas
+                if (this.x < -20 || this.x > canvas.width + 20 || this.y < -20 || this.y > canvas.height + 20) {
+                    this.active = false;
+                }
             }
 
             draw() {
@@ -361,7 +365,16 @@
             let baseX = canvas.width / 2;
             let baseY = canvas.height;
 
-            lasers.push(new Laser(baseX, baseY, clientX, clientY));
+            // Extend the trajectory well past the screen so a miss travels
+            // all the way to the edge instead of stopping at the click point
+            let dx = clientX - baseX;
+            let dy = clientY - baseY;
+            let dist = Math.hypot(dx, dy) || 1;
+            let extension = canvas.width + canvas.height; // guaranteed to clear the screen
+            let farX = baseX + (dx / dist) * extension;
+            let farY = baseY + (dy / dist) * extension;
+
+            lasers.push(new Laser(baseX, baseY, farX, farY));
         }
 
         // Input Listeners
@@ -464,13 +477,25 @@
             }
         }
 
-        signInBtn.addEventListener('click', () => window.Clerk && window.Clerk.openSignIn());
+        signInBtn.addEventListener('click', () => window.Clerk && window.Clerk.openSignIn({
+            fallbackRedirectUrl: window.location.href,
+            forceRedirectUrl: window.location.href
+        }));
 
         window.addEventListener('load', async () => {
             if (!window.Clerk) return; // Clerk script not loaded (key not configured yet)
-            await window.Clerk.load();
+            await window.Clerk.load({
+                signInFallbackRedirectUrl: window.location.href,
+                signInForceRedirectUrl: window.location.href,
+                signUpFallbackRedirectUrl: window.location.href,
+                signUpForceRedirectUrl: window.location.href,
+                afterSignOutUrl: window.location.href
+            });
             updateHighScoreUI();
-            window.Clerk.mountUserButton(userButtonDiv);
+            window.Clerk.mountUserButton(userButtonDiv, {
+                userProfileMode: 'modal',
+                afterSignOutUrl: window.location.href
+            });
             window.Clerk.addListener(() => updateHighScoreUI());
             loadLeaderboard();
         });
