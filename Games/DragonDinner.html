@@ -75,82 +75,34 @@
             max-width: 800px;
             margin-top: 15px;
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
             padding: 0 10px;
-            gap: 15px;
         }
 
-        .slider-container {
-            flex: 1;
+        #joystick-base {
+            position: relative;
+            width: 130px;
+            height: 130px;
             background: rgba(35, 27, 20, 0.8);
             border: 2px solid #5a452c;
-            border-radius: 20px;
-            padding: 10px 20px;
-            display: flex;
-            align-items: center;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
-        }
-
-        .slider-label {
-            font-weight: bold;
-            color: #c5a059;
-            text-shadow: 1px 1px #000;
-            margin-right: 10px;
-            font-size: 14px;
-            letter-spacing: 1px;
-        }
-
-        input[type=range] {
-            -webkit-appearance: none;
-            width: 100%;
-            background: transparent;
-        }
-
-        input[type=range]:focus {
-            outline: none;
-        }
-
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 10px;
-            cursor: pointer;
-            background: #2b2015;
-            border-radius: 5px;
-            border: 1px solid #5a452c;
-        }
-
-        input[type=range]::-webkit-slider-thumb {
-            height: 24px;
-            width: 24px;
             border-radius: 50%;
-            background: #8c6f43;
-            cursor: pointer;
-            -webkit-appearance: none;
-            margin-top: -7px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            touch-action: none;
+        }
+
+        #joystick-knob {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 55px;
+            height: 55px;
+            margin: -27.5px 0 0 -27.5px;
+            background: linear-gradient(135deg, #8c6f43, #5a452c);
             border: 2px solid #d4af37;
-            box-shadow: 0 0 5px #000;
-        }
-
-        #flap-btn {
-            background: linear-gradient(135deg, #4a1515, #220a0a);
-            border: 2px solid #8c6f43;
-            border-radius: 30px;
-            color: #d4af37;
-            font-size: 18px;
-            font-weight: bold;
-            letter-spacing: 1px;
-            padding: 14px 30px;
-            cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.7);
-            text-shadow: 1px 1px 2px #000;
-            transition: transform 0.05s, background 0.05s;
-        }
-
-        #flap-btn:active {
-            transform: scale(0.95);
-            background: linear-gradient(135deg, #782121, #4a1515);
-            color: #fff;
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(0,0,0,0.7);
+            cursor: grab;
         }
 
         /* Overlay Screens */
@@ -219,8 +171,8 @@
         <div id="start-screen" class="overlay">
             <h1>DRAGON'S HUNT</h1>
             <p>Take wing as an Iceborn Dragon across the medieval archipelago. Hunt swine scattered among the island settlements, featuring dense, multi-roofed thatched villages, and rest atop fortress roofs when fatigued.<br><br>
-               <strong>Desktop:</strong> Left/Right Arrows or A/D to turn, Spacebar to flap.<br>
-               <strong>Mobile:</strong> Use the steering bar below and tap FLAP!
+               <strong>Desktop:</strong> Arrow Keys or WASD to fly in any direction.<br>
+               <strong>Mobile:</strong> Drag the joystick below to fly. Let go and the dragon glides down to land.
             </p>
             <button class="btn-start" onclick="startGame()">TAKE FLIGHT</button>
         </div>
@@ -233,11 +185,9 @@
 
         <!-- Controls -->
         <div id="controls">
-            <div class="slider-container">
-                <span class="slider-label">STEER</span>
-                <input type="range" id="steerSlider" min="-1" max="1" step="0.05" value="0">
+            <div id="joystick-base">
+                <div id="joystick-knob"></div>
             </div>
-            <button id="flap-btn">FLAP WINGS</button>
         </div>
     </div>
 
@@ -251,8 +201,8 @@
     const finalScoreEl = document.getElementById('final-score');
     const startScreen = document.getElementById('start-screen');
     const gameOverScreen = document.getElementById('game-over-screen');
-    const steerSlider = document.getElementById('steerSlider');
-    const flapBtn = document.getElementById('flap-btn');
+    const joystickBase = document.getElementById('joystick-base');
+    const joystickKnob = document.getElementById('joystick-knob');
 
     // Game Variables
     let gameLoopId;
@@ -261,7 +211,11 @@
     let cameraY = 0;
 
     // Keys state
-    const keys = { left: false, right: false, flap: false };
+    const keys = { up: false, down: false, left: false, right: false };
+
+    // Joystick state
+    const JOYSTICK_RADIUS = 40;
+    const joystick = { x: 0, y: 0, pointerId: null };
 
     // --- WORLD GENERATION DATA ---
     const TILE_WIDTH = 100;
@@ -440,7 +394,13 @@
         wingCycle: 0,
         isLanded: false,
         landedBuilding: null,
-        
+
+        ACCEL: 0.6,
+        MAX_SPEED: 7,
+        TAKEOFF_BOOST: 4,
+        GLIDE_FALL: 0.12,
+        MAX_GLIDE_FALL: 3,
+
         reset() {
             this.x = 400;
             this.y = 400;
@@ -451,28 +411,41 @@
             this.wingCycle = 0;
         },
 
-        flap() {
-            this.vy = -8.5;
-            this.isLanded = false;
-            this.landedBuilding = null;
-        },
+        // ix/iy: normalized flight-input vector from keys + joystick, magnitude <= 1
+        update(ix, iy) {
+            const isFlying = Math.hypot(ix, iy) > 0.05;
 
-        update() {
-            if (this.isLanded) {
+            if (isFlying) {
+                if (this.isLanded) {
+                    // Snappy takeoff in the direction of input
+                    this.vx = ix * this.TAKEOFF_BOOST;
+                    this.vy = iy * this.TAKEOFF_BOOST;
+                } else {
+                    this.vx += ix * this.ACCEL;
+                    this.vy += iy * this.ACCEL;
+                }
+                this.isLanded = false;
+                this.landedBuilding = null;
+
+                let speed = Math.hypot(this.vx, this.vy);
+                if (speed > this.MAX_SPEED) {
+                    this.vx = (this.vx / speed) * this.MAX_SPEED;
+                    this.vy = (this.vy / speed) * this.MAX_SPEED;
+                }
+            } else if (this.isLanded) {
                 this.vx = 0;
                 this.vy = 0;
                 return;
+            } else {
+                // No input: momentum carries the dragon forward while it gently loses lift and glides down to land
+                this.vx *= 0.94;
+                this.vy += this.GLIDE_FALL;
+                if (this.vy > this.MAX_GLIDE_FALL) this.vy = this.MAX_GLIDE_FALL;
             }
 
-            // Gravity
-            this.vy += 0.35;
-            
             // Movement
             this.x += this.vx;
             this.y += this.vy;
-
-            // Drag
-            this.vx *= 0.92;
 
             // Canvas boundaries
             if (this.x < 30) { this.x = 30; this.vx = 0; }
@@ -480,10 +453,10 @@
 
             // Wing animation cycle
             this.wingCycle += 0.15;
-            if (this.vy < 0) {
-                this.wingSpan = Math.sin(this.wingCycle) * 0.4 + 1.0; 
+            if (isFlying) {
+                this.wingSpan = Math.sin(this.wingCycle) * 0.4 + 1.0;
             } else {
-                this.wingSpan = Math.sin(this.wingCycle * 0.3) * 0.2 + 0.8; 
+                this.wingSpan = Math.sin(this.wingCycle * 0.3) * 0.2 + 0.8;
             }
         },
 
@@ -508,94 +481,110 @@
             }
 
             // --- COLOR PALETTE (ICEBORN / BLUE) ---
-            const bodyColor = '#4a5d7d';
-            const membraneColor = '#343c4a';
-            const boneColor = '#637c9a';
+            const boneColor = '#c7d5e2';
+            const clawColor = '#1c222c';
+
+            let bodyGrad = ctx.createRadialGradient(-5, -10, 4, 0, 0, 30);
+            bodyGrad.addColorStop(0, '#a8bccf');
+            bodyGrad.addColorStop(0.55, '#5f7288');
+            bodyGrad.addColorStop(1, '#333f4f');
+
+            let wingGrad = ctx.createLinearGradient(0, -70, 0, 20);
+            wingGrad.addColorStop(0, 'rgba(103, 120, 140, 0.88)');
+            wingGrad.addColorStop(1, 'rgba(43, 53, 66, 0.92)');
 
             // Glow Effect
             if (this.vy < -5 && !this.isLanded) {
-                ctx.shadowColor = '#8fa3d4'; 
+                ctx.shadowColor = '#8fa3d4';
                 ctx.shadowBlur = 20;
             } else {
                 ctx.shadowBlur = 0;
             }
 
-            // --- WINGS ---
-            ctx.fillStyle = membraneColor; 
-            ctx.strokeStyle = boneColor; 
-            ctx.lineWidth = 2.5;
-
             let wingSpanVal = this.wingSpan;
             if (this.isLanded) wingSpanVal = 0.1; // Folded
 
-            // Left Wing
-            ctx.save();
-            ctx.scale(1, wingSpanVal);
-            if(this.isLanded) ctx.rotate(-Math.PI / 8); 
+            // --- WINGS (scalloped, clawed bat-membrane) ---
+            const drawWing = (sign) => {
+                ctx.save();
+                ctx.scale(sign, wingSpanVal);
+                if (this.isLanded) ctx.rotate(-Math.PI / 8);
 
-            ctx.beginPath();
-            ctx.moveTo(-10, -5);
-            ctx.bezierCurveTo(-45, -55, -95, -35, -105, 15);
-            ctx.bezierCurveTo(-70, 25, -45, 15, -10, 10);
-            ctx.fill();
-            ctx.stroke();
+                ctx.fillStyle = wingGrad;
+                ctx.strokeStyle = boneColor;
+                ctx.lineWidth = 2;
 
-            // Wing bones
-            ctx.strokeStyle = boneColor;
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(-10, -5); ctx.lineTo(-95, -35);
-            ctx.moveTo(-10, -5); ctx.lineTo(-100, -5);
-            ctx.moveTo(-10, -5); ctx.lineTo(-85, 20);
-            ctx.stroke();
-            ctx.restore();
+                ctx.beginPath();
+                ctx.moveTo(10, -5); // shoulder
+                ctx.bezierCurveTo(20, -40, 55, -68, 95, -60);  // leading edge to tip 1
+                ctx.quadraticCurveTo(85, -35, 108, -22);        // scallop out to tip 2
+                ctx.quadraticCurveTo(90, -5, 105, 12);          // scallop out to tip 3
+                ctx.quadraticCurveTo(78, 12, 82, 28);           // scallop out to tip 4
+                ctx.quadraticCurveTo(50, 20, 10, 10);           // trailing edge back to wrist
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
 
-            // Right Wing
-            ctx.save();
-            ctx.scale(1, wingSpanVal);
-            if(this.isLanded) ctx.rotate(Math.PI / 8); 
+                // Finger bones fanning to each wingtip
+                ctx.strokeStyle = boneColor;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(10, -5); ctx.lineTo(95, -60);
+                ctx.moveTo(10, -5); ctx.lineTo(108, -22);
+                ctx.moveTo(10, -5); ctx.lineTo(105, 12);
+                ctx.moveTo(10, -5); ctx.lineTo(82, 28);
+                ctx.stroke();
 
-            ctx.beginPath();
-            ctx.moveTo(10, -5);
-            ctx.bezierCurveTo(45, -55, 95, -35, 105, 15);
-            ctx.bezierCurveTo(70, 25, 45, 15, 10, 10);
-            ctx.fill();
-            ctx.stroke();
+                ctx.restore();
+            };
+            drawWing(-1);
+            drawWing(1);
 
-            // Wing bones
-            ctx.strokeStyle = boneColor;
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(10, -5); ctx.lineTo(95, -35);
-            ctx.moveTo(10, -5); ctx.lineTo(100, -5);
-            ctx.moveTo(10, -5); ctx.lineTo(85, 20);
-            ctx.stroke();
-            ctx.restore();
+            ctx.shadowBlur = 0;
 
-            ctx.shadowBlur = 0; 
+            // --- HIND LEGS / CLAWED FEET ---
+            const drawLeg = (sign) => {
+                ctx.save();
+                ctx.scale(sign, 1);
+                ctx.fillStyle = bodyGrad;
+                ctx.beginPath();
+                ctx.ellipse(11, 15, 6, 10, 0.35, 0, Math.PI * 2);
+                ctx.fill();
 
-            // --- TAIL ---
-            ctx.strokeStyle = bodyColor;
-            ctx.lineWidth = 6;
-            ctx.beginPath();
-            ctx.moveTo(0, 20);
+                ctx.fillStyle = boneColor;
+                ctx.beginPath();
+                ctx.ellipse(16, 24, 4, 3, 0.6, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = clawColor;
+                ctx.lineWidth = 1.3;
+                ctx.beginPath();
+                ctx.moveTo(13, 26); ctx.lineTo(11, 31);
+                ctx.moveTo(17, 27); ctx.lineTo(18, 32);
+                ctx.moveTo(20, 25); ctx.lineTo(23, 29);
+                ctx.stroke();
+                ctx.restore();
+            };
+            drawLeg(-1);
+            drawLeg(1);
+
+            // --- TAIL (long, tapering) ---
             let tailCurveX = -this.vx * 3;
-            if(this.isLanded) tailCurveX = 0;
-            ctx.quadraticCurveTo(tailCurveX, 45, tailCurveX, 60);
-            ctx.stroke();
+            if (this.isLanded) tailCurveX = 0;
 
-            // Tail Spade
-            ctx.fillStyle = '#b0c4de';
+            ctx.fillStyle = bodyGrad;
             ctx.beginPath();
-            ctx.moveTo(tailCurveX, 60);
-            ctx.lineTo(tailCurveX - 8, 68);
-            ctx.lineTo(tailCurveX + 8, 68);
+            ctx.moveTo(-4, 18);
+            ctx.quadraticCurveTo(tailCurveX - 4, 45, tailCurveX - 2, 68);
+            ctx.quadraticCurveTo(tailCurveX - 1, 85, tailCurveX, 95);
+            ctx.quadraticCurveTo(tailCurveX + 1, 85, tailCurveX + 2, 68);
+            ctx.quadraticCurveTo(tailCurveX + 4, 45, 4, 18);
             ctx.closePath();
             ctx.fill();
 
             // --- DRAGON BODY ---
-            ctx.fillStyle = bodyColor;
-            ctx.strokeStyle = '#2d3345'; 
+            ctx.fillStyle = bodyGrad;
+            ctx.strokeStyle = '#252d38';
             ctx.lineWidth = 2.5;
 
             // Torso
@@ -603,6 +592,15 @@
             ctx.ellipse(0, 0, 16, 26, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
+
+            // Scale texture (fixed pattern so it doesn't flicker frame to frame)
+            ctx.fillStyle = 'rgba(200, 213, 226, 0.25)';
+            const scalePattern = [[-6, -14], [5, -10], [-3, -2], [7, 4], [-8, 10], [3, 16], [-2, -20]];
+            scalePattern.forEach(([sx, sy]) => {
+                ctx.beginPath();
+                ctx.ellipse(sx, sy, 2.5, 3.5, 0, 0, Math.PI * 2);
+                ctx.fill();
+            });
 
             // Spine
             ctx.fillStyle = boneColor;
@@ -613,22 +611,37 @@
             }
 
             // --- HEAD ---
-            ctx.fillStyle = bodyColor;
+            ctx.fillStyle = bodyGrad;
+            ctx.strokeStyle = '#252d38';
+            ctx.lineWidth = 2.5;
             ctx.beginPath();
-            ctx.moveTo(-10, -20);
-            ctx.lineTo(0, -42); // Snout
-            ctx.lineTo(10, -20);
+            ctx.moveTo(-9, -20);
+            ctx.quadraticCurveTo(-6, -34, 0, -44); // snout
+            ctx.quadraticCurveTo(6, -34, 9, -20);
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
 
-            // Spikes
+            // Small backward-curving horns
             ctx.strokeStyle = boneColor;
-            ctx.lineWidth = 2.5;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-6, -24); ctx.quadraticCurveTo(-12, -30, -14, -22);
+            ctx.moveTo(6, -24); ctx.quadraticCurveTo(12, -30, 14, -22);
+            ctx.stroke();
+
+            // Neck spikes
             ctx.beginPath();
             ctx.moveTo(-8, -22); ctx.lineTo(-16, -38);
             ctx.moveTo(8, -22); ctx.lineTo(16, -38);
             ctx.stroke();
+
+            // Eyes
+            ctx.fillStyle = '#eaf2fa';
+            ctx.beginPath();
+            ctx.ellipse(-4, -25, 1.4, 1, 0, 0, Math.PI * 2);
+            ctx.ellipse(4, -25, 1.4, 1, 0, 0, Math.PI * 2);
+            ctx.fill();
 
             ctx.restore();
         }
@@ -636,30 +649,77 @@
 
 
     // --- CONTROLS ---
+    const DIRECTION_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyA', 'KeyD', 'KeyW', 'KeyS']);
+
     window.addEventListener('keydown', (e) => {
+        if (DIRECTION_KEYS.has(e.code)) e.preventDefault();
         if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
         if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
-        if (e.code === 'Space') {
-            e.preventDefault();
-            if (!keys.flap && isPlaying) dragon.flap();
-            keys.flap = true;
-        }
+        if (e.code === 'ArrowUp' || e.code === 'KeyW') keys.up = true;
+        if (e.code === 'ArrowDown' || e.code === 'KeyS') keys.down = true;
     });
 
     window.addEventListener('keyup', (e) => {
         if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
         if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
-        if (e.code === 'Space') keys.flap = false;
+        if (e.code === 'ArrowUp' || e.code === 'KeyW') keys.up = false;
+        if (e.code === 'ArrowDown' || e.code === 'KeyS') keys.down = false;
     });
 
-    flapBtn.addEventListener('pointerdown', (e) => {
+    function updateJoystickFromPointer(e) {
+        const rect = joystickBase.getBoundingClientRect();
+        let dx = e.clientX - (rect.left + rect.width / 2);
+        let dy = e.clientY - (rect.top + rect.height / 2);
+        const dist = Math.hypot(dx, dy);
+        if (dist > JOYSTICK_RADIUS) {
+            dx = (dx / dist) * JOYSTICK_RADIUS;
+            dy = (dy / dist) * JOYSTICK_RADIUS;
+        }
+        joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+        joystick.x = dx / JOYSTICK_RADIUS;
+        joystick.y = dy / JOYSTICK_RADIUS;
+    }
+
+    function resetJoystick() {
+        joystick.pointerId = null;
+        joystick.x = 0;
+        joystick.y = 0;
+        joystickKnob.style.transform = 'translate(0px, 0px)';
+    }
+
+    joystickBase.addEventListener('pointerdown', (e) => {
         e.preventDefault();
-        if (isPlaying) dragon.flap();
+        joystick.pointerId = e.pointerId;
+        joystickBase.setPointerCapture(e.pointerId);
+        updateJoystickFromPointer(e);
     });
 
-    steerSlider.addEventListener('pointerup', () => {
-        steerSlider.value = 0;
+    joystickBase.addEventListener('pointermove', (e) => {
+        if (joystick.pointerId === e.pointerId) updateJoystickFromPointer(e);
     });
+
+    joystickBase.addEventListener('pointerup', (e) => {
+        if (joystick.pointerId === e.pointerId) resetJoystick();
+    });
+
+    joystickBase.addEventListener('pointercancel', (e) => {
+        if (joystick.pointerId === e.pointerId) resetJoystick();
+    });
+
+    function getFlightInput() {
+        let ix = 0, iy = 0;
+        if (keys.left) ix -= 1;
+        if (keys.right) ix += 1;
+        if (keys.up) iy -= 1;
+        if (keys.down) iy += 1;
+
+        ix += joystick.x;
+        iy += joystick.y;
+
+        const mag = Math.hypot(ix, iy);
+        if (mag > 1) { ix /= mag; iy /= mag; }
+        return { ix, iy };
+    }
 
     // --- GAME LOGIC ---
     function startGame() {
@@ -696,19 +756,45 @@
         gameOverScreen.style.display = 'flex';
     }
 
-    function update() {
-        let steerVal = parseFloat(steerSlider.value);
-        if (keys.left) steerVal = -1;
-        if (keys.right) steerVal = 1;
+    function checkLanding() {
+        if (dragon.isLanded || dragon.vy <= 0) return;
 
-        if (!dragon.isLanded) {
-            dragon.vx += steerVal * 0.6;
-        } else if (Math.abs(steerVal) > 0.2) {
-            dragon.flap();
-            dragon.vx = steerVal * 4;
+        for (const village of villageLayout) {
+            for (const bldg of village.buildings) {
+                if (dragon.x >= bldg.x - 10 &&
+                    dragon.x <= bldg.x + bldg.width + 10 &&
+                    dragon.y + 15 >= bldg.y &&
+                    dragon.y + 15 <= bldg.y + 20) {
+
+                    dragon.isLanded = true;
+                    dragon.landedBuilding = bldg;
+                    dragon.y = bldg.y - 12;
+                    dragon.vx = 0;
+                    dragon.vy = 0;
+                    return;
+                }
+            }
         }
 
-        dragon.update();
+        for (const tile of groundTiles) {
+            if (dragon.x >= tile.x - 5 &&
+                dragon.x <= tile.x + TILE_WIDTH + 5 &&
+                dragon.y + 15 >= tile.y &&
+                dragon.y + 15 <= tile.y + 20) {
+
+                dragon.isLanded = true;
+                dragon.landedBuilding = null;
+                dragon.y = tile.y - 12;
+                dragon.vx = 0;
+                dragon.vy = 0;
+                return;
+            }
+        }
+    }
+
+    function update() {
+        const { ix, iy } = getFlightInput();
+        dragon.update(ix, iy);
 
         // Smooth camera follow
         let targetCameraY = dragon.y - 350;
@@ -717,23 +803,7 @@
         statusEl.innerText = dragon.isLanded ? "Roosting 🏰" : "Airborne 🪽";
         statusEl.style.color = dragon.isLanded ? "#c5a059" : "#d4af37";
 
-        // Landing Logic
-        if (dragon.vy > 0) {
-            villageLayout.forEach(village => {
-                village.buildings.forEach(bldg => {
-                    if (dragon.x >= bldg.x - 10 && 
-                        dragon.x <= bldg.x + bldg.width + 10 &&
-                        dragon.y + 15 >= bldg.y && 
-                        dragon.y + 15 <= bldg.y + 20) {
-                        
-                        dragon.isLanded = true;
-                        dragon.landedBuilding = bldg;
-                        dragon.y = bldg.y - 12;
-                        dragon.vy = 0;
-                    }
-                });
-            });
-        }
+        checkLanding();
 
         // Collect Swine
         pigs.forEach(pig => {
