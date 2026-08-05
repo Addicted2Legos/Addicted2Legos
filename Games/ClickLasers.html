@@ -4,6 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Click Lasers</title>
+    <!-- Clerk: replace data-clerk-publishable-key and src domain with the values from your Clerk dashboard (Configure > API Keys) -->
+    <script
+      async
+      crossorigin="anonymous"
+      data-clerk-publishable-key="pk_test_bm9ybWFsLWRhc3NpZS0xOS5jbGVyay5hY2NvdW50cy5kZXYk"
+      src="https://normal-dassie-19.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+      type="text/javascript"
+    ></script>
+    <!-- Supabase: replace SUPABASE_URL / SUPABASE_ANON_KEY constants further down once your project is set up -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
       html, body { touch-action: manipulation; }
         * {
@@ -92,6 +102,69 @@
             text-decoration: none;
         }
 
+        #auth-bar {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        #high-score-display {
+            color: #fff;
+            font-size: 14px;
+            font-weight: bold;
+            text-shadow: 0 0 8px #00ffff;
+            display: none;
+            white-space: nowrap;
+        }
+        #sign-in-btn {
+            padding: 8px 20px;
+            font-size: 14px;
+            display: none;
+        }
+        #user-button {
+            display: none;
+        }
+        #high-score-line {
+            display: none;
+        }
+        #leaderboard-panel {
+            margin-top: 10px;
+            min-width: 260px;
+        }
+        #leaderboard-panel h2 {
+            font-size: 16px;
+            color: #00ffff;
+            text-shadow: 0 0 10px #00ffff;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+        #leaderboard-list {
+            list-style: none;
+            font-size: 14px;
+            color: #fff;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        #leaderboard-list li {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            padding: 2px 10px;
+        }
+        #leaderboard-list li.me {
+            color: #00ffff;
+            text-shadow: 0 0 8px #00ffff;
+        }
+        #leaderboard-empty {
+            font-size: 13px;
+            color: #888;
+            margin: 0;
+        }
         body::before {
             content: "";
             position: fixed;
@@ -110,15 +183,28 @@
         <div id="lives-display">LIVES: 3</div>
     </div>
 
+    <div id="auth-bar">
+        <div id="high-score-display">HIGH SCORE: <span id="high-score-value">0</span></div>
+        <button id="sign-in-btn" class="btn">Sign In</button>
+        <div id="user-button"></div>
+    </div>
+
     <div id="start-screen">
         <h1>CLICK LASERS</h1>
         <p>Tap anywhere to shoot. Defend the perimeter.</p>
+        <p id="high-score-line">Your High Score: <span id="high-score-line-value">0</span></p>
         <button class="btn" onclick="startGame()">Start Game</button>
+        <div id="leaderboard-panel">
+            <h2>Top 10</h2>
+            <ol id="leaderboard-list"></ol>
+            <p id="leaderboard-empty" style="display:none;">No scores yet — be the first!</p>
+        </div>
     </div>
 
     <div id="game-over-screen">
         <h1>GAME OVER</h1>
         <p id="final-score">Final Score: 0</p>
+        <p id="new-high-score" style="display:none; color:#ff0055; text-shadow:0 0 20px #ff0055;">New High Score!</p>
         <button class="btn" onclick="restartGame()">Play Again</button>
         <button class="btn" onclick="mainMenu()">Main Menu</button>
     </div>
@@ -329,7 +415,130 @@
         function triggerGameOver() {
             gameState = 'GAMEOVER';
             finalScoreText.innerText = `Final Score: ${score}`;
+            document.getElementById('new-high-score').style.display = 'none';
             gameOverScreen.style.display = 'flex';
+            saveHighScoreIfBeaten(score);
+        }
+
+        // --- Clerk auth & high score ---
+        const HIGH_SCORE_KEY = 'clickLasersHighScore';
+        const highScoreDisplay = document.getElementById('high-score-display');
+        const highScoreValue = document.getElementById('high-score-value');
+        const highScoreLine = document.getElementById('high-score-line');
+        const highScoreLineValue = document.getElementById('high-score-line-value');
+        const signInBtn = document.getElementById('sign-in-btn');
+        const userButtonDiv = document.getElementById('user-button');
+        let highScore = 0;
+
+        function updateHighScoreUI() {
+            const signedIn = window.Clerk && window.Clerk.user;
+            if (signedIn) {
+                highScore = window.Clerk.user.unsafeMetadata?.[HIGH_SCORE_KEY] || 0;
+                highScoreDisplay.style.display = 'block';
+                highScoreValue.innerText = highScore;
+                highScoreLine.style.display = 'block';
+                highScoreLineValue.innerText = highScore;
+                signInBtn.style.display = 'none';
+                userButtonDiv.style.display = 'block';
+            } else {
+                highScore = 0;
+                highScoreDisplay.style.display = 'none';
+                highScoreLine.style.display = 'none';
+                signInBtn.style.display = 'inline-flex';
+                userButtonDiv.style.display = 'none';
+            }
+        }
+
+        async function saveHighScoreIfBeaten(finalScore) {
+            if (window.Clerk && window.Clerk.user && finalScore > highScore) {
+                highScore = finalScore;
+                await window.Clerk.user.update({
+                    unsafeMetadata: {
+                        ...window.Clerk.user.unsafeMetadata,
+                        [HIGH_SCORE_KEY]: highScore
+                    }
+                });
+                document.getElementById('new-high-score').style.display = 'block';
+                updateHighScoreUI();
+                submitScoreToLeaderboard(highScore);
+            }
+        }
+
+        signInBtn.addEventListener('click', () => window.Clerk && window.Clerk.openSignIn());
+
+        window.addEventListener('load', async () => {
+            if (!window.Clerk) return; // Clerk script not loaded (key not configured yet)
+            await window.Clerk.load();
+            updateHighScoreUI();
+            window.Clerk.mountUserButton(userButtonDiv);
+            window.Clerk.addListener(() => updateHighScoreUI());
+            loadLeaderboard();
+        });
+
+        // --- Supabase: shared top-10 leaderboard ---
+        // Replace with the values from your Supabase project (Settings > API)
+        const SUPABASE_URL = 'https://tgdypcnzpojjxuxizjvh.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable__4owv0oy0QoOnTNYBIOPow_-BDrQ7iS';
+
+        const supabaseClient = (window.supabase && SUPABASE_URL.indexOf('REPLACE-ME') === -1)
+            ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                accessToken: async () => (await window.Clerk?.session?.getToken()) ?? null
+              })
+            : null;
+
+        async function submitScoreToLeaderboard(finalScore) {
+            if (!supabaseClient || !window.Clerk?.user) return;
+            const user = window.Clerk.user;
+            const username = user.username || user.fullName || user.primaryEmailAddress?.emailAddress || 'Anonymous';
+            const { error } = await supabaseClient.from('leaderboard').upsert({
+                clerk_user_id: user.id,
+                username,
+                score: finalScore
+            });
+            if (error) {
+                console.error('Failed to submit score:', error);
+                return;
+            }
+            loadLeaderboard();
+        }
+
+        async function loadLeaderboard() {
+            const list = document.getElementById('leaderboard-list');
+            const empty = document.getElementById('leaderboard-empty');
+            if (!supabaseClient) {
+                empty.textContent = 'Leaderboard not configured yet.';
+                empty.style.display = 'block';
+                list.innerHTML = '';
+                return;
+            }
+            const { data, error } = await supabaseClient
+                .from('leaderboard')
+                .select('clerk_user_id, username, score')
+                .order('score', { ascending: false })
+                .limit(10);
+            if (error) {
+                console.error('Failed to load leaderboard:', error);
+                return;
+            }
+            list.innerHTML = '';
+            if (!data || data.length === 0) {
+                empty.textContent = 'No scores yet — be the first!';
+                empty.style.display = 'block';
+                return;
+            }
+            empty.style.display = 'none';
+            const myId = window.Clerk?.user?.id;
+            data.forEach((row, i) => {
+                const li = document.createElement('li');
+                if (row.clerk_user_id === myId) li.className = 'me';
+                const rank = document.createElement('span');
+                rank.textContent = `${i + 1}. ${row.username}`;
+                const pts = document.createElement('span');
+                pts.textContent = row.score;
+                li.appendChild(rank);
+                li.appendChild(pts);
+                list.appendChild(li);
+            });
         }
 
         // Main Loop
