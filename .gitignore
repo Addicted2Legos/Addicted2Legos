@@ -1,1 +1,24 @@
+# OS
 .DS_Store
+**/.DS_Store
+Thumbs.db
+
+# Claude Code local settings (per-machine, not shared)
+.claude/settings.local.json
+
+# Secrets / env files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Logs
+*.log
+
+# Editor
+.vscode/
+.idea/
+
+# Dependencies (in case any game later adds tooling)
+node_modules/
