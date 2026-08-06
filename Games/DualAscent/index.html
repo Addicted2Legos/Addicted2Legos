@@ -97,13 +97,14 @@
             <button class="tab-btn" data-tab="tab-alignment" onclick="switchTab('tab-alignment')">4. Vision & Dialogue</button>
             <button class="tab-btn" data-tab="tab-goals" onclick="switchTab('tab-goals')">5. Goals</button>
             <button class="tab-btn" data-tab="tab-learning" onclick="switchTab('tab-learning')">6. Learning Together</button>
-            <button class="tab-btn" data-tab="tab-ledger" onclick="switchTab('tab-ledger')">7. Ledger</button>
+            <button class="tab-btn" data-tab="tab-grow" onclick="switchTab('tab-grow')">7. Grow Together</button>
+            <button class="tab-btn" data-tab="tab-ledger" onclick="switchTab('tab-ledger')">8. Ledger</button>
         </div>
 
         <!-- TAB 1: Financial Personality (Klontz Money Scripts) -->
         <div id="tab-archetype" class="tab-content active">
             <h2>Discover Your Financial Personality</h2>
-            <p>These four "money scripts" come from research by psychologists Dr. Brad Klontz and Dr. Sonya Britt on the beliefs that drive financial behavior. Pick whichever feels closest to you, or take the short quiz if you're not sure. Full citation in <a href="#sources">Sources</a> below.</p>
+            <p>These nine money mindsets come from Tori Dunlap's <em>Financial Feminist</em> framework, which pairs Enneagram psychology with money behavior. Pick whichever feels closest to you, or take the short quiz if you're not sure. Full citation in <a href="#sources">Sources</a> below.</p>
 
             <div class="archetype-grid" id="archetype-grid"></div>
 
@@ -346,7 +347,20 @@
             </div>
         </div>
 
-        <!-- TAB 7: Household Ledger -->
+        <!-- TAB 7: Grow Together -->
+        <div id="tab-grow" class="tab-content">
+            <div id="grow-gate" class="gate-message">Sign in above to explore this together.</div>
+            <div id="grow-app" style="display:none;">
+                <h2>Grow Together</h2>
+                <p>Common patterns in couples' money lives, drawn from financial psychology and behavioral economics research. Explore the ones that sound like you two, and use the questions and paths forward to talk it through together.</p>
+
+                <div id="grow-highlights" class="summary-box" style="display:none;"></div>
+
+                <div id="grow-dynamics-grid"></div>
+            </div>
+        </div>
+
+        <!-- TAB 8: Household Ledger -->
         <div id="tab-ledger" class="tab-content">
             <div id="ledger-gate" class="gate-message">Sign in above to start tracking shared expenses.</div>
             <div id="ledger-app" style="display:none;">
@@ -378,8 +392,10 @@
         <footer id="sources">
             <h3>Sources</h3>
             <ul>
-                <li>Klontz, B. T., &amp; Britt, S. L. (2011). <em>Money Beliefs and Financial Behaviors: Development of the Klontz Money Script Inventory.</em> Journal of Financial Therapy, 2(1). Basis for the four Financial Personality types in the quiz above — an original quiz inspired by these concepts, not a reproduction of the clinical instrument. <a href="https://www.researchgate.net/publication/265907828_Money_Beliefs_and_Financial_Behaviors_Development_of_the_Klontz_Money_Script_Inventory" target="_blank" rel="noopener">Read the paper</a></li>
+                <li>Tori Dunlap, <em>Financial Feminist</em>, and the Her First $100K platform. Basis for the nine Financial Personality types in the quiz above — an original quiz inspired by Tori Dunlap's Enneagram-and-money framework, not a reproduction of her assessment.</li>
+                <li>Klontz, B. T., &amp; Britt, S. L. (2011). <em>Money Beliefs and Financial Behaviors: Development of the Klontz Money Script Inventory.</em> Journal of Financial Therapy, 2(1). Referenced in the Grow Together tab's discussion of financial avoidance patterns. <a href="https://www.researchgate.net/publication/265907828_Money_Beliefs_and_Financial_Behaviors_Development_of_the_Klontz_Money_Script_Inventory" target="_blank" rel="noopener">Read the paper</a></li>
                 <li>Ramit Sethi, <em>I Will Teach You to Be Rich.</em> Basis for the Conscious Spending Plan percentage targets used in the Spending Plan tab.</li>
+                <li>The Grow Together tab draws on the concepts above plus additional research directions in couples' financial psychology and behavioral economics — including work on "tightwad/spendthrift" mismatches in relationships (Scott Rick and colleagues), joint vs. separate account structures (Jenny Olson, Scott Rick, and colleagues), relative income within households (Marianne Bertrand, Emir Kamenica, Jessica Pan), and financial infidelity survey research from the National Endowment for Financial Education (NEFE). These summaries are our own plain-language interpretations, not verbatim findings or endorsements from those researchers.</li>
             </ul>
             <p class="disclaimer">This app is inspired by and adapts ideas from the work above. It is not affiliated with, endorsed by, or reviewed by these authors.</p>
         </footer>

@@ -1,37 +1,165 @@
-    // ================= Financial Personality data (Klontz Money Scripts) =================
+    // ================= Financial Personality data (Tori Dunlap's Enneagram & Money framework) =================
     const ARCHETYPES = {
-        Avoidance: {
-            emoji: '🙈',
-            title: 'Money Avoidance',
-            desc: "Money feels stressful or even a little shameful. You might put off checking balances or big decisions, or feel you don't quite deserve to have much. Anxiety, more than a plan, tends to drive your choices."
+        Perfectionist: {
+            emoji: '📏',
+            title: 'The Perfectionist',
+            desc: "Driven by getting your finances exactly right. You track carefully and hold high standards for yourself — but a small budget slip can spiral into guilt or all-or-nothing thinking that keeps you stuck re-analyzing instead of moving forward."
         },
-        Worship: {
-            emoji: '✨',
-            title: 'Money Worship',
-            desc: "You believe more money would fix a lot and bring real happiness. It can feel like there's never quite enough, which makes it easy to overspend, overwork, or struggle to say no to a purchase that promises relief."
+        Helper: {
+            emoji: '🤲',
+            title: 'The Helper',
+            desc: "You show up for the people you love, financially and otherwise — covering a tab, lending a hand, picking up the check. The tricky part is remembering your own goals count too, and that saying no to someone else's ask isn't a failure to care."
         },
-        Status: {
-            emoji: '🏆',
-            title: 'Money Status',
-            desc: "Money and self-worth feel connected. What you earn, own, or spend can feel like a scoreboard — for you and for how others see you — which can make it hard to spend below your means, even when it would help."
+        Achiever: {
+            emoji: '🏅',
+            title: 'The Achiever',
+            desc: "Net worth can feel like a scoreboard — for how hard you've worked and how far you've come. That drive is a real asset, but it can tip into lifestyle creep or status spending when your bank balance starts standing in for your worth."
         },
-        Vigilance: {
-            emoji: '🧐',
-            title: 'Money Vigilance',
-            desc: "You're watchful and usually know exactly where your money stands — a real strength. Taken to an extreme, though, it can turn into anxiety, trouble enjoying money you've earned, or reluctance to talk openly about it."
+        Individualist: {
+            emoji: '🎨',
+            title: 'The Individualist',
+            desc: "Spending is one of the ways you express who you are — and there's nothing wrong with that. Where it gets messy is the unglamorous stuff: budgets, bills, and spreadsheets can feel so mundane that they're easy to avoid."
+        },
+        Investigator: {
+            emoji: '🔎',
+            title: 'The Investigator',
+            desc: "You'd rather over-research and over-save than be caught off guard. That instinct can build real security, but taken far enough, it can turn into hoarding information or money out of a quiet fear that there will never be enough."
+        },
+        Loyalist: {
+            emoji: '🛡️',
+            title: 'The Loyalist',
+            desc: "Security is the whole point. You plan for what could go wrong, and that worst-case-scenario thinking has probably saved you more than once. The flip side is a risk aversion that can keep you from moves that would actually serve you."
+        },
+        Enthusiast: {
+            emoji: '🎉',
+            title: 'The Enthusiast',
+            desc: "Money is freedom — the ticket to the next trip, the next fun night out, the next new thing. That enthusiasm is contagious, but budgets can feel like a cage, which makes impulse spending an easy trap."
+        },
+        Challenger: {
+            emoji: '💪',
+            title: 'The Challenger',
+            desc: "Money is power, protection, and independence to you, and you're not shy about asking for what you're worth. That assertiveness is a strength at the negotiating table — just watch for using money as a way to control situations or people."
+        },
+        Peacemaker: {
+            emoji: '🕊️',
+            title: 'The Peacemaker',
+            desc: "You'd rather keep the peace than look closely at an uncomfortable number. Conflict-avoidance can mean unopened statements and unspoken money resentments quietly piling up instead of getting addressed."
         }
     };
 
     const QUIZ_QUESTIONS = [
-        { text: "I feel anxious or a little guilty when I spend money on myself.", script: 'Avoidance' },
-        { text: "I'd rather not look too closely at my bank balance.", script: 'Avoidance' },
-        { text: "I believe having more money would make me significantly happier.", script: 'Worship' },
-        { text: "A purchase can give me a sense of relief, even if I can't fully afford it.", script: 'Worship' },
-        { text: "I judge my own success partly by how much I earn or own.", script: 'Status' },
-        { text: "I feel pressure to spend in ways that match how others see me.", script: 'Status' },
-        { text: "I feel uneasy if I don't know exactly how much money I have.", script: 'Vigilance' },
-        { text: "I'm careful with money to the point that it's hard to enjoy spending, even when I can afford it.", script: 'Vigilance' }
+        { text: "A small budgeting mistake can send me into a spiral of guilt or over-analysis.", script: 'Perfectionist' },
+        { text: "I often cover costs for friends or family before I look after my own savings goals.", script: 'Helper' },
+        { text: "I measure some of my success by my net worth or what I can afford to show for it.", script: 'Achiever' },
+        { text: "I'd rather spend on something that feels like \"me\" than stick to a generic budget category.", script: 'Individualist' },
+        { text: "I feel safer the more I've researched or saved, even if it means holding back from spending.", script: 'Investigator' },
+        { text: "I spend a lot of energy planning for worst-case financial scenarios.", script: 'Loyalist' },
+        { text: "Strict budget rules make me want to break them, and I'd rather chase the next fun experience.", script: 'Enthusiast' },
+        { text: "I use money to stay in control of my situation, and I'm comfortable negotiating hard for what I'm worth.", script: 'Challenger' },
+        { text: "I'd rather avoid checking a number than deal with the discomfort of an uncomfortable one.", script: 'Peacemaker' }
     ];
+
+    // ================= Grow Together: couple financial dynamics =================
+    const COUPLE_DYNAMICS = {
+        saverSpender: {
+            emoji: '⚖️',
+            title: 'The Saver vs. The Spender',
+            desc: "One partner feels anxious whenever money leaves the account; the other feels constrained or judged by too much caution. Left unspoken, it turns into a recurring fight about a purchase instead of a conversation about what safety and enjoyment mean to each of you.",
+            questions: [
+                "When you were growing up, was money talked about openly, or was it tense or avoided?",
+                "What's a purchase you've made that you still feel a little guilty about — and why?",
+                "What would \"enough\" savings actually feel like to you?"
+            ],
+            actions: [
+                "Build a guilt-free spending number into the budget (see the Spending Plan tab) so the spender has permission and the saver has a ceiling.",
+                "Try a standing monthly money date instead of in-the-moment purchase debates.",
+                "Separate small joy purchases from major financial decisions — only the latter need a joint sign-off."
+            ],
+            source: "Concept studied by consumer psychologists as \"tightwad/spendthrift\" mismatches in relationships (Scott Rick and colleagues)."
+        },
+        invisibleBurden: {
+            emoji: '🧾',
+            title: 'The Invisible Burden',
+            desc: "One partner manages most or all of the household's financial logistics — bills, budgeting, planning — while the other stays disengaged or out of the loop. It can look like teamwork from the outside while quietly building resentment on the inside.",
+            questions: [
+                "Can you name every recurring bill and when it's due, without checking? Can I?",
+                "Whose name is actually on the accounts, the budget, and the tax filing?",
+                "Does how we split financial tasks feel fair to both of us — not just efficient?"
+            ],
+            actions: [
+                "Trade roles for one billing cycle so the less-involved partner learns the full picture firsthand.",
+                "Put every recurring account, password, and due date somewhere both partners can access.",
+                "Schedule a recurring check-in (see your Check-In Frequency preference) so visibility isn't left to one person to maintain."
+            ],
+            source: "Related to the financial enmeshment and avoidance imbalances described in Klontz & Britt's money-script research — see Sources below."
+        },
+        incomeDisparity: {
+            emoji: '📊',
+            title: 'Income Disparities',
+            desc: "When one partner earns significantly more than the other, money can start to carry unspoken power — over decisions, over guilt, over who \"gets a say.\" Naming the dynamic directly tends to defuse it.",
+            questions: [
+                "Does the income gap between us ever change how a decision actually gets made?",
+                "Does either of us feel like we've earned more or less say because of what we bring in?",
+                "How do we want to define \"fair\" when it doesn't mean \"equal\"?"
+            ],
+            actions: [
+                "Consider contributions proportional to income rather than a strict 50/50 split, if that feels fairer to you both.",
+                "Separate financial contribution from decision-making power — keep major decisions joint regardless of who earns more.",
+                "Revisit the split whenever either income changes significantly, not just once."
+            ],
+            source: "Studied by economists researching relative income within households (Marianne Bertrand, Emir Kamenica, Jessica Pan)."
+        },
+        phantomGoals: {
+            emoji: '👻',
+            title: 'Phantom Financial Goals',
+            desc: "Saving diligently toward a big number — \"a million dollars,\" \"early retirement\" — without a clear picture of what it's actually for. The goal keeps growing, but nobody feels closer to enjoying it.",
+            questions: [
+                "If we hit this goal tomorrow, what would actually change about our lives?",
+                "Is there a number we're saving toward that we've never actually said out loud to each other?",
+                "What's one thing we're \"saving for later\" that we could safely enjoy now?"
+            ],
+            actions: [
+                "Attach a specific why and dollar figure to every goal in your Goals tab — replace vague targets with concrete ones.",
+                "Set a spend milestone alongside your savings milestone — something you'll actually do at 25%, 50%, 100%.",
+                "Revisit the Vision & Dialogue tab together and write down what the money is actually for."
+            ],
+            source: "An extension of Ramit Sethi's \"Rich Life\" framework — see Sources below."
+        },
+        mergedAccounts: {
+            emoji: '🏦',
+            title: 'Merged vs. Separate Accounts',
+            desc: "Some couples pool everything into joint accounts; others keep finances mostly separate. Neither is inherently right — but an unexamined default can create friction if it doesn't match either partner's need for togetherness or autonomy.",
+            questions: [
+                "Would you feel more secure or more boxed in by a fully joint account?",
+                "Is there anything about full financial transparency that makes you uneasy?",
+                "What would a hybrid setup — some joint, some individual — need to look like for both of us?"
+            ],
+            actions: [
+                "Try a \"yours, mine, ours\" structure — a joint account for shared expenses, individual accounts for personal spending.",
+                "Set a dollar threshold above which purchases from individual accounts still get discussed together.",
+                "Revisit the setup after a big life change — raise, new baby, job loss — instead of assuming it still fits."
+            ],
+            source: "Studied by behavioral scientists researching joint vs. separate account structures and relationship satisfaction (Jenny Olson, Scott Rick, and colleagues)."
+        },
+        financialInfidelity: {
+            emoji: '🤫',
+            title: 'Financial Secrets',
+            desc: "Hidden purchases, secret accounts, or debt one partner doesn't know about. Even small, well-intentioned omissions erode the trust that a shared financial life depends on.",
+            questions: [
+                "Is there a purchase, account, or debt you've kept from me — even a small one?",
+                "What would make it feel safe to tell each other about a financial mistake?",
+                "Do we both actually know our full combined financial picture right now?"
+            ],
+            actions: [
+                "Do a full joint account and debt review together, once, with no judgment attached — just visibility.",
+                "Agree on a dollar threshold above which either partner always tells the other before spending.",
+                "If something's already hidden, disclose it on your own terms in a calm moment rather than letting it surface in a fight."
+            ],
+            source: "Reflects patterns tracked in National Endowment for Financial Education (NEFE) financial infidelity survey research."
+        }
+    };
+
+    let growExpandedKey = null;
 
     let appState = {
         myArchetype: null,
@@ -80,7 +208,8 @@
     }
 
     function submitQuiz() {
-        const scores = { Avoidance: 0, Worship: 0, Status: 0, Vigilance: 0 };
+        const scores = {};
+        Object.keys(ARCHETYPES).forEach(key => { scores[key] = 0; });
         let answeredAll = true;
         QUIZ_QUESTIONS.forEach((q, i) => {
             const checked = document.querySelector(`input[name="quiz-q${i}"]:checked`);
@@ -123,6 +252,7 @@
         checkTeamPlayerBadge();
         updateProgressRing();
         renderBadges();
+        renderGrowGate();
     }
 
     function switchTab(tabId) {
@@ -138,6 +268,7 @@
         if (tabId === 'tab-goals') { renderGoalsGate(); renderGoalsList(); }
         if (tabId === 'tab-ledger') { renderLedgerGate(); renderLedgerList(); renderBalanceSummary(); }
         if (tabId === 'tab-learning') { renderLearningGate(); renderLearningLists(); }
+        if (tabId === 'tab-grow') renderGrowGate();
     }
 
     function calculateCSP() {
@@ -302,6 +433,7 @@
             renderGoalsGate();
             renderLedgerGate();
             renderLearningGate();
+            renderGrowGate();
         }
     }
 
@@ -310,6 +442,7 @@
             renderGoalsGate();
             renderLedgerGate();
             renderLearningGate();
+            renderGrowGate();
             return;
         }
         const uid = myUserId();
@@ -330,6 +463,7 @@
             renderGoalsGate();
             renderLedgerGate();
             renderLearningGate();
+            renderGrowGate();
             return;
         }
 
@@ -364,6 +498,7 @@
         renderGoalsGate();
         renderLedgerGate();
         renderLearningGate();
+        renderGrowGate();
     }
 
     function showModeChooser() {
@@ -546,6 +681,7 @@
         renderPartnerProfileSummary();
         checkTeamPlayerBadge();
         updateProgressRing();
+        renderGrowGate();
     }
 
     function hydrateMyProfileForm() {
@@ -598,6 +734,7 @@
         renderPartnerProfileSummary();
         updateProgressRing();
         renderBadges();
+        renderGrowGate();
     }
 
     function renderPartnerProfileSummary() {
@@ -697,6 +834,7 @@
             contributionsCache = [];
             renderGoalsList();
             updateProgressRing();
+            renderGrowContent();
             return;
         }
 
@@ -711,6 +849,7 @@
 
         renderGoalsList();
         updateProgressRing();
+        renderGrowContent();
     }
 
     function nextMilestone(pct) {
@@ -859,6 +998,143 @@
         }
     }
 
+    // ---------------- Grow Together ----------------
+
+    function renderGrowGate() {
+        const gate = document.getElementById('grow-gate');
+        const app = document.getElementById('grow-app');
+        if (!gate || !app) return;
+
+        if (!window.Clerk?.user) {
+            gate.innerText = 'Sign in above to explore this together.';
+            gate.style.display = 'block';
+            app.style.display = 'none';
+            return;
+        }
+        if (!currentHousehold) {
+            gate.innerText = 'Choose With a Partner above to unlock this section.';
+            gate.style.display = 'block';
+            app.style.display = 'none';
+            return;
+        }
+        if (currentHousehold.is_solo) {
+            gate.innerText = 'This section is built for two — invite your partner with your household code above to unlock it.';
+            gate.style.display = 'block';
+            app.style.display = 'none';
+            return;
+        }
+
+        const mine = memberProfilesCache[myUserId()];
+        const profileStarted = !!(appState.myArchetype || (mine?.personal_info && Object.keys(mine.personal_info).length > 0));
+        if (!profileStarted) {
+            gate.innerText = "Set your Financial Personality and My Profile first — we'll use them to tailor what to explore together.";
+            gate.style.display = 'block';
+            app.style.display = 'none';
+            return;
+        }
+        if (currentHousehold.members.length < 2) {
+            gate.innerText = 'Waiting on your partner to join with the invite code above.';
+            gate.style.display = 'block';
+            app.style.display = 'none';
+            return;
+        }
+
+        gate.style.display = 'none';
+        app.style.display = 'block';
+        renderGrowContent();
+    }
+
+    function computeResonantDynamics() {
+        const resonant = new Set();
+        if (!currentHousehold || currentHousehold.is_solo) return resonant;
+
+        const myProfile = memberProfilesCache[myUserId()];
+        const pid = partnerId();
+        const partnerProfile = pid ? memberProfilesCache[pid] : null;
+
+        const SAVER_LEANING = ['Investigator', 'Loyalist', 'Perfectionist'];
+        const SPENDER_LEANING = ['Enthusiast', 'Achiever', 'Individualist'];
+        const myArch = myProfile?.archetype || appState.myArchetype;
+        const partnerArch = partnerProfile?.archetype;
+
+        if (myArch && partnerArch) {
+            const oneSaverOneSpender =
+                (SAVER_LEANING.includes(myArch) && SPENDER_LEANING.includes(partnerArch)) ||
+                (SAVER_LEANING.includes(partnerArch) && SPENDER_LEANING.includes(myArch));
+            if (oneSaverOneSpender) resonant.add('saverSpender');
+            if (myArch === 'Peacemaker' || partnerArch === 'Peacemaker') resonant.add('invisibleBurden');
+        }
+
+        const myIncome = myProfile?.financial_info?.monthlyIncome;
+        const partnerIncome = partnerProfile?.financial_info?.monthlyIncome;
+        if (myIncome > 0 && partnerIncome > 0) {
+            const ratio = Math.max(myIncome, partnerIncome) / Math.min(myIncome, partnerIncome);
+            if (ratio >= 1.5) resonant.add('incomeDisparity');
+        }
+
+        if (goalsCache.some(g => Number(g.target_amount) >= 10000)) resonant.add('phantomGoals');
+
+        if (ledgerCache.length >= 4) {
+            const counts = {};
+            ledgerCache.forEach(e => { counts[e.created_by] = (counts[e.created_by] || 0) + 1; });
+            const maxCount = Math.max(...Object.values(counts));
+            if (maxCount / ledgerCache.length >= 0.8) resonant.add('invisibleBurden');
+        }
+
+        return resonant;
+    }
+
+    function toggleDynamicCard(key) {
+        const opening = growExpandedKey !== key;
+        growExpandedKey = opening ? key : null;
+        if (opening && !appState.badges.growthMinded) {
+            awardXP(5, 'Explored a dynamic together');
+            unlockBadge('growthMinded', '🌱', 'Growth-Minded');
+        }
+        renderGrowContent();
+    }
+
+    function renderGrowContent() {
+        const grid = document.getElementById('grow-dynamics-grid');
+        const highlightBox = document.getElementById('grow-highlights');
+        if (!grid || !currentHousehold || currentHousehold.is_solo) return;
+
+        const resonant = computeResonantDynamics();
+        const keys = Object.keys(COUPLE_DYNAMICS).sort((a, b) => (resonant.has(a) ? 0 : 1) - (resonant.has(b) ? 0 : 1));
+
+        if (highlightBox) {
+            if (resonant.size > 0) {
+                highlightBox.style.display = 'block';
+                highlightBox.innerHTML = 'Based on what you\'ve both entered so far, these might be worth starting with: ' +
+                    [...resonant].map(k => `<strong>${escapeHtml(COUPLE_DYNAMICS[k].title)}</strong>`).join(', ') + '.';
+            } else {
+                highlightBox.style.display = 'none';
+            }
+        }
+
+        grid.innerHTML = keys.map(key => {
+            const d = COUPLE_DYNAMICS[key];
+            const isHighlighted = resonant.has(key);
+            const isOpen = growExpandedKey === key;
+            return `
+                <div class="dynamic-card${isHighlighted ? ' highlighted' : ''}">
+                    <h4>${d.emoji} ${escapeHtml(d.title)} ${isHighlighted ? '<span class="resonate-tag">Might resonate</span>' : ''}</h4>
+                    <p class="dc-desc">${escapeHtml(d.desc)}</p>
+                    <button class="dc-toggle-btn" onclick="toggleDynamicCard('${key}')">${isOpen ? 'Hide' : 'Explore this together'}</button>
+                    ${isOpen ? `
+                        <div class="dc-detail">
+                            <h5>Questions to explore together</h5>
+                            <ul>${d.questions.map(q => `<li>${escapeHtml(q)}</li>`).join('')}</ul>
+                            <h5>Paths forward</h5>
+                            <ul>${d.actions.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ul>
+                            <div class="dc-source">${escapeHtml(d.source)}</div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }).join('');
+    }
+
     // ---------------- Ledger ----------------
 
     async function addLedgerEntry() {
@@ -898,6 +1174,7 @@
         ledgerCache = data || [];
         renderLedgerList();
         renderBalanceSummary();
+        renderGrowContent();
     }
 
     function renderLedgerList() {
