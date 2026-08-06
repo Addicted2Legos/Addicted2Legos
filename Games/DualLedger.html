@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Money & Mindset Alignment App</title>
+    <!-- Clerk: this app uses its own Clerk application, separate from ClickLasers.html.
+         Replace data-clerk-publishable-key and src domain with the values from that app's dashboard (Configure > API Keys) -->
+    <script
+      async
+      crossorigin="anonymous"
+      data-clerk-publishable-key="pk_test_ZWFzeS1jb3lvdGUtNjAuY2xlcmsuYWNjb3VudHMuZGV2JA"
+      src="https://easy-coyote-60.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+      type="text/javascript"
+    ></script>
+    <!-- Supabase: this app uses its own Supabase project, separate from ClickLasers.html.
+         Replace SUPABASE_URL / SUPABASE_ANON_KEY constants further down once your project is set up -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg-color: #f4f6f8;
+            --card-bg: #ffffff;
+            --primary: #2e7d32;
+            --primary-light: #e8f5e9;
+            --secondary: #1565c0;
+            --accent: #ff8f00;
+            --text-main: #212121;
+            --text-muted: #616161;
+            --border: #e0e0e0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            padding: 30px;
+        }
+
+        header {
+            text-align: center;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 20px;
+            margin-bottom: 25px;
+        }
+
+        h1 { margin: 0 0 10px 0; color: var(--primary); }
+        p.subtitle { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
+
+        /* Navigation Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tab-btn {
+            padding: 12px 20px;
+            border: none;
+            background: none;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Form Controls & Layout */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 650px) {
+            .grid-2 { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: #fafafa;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card h3 { margin-top: 0; color: var(--secondary); }
+
+        label {
+            display: block;
+            margin-top: 12px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 0.95rem;
+        }
+
+        button.action-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        button.action-btn:hover { background-color: #1b5e20; }
+
+        /* Progress Bar */
+        .progress-bar-container {
+            height: 24px;
+            background: #e0e0e0;
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            margin: 15px 0;
+        }
+
+        .progress-segment {
+            height: 100%;
+            text-align: center;
+            color: white;
+            font-size: 0.75rem;
+            line-height: 24px;
+            font-weight: bold;
+            transition: width 0.3s ease;
+        }
+
+        .seg-fixed { background: #d32f2f; }
+        .seg-invest { background: #1976d2; }
+        .seg-savings { background: #00796b; }
+        .seg-guiltfree { background: #388e3c; }
+
+        .legend {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            font-size: 0.85rem;
+            margin-bottom: 15px;
+        }
+
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+
+        .summary-box {
+            background: var(--primary-light);
+            border-left: 4px solid var(--primary);
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+
+        /* Auth bar */
+        #auth-bar {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        #sign-in-btn {
+            background-color: var(--secondary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 0.9rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        #user-button { display: none; }
+
+        /* Household panel */
+        #household-bar {
+            display: none;
+            background: #fafafa;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+        }
+        #household-bar.signed-in { display: block; }
+        #household-setup { display: flex; gap: 20px; flex-wrap: wrap; }
+        #household-setup .setup-col { flex: 1; min-width: 220px; }
+        #household-setup label { margin-top: 0; }
+        #household-setup .action-btn { padding: 10px 18px; font-size: 0.9rem; }
+        #household-status { display: none; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+        #household-status .hh-name { font-weight: bold; color: var(--secondary); font-size: 1.05rem; }
+        #household-status .hh-members { font-size: 0.85rem; color: var(--text-muted); }
+        .invite-code-chip {
+            font-family: monospace;
+            background: var(--primary-light);
+            border: 1px dashed var(--primary);
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            cursor: pointer;
+        }
+        .gate-message {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 40px 20px;
+            font-size: 0.95rem;
+        }
+
+        /* Goals */
+        .goal-card { position: relative; }
+        .goal-card .goal-title-row { display: flex; justify-content: space-between; align-items: baseline; }
+        .goal-card .goal-amounts { font-size: 0.85rem; color: var(--text-muted); }
+        .goal-progress-wrap { position: relative; margin: 18px 0 8px 0; }
+        .seg-mine { background: var(--secondary); }
+        .seg-partner { background: var(--accent); }
+        .milestone-ticks { position: absolute; top: 0; left: 0; width: 100%; height: 24px; pointer-events: none; }
+        .milestone-tick {
+            position: absolute;
+            top: 0;
+            width: 2px;
+            height: 24px;
+            background: rgba(255,255,255,0.6);
+        }
+        .goal-legend { display: flex; gap: 15px; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
+        .contribute-row { display: flex; gap: 10px; margin-top: 12px; align-items: center; }
+        .contribute-row input { width: auto; flex: 1; margin-top: 0; }
+        .contribute-row button { margin-top: 0; padding: 8px 16px; font-size: 0.85rem; }
+        .milestone-flag { font-size: 0.8rem; color: var(--primary); font-weight: bold; margin-top: 4px; }
+
+        /* Ledger */
+        .balance-owe { border-left-color: #d32f2f !important; background: #ffebee !important; }
+        .balance-settled { border-left-color: var(--primary) !important; background: var(--primary-light) !important; }
+        .ledger-entry {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+        .ledger-entry:last-child { border-bottom: none; }
+        .ledger-entry .le-desc { font-weight: 600; }
+        .ledger-entry .le-meta { font-size: 0.8rem; color: var(--text-muted); }
+        .ledger-entry .le-amount { font-weight: bold; text-align: right; white-space: nowrap; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Money & Mindset Alignment</h1>
+        <p class="subtitle">Inspired by Farnoosh Torabi & Ramit Sethi's Frameworks</p>
+    </header>
+
+    <div id="auth-bar">
+        <button id="sign-in-btn" class="action-btn" style="margin-top:0;">Sign In</button>
+        <div id="user-button"></div>
+    </div>
+
+    <div id="household-bar">
+        <div id="household-setup">
+            <div class="setup-col">
+                <h3 style="margin-top:0;">Create a Household</h3>
+                <label>Household Name</label>
+                <input type="text" id="hh-create-name" placeholder="e.g., The Smiths">
+                <button class="action-btn" onclick="handleCreateHousehold()">Create Household</button>
+            </div>
+            <div class="setup-col">
+                <h3 style="margin-top:0;">Join a Household</h3>
+                <label>Invite Code</label>
+                <input type="text" id="hh-join-code" placeholder="e.g., A1B2C3" style="text-transform:uppercase;">
+                <button class="action-btn" onclick="handleJoinHousehold()">Join Household</button>
+            </div>
+        </div>
+        <div id="household-status">
+            <div>
+                <div class="hh-name" id="hh-name-display"></div>
+                <div class="hh-members" id="hh-members-display"></div>
+            </div>
+            <div>
+                Invite code: <span class="invite-code-chip" id="hh-invite-code" title="Click to copy" onclick="copyInviteCode()"></span>
+            </div>
+        </div>
+        <div id="household-error" style="color:#d32f2f; font-size:0.85rem; margin-top:8px; display:none;"></div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('tab-archetype')">1. Archetype Quiz</button>
+        <button class="tab-btn" onclick="switchTab('tab-csp')">2. Conscious Spending Plan</button>
+        <button class="tab-btn" onclick="switchTab('tab-alignment')">3. Vision & Dialogue</button>
+        <button class="tab-btn" onclick="switchTab('tab-goals')">4. Goals</button>
+        <button class="tab-btn" onclick="switchTab('tab-ledger')">5. Ledger</button>
+    </div>
+
+    <!-- TAB 1: Farnoosh Torabi Money Personality Archetypes -->
+    <div id="tab-archetype" class="tab-content active">
+        <h2>Discover Your Financial Archetype</h2>
+        <p>Farnoosh Torabi emphasizes that money choices are often driven by emotional history and personal fears. Identify where you and your partner sit:</p>
+        
+        <div class="grid-2">
+            <div class="card">
+                <h3>Partner 1</h3>
+                <label>Name</label>
+                <input type="text" id="p1-name" value="Partner 1">
+
+                <label>Primary Money Feeling</label>
+                <select id="p1-feeling">
+                    <option value="security">Anxiety / Need for Safety</option>
+                    <option value="freedom">Freedom / Spontaneity</option>
+                    <option value="status">Achievement / Recognition</option>
+                    <option value="avoidance">Overwhelmed / Avoidance</option>
+                </select>
+
+                <label>Childhood Money Script</label>
+                <input type="text" id="p1-script" placeholder="e.g., 'We never had enough' or 'Money bought love'">
+
+                <label>Archetype</label>
+                <select id="p1-archetype">
+                    <option value="Guardian">The Guardian (Strict Saver)</option>
+                    <option value="Visionary">The Visionary (Big Spender / Big Ideas)</option>
+                    <option value="Analyst">The Analyst (Optimizes Everything)</option>
+                    <option value="FreeSpirit">The Free Spirit (Live for Today)</option>
+                </select>
+            </div>
+
+            <div class="card">
+                <h3>Partner 2</h3>
+                <label>Name</label>
+                <input type="text" id="p2-name" value="Partner 2">
+
+                <label>Primary Money Feeling</label>
+                <select id="p2-feeling">
+                    <option value="freedom">Freedom / Spontaneity</option>
+                    <option value="security">Anxiety / Need for Safety</option>
+                    <option value="status">Achievement / Recognition</option>
+                    <option value="avoidance">Overwhelmed / Avoidance</option>
+                </select>
+
+                <label>Childhood Money Script</label>
+                <input type="text" id="p2-script" placeholder="e.g., 'Money causes fights' or 'Work hard, spend hard'">
+
+                <label>Archetype</label>
+                <select id="p2-archetype">
+                    <option value="FreeSpirit">The Free Spirit (Live for Today)</option>
+                    <option value="Guardian">The Guardian (Strict Saver)</option>
+                    <option value="Visionary">The Visionary (Big Spender / Big Ideas)</option>
+                    <option value="Analyst">The Analyst (Optimizes Everything)</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="action-btn" onclick="saveArchetypes()">Save Archetypes & Continue</button>
+    </div>
+
+    <!-- TAB 2: Ramit Sethi's Conscious Spending Plan -->
+    <div id="tab-csp" class="tab-content">
+        <h2>Conscious Spending Plan (CSP)</h2>
+        <p>Ramit Sethi’s system shifts focus away from tracking every penny to allocating target percentage ranges for total household income.</p>
+
+        <div class="card">
+            <label>Combined Net Monthly Income ($)</label>
+            <input type="number" id="net-income" value="6000" oninput="calculateCSP()">
+        </div>
+
+        <div class="grid-2">
+            <div>
+                <div class="card">
+                    <h3>Monthly Expenses ($)</h3>
+                    
+                    <label>Fixed Costs (Housing, Bills, Min. Debt, Groceries)</label>
+                    <input type="number" id="exp-fixed" value="3300" oninput="calculateCSP()">
+
+                    <label>Investments (401k, Roth IRA, Brokerage)</label>
+                    <input type="number" id="exp-invest" value="600" oninput="calculateCSP()">
+
+                    <label>Savings (Emergency Fund, Travel, Big Goals)</label>
+                    <input type="number" id="exp-savings" value="600" oninput="calculateCSP()">
+
+                    <label>Guilt-Free Spending (Dining, Hobbies, Fun)</label>
+                    <input type="number" id="exp-guiltfree" value="1500" oninput="calculateCSP()">
+                </div>
+            </div>
+
+            <div>
+                <div class="card">
+                    <h3>Breakdown & Target Ranges</h3>
+                    
+                    <div class="legend">
+                        <div class="legend-item"><span class="dot seg-fixed"></span> Fixed (<span id="lbl-fixed-pct">0%</span>)</div>
+                        <div class="legend-item"><span class="dot seg-invest"></span> Invest (<span id="lbl-invest-pct">0%</span>)</div>
+                        <div class="legend-item"><span class="dot seg-savings"></span> Save (<span id="lbl-savings-pct">0%</span>)</div>
+                        <div class="legend-item"><span class="dot seg-guiltfree"></span> Fun (<span id="lbl-guiltfree-pct">0%</span>)</div>
+                    </div>
+
+                    <div class="progress-bar-container">
+                        <div id="bar-fixed" class="progress-segment seg-fixed"></div>
+                        <div id="bar-invest" class="progress-segment seg-invest"></div>
+                        <div id="bar-savings" class="progress-segment seg-savings"></div>
+                        <div id="bar-guiltfree" class="progress-segment seg-guiltfree"></div>
+                    </div>
+
+                    <ul style="font-size: 0.85rem; line-height: 1.5; color: var(--text-muted); padding-left: 18px;">
+                        <li><strong>Fixed Costs:</strong> Target 50–60%</li>
+                        <li><strong>Investments:</strong> Target 10%</li>
+                        <li><strong>Savings:</strong> Target 5–10%</li>
+                        <li><strong>Guilt-Free Spending:</strong> Target 20–35%</li>
+                    </ul>
+
+                    <div id="csp-feedback" class="summary-box"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: Shared Vision & Guided Dialogue -->
+    <div id="tab-alignment" class="tab-content">
+        <h2>Shared Vision & Alignment Dialogue</h2>
+        <p>Use these prompts to align your expectations and build a shared definition of your "Rich Life."</p>
+
+        <div class="card">
+            <h3>1. What is your shared "Rich Life"?</h3>
+            <p style="font-size:0.85rem; color:var(--text-muted)">What do you want to spend extravagantly on, and what do you both agree to ruthlessly cut back on?</p>
+            <textarea id="vision-text" rows="3" placeholder="e.g., We want to take one major international trip every year without worrying about price, but we agree to cook at home on weekdays and drive reliable older cars."></textarea>
+        </div>
+
+        <div class="card">
+            <h3>2. Money Dial Alignment</h3>
+            <p style="font-size:0.85rem; color:var(--text-muted)">Select the top 2 "Money Dials" (spending priorities) for each partner:</p>
+            <div class="grid-2">
+                <div>
+                    <label><span class="p1-label-name">Partner 1</span> Top Dial</label>
+                    <select id="p1-dial">
+                        <option>Travel</option>
+                        <option>Dining Out / Food</option>
+                        <option>Convenience / Time-Saving</option>
+                        <option>Fitness / Wellness</option>
+                        <option>Hobbies / Experiences</option>
+                    </select>
+                </div>
+                <div>
+                    <label><span class="p2-label-name">Partner 2</span> Top Dial</label>
+                    <select id="p2-dial">
+                        <option>Travel</option>
+                        <option>Dining Out / Food</option>
+                        <option>Convenience / Time-Saving</option>
+                        <option>Fitness / Wellness</option>
+                        <option>Hobbies / Experiences</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>3. Summary & Action Plan</h3>
+            <button class="action-btn" onclick="generateSummary()">Generate Alignment Plan</button>
+            <div id="final-summary" class="summary-box" style="display:none;"></div>
+        </div>
+    </div>
+
+    <!-- TAB 4: Goal Progression -->
+    <div id="tab-goals" class="tab-content">
+        <div id="goals-gate" class="gate-message">Sign in above to start tracking shared goals.</div>
+        <div id="goals-app" style="display:none;">
+            <h2>Shared Goals</h2>
+            <p>Track progress toward savings milestones together — see exactly how much each of you has contributed.</p>
+
+            <div class="card">
+                <h3>Add a New Goal</h3>
+                <label>Goal Title</label>
+                <input type="text" id="goal-title" placeholder="e.g., Emergency Fund, Hawaii Trip">
+                <label>Target Amount ($)</label>
+                <input type="number" id="goal-target" placeholder="5000">
+                <label>Target Date (optional)</label>
+                <input type="date" id="goal-date">
+                <button class="action-btn" onclick="createGoal()">Add Goal</button>
+            </div>
+
+            <div id="goals-list"></div>
+        </div>
+    </div>
+
+    <!-- TAB 5: Household Ledger -->
+    <div id="tab-ledger" class="tab-content">
+        <div id="ledger-gate" class="gate-message">Sign in above to start tracking shared expenses.</div>
+        <div id="ledger-app" style="display:none;">
+            <h2>Household Ledger</h2>
+            <p>Log shared expenses and always know exactly who owes whom.</p>
+
+            <div id="balance-summary" class="summary-box"></div>
+
+            <div class="card">
+                <h3>Add an Expense</h3>
+                <label>Description</label>
+                <input type="text" id="ledger-desc" placeholder="e.g., Groceries, Electric Bill">
+                <label>Amount ($)</label>
+                <input type="number" id="ledger-amount" placeholder="80.00">
+                <label>Paid By</label>
+                <select id="ledger-paid-by"></select>
+                <label>Payer's Share (%) <span style="font-weight:normal; color:var(--text-muted);">— default 50/50, edit for an uneven split</span></label>
+                <input type="number" id="ledger-share-pct" value="50" min="0" max="100">
+                <button class="action-btn" onclick="addLedgerEntry()">Add Expense</button>
+            </div>
+
+            <div class="card">
+                <h3>Recent Entries</h3>
+                <div id="ledger-list"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let appState = {
+        p1Name: 'Partner 1',
+        p2Name: 'Partner 2',
+        p1Archetype: 'Guardian',
+        p2Archetype: 'FreeSpirit'
+    };
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        
+        document.getElementById(tabId).classList.add('active');
+        event.currentTarget.classList.add('active');
+
+        if(tabId === 'tab-csp') calculateCSP();
+        if(tabId === 'tab-goals') { renderGoalsGate(); renderGoalsList(); }
+        if(tabId === 'tab-ledger') { renderLedgerGate(); renderLedgerList(); renderBalanceSummary(); }
+    }
+
+    function saveArchetypes() {
+        appState.p1Name = document.getElementById('p1-name').value || 'Partner 1';
+        appState.p2Name = document.getElementById('p2-name').value || 'Partner 2';
+        appState.p1Archetype = document.getElementById('p1-archetype').value;
+        appState.p2Archetype = document.getElementById('p2-archetype').value;
+
+        document.querySelectorAll('.p1-label-name').forEach(el => el.innerText = appState.p1Name);
+        document.querySelectorAll('.p2-label-name').forEach(el => el.innerText = appState.p2Name);
+
+        switchTab('tab-csp');
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        document.querySelectorAll('.tab-btn')[0].classList.remove('active');
+    }
+
+    function calculateCSP() {
+        const income = parseFloat(document.getElementById('net-income').value) || 1;
+        const fixed = parseFloat(document.getElementById('exp-fixed').value) || 0;
+        const invest = parseFloat(document.getElementById('exp-invest').value) || 0;
+        const savings = parseFloat(document.getElementById('exp-savings').value) || 0;
+        const guiltfree = parseFloat(document.getElementById('exp-guiltfree').value) || 0;
+
+        const fixedPct = Math.round((fixed / income) * 100);
+        const investPct = Math.round((invest / income) * 100);
+        const savingsPct = Math.round((savings / income) * 100);
+        const guiltfreePct = Math.round((guiltfree / income) * 100);
+
+        // Update labels
+        document.getElementById('lbl-fixed-pct').innerText = fixedPct + '%';
+        document.getElementById('lbl-invest-pct').innerText = investPct + '%';
+        document.getElementById('lbl-savings-pct').innerText = savingsPct + '%';
+        document.getElementById('lbl-guiltfree-pct').innerText = guiltfreePct + '%';
+
+        // Update bars
+        document.getElementById('bar-fixed').style.width = fixedPct + '%';
+        document.getElementById('bar-invest').style.width = investPct + '%';
+        document.getElementById('bar-savings').style.width = savingsPct + '%';
+        document.getElementById('bar-guiltfree').style.width = guiltfreePct + '%';
+
+        // Feedback
+        let feedback = "";
+        if (fixedPct > 60) {
+            feedback += `⚠️ <strong>Fixed Costs are high (${fixedPct}%).</strong> Target is 50-60%. Consider ways to downsize overhead or keep fixed costs low while boosting income.<br>`;
+        } else {
+            feedback += `✅ <strong>Fixed Costs look healthy (${fixedPct}%).</strong><br>`;
+        }
+
+        if (investPct < 10) {
+            feedback += `⚠️ <strong>Investments are below target (${investPct}%).</strong> Aim for at least 10% to let compound growth work for you.`;
+        } else {
+            feedback += `✅ <strong>Investment target met (${investPct}%).</strong>`;
+        }
+
+        document.getElementById('csp-feedback').innerHTML = feedback;
+    }
+
+    function generateSummary() {
+        const vision = document.getElementById('vision-text').value || "No vision stated yet.";
+        const p1Dial = document.getElementById('p1-dial').value;
+        const p2Dial = document.getElementById('p2-dial').value;
+
+        const summaryBox = document.getElementById('final-summary');
+        summaryBox.style.display = 'block';
+        summaryBox.innerHTML = `
+            <h4>Alignment Summary for ${appState.p1Name} & ${appState.p2Name}</h4>
+            <p><strong>Archetype Pair:</strong> ${appState.p1Name} (${appState.p1Archetype}) & ${appState.p2Name} (${appState.p2Archetype})</p>
+            <p><strong>Shared Rich Life Vision:</strong> "${vision}"</p>
+            <p><strong>Spending Focus (Money Dials):</strong> ${appState.p1Name} values <em>${p1Dial}</em>, while ${appState.p2Name} values <em>${p2Dial}</em>.</p>
+            <p><em>Tip from Farnoosh & Ramit:</em> Focus on supporting each other's money dials in your guilt-free spending budget, rather than judging individual line-item purchases!</p>
+        `;
+    }
+
+    // ================= Clerk + Supabase: Goals & Ledger =================
+    const SUPABASE_URL = 'https://bvweuydrpildjxjmcpxa.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_-cbUrULpA-JAXXQy38W_5Q_fGgz7z-w';
+
+    const supabaseClient = (window.supabase && SUPABASE_URL.indexOf('REPLACE-ME') === -1)
+        ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            accessToken: async () => (await window.Clerk?.session?.getToken()) ?? null
+          })
+        : null;
+
+    let currentHousehold = null; // { id, name, invite_code, members: [{clerk_user_id, display_name}] }
+    let goalsCache = [];
+    let contributionsCache = [];
+    let ledgerCache = [];
+    let realtimeChannel = null;
+
+    function myUserId() {
+        return window.Clerk?.user?.id || null;
+    }
+
+    function myDisplayName() {
+        const u = window.Clerk?.user;
+        if (!u) return 'Me';
+        return u.username || u.fullName || u.primaryEmailAddress?.emailAddress || 'Me';
+    }
+
+    function nameFor(clerkUserId) {
+        if (!currentHousehold) return clerkUserId;
+        const m = currentHousehold.members.find(m => m.clerk_user_id === clerkUserId);
+        return m ? (m.display_name || 'Member') : 'Member';
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.innerText = str;
+        return div.innerHTML;
+    }
+
+    const signInBtn = document.getElementById('sign-in-btn');
+    const userButtonDiv = document.getElementById('user-button');
+    const householdBar = document.getElementById('household-bar');
+    const householdSetup = document.getElementById('household-setup');
+    const householdStatus = document.getElementById('household-status');
+    const householdError = document.getElementById('household-error');
+
+    signInBtn.addEventListener('click', () => window.Clerk && window.Clerk.openSignIn({
+        fallbackRedirectUrl: window.location.href,
+        forceRedirectUrl: window.location.href
+    }));
+
+    window.addEventListener('load', async () => {
+        if (!window.Clerk) return; // Clerk script not loaded (key not configured yet)
+        await window.Clerk.load({
+            signInFallbackRedirectUrl: window.location.href,
+            signInForceRedirectUrl: window.location.href,
+            signUpFallbackRedirectUrl: window.location.href,
+            signUpForceRedirectUrl: window.location.href,
+            afterSignOutUrl: window.location.href
+        });
+        window.Clerk.mountUserButton(userButtonDiv, {
+            userProfileMode: 'modal',
+            afterSignOutUrl: window.location.href
+        });
+        window.Clerk.addListener(() => onAuthChange());
+        onAuthChange();
+    });
+
+    function onAuthChange() {
+        const signedIn = !!window.Clerk?.user;
+        signInBtn.style.display = signedIn ? 'none' : 'inline-flex';
+        userButtonDiv.style.display = signedIn ? 'block' : 'none';
+
+        if (signedIn) {
+            householdBar.classList.add('signed-in');
+            loadHousehold();
+        } else {
+            householdBar.classList.remove('signed-in');
+            currentHousehold = null;
+            renderGoalsGate();
+            renderLedgerGate();
+        }
+    }
+
+    async function loadHousehold() {
+        if (!supabaseClient) {
+            renderGoalsGate();
+            renderLedgerGate();
+            return;
+        }
+        const uid = myUserId();
+        const { data: memberRows, error: memberErr } = await supabaseClient
+            .from('household_members')
+            .select('household_id')
+            .eq('clerk_user_id', uid)
+            .limit(1);
+
+        if (memberErr) {
+            console.error('Failed to load household membership:', memberErr);
+            return;
+        }
+
+        if (!memberRows || memberRows.length === 0) {
+            currentHousehold = null;
+            householdSetup.style.display = 'flex';
+            householdStatus.style.display = 'none';
+            renderGoalsGate();
+            renderLedgerGate();
+            return;
+        }
+
+        const householdId = memberRows[0].household_id;
+        const [{ data: hh, error: hhErr }, { data: members, error: membersErr }] = await Promise.all([
+            supabaseClient.from('households').select('id, name, invite_code').eq('id', householdId).single(),
+            supabaseClient.from('household_members').select('clerk_user_id, display_name').eq('household_id', householdId)
+        ]);
+
+        if (hhErr || membersErr) {
+            console.error('Failed to load household:', hhErr || membersErr);
+            return;
+        }
+
+        currentHousehold = { id: hh.id, name: hh.name, invite_code: hh.invite_code, members: members || [] };
+
+        householdSetup.style.display = 'none';
+        householdStatus.style.display = 'flex';
+        document.getElementById('hh-name-display').innerText = currentHousehold.name || 'Your Household';
+        document.getElementById('hh-members-display').innerText = currentHousehold.members.map(m => m.display_name || 'Member').join(' & ');
+        document.getElementById('hh-invite-code').innerText = currentHousehold.invite_code;
+
+        populatePaidBySelect();
+        subscribeRealtime();
+        loadGoals();
+        loadLedger();
+        renderGoalsGate();
+        renderLedgerGate();
+    }
+
+    async function handleCreateHousehold() {
+        if (!supabaseClient) return;
+        const name = document.getElementById('hh-create-name').value.trim() || 'Our Household';
+        householdError.style.display = 'none';
+        const { error } = await supabaseClient.rpc('create_household', { p_name: name, p_display_name: myDisplayName() });
+        if (error) {
+            householdError.innerText = error.message;
+            householdError.style.display = 'block';
+            return;
+        }
+        loadHousehold();
+    }
+
+    async function handleJoinHousehold() {
+        if (!supabaseClient) return;
+        const code = document.getElementById('hh-join-code').value.trim();
+        householdError.style.display = 'none';
+        if (!code) return;
+        const { error } = await supabaseClient.rpc('join_household', { p_invite_code: code, p_display_name: myDisplayName() });
+        if (error) {
+            householdError.innerText = error.message;
+            householdError.style.display = 'block';
+            return;
+        }
+        loadHousehold();
+    }
+
+    function copyInviteCode() {
+        if (!currentHousehold) return;
+        navigator.clipboard.writeText(currentHousehold.invite_code).then(() => {
+            const chip = document.getElementById('hh-invite-code');
+            const original = chip.innerText;
+            chip.innerText = 'Copied!';
+            setTimeout(() => chip.innerText = original, 1200);
+        });
+    }
+
+    function populatePaidBySelect() {
+        const select = document.getElementById('ledger-paid-by');
+        if (!select || !currentHousehold) return;
+        select.innerHTML = '';
+        currentHousehold.members.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.clerk_user_id;
+            opt.innerText = (m.clerk_user_id === myUserId() ? 'You' : (m.display_name || 'Partner'));
+            select.appendChild(opt);
+        });
+    }
+
+    function subscribeRealtime() {
+        if (!supabaseClient || !currentHousehold) return;
+        if (realtimeChannel) supabaseClient.removeChannel(realtimeChannel);
+        realtimeChannel = supabaseClient.channel('household-' + currentHousehold.id)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'ledger_entries', filter: `household_id=eq.${currentHousehold.id}` }, () => loadLedger())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'goals', filter: `household_id=eq.${currentHousehold.id}` }, () => loadGoals())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'goal_contributions' }, () => loadGoals())
+            .subscribe();
+    }
+
+    // ---------------- Gates ----------------
+
+    function renderGoalsGate() {
+        const gate = document.getElementById('goals-gate');
+        const app = document.getElementById('goals-app');
+        if (!window.Clerk?.user) {
+            gate.innerText = 'Sign in above to start tracking shared goals.';
+            gate.style.display = 'block';
+            app.style.display = 'none';
+        } else if (!currentHousehold) {
+            gate.innerText = 'Create or join a household above to start tracking shared goals.';
+            gate.style.display = 'block';
+            app.style.display = 'none';
+        } else {
+            gate.style.display = 'none';
+            app.style.display = 'block';
+        }
+    }
+
+    function renderLedgerGate() {
+        const gate = document.getElementById('ledger-gate');
+        const app = document.getElementById('ledger-app');
+        if (!window.Clerk?.user) {
+            gate.innerText = 'Sign in above to start tracking shared expenses.';
+            gate.style.display = 'block';
+            app.style.display = 'none';
+        } else if (!currentHousehold) {
+            gate.innerText = 'Create or join a household above to start tracking shared expenses.';
+            gate.style.display = 'block';
+            app.style.display = 'none';
+        } else {
+            gate.style.display = 'none';
+            app.style.display = 'block';
+        }
+    }
+
+    // ---------------- Goals ----------------
+
+    async function createGoal() {
+        if (!supabaseClient || !currentHousehold) return;
+        const title = document.getElementById('goal-title').value.trim();
+        const target = parseFloat(document.getElementById('goal-target').value);
+        const date = document.getElementById('goal-date').value || null;
+        if (!title || !target || target <= 0) return;
+
+        const { error } = await supabaseClient.from('goals').insert({
+            household_id: currentHousehold.id,
+            title,
+            target_amount: target,
+            target_date: date,
+            created_by: myUserId()
+        });
+        if (error) { console.error('Failed to create goal:', error); return; }
+
+        document.getElementById('goal-title').value = '';
+        document.getElementById('goal-target').value = '';
+        document.getElementById('goal-date').value = '';
+        loadGoals();
+    }
+
+    async function contributeToGoal(goalId) {
+        if (!supabaseClient) return;
+        const input = document.getElementById('contribute-input-' + goalId);
+        const amount = parseFloat(input.value);
+        if (!amount || amount <= 0) return;
+
+        const { error } = await supabaseClient.from('goal_contributions').insert({
+            goal_id: goalId,
+            clerk_user_id: myUserId(),
+            amount
+        });
+        if (error) { console.error('Failed to add contribution:', error); return; }
+        input.value = '';
+        loadGoals();
+    }
+
+    async function loadGoals() {
+        if (!supabaseClient || !currentHousehold) return;
+        const { data: goals, error: goalsErr } = await supabaseClient
+            .from('goals')
+            .select('id, title, target_amount, target_date')
+            .eq('household_id', currentHousehold.id)
+            .order('created_at', { ascending: true });
+
+        if (goalsErr) { console.error('Failed to load goals:', goalsErr); return; }
+        goalsCache = goals || [];
+
+        if (goalsCache.length === 0) {
+            contributionsCache = [];
+            renderGoalsList();
+            return;
+        }
+
+        const goalIds = goalsCache.map(g => g.id);
+        const { data: contributions, error: contribErr } = await supabaseClient
+            .from('goal_contributions')
+            .select('goal_id, clerk_user_id, amount')
+            .in('goal_id', goalIds);
+
+        if (contribErr) { console.error('Failed to load contributions:', contribErr); return; }
+        contributionsCache = contributions || [];
+
+        renderGoalsList();
+    }
+
+    function nextMilestone(pct) {
+        if (pct < 25) return 25;
+        if (pct < 50) return 50;
+        if (pct < 75) return 75;
+        return 100;
+    }
+
+    function renderGoalsList() {
+        const container = document.getElementById('goals-list');
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (goalsCache.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:20px 0;">No goals yet — add one above.</p>';
+            return;
+        }
+
+        goalsCache.forEach(goal => {
+            const goalContribs = contributionsCache.filter(c => c.goal_id === goal.id);
+            const byMember = {};
+            goalContribs.forEach(c => { byMember[c.clerk_user_id] = (byMember[c.clerk_user_id] || 0) + Number(c.amount); });
+
+            const total = Object.values(byMember).reduce((a, b) => a + b, 0);
+            const myTotal = byMember[myUserId()] || 0;
+            const partnerTotal = total - myTotal;
+            const pct = Math.min(100, (total / goal.target_amount) * 100);
+            const myPct = Math.min(100, (myTotal / goal.target_amount) * 100);
+            const partnerPct = Math.min(100 - myPct, (partnerTotal / goal.target_amount) * 100);
+
+            const card = document.createElement('div');
+            card.className = 'card goal-card';
+            card.innerHTML = `
+                <div class="goal-title-row">
+                    <h3 style="margin:0;">${escapeHtml(goal.title)}</h3>
+                    <span class="goal-amounts">$${total.toFixed(2)} of $${Number(goal.target_amount).toFixed(2)} (${Math.round(pct)}%)</span>
+                </div>
+                ${goal.target_date ? `<div style="font-size:0.8rem; color:var(--text-muted);">Target date: ${goal.target_date}</div>` : ''}
+                <div class="goal-legend">
+                    <span><span class="dot seg-mine"></span> You: $${myTotal.toFixed(2)}</span>
+                    <span><span class="dot seg-partner"></span> Partner: $${partnerTotal.toFixed(2)}</span>
+                </div>
+                <div class="goal-progress-wrap">
+                    <div class="progress-bar-container">
+                        <div class="progress-segment seg-mine" style="width:${myPct}%;"></div>
+                        <div class="progress-segment seg-partner" style="width:${partnerPct}%;"></div>
+                    </div>
+                    <div class="milestone-ticks">
+                        <div class="milestone-tick" style="left:25%;"></div>
+                        <div class="milestone-tick" style="left:50%;"></div>
+                        <div class="milestone-tick" style="left:75%;"></div>
+                    </div>
+                </div>
+                ${pct >= 100 ? '<div class="milestone-flag">🎉 Goal reached!</div>' : `<div class="milestone-flag">Next milestone: ${nextMilestone(pct)}%</div>`}
+                <div class="contribute-row">
+                    <input type="number" id="contribute-input-${goal.id}" placeholder="Amount ($)">
+                    <button class="action-btn" onclick="contributeToGoal('${goal.id}')">Add Contribution</button>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    // ---------------- Ledger ----------------
+
+    async function addLedgerEntry() {
+        if (!supabaseClient || !currentHousehold) return;
+        const description = document.getElementById('ledger-desc').value.trim();
+        const amount = parseFloat(document.getElementById('ledger-amount').value);
+        const paidBy = document.getElementById('ledger-paid-by').value;
+        const sharePct = parseFloat(document.getElementById('ledger-share-pct').value);
+
+        if (!description || !amount || amount <= 0) return;
+
+        const { error } = await supabaseClient.from('ledger_entries').insert({
+            household_id: currentHousehold.id,
+            description,
+            amount,
+            paid_by: paidBy,
+            payer_share_pct: isNaN(sharePct) ? 50 : sharePct,
+            created_by: myUserId()
+        });
+        if (error) { console.error('Failed to add ledger entry:', error); return; }
+
+        document.getElementById('ledger-desc').value = '';
+        document.getElementById('ledger-amount').value = '';
+        document.getElementById('ledger-share-pct').value = '50';
+        loadLedger();
+    }
+
+    async function loadLedger() {
+        if (!supabaseClient || !currentHousehold) return;
+        const { data, error } = await supabaseClient
+            .from('ledger_entries')
+            .select('id, description, amount, paid_by, payer_share_pct, entry_date, created_at')
+            .eq('household_id', currentHousehold.id)
+            .order('created_at', { ascending: false });
+
+        if (error) { console.error('Failed to load ledger:', error); return; }
+        ledgerCache = data || [];
+        renderLedgerList();
+        renderBalanceSummary();
+    }
+
+    function renderLedgerList() {
+        const container = document.getElementById('ledger-list');
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (ledgerCache.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:10px 0;">No expenses logged yet.</p>';
+            return;
+        }
+
+        ledgerCache.forEach(entry => {
+            const row = document.createElement('div');
+            row.className = 'ledger-entry';
+            const otherShare = 100 - entry.payer_share_pct;
+            row.innerHTML = `
+                <div>
+                    <div class="le-desc">${escapeHtml(entry.description)}</div>
+                    <div class="le-meta">Paid by ${entry.paid_by === myUserId() ? 'you' : escapeHtml(nameFor(entry.paid_by))} · Split ${entry.payer_share_pct}/${otherShare} · ${entry.entry_date}</div>
+                </div>
+                <div class="le-amount">$${Number(entry.amount).toFixed(2)}</div>
+            `;
+            container.appendChild(row);
+        });
+    }
+
+    function renderBalanceSummary() {
+        const box = document.getElementById('balance-summary');
+        if (!box || !currentHousehold) return;
+
+        if (currentHousehold.members.length < 2) {
+            box.className = 'summary-box';
+            box.innerHTML = 'Invite your partner with the code above to start splitting expenses.';
+            return;
+        }
+
+        const balances = {};
+        currentHousehold.members.forEach(m => balances[m.clerk_user_id] = 0);
+
+        ledgerCache.forEach(e => {
+            const payerShare = Number(e.amount) * (Number(e.payer_share_pct) / 100);
+            const otherShare = Number(e.amount) - payerShare;
+            const others = currentHousehold.members.filter(m => m.clerk_user_id !== e.paid_by);
+            if (!(e.paid_by in balances)) balances[e.paid_by] = 0;
+            balances[e.paid_by] += otherShare;
+            others.forEach(m => {
+                balances[m.clerk_user_id] = (balances[m.clerk_user_id] || 0) - (otherShare / (others.length || 1));
+            });
+        });
+
+        const uid = myUserId();
+        const myBalance = balances[uid] || 0;
+
+        if (Math.abs(myBalance) < 0.01) {
+            box.className = 'summary-box balance-settled';
+            box.innerHTML = '✅ All settled up!';
+            return;
+        }
+
+        box.className = 'summary-box balance-owe';
+        if (myBalance > 0) {
+            box.innerHTML = `You are owed <strong>$${myBalance.toFixed(2)}</strong> overall.`;
+        } else {
+            box.innerHTML = `You owe <strong>$${Math.abs(myBalance).toFixed(2)}</strong> overall.`;
+        }
+    }
+</script>
+
+</body>
+</html>
