@@ -1,8 +1,8 @@
         :root {
-            --bg-color: #f4f6f8;
+            --bg-color: #3d454d;
             --card-bg: #ffffff;
-            --primary: #2e7d32;
-            --primary-light: #e8f5e9;
+            --primary: #00796b;
+            --primary-light: #e0f2f1;
             --secondary: #1565c0;
             --accent: #ff8f00;
             --text-main: #212121;
@@ -43,6 +43,7 @@
         #landing-gate { text-align: center; padding: 50px 20px; }
         .landing-hero h2 { color: var(--primary); margin-bottom: 12px; }
         .landing-hero p { color: var(--text-muted); max-width: 480px; margin: 0 auto 22px auto; line-height: 1.5; }
+        .landing-logo { display: block; width: 90px; height: auto; margin: 24px auto 0 auto; }
 
         /* Navigation Tabs */
         .tabs {

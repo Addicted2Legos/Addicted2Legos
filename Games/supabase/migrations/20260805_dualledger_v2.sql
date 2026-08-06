@@ -1,6 +1,6 @@
--- DualLedger v2 migration
+-- DualAscent v2 migration
 --
--- IMPORTANT: This is a best-effort script inferred from how Games/DualLedger.html
+-- IMPORTANT: This is a best-effort script inferred from how Games/DualAscent.html
 -- calls Supabase (create_household/join_household RPCs, households, household_members,
 -- goals, ledger_entries tables). I do not have access to the live project, so I cannot
 -- see the real column types, existing RLS policies, or the current body of
@@ -9,7 +9,7 @@
 -- any of this, especially the CREATE OR REPLACE FUNCTION block, which will overwrite
 -- your existing create_household function.
 --
--- Run in the Supabase SQL Editor for the project backing DualLedger.html
+-- Run in the Supabase SQL Editor for the project backing DualAscent.html
 -- (https://bvweuydrpildjxjmcpxa.supabase.co).
 
 -- 1. Solo vs. partner households -------------------------------------------------

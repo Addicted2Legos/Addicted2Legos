@@ -16,16 +16,16 @@
     <!-- Supabase: this app uses its own Supabase project, separate from ClickLasers.html.
          Replace SUPABASE_URL / SUPABASE_ANON_KEY constants in app.js once your project is set up.
          Schema additions this version depends on (is_solo, member_profiles, learning_items) live in
-         Games/supabase/migrations/20260805_dualledger_v2.sql — run that in the Supabase SQL editor first. -->
+         Games/supabase/migrations/20260805_DualAscent_v2.sql — run that in the Supabase SQL editor first. -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="DualAscentLogoSquareSmall.png">
 </head>
 <body>
 
 <div class="container">
     <header>
         <h1>Money & Mindset Alignment</h1>
-        <p class="subtitle">Built on real, cited research — see Sources at the bottom of the app.</p>
     </header>
 
     <div id="auth-bar">
@@ -39,6 +39,7 @@
             <h2>Get on the same page about money — together.</h2>
             <p>Discover your financial personality, build a shared spending plan, set a goal, and learn from each other. Works solo, or with a partner.</p>
             <button class="action-btn clerk-sign-in-trigger" id="landing-sign-in-btn">Sign In to Get Started</button>
+            <img src="DualAscentLogoSquareSmall.png" alt="DualAscent" class="landing-logo">
         </div>
     </div>
 
