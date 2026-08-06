@@ -1,0 +1,311 @@
+        :root {
+            --bg-color: #f4f6f8;
+            --card-bg: #ffffff;
+            --primary: #2e7d32;
+            --primary-light: #e8f5e9;
+            --secondary: #1565c0;
+            --accent: #ff8f00;
+            --text-main: #212121;
+            --text-muted: #616161;
+            --border: #e0e0e0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            padding: 30px;
+        }
+
+        header {
+            text-align: center;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 20px;
+            margin-bottom: 25px;
+        }
+
+        h1 { margin: 0 0 10px 0; color: var(--primary); }
+        p.subtitle { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
+
+        /* Landing gate (signed out) */
+        #landing-gate { text-align: center; padding: 50px 20px; }
+        .landing-hero h2 { color: var(--primary); margin-bottom: 12px; }
+        .landing-hero p { color: var(--text-muted); max-width: 480px; margin: 0 auto 22px auto; line-height: 1.5; }
+
+        /* Navigation Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 12px 16px;
+            border: none;
+            background: none;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Form Controls & Layout */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 650px) {
+            .grid-2 { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: #fafafa;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card h3 { margin-top: 0; color: var(--secondary); }
+
+        label {
+            display: block;
+            margin-top: 12px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 0.95rem;
+        }
+
+        button.action-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        button.action-btn:hover { background-color: #1b5e20; }
+        button.action-btn.secondary-btn { background-color: var(--secondary); }
+        button.action-btn.secondary-btn:hover { background-color: #0d47a1; }
+
+        /* Progress Bar (CSP) */
+        .progress-bar-container {
+            height: 24px;
+            background: #e0e0e0;
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            margin: 15px 0;
+        }
+
+        .progress-segment {
+            height: 100%;
+            text-align: center;
+            color: white;
+            font-size: 0.75rem;
+            line-height: 24px;
+            font-weight: bold;
+            transition: width 0.3s ease;
+        }
+
+        .seg-fixed { background: #d32f2f; }
+        .seg-invest { background: #1976d2; }
+        .seg-savings { background: #00796b; }
+        .seg-guiltfree { background: #388e3c; }
+
+        .legend {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            font-size: 0.85rem;
+            margin-bottom: 15px;
+        }
+
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+
+        .summary-box {
+            background: var(--primary-light);
+            border-left: 4px solid var(--primary);
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+
+        /* Auth bar */
+        #auth-bar {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        #sign-in-btn {
+            background-color: var(--secondary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 0.9rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        #user-button { display: none; }
+
+        /* Progress ring + badges */
+        #progress-panel { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+        .progress-ring {
+            width: 54px; height: 54px; border-radius: 50%; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            background: conic-gradient(#e0e0e0 0%, #e0e0e0 0);
+        }
+        .progress-ring-hole { width: 38px; height: 38px; border-radius: 50%; background: var(--card-bg); }
+        #progress-ring-label { font-weight: 600; font-size: 0.85rem; }
+        .badge-shelf { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+        .badge-chip {
+            background: var(--primary-light); border: 1px solid var(--primary); color: var(--primary);
+            font-size: 0.75rem; font-weight: 600; padding: 3px 9px; border-radius: 12px;
+        }
+
+        /* Toasts */
+        #toast-container { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 1000; }
+        .toast {
+            background: #212121; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 0.85rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2); opacity: 0; transform: translateY(10px);
+            transition: opacity 0.3s ease, transform 0.3s ease; max-width: 280px;
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+
+        /* Household panel */
+        #household-bar {
+            background: #fafafa;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+        }
+        .mode-choice-row { display: flex; gap: 12px; flex-wrap: wrap; }
+        #household-setup { display: flex; gap: 20px; flex-wrap: wrap; }
+        #household-setup .setup-col { flex: 1; min-width: 220px; }
+        #household-setup label { margin-top: 0; }
+        #household-setup .action-btn { padding: 10px 18px; font-size: 0.9rem; }
+        #household-status { display: none; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+        #household-status .hh-name { font-weight: bold; color: var(--secondary); font-size: 1.05rem; }
+        #household-status .hh-members { font-size: 0.85rem; color: var(--text-muted); }
+        .invite-code-chip {
+            font-family: monospace;
+            background: var(--primary-light);
+            border: 1px dashed var(--primary);
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            cursor: pointer;
+        }
+        .gate-message {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 40px 20px;
+            font-size: 0.95rem;
+        }
+
+        /* Financial personality (archetype) */
+        .archetype-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 14px; margin: 16px 0; }
+        .archetype-card {
+            border: 2px solid var(--border); border-radius: 10px; padding: 16px; cursor: pointer;
+            background: #fafafa; transition: border-color 0.15s ease, transform 0.15s ease;
+        }
+        .archetype-card:hover { transform: translateY(-2px); }
+        .archetype-card.selected { border-color: var(--primary); background: var(--primary-light); }
+        .archetype-card h4 { margin: 0 0 6px 0; }
+        .archetype-card p { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
+
+        .quiz-question { margin-bottom: 16px; }
+        .quiz-question label { margin-top: 0; }
+        .likert-row { display: flex; gap: 10px; margin-top: 6px; }
+        .likert-opt { display: flex; flex-direction: column; align-items: center; font-weight: 400; font-size: 0.8rem; margin-top: 0; gap: 4px; }
+        .likert-scale-labels { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
+
+        /* Goals */
+        .goal-card { position: relative; }
+        .goal-card .goal-title-row { display: flex; justify-content: space-between; align-items: baseline; }
+        .goal-card .goal-amounts { font-size: 0.85rem; color: var(--text-muted); }
+        .goal-progress-wrap { position: relative; margin: 18px 0 8px 0; }
+        .seg-mine { background: var(--secondary); }
+        .seg-partner { background: var(--accent); }
+        .milestone-ticks { position: absolute; top: 0; left: 0; width: 100%; height: 24px; pointer-events: none; }
+        .milestone-tick {
+            position: absolute;
+            top: 0;
+            width: 2px;
+            height: 24px;
+            background: rgba(255,255,255,0.6);
+        }
+        .goal-legend { display: flex; gap: 15px; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
+        .contribute-row { display: flex; gap: 10px; margin-top: 12px; align-items: center; }
+        .contribute-row input { width: auto; flex: 1; margin-top: 0; }
+        .contribute-row button { margin-top: 0; padding: 8px 16px; font-size: 0.85rem; }
+        .milestone-flag { font-size: 0.8rem; color: var(--primary); font-weight: bold; margin-top: 4px; }
+
+        /* Ledger / Learning list rows */
+        .balance-owe { border-left-color: #d32f2f !important; background: #ffebee !important; }
+        .balance-settled { border-left-color: var(--primary) !important; background: var(--primary-light) !important; }
+        .ledger-entry {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+            gap: 10px;
+        }
+        .ledger-entry:last-child { border-bottom: none; }
+        .ledger-entry .le-desc { font-weight: 600; }
+        .ledger-entry .le-meta { font-size: 0.8rem; color: var(--text-muted); display: block; }
+        .ledger-entry .le-amount { font-weight: bold; text-align: right; white-space: nowrap; }
+
+        /* Sources footer */
+        #sources { margin-top: 10px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--text-muted); }
+        #sources h3 { color: var(--text-main); font-size: 0.95rem; margin-bottom: 8px; }
+        #sources ul { padding-left: 18px; margin: 0 0 10px 0; }
+        #sources li { margin-bottom: 8px; }
+        #sources a { color: var(--secondary); }
+        #sources .disclaimer { font-style: italic; }
