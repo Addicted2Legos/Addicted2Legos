@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Money & Mindset Alignment App</title>
+    <title>DualAscent</title>
     <!-- Clerk: this app uses its own Clerk application, separate from ClickLasers.html.
          Replace data-clerk-publishable-key and src domain with the values from that app's dashboard (Configure > API Keys) -->
     <script
@@ -19,13 +19,17 @@
          Games/supabase/migrations/20260805_DualAscent_v2.sql — run that in the Supabase SQL editor first. -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="style.css">
-    <link rel="icon" type="image/png" href="DualAscentLogoSquareSmall.png">
+    <link rel="icon" type="image/png" href="DualAscentLogoTransparentBackground.png">
 </head>
 <body>
 
 <div class="container">
     <header>
         <h1>Money & Mindset Alignment</h1>
+        <p>For Couples, Spouses, Partners, Parent Child etc...</p>
+        <p>Get on the same page about money — together.<br>
+            Discover your financial personality, build a shared spending plan, set a goal, and learn from each other.<br>
+            Works solo, or with a partner.</p>
     </header>
 
     <div id="auth-bar">
@@ -39,7 +43,7 @@
             <h2>Get on the same page about money — together.</h2>
             <p>Discover your financial personality, build a shared spending plan, set a goal, and learn from each other. Works solo, or with a partner.</p>
             <button class="action-btn clerk-sign-in-trigger" id="landing-sign-in-btn">Sign In to Get Started</button>
-            <img src="DualAscentLogoSquareSmall.png" alt="DualAscent" class="landing-logo">
+            <img src="DualAscentLogoTransparentBackground.png" alt="DualAscent" class="landing-logo">
         </div>
     </div>
 
@@ -257,26 +261,49 @@
 
             <div class="card">
                 <h3>2. Money Dial Alignment</h3>
-                <p style="font-size:0.85rem; color:var(--text-muted)">Select each partner's top spending priority ("Money Dial"):</p>
+                <p style="font-size:0.85rem; color:var(--text-muted)">Ramit Sethi's "Money Dials" — the specific categories worth spending extravagantly on, once you've cut costs elsewhere. Select each partner's top dial:</p>
+                <ul style="font-size:0.8rem; line-height:1.6; color:var(--text-muted); padding-left:18px;">
+                    <li><strong>Convenience</strong> — rideshares, delivery, help around the house</li>
+                    <li><strong>Travel</strong> — flights, trips, time away</li>
+                    <li><strong>Health/Fitness</strong> — trainers, premium gyms, wellness</li>
+                    <li><strong>Experiences</strong> — concerts, festivals, events</li>
+                    <li><strong>Freedom</strong> — location independence, walking away from a job</li>
+                    <li><strong>Relationships</strong> — picking up the tab, gifts, family support</li>
+                    <li><strong>Generosity</strong> — charitable giving, tipping well</li>
+                    <li><strong>Luxury</strong> — designer goods, high-end pieces</li>
+                    <li><strong>Social Status</strong> — exclusive clubs, high-end dining</li>
+                    <li><strong>Self-Improvement</strong> — courses, coaching, books</li>
+                </ul>
                 <div class="grid-2">
                     <div>
                         <label>My Top Dial</label>
-                        <select id="my-dial">
+                        <select id="my-dial" onchange="renderDialHint()">
+                            <option>Convenience</option>
                             <option>Travel</option>
-                            <option>Dining Out / Food</option>
-                            <option>Convenience / Time-Saving</option>
-                            <option>Fitness / Wellness</option>
-                            <option>Hobbies / Experiences</option>
+                            <option>Health/Fitness</option>
+                            <option>Experiences</option>
+                            <option>Freedom</option>
+                            <option>Relationships</option>
+                            <option>Generosity</option>
+                            <option>Luxury</option>
+                            <option>Social Status</option>
+                            <option>Self-Improvement</option>
                         </select>
+                        <div id="dial-hint" class="summary-box" style="display:none; margin-top:10px; padding:10px 14px; font-size:0.85rem;"></div>
                     </div>
                     <div id="partner-dial-wrap">
                         <label>Partner's Top Dial</label>
                         <select id="partner-dial">
+                            <option>Convenience</option>
                             <option>Travel</option>
-                            <option>Dining Out / Food</option>
-                            <option>Convenience / Time-Saving</option>
-                            <option>Fitness / Wellness</option>
-                            <option>Hobbies / Experiences</option>
+                            <option>Health/Fitness</option>
+                            <option>Experiences</option>
+                            <option>Freedom</option>
+                            <option>Relationships</option>
+                            <option>Generosity</option>
+                            <option>Luxury</option>
+                            <option>Social Status</option>
+                            <option>Self-Improvement</option>
                         </select>
                     </div>
                 </div>
@@ -394,13 +421,16 @@
             <ul>
                 <li>Tori Dunlap, <em>Financial Feminist</em>, and the Her First $100K platform. Basis for the nine Financial Personality types in the quiz above — an original quiz inspired by Tori Dunlap's Enneagram-and-money framework, not a reproduction of her assessment.</li>
                 <li>Klontz, B. T., &amp; Britt, S. L. (2011). <em>Money Beliefs and Financial Behaviors: Development of the Klontz Money Script Inventory.</em> Journal of Financial Therapy, 2(1). Referenced in the Grow Together tab's discussion of financial avoidance patterns. <a href="https://www.researchgate.net/publication/265907828_Money_Beliefs_and_Financial_Behaviors_Development_of_the_Klontz_Money_Script_Inventory" target="_blank" rel="noopener">Read the paper</a></li>
-                <li>Ramit Sethi, <em>I Will Teach You to Be Rich.</em> Basis for the Conscious Spending Plan percentage targets used in the Spending Plan tab.</li>
+                <li>Ramit Sethi, <em>I Will Teach You to Be Rich.</em> Basis for the Conscious Spending Plan percentage targets in the Spending Plan tab, and for the ten "Money Dials" used in the Vision & Dialogue tab.</li>
+                <li>The "why this appeals to you" hint under Money Dial Alignment pairs the two frameworks above: Tori Dunlap's archetypes describe why a category of spending appeals to you, while Ramit Sethi's Money Dials describe where it shows up. Our mapping between the two is an original interpretation, not published by either author.</li>
                 <li>The Grow Together tab draws on the concepts above plus additional research directions in couples' financial psychology and behavioral economics — including work on "tightwad/spendthrift" mismatches in relationships (Scott Rick and colleagues), joint vs. separate account structures (Jenny Olson, Scott Rick, and colleagues), relative income within households (Marianne Bertrand, Emir Kamenica, Jessica Pan), and financial infidelity survey research from the National Endowment for Financial Education (NEFE). These summaries are our own plain-language interpretations, not verbatim findings or endorsements from those researchers.</li>
             </ul>
             <p class="disclaimer">This app is inspired by and adapts ideas from the work above. It is not affiliated with, endorsed by, or reviewed by these authors.</p>
         </footer>
     </div>
 </div>
+
+<img src="DualAscentLogoTransparentBackground.png" alt="DualAscent" class="page-footer-logo">
 
 <div id="toast-container"></div>
 

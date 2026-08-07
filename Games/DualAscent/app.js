@@ -269,6 +269,7 @@
         if (tabId === 'tab-ledger') { renderLedgerGate(); renderLedgerList(); renderBalanceSummary(); }
         if (tabId === 'tab-learning') { renderLearningGate(); renderLearningLists(); }
         if (tabId === 'tab-grow') renderGrowGate();
+        if (tabId === 'tab-alignment') renderDialHint();
     }
 
     function calculateCSP() {
@@ -335,6 +336,40 @@
             <p><strong>Shared Rich Life Vision:</strong> "${escapeHtml(vision)}"</p>
             <p><em>Tip:</em> Try supporting each other's top spending priority within your guilt-free budget, rather than judging individual line items.</p>
         `;
+    }
+
+    // Tori Dunlap's framework explains *why* a dial appeals to you; Ramit Sethi's Money Dials say *where* it shows up.
+    const ARCHETYPE_DIAL_HINTS = {
+        Perfectionist: { dials: ['Convenience'], note: "Getting things exactly right takes energy — dialing up Convenience can buy back the time and mental space perfectionism eats into." },
+        Helper: { dials: ['Generosity', 'Relationships'], note: "Showing up for people is core to who you are — Generosity and Relationships are often where Helpers naturally want to spend more, not less." },
+        Achiever: { dials: ['Social Status', 'Luxury'], note: "When net worth feels like a scoreboard, Social Status and Luxury spending tend to creep up — worth checking whether they're bringing you joy or just keeping score." },
+        Individualist: { dials: ['Luxury', 'Self-Improvement'], note: "Spending that expresses who you are — distinctive pieces, personal growth — tends to resonate more than a generic category ever will." },
+        Investigator: { dials: ['Convenience'], note: "Research and preparation take real time — Convenience is often the dial worth turning up so you can reclaim it." },
+        Loyalist: { dials: ['Health/Fitness'], note: "Security-minded spending on your future self — like health and fitness — tends to feel worth it even to a naturally cautious saver." },
+        Enthusiast: { dials: ['Travel', 'Experiences'], note: "Freedom and fun drive you — Travel and Experiences are classic Enthusiast dials, as long as they're planned for rather than impulse-bought." },
+        Challenger: { dials: ['Freedom'], note: "Independence matters to you more than most — the Freedom dial (autonomy, optionality, room to walk away) often matters more than any single purchase." },
+        Peacemaker: { dials: ['Convenience'], note: "Paying to avoid friction is a common Peacemaker pattern — worth noticing when it's genuine ease vs. avoiding a harder conversation." }
+    };
+
+    function renderDialHint() {
+        const box = document.getElementById('dial-hint');
+        if (!box) return;
+
+        const hint = appState.myArchetype ? ARCHETYPE_DIAL_HINTS[appState.myArchetype] : null;
+        if (!hint) {
+            box.style.display = 'none';
+            return;
+        }
+
+        const myDialEl = document.getElementById('my-dial');
+        const myDial = myDialEl ? myDialEl.value : '';
+        const matchesPick = hint.dials.includes(myDial);
+        const archTitle = ARCHETYPES[appState.myArchetype].title;
+
+        box.style.display = 'block';
+        box.innerHTML = matchesPick
+            ? `<strong>That tracks:</strong> ${escapeHtml(archTitle)}s often dial up ${hint.dials.map(escapeHtml).join(' or ')}. ${escapeHtml(hint.note)}`
+            : `<strong>Worth a look:</strong> as ${escapeHtml(archTitle)}, you might expect to lean toward ${hint.dials.map(escapeHtml).join(' or ')}. ${escapeHtml(hint.note)}`;
     }
 
     // ================= Clerk + Supabase =================
