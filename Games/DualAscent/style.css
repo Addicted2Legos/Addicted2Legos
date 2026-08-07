@@ -114,6 +114,14 @@
             font-size: 0.95rem;
         }
 
+        input[type="range"] {
+            padding: 0;
+            border: none;
+            margin-top: 10px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
         button.action-btn {
             background-color: var(--primary);
             color: white;

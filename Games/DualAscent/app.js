@@ -263,6 +263,9 @@
         const btn = document.querySelector('.tab-btn[data-tab="' + tabId + '"]');
         if (btn) btn.classList.add('active');
 
+        const sourcesFooter = document.getElementById('sources');
+        if (sourcesFooter) sourcesFooter.style.display = (tabId === 'tab-archetype') ? 'block' : 'none';
+
         if (tabId === 'tab-csp') { calculateCSP(); appState.cspVisited = true; updateProgressRing(); }
         if (tabId === 'tab-profile') hydrateMyProfileForm();
         if (tabId === 'tab-goals') { renderGoalsGate(); renderGoalsList(); }
@@ -272,12 +275,29 @@
         if (tabId === 'tab-alignment') renderDialHint();
     }
 
+    function onExpenseSliderInput(field) {
+        document.getElementById('exp-' + field).value = document.getElementById('exp-' + field + '-slider').value;
+        calculateCSP();
+    }
+
+    function syncExpenseSlider(field, income, currentValue) {
+        const sliderEl = document.getElementById('exp-' + field + '-slider');
+        if (!sliderEl) return;
+        sliderEl.max = Math.max(income, currentValue, 100);
+        sliderEl.value = currentValue;
+    }
+
     function calculateCSP() {
         const income = parseFloat(document.getElementById('net-income').value) || 1;
         const fixed = parseFloat(document.getElementById('exp-fixed').value) || 0;
         const invest = parseFloat(document.getElementById('exp-invest').value) || 0;
         const savings = parseFloat(document.getElementById('exp-savings').value) || 0;
         const guiltfree = parseFloat(document.getElementById('exp-guiltfree').value) || 0;
+
+        syncExpenseSlider('fixed', income, fixed);
+        syncExpenseSlider('invest', income, invest);
+        syncExpenseSlider('savings', income, savings);
+        syncExpenseSlider('guiltfree', income, guiltfree);
 
         const fixedPct = Math.round((fixed / income) * 100);
         const investPct = Math.round((invest / income) * 100);
@@ -474,6 +494,8 @@
 
     async function loadHousehold() {
         if (!supabaseClient) {
+            householdError.innerText = "Couldn't connect to the database — check your connection and reload the page.";
+            householdError.style.display = 'block';
             renderGoalsGate();
             renderLedgerGate();
             renderLearningGate();
@@ -489,6 +511,13 @@
 
         if (memberErr) {
             console.error('Failed to load household membership:', memberErr);
+            householdError.innerText = 'Failed to load your household: ' + memberErr.message;
+            householdError.style.display = 'block';
+            showModeChooser();
+            renderGoalsGate();
+            renderLedgerGate();
+            renderLearningGate();
+            renderGrowGate();
             return;
         }
 
@@ -510,11 +539,14 @@
 
         if (hhErr || membersErr) {
             console.error('Failed to load household:', hhErr || membersErr);
+            householdError.innerText = 'Failed to load your household: ' + (hhErr || membersErr).message;
+            householdError.style.display = 'block';
             return;
         }
 
         currentHousehold = { id: hh.id, name: hh.name, invite_code: hh.invite_code, is_solo: !!hh.is_solo, members: members || [] };
 
+        householdError.style.display = 'none';
         modeChooser.style.display = 'none';
         householdSetup.style.display = 'none';
         householdStatus.style.display = 'flex';
@@ -613,6 +645,9 @@
 
         const partnerSummary = document.getElementById('partner-profile-summary');
         if (partnerSummary && isSolo) partnerSummary.style.display = 'none';
+
+        const goalTypeRow = document.getElementById('goal-type-row');
+        if (goalTypeRow) goalTypeRow.style.display = isSolo ? 'none' : 'block';
     }
 
     function populatePaidBySelect() {
@@ -818,6 +853,8 @@
         const title = document.getElementById('goal-title').value.trim();
         const target = parseFloat(document.getElementById('goal-target').value);
         const date = document.getElementById('goal-date').value || null;
+        const goalTypeEl = document.getElementById('goal-type');
+        const goalType = (!currentHousehold.is_solo && goalTypeEl) ? goalTypeEl.value : 'shared';
         if (!title || !target || target <= 0) return;
 
         const { error } = await supabaseClient.from('goals').insert({
@@ -825,6 +862,7 @@
             title,
             target_amount: target,
             target_date: date,
+            goal_type: goalType,
             created_by: myUserId()
         });
         if (error) { console.error('Failed to create goal:', error); return; }
@@ -858,7 +896,7 @@
         if (!supabaseClient || !currentHousehold) return;
         const { data: goals, error: goalsErr } = await supabaseClient
             .from('goals')
-            .select('id, title, target_amount, target_date')
+            .select('id, title, target_amount, target_date, goal_type, created_by')
             .eq('household_id', currentHousehold.id)
             .order('created_at', { ascending: true });
 
@@ -894,6 +932,64 @@
         return 100;
     }
 
+    function buildGoalCard(goal) {
+        const goalContribs = contributionsCache.filter(c => c.goal_id === goal.id);
+        const byMember = {};
+        goalContribs.forEach(c => { byMember[c.clerk_user_id] = (byMember[c.clerk_user_id] || 0) + Number(c.amount); });
+
+        const total = Object.values(byMember).reduce((a, b) => a + b, 0);
+        const myTotal = byMember[myUserId()] || 0;
+        const partnerTotal = total - myTotal;
+        const pct = Math.min(100, (total / goal.target_amount) * 100);
+        const myPct = Math.min(100, (myTotal / goal.target_amount) * 100);
+        const partnerPct = Math.min(100 - myPct, (partnerTotal / goal.target_amount) * 100);
+
+        const isIndividual = goal.goal_type === 'individual';
+        const typeTag = isIndividual
+            ? `<span class="badge-chip">🙋 ${goal.created_by === myUserId() ? 'Mine' : escapeHtml(nameFor(goal.created_by))}</span>`
+            : (currentHousehold && !currentHousehold.is_solo ? '<span class="badge-chip">🤝 Shared</span>' : '');
+
+        const card = document.createElement('div');
+        card.className = 'card goal-card';
+        card.innerHTML = `
+            <div class="goal-title-row">
+                <h3 style="margin:0;">${escapeHtml(goal.title)} ${typeTag}</h3>
+                <span class="goal-amounts">$${total.toFixed(2)} of $${Number(goal.target_amount).toFixed(2)} (${Math.round(pct)}%)</span>
+            </div>
+            ${goal.target_date ? `<div style="font-size:0.8rem; color:var(--text-muted);">Target date: ${goal.target_date}</div>` : ''}
+            <div class="goal-legend">
+                <span><span class="dot seg-mine"></span> You: $${myTotal.toFixed(2)}</span>
+                <span><span class="dot seg-partner"></span> Partner: $${partnerTotal.toFixed(2)}</span>
+            </div>
+            <div class="goal-progress-wrap">
+                <div class="progress-bar-container">
+                    <div class="progress-segment seg-mine" style="width:${myPct}%;"></div>
+                    <div class="progress-segment seg-partner" style="width:${partnerPct}%;"></div>
+                </div>
+                <div class="milestone-ticks">
+                    <div class="milestone-tick" style="left:25%;"></div>
+                    <div class="milestone-tick" style="left:50%;"></div>
+                    <div class="milestone-tick" style="left:75%;"></div>
+                </div>
+            </div>
+            ${pct >= 100 ? '<div class="milestone-flag">🎉 Goal reached!</div>' : `<div class="milestone-flag">Next milestone: ${nextMilestone(pct)}%</div>`}
+            <div class="contribute-row">
+                <input type="number" id="contribute-input-${goal.id}" placeholder="Amount ($)">
+                <button class="action-btn" onclick="contributeToGoal('${goal.id}')">Add Contribution</button>
+            </div>
+        `;
+        return card;
+    }
+
+    function appendGoalGroup(container, label, goals) {
+        if (goals.length === 0) return;
+        const heading = document.createElement('h3');
+        heading.style.cssText = 'margin: 18px 0 8px 0; color: var(--secondary); font-size: 1rem;';
+        heading.innerText = label;
+        container.appendChild(heading);
+        goals.forEach(goal => container.appendChild(buildGoalCard(goal)));
+    }
+
     function renderGoalsList() {
         const container = document.getElementById('goals-list');
         if (!container) return;
@@ -904,49 +1000,20 @@
             return;
         }
 
-        goalsCache.forEach(goal => {
-            const goalContribs = contributionsCache.filter(c => c.goal_id === goal.id);
-            const byMember = {};
-            goalContribs.forEach(c => { byMember[c.clerk_user_id] = (byMember[c.clerk_user_id] || 0) + Number(c.amount); });
+        const isSolo = !!(currentHousehold && currentHousehold.is_solo);
+        if (isSolo) {
+            goalsCache.forEach(goal => container.appendChild(buildGoalCard(goal)));
+            return;
+        }
 
-            const total = Object.values(byMember).reduce((a, b) => a + b, 0);
-            const myTotal = byMember[myUserId()] || 0;
-            const partnerTotal = total - myTotal;
-            const pct = Math.min(100, (total / goal.target_amount) * 100);
-            const myPct = Math.min(100, (myTotal / goal.target_amount) * 100);
-            const partnerPct = Math.min(100 - myPct, (partnerTotal / goal.target_amount) * 100);
+        const myId = myUserId();
+        const shared = goalsCache.filter(g => g.goal_type !== 'individual');
+        const mine = goalsCache.filter(g => g.goal_type === 'individual' && g.created_by === myId);
+        const partnersGoals = goalsCache.filter(g => g.goal_type === 'individual' && g.created_by !== myId);
 
-            const card = document.createElement('div');
-            card.className = 'card goal-card';
-            card.innerHTML = `
-                <div class="goal-title-row">
-                    <h3 style="margin:0;">${escapeHtml(goal.title)}</h3>
-                    <span class="goal-amounts">$${total.toFixed(2)} of $${Number(goal.target_amount).toFixed(2)} (${Math.round(pct)}%)</span>
-                </div>
-                ${goal.target_date ? `<div style="font-size:0.8rem; color:var(--text-muted);">Target date: ${goal.target_date}</div>` : ''}
-                <div class="goal-legend">
-                    <span><span class="dot seg-mine"></span> You: $${myTotal.toFixed(2)}</span>
-                    <span><span class="dot seg-partner"></span> Partner: $${partnerTotal.toFixed(2)}</span>
-                </div>
-                <div class="goal-progress-wrap">
-                    <div class="progress-bar-container">
-                        <div class="progress-segment seg-mine" style="width:${myPct}%;"></div>
-                        <div class="progress-segment seg-partner" style="width:${partnerPct}%;"></div>
-                    </div>
-                    <div class="milestone-ticks">
-                        <div class="milestone-tick" style="left:25%;"></div>
-                        <div class="milestone-tick" style="left:50%;"></div>
-                        <div class="milestone-tick" style="left:75%;"></div>
-                    </div>
-                </div>
-                ${pct >= 100 ? '<div class="milestone-flag">🎉 Goal reached!</div>' : `<div class="milestone-flag">Next milestone: ${nextMilestone(pct)}%</div>`}
-                <div class="contribute-row">
-                    <input type="number" id="contribute-input-${goal.id}" placeholder="Amount ($)">
-                    <button class="action-btn" onclick="contributeToGoal('${goal.id}')">Add Contribution</button>
-                </div>
-            `;
-            container.appendChild(card);
-        });
+        appendGoalGroup(container, '🤝 Shared Goals', shared);
+        appendGoalGroup(container, '🙋 My Individual Goals', mine);
+        appendGoalGroup(container, `🙋 ${nameFor(partnerId())}'s Individual Goals`, partnersGoals);
     }
 
     // ---------------- Learning Together ----------------
