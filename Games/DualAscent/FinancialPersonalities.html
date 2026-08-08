@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Personality — DualAscent</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="Images/DualAscentLogoTransparentBackground.png">
+</head>
+<body>
+
+<div class="container">
+    <a href="index.html" class="back-link">← Back to DualAscent</a>
+
+    <div id="personality-content"></div>
+
+    <div class="personality-nav">
+        <a id="personality-prev" class="action-btn secondary-btn" href="#">← Previous</a>
+        <a href="index.html#tab-archetype" class="action-btn">All Personality Types</a>
+        <a id="personality-next" class="action-btn secondary-btn" href="#">Next →</a>
+    </div>
+
+    <footer id="sources">
+        <h3>Sources</h3>
+        <p>These nine money mindsets come from Tori Dunlap's <em>Financial Feminist</em> framework, which pairs Enneagram psychology with money behavior. The strengths, watch-outs, and partner tips on this page are our own plain-language interpretation, built for couples using DualAscent — not a reproduction of Tori Dunlap's assessment.</p>
+        <p class="disclaimer">This app is inspired by and adapts ideas from the work above. It is not affiliated with, endorsed by, or reviewed by the author.</p>
+    </footer>
+</div>
+
+<img src="Images/DualAscentLogoWide.png" alt="DualAscent" class="page-footer-logo">
+
+<script src="personalities-data.js"></script>
+<script>
+    function getTypeFromQuery() {
+        const params = new URLSearchParams(window.location.search);
+        const type = params.get('type');
+        return (type && PERSONALITY_DETAILS[type]) ? type : PERSONALITY_ORDER[0];
+    }
+
+    function renderList(items) {
+        return `<ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>`;
+    }
+
+    function render() {
+        const key = getTypeFromQuery();
+        const p = PERSONALITY_DETAILS[key];
+
+        document.title = `${p.title} — DualAscent`;
+
+        document.getElementById('personality-content').innerHTML = `
+            <header class="personality-header">
+                <div class="personality-emoji">${p.emoji}</div>
+                <h1>${p.title}</h1>
+                <p>${p.desc}</p>
+            </header>
+
+            <div class="card">
+                <h3>Strengths</h3>
+                ${renderList(p.strengths)}
+            </div>
+
+            <div class="card">
+                <h3>Watch-Outs</h3>
+                ${renderList(p.watchOuts)}
+            </div>
+
+            <div class="card">
+                <h3>If Your Partner Is ${p.title.replace('The ', 'a ')}</h3>
+                ${renderList(p.partnerTips)}
+            </div>
+        `;
+
+        const idx = PERSONALITY_ORDER.indexOf(key);
+        const prevKey = PERSONALITY_ORDER[(idx - 1 + PERSONALITY_ORDER.length) % PERSONALITY_ORDER.length];
+        const nextKey = PERSONALITY_ORDER[(idx + 1) % PERSONALITY_ORDER.length];
+
+        const prevLink = document.getElementById('personality-prev');
+        const nextLink = document.getElementById('personality-next');
+        prevLink.href = `FinancialPersonalities.html?type=${prevKey}`;
+        prevLink.textContent = `← ${PERSONALITY_DETAILS[prevKey].emoji} ${PERSONALITY_DETAILS[prevKey].title}`;
+        nextLink.href = `FinancialPersonalities.html?type=${nextKey}`;
+        nextLink.textContent = `${PERSONALITY_DETAILS[nextKey].emoji} ${PERSONALITY_DETAILS[nextKey].title} →`;
+    }
+
+    render();
+</script>
+
+</body>
+</html>

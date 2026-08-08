@@ -176,6 +176,7 @@
                 <div class="archetype-card" data-key="${key}" onclick="saveArchetype('${key}')">
                     <h4>${a.emoji} ${a.title}</h4>
                     <p>${a.desc}</p>
+                    <a class="learn-more-link" href="FinancialPersonalities.html?type=${key}" onclick="event.stopPropagation()">Learn more →</a>
                 </div>
             `;
         }).join('');
@@ -511,7 +512,7 @@
 
         if (memberErr) {
             console.error('Failed to load household membership:', memberErr);
-            householdError.innerText = 'Failed to load your household: ' + memberErr.message;
+            householdError.innerText = "We couldn't load your household right now. Try refreshing the page — if it keeps happening, let us know.";
             householdError.style.display = 'block';
             showModeChooser();
             renderGoalsGate();
@@ -539,7 +540,7 @@
 
         if (hhErr || membersErr) {
             console.error('Failed to load household:', hhErr || membersErr);
-            householdError.innerText = 'Failed to load your household: ' + (hhErr || membersErr).message;
+            householdError.innerText = "We couldn't load your household right now. Try refreshing the page — if it keeps happening, let us know.";
             householdError.style.display = 'block';
             return;
         }
@@ -554,6 +555,7 @@
         document.getElementById('hh-members-display').innerText = currentHousehold.members.map(m => m.display_name || 'Member').join(' & ');
         document.getElementById('hh-invite-code').innerText = currentHousehold.invite_code;
         document.getElementById('hh-invite-wrap').style.display = currentHousehold.is_solo ? 'none' : 'block';
+        document.getElementById('invite-email-template').innerText = buildInviteEmailText();
 
         applyModeVisibility();
         populatePaidBySelect();
@@ -625,6 +627,29 @@
             const original = chip.innerText;
             chip.innerText = 'Copied!';
             setTimeout(() => chip.innerText = original, 1200);
+        });
+    }
+
+    function buildInviteEmailText() {
+        if (!currentHousehold) return '';
+        const link = window.location.origin + window.location.pathname;
+        return `Hi!\n\n`
+            + `${myDisplayName()} invited you to join "${currentHousehold.name}" on DualAscent — an app for getting on the same page about money together.\n\n`
+            + `1. Go to ${link}\n`
+            + `2. Sign in (or create a free account)\n`
+            + `3. Choose "With a Partner", then "Join a Household"\n`
+            + `4. Enter this invite code: ${currentHousehold.invite_code}\n\n`
+            + `See you there!`;
+    }
+
+    function copyInviteEmail() {
+        const text = buildInviteEmailText();
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = document.getElementById('copy-invite-email-btn');
+            const original = btn.innerText;
+            btn.innerText = 'Copied!';
+            setTimeout(() => btn.innerText = original, 1200);
         });
     }
 

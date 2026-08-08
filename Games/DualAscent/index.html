@@ -17,10 +17,12 @@
          Replace SUPABASE_URL / SUPABASE_ANON_KEY constants in app.js once your project is set up.
          Schema additions this version depends on live in Games/supabase/migrations/ — run these in the
          Supabase SQL editor first: 20260805_dualledger_v2.sql (is_solo, member_profiles, learning_items),
-         then 20260806_dualascent_goal_types.sql (goal_type on goals, for individual vs. shared goals). -->
+         then 20260806_dualascent_goal_types.sql (goal_type on goals, for individual vs. shared goals),
+         then 20260807_fix_household_members_recursion.sql (fixes "infinite recursion detected in policy
+         for relation household_members" when loading your household). -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="style.css">
-    <link rel="icon" type="image/png" href="DualAscentLogoTransparentBackground.png">
+    <link rel="icon" type="image/png" href="Images/DualAscentLogoTransparentBackground.png">
 </head>
 <body>
 
@@ -44,7 +46,7 @@
             <h2>Get on the same page about money — together.</h2>
             <p>Discover your financial personality, build a shared spending plan, set a goal, and learn from each other. Works solo, or with a partner.</p>
             <button class="action-btn clerk-sign-in-trigger" id="landing-sign-in-btn">Sign In to Get Started</button>
-            <img src="DualAscentLogoTransparentBackground.png" alt="DualAscent" class="landing-logo">
+            <img src="Images/DualAscentLogoTransparentBackground.png" alt="DualAscent" class="landing-logo">
         </div>
     </div>
 
@@ -81,7 +83,12 @@
                     <div class="hh-members" id="hh-members-display"></div>
                 </div>
                 <div id="hh-invite-wrap">
-                    Invite code: <span class="invite-code-chip" id="hh-invite-code" title="Click to copy" onclick="copyInviteCode()"></span>
+                    <div>Invite code: <span class="invite-code-chip" id="hh-invite-code" title="Click to copy" onclick="copyInviteCode()"></span></div>
+                    <div class="invite-email-block">
+                        <p class="invite-instructions">Copy the message below and send it to your partner:</p>
+                        <div class="invite-email-template" id="invite-email-template"></div>
+                        <button class="action-btn secondary-btn" id="copy-invite-email-btn" onclick="copyInviteEmail()">Copy Invite Message</button>
+                    </div>
                 </div>
             </div>
             <div id="household-error" style="color:#d32f2f; font-size:0.85rem; margin-top:8px; display:none;"></div>
@@ -442,7 +449,7 @@
     </div>
 </div>
 
-<img src="DualAscentLogoTransparentBackground.png" alt="DualAscent" class="page-footer-logo">
+<img src="Images/DualAscentLogoWide.png" alt="DualAscent" class="page-footer-logo">
 
 <div id="toast-container"></div>
 
