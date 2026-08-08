@@ -71,24 +71,54 @@
 
         /* On-Screen Controls */
         #controls {
+            position: relative;
             width: 100%;
             max-width: 800px;
+            height: 170px;
             margin-top: 15px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 0 10px;
+            border: 1px dashed rgba(140, 111, 67, 0.35);
+            border-radius: 14px;
+            background: rgba(20, 16, 22, 0.35);
+            touch-action: none;
+            overflow: hidden;
+        }
+
+        #joystick-hint {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #8c6f43;
+            font-size: 14px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        #controls.active #joystick-hint {
+            opacity: 0;
         }
 
         #joystick-base {
-            position: relative;
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 130px;
             height: 130px;
             background: rgba(35, 27, 20, 0.8);
             border: 2px solid #5a452c;
             border-radius: 50%;
             box-shadow: 0 0 10px rgba(0,0,0,0.5);
-            touch-action: none;
+            transform: translate(-50%, -50%) scale(0.8);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s ease, transform 0.15s ease;
+        }
+
+        #controls.active #joystick-base {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
         }
 
         #joystick-knob {
@@ -102,7 +132,6 @@
             border: 2px solid #d4af37;
             border-radius: 50%;
             box-shadow: 0 0 8px rgba(0,0,0,0.7);
-            cursor: grab;
         }
 
         /* Overlay Screens */
@@ -172,7 +201,7 @@
             <h1>DRAGON'S HUNT</h1>
             <p>Take wing as an Iceborn Dragon across the medieval archipelago. Hunt swine scattered among the island settlements, featuring dense, multi-roofed thatched villages, and rest atop fortress roofs when fatigued.<br><br>
                <strong>Desktop:</strong> Arrow Keys or WASD to fly in any direction.<br>
-               <strong>Mobile:</strong> Drag the joystick below to fly. Let go and the dragon glides down to land.
+               <strong>Mobile:</strong> Touch anywhere in the control area below and drag to fly. Let go and the dragon glides down to land.
             </p>
             <button class="btn-start" onclick="startGame()">TAKE FLIGHT</button>
         </div>
@@ -185,6 +214,7 @@
 
         <!-- Controls -->
         <div id="controls">
+            <div id="joystick-hint">Touch &amp; drag to fly</div>
             <div id="joystick-base">
                 <div id="joystick-knob"></div>
             </div>
@@ -214,8 +244,9 @@
     const keys = { up: false, down: false, left: false, right: false };
 
     // Joystick state
-    const JOYSTICK_RADIUS = 40;
-    const joystick = { x: 0, y: 0, pointerId: null };
+    const JOYSTICK_RADIUS = 44;
+    const joystick = { x: 0, y: 0, pointerId: null, anchorX: 0, anchorY: 0 };
+    const controlsZone = document.getElementById('controls');
 
     // --- WORLD GENERATION DATA ---
     const TILE_WIDTH = 100;
@@ -666,10 +697,32 @@
         if (e.code === 'ArrowDown' || e.code === 'KeyS') keys.down = false;
     });
 
+    // Floating joystick: the base spawns wherever the player first touches
+    // down inside the control zone, then the knob is dragged from there.
+    function activateJoystick(e) {
+        const rect = controlsZone.getBoundingClientRect();
+        const margin = JOYSTICK_RADIUS + 30; // keeps the base fully on-screen
+        let anchorX = e.clientX - rect.left;
+        let anchorY = e.clientY - rect.top;
+        anchorX = Math.min(Math.max(anchorX, margin), rect.width - margin);
+        anchorY = Math.min(Math.max(anchorY, margin), rect.height - margin);
+
+        joystick.anchorX = anchorX;
+        joystick.anchorY = anchorY;
+        joystick.pointerId = e.pointerId;
+
+        joystickBase.style.left = anchorX + 'px';
+        joystickBase.style.top = anchorY + 'px';
+        controlsZone.classList.add('active');
+        controlsZone.setPointerCapture(e.pointerId);
+
+        updateJoystickFromPointer(e);
+    }
+
     function updateJoystickFromPointer(e) {
-        const rect = joystickBase.getBoundingClientRect();
-        let dx = e.clientX - (rect.left + rect.width / 2);
-        let dy = e.clientY - (rect.top + rect.height / 2);
+        const rect = controlsZone.getBoundingClientRect();
+        let dx = (e.clientX - rect.left) - joystick.anchorX;
+        let dy = (e.clientY - rect.top) - joystick.anchorY;
         const dist = Math.hypot(dx, dy);
         if (dist > JOYSTICK_RADIUS) {
             dx = (dx / dist) * JOYSTICK_RADIUS;
@@ -685,24 +738,24 @@
         joystick.x = 0;
         joystick.y = 0;
         joystickKnob.style.transform = 'translate(0px, 0px)';
+        controlsZone.classList.remove('active');
     }
 
-    joystickBase.addEventListener('pointerdown', (e) => {
+    controlsZone.addEventListener('pointerdown', (e) => {
         e.preventDefault();
-        joystick.pointerId = e.pointerId;
-        joystickBase.setPointerCapture(e.pointerId);
-        updateJoystickFromPointer(e);
+        if (joystick.pointerId !== null) return; // one touch at a time
+        activateJoystick(e);
     });
 
-    joystickBase.addEventListener('pointermove', (e) => {
+    controlsZone.addEventListener('pointermove', (e) => {
         if (joystick.pointerId === e.pointerId) updateJoystickFromPointer(e);
     });
 
-    joystickBase.addEventListener('pointerup', (e) => {
+    controlsZone.addEventListener('pointerup', (e) => {
         if (joystick.pointerId === e.pointerId) resetJoystick();
     });
 
-    joystickBase.addEventListener('pointercancel', (e) => {
+    controlsZone.addEventListener('pointercancel', (e) => {
         if (joystick.pointerId === e.pointerId) resetJoystick();
     });
 
