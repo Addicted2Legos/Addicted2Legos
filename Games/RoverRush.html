@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MEV-5 Lunar Rover Graphic</title>
+    <style>
+        :root {
+            --moon-dark: #121316;
+            --moon-mid: #2a2d32;
+            --moon-light: #8b909a;
+            --rover-white: #e8e9ec;
+            --rover-shadow: #9aa0a8;
+            --rover-dark: #1a1d21;
+            --rover-yellow: #d99b26;
+            --rover-glass: rgba(15, 23, 30, 0.85);
+            --wheel-rim: #d0d4dc;
+            --wheel-tread: #2d3036;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #030406;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        .scene {
+            position: relative;
+            width: 900px;
+            height: 550px;
+            background: linear-gradient(to bottom, #020204 0%, #080a0f 60%, #10141d 100%);
+            border-radius: 12px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            overflow: hidden;
+        }
+
+        /* --- Environment --- */
+        .stars {
+            position: absolute;
+            width: 100%;
+            height: 60%;
+            background-image: 
+                radial-gradient(1.5px 1.5px at 10px 20px, #fff, rgba(0,0,0,0)),
+                radial-gradient(1px 1px at 40px 70px, #fff, rgba(0,0,0,0)),
+                radial-gradient(2px 2px at 120px 40px, #fff, rgba(0,0,0,0)),
+                radial-gradient(1.5px 1.5px at 250px 140px, #fff, rgba(0,0,0,0)),
+                radial-gradient(1px 1px at 380px 50px, #fff, rgba(0,0,0,0)),
+                radial-gradient(1.5px 1.5px at 520px 120px, #fff, rgba(0,0,0,0)),
+                radial-gradient(2px 2px at 670px 30px, #fff, rgba(0,0,0,0)),
+                radial-gradient(1px 1px at 790px 110px, #fff, rgba(0,0,0,0)),
+                radial-gradient(1.5px 1.5px at 860px 60px, #fff, rgba(0,0,0,0));
+            opacity: 0.8;
+        }
+
+        .earth {
+            position: absolute;
+            top: 40px;
+            left: 220px;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #60a5fa, #1d4ed8 60%, #1e3a8a);
+            box-shadow: 0 0 15px rgba(96, 165, 250, 0.4);
+            overflow: hidden;
+        }
+
+        .earth::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 70% 70%, transparent 40%, rgba(0, 0, 0, 0.85) 80%);
+        }
+
+        .horizon-bg {
+            position: absolute;
+            bottom: 120px;
+            width: 120%;
+            left: -10%;
+            height: 180px;
+            background: #1c1f24;
+            border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+            transform: rotate(-2deg);
+        }
+
+        .ground {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 180px;
+            background: linear-gradient(to bottom, #343840 0%, #212429 40%, #15171a 100%);
+            clip-path: polygon(0 30%, 25% 15%, 55% 25%, 85% 10%, 100% 20%, 100% 100%, 0 100%);
+        }
+
+        .ground-texture {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 150px;
+            background-image: 
+                radial-gradient(ellipse at 30% 40%, rgba(0,0,0,0.4) 0%, transparent 60%),
+                radial-gradient(ellipse at 70% 70%, rgba(0,0,0,0.5) 0%, transparent 50%),
+                radial-gradient(ellipse at 15% 80%, rgba(255,255,255,0.05) 0%, transparent 40%);
+        }
+
+        /* --- Rover Wrapper --- */
+        .rover {
+            position: absolute;
+            bottom: 90px;
+            left: 180px;
+            width: 480px;
+            height: 320px;
+        }
+
+        /* Shadow beneath rover */
+        .rover-shadow {
+            position: absolute;
+            bottom: -15px;
+            left: 20px;
+            width: 440px;
+            height: 40px;
+            background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.75) 0%, rgba(0,0,0,0) 70%);
+            transform: rotate(-1deg);
+            z-index: 1;
+        }
+
+        /* --- Chassis & Arms --- */
+        .suspension-arm {
+            position: absolute;
+            background: #25282e;
+            border: 2px solid #111215;
+            border-radius: 4px;
+            z-index: 2;
+        }
+
+        .arm-front {
+            width: 110px;
+            height: 22px;
+            bottom: 80px;
+            left: 80px;
+            transform: rotate(-28deg);
+            background: linear-gradient(to right, #2a2d34, #1a1c20);
+        }
+
+        .arm-mid {
+            width: 80px;
+            height: 20px;
+            bottom: 75px;
+            left: 210px;
+            transform: rotate(20deg);
+        }
+
+        .arm-rear {
+            width: 100px;
+            height: 22px;
+            bottom: 80px;
+            left: 300px;
+            transform: rotate(25deg);
+            background: linear-gradient(to left, #2a2d34, #1a1c20);
+        }
+
+        .undercarriage {
+            position: absolute;
+            bottom: 85px;
+            left: 100px;
+            width: 280px;
+            height: 45px;
+            background: #181a1d;
+            border-radius: 8px;
+            border-bottom: 4px solid #0d0e10;
+            z-index: 3;
+        }
+
+        /* --- Main Cabin (Body) --- */
+        .cabin {
+            position: absolute;
+            top: 25px;
+            left: 70px;
+            width: 320px;
+            height: 175px;
+            z-index: 5;
+        }
+
+        /* Main body block */
+        .cabin-main {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--rover-white) 0%, #c8cbd2 70%, var(--rover-shadow) 100%);
+            border-radius: 12px 18px 10px 10px;
+            box-shadow: inset 0 2px 4px rgba(255,255,255,0.8), inset -3px -3px 8px rgba(0,0,0,0.3);
+            border: 1px solid #b0b4bc;
+        }
+
+        /* Cockpit Window */
+        .cockpit {
+            position: absolute;
+            top: 12px;
+            left: 8px;
+            width: 125px;
+            height: 105px;
+            background: var(--rover-glass);
+            border-radius: 8px 4px 4px 6px;
+            border: 3px solid #2a2d32;
+            overflow: hidden;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.9);
+        }
+
+        .cockpit-glare {
+            position: absolute;
+            top: -20px;
+            left: -20px;
+            width: 150px;
+            height: 80px;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.25), transparent);
+            transform: rotate(-30deg);
+        }
+
+        .headlight {
+            position: absolute;
+            width: 10px;
+            height: 35px;
+            background: #e2e8f0;
+            border: 2px solid #475569;
+            box-shadow: 0 0 12px #93c5fd, 0 0 25px rgba(147, 197, 253, 0.6);
+            z-index: 6;
+        }
+
+        .headlight-left { top: 30px; left: 2px; }
+        .headlight-right { top: 30px; left: 135px; }
+
+        /* Side panels & MEV-5 details */
+        .panel-line {
+            position: absolute;
+            background: rgba(0,0,0,0.15);
+        }
+
+        .panel-1 { top: 0; left: 150px; width: 2px; height: 100%; }
+        .panel-2 { top: 120px; left: 0; width: 100%; height: 2px; }
+
+        .mev-text {
+            position: absolute;
+            top: 45px;
+            right: 45px;
+            font-family: 'Arial Black', sans-serif;
+            font-size: 22px;
+            font-weight: 900;
+            color: #2b303a;
+            letter-spacing: -1px;
+        }
+
+        .mev-subtext {
+            position: absolute;
+            top: 40px;
+            right: 47px;
+            font-family: monospace;
+            font-size: 10px;
+            color: #4b5563;
+            font-weight: bold;
+        }
+
+        .hazard-symbol {
+            position: absolute;
+            top: 78px;
+            right: 85px;
+            width: 16px;
+            height: 16px;
+            background: var(--rover-yellow);
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .hazard-symbol::after {
+            content: '!';
+            font-size: 10px;
+            font-weight: bold;
+            color: #000;
+            margin-top: 2px;
+        }
+
+        .yellow-tank {
+            position: absolute;
+            bottom: 22px;
+            right: 110px;
+            width: 45px;
+            height: 16px;
+            background: linear-gradient(to bottom, #f59e0b, #d97706);
+            border-radius: 8px;
+            border: 2px solid #78350f;
+            box-shadow: inset 0 2px 2px rgba(255,255,255,0.4);
+        }
+
+        .rear-module {
+            position: absolute;
+            top: 20px;
+            right: -45px;
+            width: 50px;
+            height: 130px;
+            background: linear-gradient(135deg, #d1d5db, #9ca3af);
+            border-radius: 4px 8px 8px 4px;
+            border: 2px solid #6b7280;
+            box-shadow: inset -4px 0 8px rgba(0,0,0,0.3);
+        }
+
+        .roof-equipment {
+            position: absolute;
+            top: -16px;
+            left: 160px;
+            width: 32px;
+            height: 16px;
+            background: #e5e7eb;
+            border-radius: 12px 12px 0 0;
+            border: 2px solid #9ca3af;
+            border-bottom: none;
+        }
+
+        .antenna {
+            position: absolute;
+            top: -45px;
+            left: 130px;
+            width: 2px;
+            height: 45px;
+            background: #94a3b8;
+        }
+
+        /* --- Wheels --- */
+        .wheel-container {
+            position: absolute;
+            width: 96px;
+            height: 96px;
+            z-index: 4;
+        }
+
+        /* Wheel Positions */
+        .wheel-f-left  { bottom: 10px; left: 10px; z-index: 6; } /* Front Outer */
+        .wheel-f-right { bottom: 35px; left: 80px; z-index: 2; transform: scale(0.88); filter: brightness(0.7); } /* Front Inner */
+        
+        .wheel-m-left  { bottom: 5px;  left: 175px; z-index: 6; } /* Mid Outer */
+        .wheel-m-right { bottom: 30px; left: 235px; z-index: 2; transform: scale(0.88); filter: brightness(0.7); } /* Mid Inner */
+
+        .wheel-r-left  { bottom: 10px; left: 320px; z-index: 6; } /* Rear Outer */
+        .wheel-r-right { bottom: 35px; left: 370px; z-index: 2; transform: scale(0.88); filter: brightness(0.7); } /* Rear Inner */
+
+        .wheel {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #4b5563 0%, var(--wheel-tread) 60%, #111827 100%);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5), inset 0 0 0 8px #1f2937;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Wheel Treads */
+        .wheel::before {
+            content: '';
+            position: absolute;
+            width: 102%;
+            height: 102%;
+            border-radius: 50%;
+            border: 5px dashed #111827;
+            box-sizing: border-box;
+        }
+
+        .wheel-hub {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #f3f4f6 0%, var(--wheel-rim) 70%, #9ca3af 100%);
+            border: 3px solid #374151;
+            box-shadow: inset 0 2px 4px rgba(255,255,255,0.8), 0 2px 5px rgba(0,0,0,0.4);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .hub-cap {
+            width: 20px;
+            height: 20px;
+            background: #d1d5db;
+            border: 2px solid #4b5563;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="scene">
+        <!-- Background Elements -->
+        <div class="stars"></div>
+        <div class="earth"></div>
+        <div class="horizon-bg"></div>
+        <div class="ground"></div>
+        <div class="ground-texture"></div>
+
+        <!-- Space Rover Graphic -->
+        <div class="rover">
+            <div class="rover-shadow"></div>
+
+            <!-- Inner Back Wheels -->
+            <div class="wheel-container wheel-f-right"><div class="wheel"><div class="wheel-hub"><div class="hub-cap"></div></div></div></div>
+            <div class="wheel-container wheel-m-right"><div class="wheel"><div class="wheel-hub"><div class="hub-cap"></div></div></div></div>
+            <div class="wheel-container wheel-r-right"><div class="wheel"><div class="wheel-hub"><div class="hub-cap"></div></div></div></div>
+
+            <!-- Suspension & Undercarriage -->
+            <div class="suspension-arm arm-front"></div>
+            <div class="suspension-arm arm-mid"></div>
+            <div class="suspension-arm arm-rear"></div>
+            <div class="undercarriage"></div>
+
+            <!-- Main Cabin Assembly -->
+            <div class="cabin">
+                <div class="antenna"></div>
+                <div class="roof-equipment"></div>
+                <div class="rear-module"></div>
+                
+                <div class="cabin-main">
+                    <div class="cockpit">
+                        <div class="cockpit-glare"></div>
+                    </div>
+                    <div class="headlight headlight-left"></div>
+                    <div class="headlight headlight-right"></div>
+                    
+                    <div class="panel-line panel-1"></div>
+                    <div class="panel-line panel-2"></div>
+                    
+                    <div class="mev-subtext">MEV</div>
+                    <div class="mev-text">5</div>
+                    <div class="hazard-symbol"></div>
+                    <div class="yellow-tank"></div>
+                </div>
+            </div>
+
+            <!-- Outer Front Wheels -->
+            <div class="wheel-container wheel-f-left"><div class="wheel"><div class="wheel-hub"><div class="hub-cap"></div></div></div></div>
+            <div class="wheel-container wheel-m-left"><div class="wheel"><div class="wheel-hub"><div class="hub-cap"></div></div></div></div>
+            <div class="wheel-container wheel-r-left"><div class="wheel"><div class="wheel-hub"><div class="hub-cap"></div></div></div></div>
+        </div>
+    </div>
+
+</body>
+</html>
