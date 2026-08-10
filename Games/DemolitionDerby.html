@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demolition Derby</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #121212;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 25px rgba(0,0,0,0.9);
+        }
+        canvas {
+            border: 6px solid #2d2013;
+            border-radius: 4px;
+            display: block;
+            background-color: #5c4328;
+        }
+        #hud {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            font-weight: bold;
+            font-size: 18px;
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.9);
+        }
+        .health-bar-container {
+            width: 220px;
+            height: 22px;
+            background: #222;
+            border: 2px solid #fff;
+            border-radius: 11px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+        #health-bar {
+            width: 100%;
+            height: 100%;
+            background: #2ee649;
+            transition: width 0.1s ease;
+        }
+        #scoreboard {
+            margin-top: 8px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.25);
+            border-radius: 6px;
+            padding: 8px 10px;
+            width: 170px;
+            font-size: 12px;
+            font-weight: normal;
+            text-shadow: none;
+        }
+        #scoreboard .sb-title {
+            font-weight: bold;
+            font-size: 11px;
+            letter-spacing: 1px;
+            opacity: 0.7;
+            margin-bottom: 5px;
+            text-align: right;
+        }
+        .sb-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 0;
+        }
+        .sb-row .sb-name {
+            width: 26px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .sb-row .sb-bar-track {
+            flex: 1;
+            height: 7px;
+            background: #222;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .sb-row .sb-bar-fill {
+            height: 100%;
+            background: #2ee649;
+        }
+        .sb-row .sb-pct {
+            width: 30px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+        .sb-row.sb-player .sb-name {
+            color: #39ff14;
+        }
+        .sb-row.sb-dead {
+            opacity: 0.45;
+        }
+        #announcer {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 64px;
+            font-weight: 900;
+            color: #ffcc00;
+            text-shadow: 4px 4px 10px rgba(0,0,0,0.9), -2px -2px 0 #000;
+            pointer-events: none;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="hud">
+        <div>
+            <div>PLAYER HEALTH</div>
+            <div class="health-bar-container">
+                <div id="health-bar"></div>
+            </div>
+        </div>
+        <div style="text-align: right;">
+            <div id="car-count">CARS REMAINING: 10</div>
+            <div id="scoreboard">
+                <div class="sb-title">DAMAGE</div>
+                <div id="scoreboard-rows"></div>
+            </div>
+        </div>
+    </div>
+    <div id="announcer"></div>
+    <canvas id="derbyCanvas" width="1000" height="650"></canvas>
+</div>
+
+<script>
+const canvas = document.getElementById('derbyCanvas');
+const ctx = canvas.getContext('2d');
+const healthBar = document.getElementById('health-bar');
+const carCountText = document.getElementById('car-count');
+const announcer = document.getElementById('announcer');
+const scoreboardRowsEl = document.getElementById('scoreboard-rows');
+
+const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+window.addEventListener('keydown', e => { if (e.key in keys) keys[e.key] = true; });
+window.addEventListener('keyup', e => { if (e.key in keys) keys[e.key] = false; });
+window.addEventListener('keydown', e => {
+    if (e.code === 'Space' || e.key === ' ') {
+        e.preventDefault();
+        skipEntranceParade();
+    }
+});
+
+// --- Elevated 60-degree camera view ---
+// The grandstand occupies the top band of the canvas; everything below it
+// is the dirt pit, rendered as a perspective trapezoid (narrow/far at the
+// top, wide/near at the bottom) so the scene reads like a photo taken from
+// the fence line rather than a straight overhead map.
+const STANDS_H = 170;
+const CENTER_X = canvas.width / 2;
+const NUMBER_COLORS = ['#ff2d95', '#ffffff', '#ffe66d', '#00e5ff', '#ff6b35'];
+
+function project(wx, wy) {
+    const t = Math.max(0, Math.min(1, wy / canvas.height));
+    const scale = 0.42 + 0.58 * Math.pow(t, 0.85);
+    const screenY = STANDS_H + Math.pow(t, 1.4) * (canvas.height - STANDS_H);
+    const screenX = CENTER_X + (wx - CENTER_X) * scale;
+    return { x: screenX, y: screenY, scale };
+}
+
+// Precomputed crowd so the stands don't re-randomize every frame
+const CROWD = (function generateCrowd() {
+    const dots = [];
+    const skinTones = ['#e8b98a', '#c68863', '#8d5524', '#f1c27d', '#ffdbac'];
+    const clothColors = ['#333', '#555', '#1a1a2e', '#7f1d1d', '#1e3a5f', '#444', '#222', '#654321', '#3a3a3a'];
+    const rowCount = 9;
+    for (let row = 0; row < rowCount; row++) {
+        const rowY = 8 + row * (STANDS_H - 16) / rowCount;
+        const density = 55 + row * 3;
+        for (let i = 0; i < density; i++) {
+            const x = Math.random() * canvas.width;
+            const y = rowY + Math.random() * ((STANDS_H - 16) / rowCount);
+            const r = 1.4 + (row / rowCount) * 1.6;
+            const color = Math.random() < 0.35
+                ? skinTones[Math.floor(Math.random() * skinTones.length)]
+                : clothColors[Math.floor(Math.random() * clothColors.length)];
+            dots.push({ x, y, r, color });
+        }
+    }
+    return dots;
+})();
+
+const POLE_X = [60, 260, 500, 740, 940];
+
+const SKID_MARKS = [
+    { cx: 300, cy: 300, rx: 70, ry: 30, rot: 0.3 },
+    { cx: 650, cy: 400, rx: 90, ry: 35, rot: -0.5 },
+    { cx: 500, cy: 250, rx: 60, ry: 25, rot: 0.8 },
+    { cx: 400, cy: 480, rx: 100, ry: 20, rot: -0.2 },
+    { cx: 750, cy: 220, rx: 50, ry: 20, rot: 1.1 }
+];
+
+// --- Entrance parade path: a single oval loop inset from the berm ---
+const PARADE_CENTER = { x: 500, y: 325 };
+const PARADE_RX = 330;
+const PARADE_RY = 185;
+const PARADE_ENTRY_ANGLE = Math.PI; // leftmost point of the oval, by the gate
+
+function ellipsePoint(angle) {
+    return {
+        x: PARADE_CENTER.x + Math.cos(angle) * PARADE_RX,
+        y: PARADE_CENTER.y + Math.sin(angle) * PARADE_RY
+    };
+}
+
+// --- Battle arena boundary: an oval, with the berm mounded just outside it ---
+const ARENA_CENTER = { x: 500, y: 325 };
+const ARENA_RX = 380;
+const ARENA_RY = 215;
+const BERM_THICKNESS = 34;
+
+function clampToArena(car) {
+    const dx = car.x - ARENA_CENTER.x;
+    const dy = car.y - ARENA_CENTER.y;
+    const nx = dx / ARENA_RX;
+    const ny = dy / ARENA_RY;
+    const norm = Math.hypot(nx, ny);
+    if (norm > 1) {
+        car.x = ARENA_CENTER.x + dx / norm;
+        car.y = ARENA_CENTER.y + dy / norm;
+        car.speed *= -0.5;
+    }
+}
+
+// Each car drives in through the gate and follows the oval clockwise, but
+// peels off after a different distance: car 1 goes almost all the way
+// around, and each car after it stops a bit sooner, so the last car parks
+// just barely past the gate. The "+1" slot leaves a gap at the gate itself
+// so car 1 doesn't end up parked right on top of it.
+function buildParadeWaypoints(id, total) {
+    const numSlots = total + 1;
+    const stepAngle = (Math.PI * 2) / numSlots;
+    const parkAngle = PARADE_ENTRY_ANGLE + stepAngle * (total - id);
+
+    const waypoints = [
+        { x: 90, y: PARADE_CENTER.y },  // through the left gate
+        ellipsePoint(PARADE_ENTRY_ANGLE) // onto the oval
+    ];
+
+    const strideAngle = Math.PI / 9; // ~20 degree strides for a smooth curve
+    let a = PARADE_ENTRY_ANGLE;
+    while (a + strideAngle < parkAngle) {
+        a += strideAngle;
+        waypoints.push(ellipsePoint(a));
+    }
+    waypoints.push(ellipsePoint(parkAngle));
+
+    return waypoints;
+}
+
+// Game States: 'ENTERING', 'COUNTDOWN', 'PLAYING', 'GAME_OVER'
+let gameState = 'ENTERING';
+let countdownTime = 5;
+let countdownTimer = null;
+
+class Car {
+    constructor(id, color, isPlayer = false) {
+        this.id = id;
+        this.x = -80; // Start off-screen left
+        this.y = 325;
+        this.width = 54;  // Enlarged vehicle dimensions
+        this.height = 30;
+        this.angle = 0;
+        this.speed = 0;
+        this.maxSpeed = isPlayer ? 4.8 : 3.8;
+        this.accel = 0.16;
+        this.friction = 0.96;
+        this.turnSpeed = 0.055;
+        this.color = color;
+        this.numberColor = NUMBER_COLORS[id % NUMBER_COLORS.length];
+        this.isPlayer = isPlayer;
+        this.health = 100;
+        this.isDead = false;
+
+        // AI-only: how long this car has been stalled (nose-to-nose stalemate),
+        // and how long it's currently backing off to break out of one
+        this.stuckTimer = 0;
+        this.disengageTimer = 0;
+        this.disengageSign = 1;
+
+        // Entrance Parade Waypoint Tracking
+        this.hasEntered = false;
+        this.paradeStep = 0;
+        this.waypoints = [];
+    }
+
+    update(allCars) {
+        if (this.isDead) return;
+
+        if (gameState === 'ENTERING') {
+            this.updateEntranceParade();
+            return;
+        }
+
+        if (gameState === 'COUNTDOWN' || gameState === 'GAME_OVER') {
+            this.speed = 0;
+            return;
+        }
+
+        // --- Active Gameplay Physics & AI ---
+        if (this.isPlayer) {
+            if (keys.ArrowUp) this.speed = Math.min(this.speed + this.accel, this.maxSpeed);
+            if (keys.ArrowDown) this.speed = Math.max(this.speed - this.accel, -this.maxSpeed * 0.5);
+            // Steering flips while reversing, same as turning a real car's wheel in reverse
+            const steer = this.speed < 0 ? -1 : 1;
+            if (keys.ArrowLeft) this.angle -= steer * this.turnSpeed * (Math.abs(this.speed) / this.maxSpeed);
+            if (keys.ArrowRight) this.angle += steer * this.turnSpeed * (Math.abs(this.speed) / this.maxSpeed);
+        } else if (this.disengageTimer > 0) {
+            // Nose-to-nose stalemate: back off and turn away instead of
+            // grinding against the other car forever.
+            this.disengageTimer--;
+            this.speed = Math.max(this.speed - this.accel, -this.maxSpeed * 0.6);
+            this.angle += this.disengageSign * this.turnSpeed * 1.3;
+        } else {
+            // Target the nearest active competitor, but prefer one that isn't
+            // already crowded by other cars, so the AI spreads into several
+            // separate scrums instead of every car piling onto the same one.
+            let target = null;
+            let bestScore = Infinity;
+            allCars.forEach(other => {
+                if (other !== this && !other.isDead) {
+                    let d = Math.hypot(other.x - this.x, other.y - this.y);
+                    let crowd = allCars.reduce((n, c) => {
+                        return (c !== other && c !== this && !c.isDead && Math.hypot(c.x - other.x, c.y - other.y) < 50) ? n + 1 : n;
+                    }, 0);
+                    let score = d + crowd * 90;
+                    if (score < bestScore) { bestScore = score; target = other; }
+                }
+            });
+
+            if (target) {
+                let targetAngle = Math.atan2(target.y - this.y, target.x - this.x);
+                let angleDiff = targetAngle - this.angle;
+                while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+
+                if (angleDiff > 0.1) this.angle += this.turnSpeed * 0.75;
+                else if (angleDiff < -0.1) this.angle -= this.turnSpeed * 0.75;
+
+                this.speed = Math.min(this.speed + this.accel * 0.85, this.maxSpeed);
+            }
+
+            // Stuck spinning against something (a head-on lock reads as very
+            // low speed despite constantly trying to accelerate). Let it
+            // circle for about half a turn, then trigger a disengage.
+            if (Math.abs(this.speed) < 0.5) {
+                this.stuckTimer++;
+            } else {
+                this.stuckTimer = 0;
+            }
+            if (this.stuckTimer > 75) {
+                this.disengageTimer = 50;
+                this.disengageSign = Math.random() < 0.5 ? -1 : 1;
+                this.stuckTimer = 0;
+            }
+        }
+
+        this.speed *= this.friction;
+        this.x += Math.cos(this.angle) * this.speed;
+        this.y += Math.sin(this.angle) * this.speed;
+
+        // Oval dirt berm boundary
+        clampToArena(this);
+    }
+
+    updateEntranceParade() {
+        const target = this.waypoints[this.paradeStep];
+        let dx = target.x - this.x;
+        let dy = target.y - this.y;
+        let dist = Math.hypot(dx, dy);
+
+        if (dist < 22) {
+            if (this.paradeStep < this.waypoints.length - 1) {
+                this.paradeStep++;
+            } else {
+                this.hasEntered = true;
+                this.speed = 0;
+                // Stays facing whichever way it was already driving when it stopped
+                return;
+            }
+        }
+
+        let targetAngle = Math.atan2(dy, dx);
+        this.angle = targetAngle;
+        this.speed = 2.8;
+        this.x += Math.cos(this.angle) * this.speed;
+        this.y += Math.sin(this.angle) * this.speed;
+    }
+
+    // Jumps straight to the parked starting position, facing the same way
+    // it would have ended up facing if it had driven the whole parade route.
+    skipEntrance() {
+        const wp = this.waypoints;
+        const last = wp[wp.length - 1];
+        const prev = wp[wp.length - 2] || last;
+        this.angle = Math.atan2(last.y - prev.y, last.x - prev.x);
+        this.x = last.x;
+        this.y = last.y;
+        this.speed = 0;
+        this.paradeStep = wp.length - 1;
+        this.hasEntered = true;
+    }
+
+    draw(ctx) {
+        const p = project(this.x, this.y);
+        const s = 1; // cars stay the same size regardless of depth; the arena's too small to need distance cues
+        const w = this.width, h = this.height;
+
+        // Bright pulsing halo marks the player's own car
+        if (this.isPlayer) {
+            const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 200);
+            ctx.save();
+            ctx.translate(p.x, p.y + h * 0.35 * s);
+            ctx.scale(s, s * 0.55);
+            const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, w * 1.1);
+            glow.addColorStop(0, `rgba(57,255,20,${0.5 + 0.3 * pulse})`);
+            glow.addColorStop(1, 'rgba(57,255,20,0)');
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, w * 1.1, w * 1.1, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Ground contact shadow, flattened to read as lying on the dirt
+        ctx.save();
+        ctx.translate(p.x, p.y + h * 0.35 * s);
+        ctx.scale(s, s * 0.55);
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, w / 2 + 4, h / 2 + 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.scale(s, s);
+        ctx.rotate(this.angle);
+
+        const damage = Math.max(0, 100 - this.health) / 100;
+
+        // Wheels peeking out at the corners
+        ctx.fillStyle = '#0a0a0a';
+        [[-w / 2 + 6, -h / 2 - 3], [w / 2 - 10, -h / 2 - 3], [-w / 2 + 6, h / 2 - 3], [w / 2 - 10, h / 2 - 3]]
+            .forEach(([wx, wy]) => ctx.fillRect(wx, wy, 10, 6));
+
+        // Reinforced Front/Rear Metal Bumpers
+        ctx.fillStyle = '#1c1c1c';
+        ctx.fillRect(-w / 2 - 3, -h / 2 - 1, 6, h + 2);
+        ctx.fillRect(w / 2 - 3, -h / 2 - 1, 6, h + 2);
+
+        // Vehicle Main Body
+        ctx.fillStyle = this.isDead ? '#3a3a3a' : this.color;
+        ctx.fillRect(-w / 2, -h / 2, w, h);
+
+        // Simple top-lit shading for a rounder, less flat body
+        const shade = ctx.createLinearGradient(0, -h / 2, 0, h / 2);
+        shade.addColorStop(0, 'rgba(255,255,255,0.2)');
+        shade.addColorStop(0.5, 'rgba(255,255,255,0)');
+        shade.addColorStop(1, 'rgba(0,0,0,0.28)');
+        ctx.fillStyle = shade;
+        ctx.fillRect(-w / 2, -h / 2, w, h);
+
+        // Neon outline so the player's car stands out from the AI pack
+        if (this.isPlayer) {
+            ctx.strokeStyle = '#39ff14';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(-w / 2, -h / 2, w, h);
+        }
+
+        // Crumpled front-end damage that grows as health drops
+        if (damage > 0.05) {
+            ctx.fillStyle = `rgba(30,30,30,${0.25 + damage * 0.5})`;
+            ctx.beginPath();
+            ctx.moveTo(w / 2 - 2, -h / 2 + 2);
+            ctx.lineTo(w / 2 - 10 * damage, -h / 2 + 6);
+            ctx.lineTo(w / 2 - 4, 0);
+            ctx.lineTo(w / 2 - 12 * damage, h / 2 - 4);
+            ctx.lineTo(w / 2 - 2, h / 2 - 2);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // Headlights / taillights
+        ctx.fillStyle = this.isDead ? '#555' : '#fff8c0';
+        ctx.fillRect(w / 2 - 2, -h / 2 + 2, 3, 5);
+        ctx.fillRect(w / 2 - 2, h / 2 - 7, 3, 5);
+        ctx.fillStyle = '#c0392b';
+        ctx.fillRect(-w / 2 - 1, -h / 2 + 2, 3, 5);
+        ctx.fillRect(-w / 2 - 1, h / 2 - 7, 3, 5);
+
+        // Roof / Roll Cage / Windshield
+        ctx.fillStyle = '#111';
+        ctx.fillRect(-8, -10, 18, 20);
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-8, -10, 18, 20);
+
+        // Whip antenna flag for identification, like the real derby cars
+        ctx.strokeStyle = this.numberColor;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(6, -h / 2);
+        ctx.lineTo(14, -h / 2 - 16);
+        ctx.stroke();
+        ctx.fillStyle = this.numberColor;
+        ctx.beginPath();
+        ctx.arc(14, -h / 2 - 16, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Car Numbering / Player Indicator
+        ctx.font = 'bold 13px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const label = this.isPlayer ? 'P1' : `${this.id}`;
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.strokeText(label, 0, 1);
+        ctx.fillStyle = this.numberColor;
+        ctx.fillText(label, 0, 1);
+
+        ctx.restore();
+
+        // Bobbing marker above the player's car, upright regardless of heading
+        if (this.isPlayer) {
+            const bob = Math.sin(Date.now() / 300) * 4;
+            ctx.save();
+            ctx.translate(p.x, p.y - 60 * s + bob);
+            ctx.beginPath();
+            ctx.moveTo(0, 14);
+            ctx.lineTo(-10, -6);
+            ctx.lineTo(10, -6);
+            ctx.closePath();
+            ctx.fillStyle = '#39ff14';
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+}
+
+// Instantiate 10 Cars
+const cars = [];
+const carColors = ['#f1c40f', '#e74c3c', '#3498db', '#2ecc71', '#9b59b6', '#e67e22', '#1abc9c', '#e84393', '#6c5ce7', '#d35400'];
+
+// Car #0 is Player 1
+cars.push(new Car(0, carColors[0], true));
+for (let i = 1; i < 10; i++) {
+    cars.push(new Car(i, carColors[i], false));
+}
+cars.forEach(car => { car.waypoints = buildParadeWaypoints(car.id, cars.length); });
+
+// Scoreboard rows are built once and reordered/updated in place, rather than
+// rebuilt every frame, to keep the (throttled) DOM updates cheap.
+const scoreboardEntries = cars.map(car => {
+    const row = document.createElement('div');
+    row.className = 'sb-row';
+    row.innerHTML = '<span class="sb-name"></span><span class="sb-bar-track"><span class="sb-bar-fill"></span></span><span class="sb-pct"></span>';
+    scoreboardRowsEl.appendChild(row);
+    return {
+        car,
+        row,
+        nameEl: row.querySelector('.sb-name'),
+        fillEl: row.querySelector('.sb-bar-fill'),
+        pctEl: row.querySelector('.sb-pct')
+    };
+});
+
+function updateScoreboard() {
+    scoreboardEntries
+        .slice()
+        .sort((a, b) => (100 - b.car.health) - (100 - a.car.health))
+        .forEach(entry => {
+            scoreboardRowsEl.appendChild(entry.row); // re-append in sorted order (most damage first)
+            const dmg = Math.min(100, Math.max(0, Math.round(100 - entry.car.health)));
+            entry.nameEl.textContent = entry.car.isPlayer ? 'P1' : `#${entry.car.id}`;
+            entry.fillEl.style.width = dmg + '%';
+            entry.fillEl.style.background = dmg > 70 ? '#e74c3c' : dmg > 35 ? '#f1c40f' : '#2ee649';
+            entry.pctEl.textContent = entry.car.isDead ? 'OUT' : dmg + '%';
+            entry.row.classList.toggle('sb-player', entry.car.isPlayer);
+            entry.row.classList.toggle('sb-dead', entry.car.isDead);
+        });
+}
+
+// Entrance Stagger Timer
+let enteringCarIndex = 0;
+let entranceInterval = setInterval(() => {
+    enteringCarIndex++;
+    if (enteringCarIndex >= cars.length) {
+        clearInterval(entranceInterval);
+    }
+}, 1800);
+
+function checkAllCarsParked() {
+    if (gameState === 'ENTERING' && cars.every(c => c.hasEntered)) {
+        gameState = 'COUNTDOWN';
+        startCountdown();
+    }
+}
+
+// Spacebar skips straight to every car parked in its starting position
+function skipEntranceParade() {
+    if (gameState !== 'ENTERING') return;
+    clearInterval(entranceInterval);
+    enteringCarIndex = cars.length - 1;
+    cars.forEach(car => car.skipEntrance());
+    checkAllCarsParked();
+}
+
+function startCountdown() {
+    countdownTimer = setInterval(() => {
+        countdownTime--;
+        if (countdownTime > 0) {
+            announcer.innerText = countdownTime;
+        } else if (countdownTime === 0) {
+            announcer.innerText = "DEMOLISH!";
+        } else {
+            clearInterval(countdownTimer);
+            announcer.innerText = "";
+            gameState = 'PLAYING';
+
+            // Initial Grand Opening Turn: AI cars turn toward center and take
+            // off on their own. The player stays put until they touch a key.
+            // Each car gets a slightly different angle/speed so they don't
+            // all converge on exactly the same point and form one giant pile.
+            cars.forEach(car => {
+                if (car.isPlayer) return;
+                car.angle += Math.PI / 2 + (Math.random() - 0.5) * 0.9;
+                car.speed = 2.6 + Math.random() * 1.2;
+            });
+        }
+    }, 1000);
+}
+
+// 10 hits demolishes a car; a fast enough hit counts as 2 or 3 hits at once.
+const HIT_UNIT = 10;
+function hitsForImpact(relativeSpeed) {
+    if (relativeSpeed >= 5) return 3;
+    if (relativeSpeed >= 2.7) return 2;
+    return 1;
+}
+
+// Cars are treated as circles ~36px apart when "touching"; they're allowed
+// to overlap that by at most 5% before being physically pushed apart.
+const CAR_TOUCH_DIST = 36;
+const CAR_MIN_DIST = CAR_TOUCH_DIST * 0.95;
+
+// Tracks which car pairs are currently touching, so a hit deals damage only
+// once per contact — not again until the pair fully separates and collides
+// again.
+const activeContacts = new Set();
+
+function resolveOverlaps() {
+    // Several passes so chains of 3+ touching cars all settle within the
+    // 5%-overlap limit, not just whichever pair is checked first each frame.
+    for (let pass = 0; pass < 4; pass++) {
+        for (let i = 0; i < cars.length; i++) {
+            for (let j = i + 1; j < cars.length; j++) {
+                let c1 = cars[i], c2 = cars[j];
+                let dx = c2.x - c1.x, dy = c2.y - c1.y;
+                let dist = Math.hypot(dx, dy);
+                if (dist >= CAR_MIN_DIST) continue;
+
+                const nx = dist === 0 ? 1 : dx / dist;
+                const ny = dist === 0 ? 0 : dy / dist;
+                const push = (CAR_MIN_DIST - dist) / 2;
+                c1.x -= nx * push;
+                c1.y -= ny * push;
+                c2.x += nx * push;
+                c2.y += ny * push;
+            }
+        }
+    }
+}
+
+function checkCollisions() {
+    for (let i = 0; i < cars.length; i++) {
+        for (let j = i + 1; j < cars.length; j++) {
+            let c1 = cars[i];
+            let c2 = cars[j];
+            const key = c1.id + '-' + c2.id;
+
+            let dist = Math.hypot(c2.x - c1.x, c2.y - c1.y);
+            if (dist >= CAR_TOUCH_DIST) {
+                activeContacts.delete(key);
+                continue;
+            }
+
+            // Already mid-collision from an earlier frame — position
+            // separation is handled by resolveOverlaps(), but no repeat
+            // damage until this pair separates and hits again.
+            if (activeContacts.has(key)) continue;
+            activeContacts.add(key);
+
+            if (c1.isDead && c2.isDead) continue;
+
+            // The faster car is the one doing the hitting; a stopped wreck
+            // can't be the aggressor even if it's dead. Read speeds before
+            // the bounce below flips them.
+            let hitter, victim;
+            if (c1.isDead) { hitter = c2; victim = c1; }
+            else if (c2.isDead) { hitter = c1; victim = c2; }
+            else { hitter = Math.abs(c1.speed) >= Math.abs(c2.speed) ? c1 : c2; victim = hitter === c1 ? c2 : c1; }
+
+            let relativeSpeed = Math.abs(c1.speed - c2.speed);
+            let damage = hitsForImpact(relativeSpeed) * HIT_UNIT;
+
+            if (!victim.isDead) victim.health -= damage;
+            // Ramming someone is usually free, but there's a 1-in-3 chance
+            // the hitter takes the same damage it just dealt out.
+            if (!hitter.isDead && Math.random() < 1 / 3) hitter.health -= damage;
+
+            if (c1.health <= 0) c1.isDead = true;
+            if (c2.health <= 0) c2.isDead = true;
+
+            c1.speed = -c1.speed * 0.5;
+            c2.speed = -c2.speed * 0.5;
+        }
+    }
+}
+
+function drawSkidMark(cx, cy, rx, ry, rot, color, width) {
+    ctx.beginPath();
+    for (let i = 0; i <= 32; i++) {
+        const a = (i / 32) * Math.PI * 2;
+        const lx = Math.cos(a) * rx, ly = Math.sin(a) * ry;
+        const wx = cx + lx * Math.cos(rot) - ly * Math.sin(rot);
+        const wy = cy + lx * Math.sin(rot) + ly * Math.cos(rot);
+        const p = project(wx, wy);
+        if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.stroke();
+}
+
+function drawArenaLayout() {
+    // Night sky behind the grandstand
+    const sky = ctx.createLinearGradient(0, 0, 0, STANDS_H);
+    sky.addColorStop(0, '#04050a');
+    sky.addColorStop(1, '#161a24');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, canvas.width, STANDS_H);
+
+    // Packed grandstand crowd
+    CROWD.forEach(d => {
+        ctx.fillStyle = d.color;
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    // Stadium light poles towering above the stands
+    POLE_X.forEach(px => {
+        ctx.strokeStyle = '#7d8391';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(px, 0);
+        ctx.lineTo(px, STANDS_H);
+        ctx.stroke();
+        const glow = ctx.createRadialGradient(px, 4, 0, px, 4, 22);
+        glow.addColorStop(0, 'rgba(255,255,230,0.9)');
+        glow.addColorStop(1, 'rgba(255,255,230,0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(px - 22, -18, 44, 44);
+    });
+
+    // Fence separating the crowd from the pit
+    ctx.strokeStyle = 'rgba(210,210,210,0.55)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, STANDS_H);
+    ctx.lineTo(canvas.width, STANDS_H);
+    ctx.stroke();
+    for (let x = 10; x < canvas.width; x += 24) {
+        ctx.beginPath();
+        ctx.moveTo(x, STANDS_H - 10);
+        ctx.lineTo(x, STANDS_H);
+        ctx.stroke();
+    }
+
+    // Dirt pit surface, drawn as a perspective trapezoid (narrow/far, wide/near)
+    const backL = project(0, 0), backR = project(canvas.width, 0);
+    const frontR = project(canvas.width, canvas.height), frontL = project(0, canvas.height);
+    const dirt = ctx.createLinearGradient(0, STANDS_H, 0, canvas.height);
+    dirt.addColorStop(0, '#7a5f42');
+    dirt.addColorStop(1, '#93744f');
+    ctx.fillStyle = dirt;
+    ctx.beginPath();
+    ctx.moveTo(backL.x, backL.y);
+    ctx.lineTo(backR.x, backR.y);
+    ctx.lineTo(frontR.x, frontR.y);
+    ctx.lineTo(frontL.x, frontL.y);
+    ctx.closePath();
+    ctx.fill();
+
+    // Stadium-light glow pooling on the dirt
+    const glowCenter = project(CENTER_X, canvas.height * 0.55);
+    const centerGlow = ctx.createRadialGradient(glowCenter.x, glowCenter.y, 0, glowCenter.x, glowCenter.y, 260 * glowCenter.scale);
+    centerGlow.addColorStop(0, 'rgba(255,245,210,0.18)');
+    centerGlow.addColorStop(1, 'rgba(255,245,210,0)');
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(backL.x, backL.y);
+    ctx.lineTo(backR.x, backR.y);
+    ctx.lineTo(frontR.x, frontR.y);
+    ctx.lineTo(frontL.x, frontL.y);
+    ctx.closePath();
+    ctx.clip();
+    ctx.fillStyle = centerGlow;
+    ctx.fillRect(0, STANDS_H, canvas.width, canvas.height - STANDS_H);
+    ctx.restore();
+
+    // Tire skid marks scarred into the dirt
+    SKID_MARKS.forEach(m => drawSkidMark(m.cx, m.cy, m.rx, m.ry, m.rot, 'rgba(40,30,20,0.35)', 3));
+
+    // Dirt berm mounded up in a thick oval ring just outside the driving area
+    const bermRx = ARENA_RX + BERM_THICKNESS / 2;
+    const bermRy = ARENA_RY + BERM_THICKNESS / 2;
+    ctx.beginPath();
+    for (let i = 0; i <= 48; i++) {
+        const a = (i / 48) * Math.PI * 2;
+        const wx = ARENA_CENTER.x + Math.cos(a) * bermRx;
+        const wy = ARENA_CENTER.y + Math.sin(a) * bermRy;
+        const bp = project(wx, wy);
+        if (i === 0) ctx.moveTo(bp.x, bp.y); else ctx.lineTo(bp.x, bp.y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = '#241708';
+    ctx.lineWidth = BERM_THICKNESS;
+    ctx.stroke();
+
+    // Lighter ridge along the top of the mound for a piled-dirt look
+    ctx.strokeStyle = 'rgba(140,105,65,0.4)';
+    ctx.lineWidth = BERM_THICKNESS * 0.4;
+    ctx.stroke();
+
+    // Foreground safety rail closest to the camera
+    ctx.strokeStyle = '#e8e8e8';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height - 14);
+    ctx.lineTo(canvas.width, canvas.height - 14);
+    ctx.stroke();
+    let postIndex = 0;
+    for (let x = 15; x < canvas.width; x += 90, postIndex++) {
+        ctx.fillStyle = postIndex % 3 === 0 ? '#c0392b' : '#333';
+        ctx.fillRect(x - 3, canvas.height - 24, 6, 24);
+    }
+
+    // Fire extinguisher hanging by the rail
+    ctx.fillStyle = '#c0392b';
+    ctx.fillRect(canvas.width - 90, canvas.height - 34, 10, 20);
+    ctx.fillStyle = '#222';
+    ctx.fillRect(canvas.width - 88, canvas.height - 38, 6, 4);
+}
+
+function gameLoop() {
+    drawArenaLayout();
+
+    // Only update active cars that have started entering
+    for (let i = 0; i <= enteringCarIndex && i < cars.length; i++) {
+        cars[i].update(cars);
+    }
+
+    if (gameState === 'ENTERING') {
+        checkAllCarsParked();
+    } else if (gameState === 'PLAYING') {
+        checkCollisions();
+        resolveOverlaps();
+    }
+
+    // Draw all cars, farthest first so nearer cars overlap correctly
+    [...cars].sort((a, b) => a.y - b.y).forEach(car => car.draw(ctx));
+
+    // Update HUD Values
+    let player = cars[0];
+    let aliveCars = cars.filter(c => !c.isDead).length;
+
+    healthBar.style.width = Math.max(0, player.health) + '%';
+    if (player.health < 30) healthBar.style.background = '#e74c3c';
+    else if (player.health < 60) healthBar.style.background = '#f1c40f';
+
+    carCountText.innerText = `CARS REMAINING: ${aliveCars}`;
+
+    if (gameState === 'PLAYING' && aliveCars <= 1) {
+        gameState = 'GAME_OVER';
+        const winner = cars.find(c => !c.isDead);
+        announcer.innerText = winner
+            ? (winner.isPlayer ? 'YOU WIN!' : `CAR #${winner.id} WINS!`)
+            : "IT'S A DRAW!";
+    }
+
+    // Scoreboard only needs to refresh a few times a second, not every frame
+    scoreboardFrameCount++;
+    if (scoreboardFrameCount % 10 === 0) updateScoreboard();
+
+    requestAnimationFrame(gameLoop);
+}
+
+let scoreboardFrameCount = 0;
+
+gameLoop();
+</script>
+</body>
+</html>
