@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wheeling Wilderness — Off-Road Trail Climber</title>
+<style>
+    html, body { touch-action: manipulation; }
+    * { box-sizing: border-box; user-select: none; }
+
+    :root {
+        --jeep-olive: #c7c94a;
+        --panel-bg: rgba(20, 30, 20, 0.55);
+        --panel-border: rgba(255, 255, 255, 0.18);
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        background: #d7ecdf;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        overflow: hidden;
+    }
+
+    .stage {
+        position: relative;
+        width: 900px;
+        height: 520px;
+        max-width: 100vw;
+        max-height: 100vh;
+        aspect-ratio: 900 / 520;
+        border-radius: 12px;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+        overflow: hidden;
+        background: #d7ecdf;
+    }
+
+    canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+    }
+
+    /* --- HUD --- */
+    .hud {
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 16px;
+        pointer-events: none;
+        font-family: 'Consolas', 'Courier New', monospace;
+    }
+
+    .hud-panel {
+        background: var(--panel-bg);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        padding: 8px 14px;
+        color: #f4f7f2;
+        backdrop-filter: blur(2px);
+    }
+
+    .hud-label {
+        font-size: 9px;
+        letter-spacing: 1px;
+        color: #d3ddca;
+        text-transform: uppercase;
+    }
+
+    .hud-value {
+        font-size: 18px;
+        font-weight: bold;
+        color: #fff;
+    }
+
+    .hud-right { text-align: right; }
+    .hud-center { text-align: center; min-width: 90px; }
+
+    .boost-bar {
+        width: 84px;
+        height: 7px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 4px;
+        overflow: hidden;
+        margin-top: 5px;
+    }
+    .boost-fill {
+        height: 100%;
+        width: 100%;
+        background: linear-gradient(90deg, #4fd0e0, #7effc0);
+    }
+    .boost-fill.empty { background: linear-gradient(90deg, #7a4444, #a35c5c); }
+
+    .hint {
+        position: absolute;
+        bottom: 12px;
+        left: 0; right: 0;
+        text-align: center;
+        color: rgba(30, 40, 25, 0.65);
+        font-size: 11px;
+        letter-spacing: 0.5px;
+        pointer-events: none;
+        font-family: 'Consolas', 'Courier New', monospace;
+        text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+    }
+
+    /* --- Touch controls --- */
+    .touch-controls {
+        position: absolute;
+        bottom: 14px;
+        left: 0;
+        right: 0;
+        display: none;
+        justify-content: space-between;
+        padding: 0 18px;
+        pointer-events: none;
+    }
+    .touch-btn {
+        pointer-events: auto;
+        width: 74px;
+        height: 74px;
+        border-radius: 50%;
+        background: rgba(20, 30, 20, 0.45);
+        border: 1px solid rgba(255,255,255,0.3);
+        color: #fff;
+        font-size: 26px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .touch-btn:active { background: rgba(20, 30, 20, 0.7); }
+
+    @media (hover: none) and (pointer: coarse) {
+        .touch-controls { display: flex; }
+        .hint { display: none; }
+    }
+
+    /* --- Overlays --- */
+    .overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background: rgba(20, 25, 18, 0.55);
+        text-align: center;
+        color: #f4f7f2;
+        transition: opacity 0.25s ease;
+    }
+
+    .overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .overlay h1 {
+        margin: 0 0 6px 0;
+        font-size: 34px;
+        letter-spacing: 1px;
+        color: #fff;
+        text-shadow: 0 0 20px rgba(199, 201, 74, 0.6);
+    }
+
+    .go-btn {
+        background: linear-gradient(180deg, #dede6a, var(--jeep-olive));
+        border: none;
+        color: #2c2c10;
+        font-weight: bold;
+        font-size: 15px;
+        letter-spacing: 1px;
+        padding: 12px 34px;
+        border-radius: 30px;
+        cursor: pointer;
+        box-shadow: 0 6px 18px rgba(199, 201, 74, 0.4);
+    }
+    .go-btn:hover { filter: brightness(1.08); }
+
+    .crash-title {
+        color: #ff6b5b;
+        text-shadow: 0 0 20px rgba(255, 107, 91, 0.6);
+    }
+
+    .stat-row {
+        display: flex;
+        gap: 30px;
+        margin-bottom: 22px;
+    }
+    .stat-box { text-align: center; }
+    .stat-box .n { font-size: 26px; font-weight: bold; color: #fff; }
+    .stat-box .l { font-size: 10px; letter-spacing: 1.5px; color: #d3ddca; text-transform: uppercase; }
+
+    .flash {
+        position: absolute;
+        inset: 0;
+        background: #fff;
+        opacity: 0;
+        pointer-events: none;
+    }
+</style>
+</head>
+<body>
+
+    <div class="stage" id="stage">
+        <canvas id="gameCanvas" width="900" height="520"></canvas>
+        <div class="flash" id="flash"></div>
+
+        <div class="hud">
+            <div class="hud-panel">
+                <div class="hud-label">Distance</div>
+                <div class="hud-value"><span id="distanceVal">0</span> m</div>
+            </div>
+            <div class="hud-panel hud-center">
+                <div class="hud-label">Coins</div>
+                <div class="hud-value"><span id="coinVal">0</span></div>
+                <div class="boost-bar"><div class="boost-fill" id="boostFill"></div></div>
+            </div>
+            <div class="hud-panel hud-right">
+                <div class="hud-label">Best</div>
+                <div class="hud-value"><span id="bestVal">0</span> m</div>
+            </div>
+        </div>
+
+        <div class="hint">&rarr; gas &nbsp;&middot;&nbsp; &larr; brake / reverse &nbsp;&middot;&nbsp; SPACE to boost off a ramp &nbsp;&middot;&nbsp; time it right to reach the coins</div>
+
+        <div class="touch-controls">
+            <div class="touch-btn" id="brakeBtn">&larr;</div>
+            <div class="touch-btn" id="boostBtn">&#9889;</div>
+            <div class="touch-btn" id="gasBtn">&rarr;</div>
+        </div>
+
+        <div class="overlay hidden" id="crashScreen">
+            <h1 class="crash-title">STUCK IN THE MUD</h1>
+            <div class="stat-row">
+                <div class="stat-box"><div class="n" id="finalDist">0</div><div class="l">Meters</div></div>
+                <div class="stat-box"><div class="n" id="bestDist">0</div><div class="l">Best</div></div>
+            </div>
+            <button class="go-btn" id="retryBtn">RETRY</button>
+        </div>
+    </div>
+
+<script>
+(function () {
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+
+    const distanceVal = document.getElementById('distanceVal');
+    const bestVal = document.getElementById('bestVal');
+    const coinVal = document.getElementById('coinVal');
+    const boostFill = document.getElementById('boostFill');
+    const crashScreen = document.getElementById('crashScreen');
+    const retryBtn = document.getElementById('retryBtn');
+    const finalDist = document.getElementById('finalDist');
+    const bestDistEl = document.getElementById('bestDist');
+    const flashEl = document.getElementById('flash');
+    const gasBtn = document.getElementById('gasBtn');
+    const brakeBtn = document.getElementById('brakeBtn');
+    const boostBtn = document.getElementById('boostBtn');
+
+    // ---------------------------------------------------------------
+    // Constants
+    // ---------------------------------------------------------------
+    const GROUND_BASE = 340;
+    const WHEEL_RADIUS = 26;
+    const HALF_WHEELBASE = 50; // rear/front wheel offset from the chassis center
+    const RIDE_LIFT = 30; // how high the body rides above the axle line
+    const SCALE = 10; // world px per "meter"
+    const CAMERA_MARGIN = 100; // keep the jeep at least this far from the top/bottom edge
+    const GROUND_BOTTOM_MARGIN = 60; // the ground below the jeep must always stay at least this far from the bottom edge
+
+    // Truck body layout, in the chassis's own local space (x: rear-to-front,
+    // y: up-negative, both around the axle line before the ride-lift
+    // offset). Shared by the drawing code and the coin-collision check so
+    // "any part of the truck" always matches what's actually drawn.
+    const BODY_REAR = -90, BODY_FRONT = 80;
+    const BELT = -32, FLOOR = -6; // beltline / rocker height, shared by hood, doors and bed
+    const CAB_REAR = -18, CAB_FRONT = 22, ROOF = -70, ROOF_FRONT = 6;
+    const TRUCK_TOP = ROOF - RIDE_LIFT;   // roof height, in axle-line space
+    const TRUCK_BOTTOM = WHEEL_RADIUS;     // wheel-bottom height, in axle-line space
+
+    const MAX_SPEED = 7.0;
+    const MAX_REVERSE_SPEED = 3.6;
+    const BOOST_MAX_SPEED = 12.5; // speed ceiling while actively boosting
+    const BOOST_FORCE = 0.55; // extra forward force on top of normal throttle
+    const BOOST_METER_MAX = 100;
+    const BOOST_DRAIN = 0.18; // per physics substep while actively boosting — full meter lasts a bit over a second
+    const BOOST_REGEN = 0.05; // per substep while not boosting — a few seconds to refill
+
+    const GRAVITY = 0.32;
+
+    // Hill-Climb-style rigid body: each wheel is an independent spring against
+    // the terrain, and the chassis's rotation is a real physical consequence
+    // of those spring forces (and their lever arms) — never scripted to match
+    // the slope. The gas pedal applies engine torque directly to the chassis
+    // (not just the wheels), which is what causes the classic "gas makes you
+    // wheelie" feel, and that same torque keeps working when you're airborne,
+    // so gas/brake also control your rotation mid-flight.
+    const INERTIA = 620;
+    const MAX_COMPRESS = 14; // suspension travel pushed in
+    const MAX_DROOP = 20; // suspension travel drooped out (keeps wheels grounded over dips)
+    const SPRING_K = 2.4;
+    const SPRING_DAMP = 0.85;
+    const MAX_DAMP_RATE = 8; // caps how much a single hard, fast impact can spike the
+    // damper force — without this, a wheel that compresses very quickly (a hard
+    // landing) computes an enormous instantaneous rate of change, which blows the
+    // spring force up to 5-10x its normal max and launches/spins the jeep
+    // unrealistically. Capping it means an impact gets absorbed by the suspension
+    // instead of catapulting or flinging the chassis.
+    const DRIVE_FORCE = 0.38;
+    const ENGINE_TORQUE = 3.1; // wheelie torque while a wheel is on the ground
+    const ROLL_FRICTION = 0.05; // gentle coast-down friction when off the throttle
+    const ANGULAR_DAMPING_GROUND = 0.85; // tires/suspension resist rotation
+    const ANGULAR_DAMPING_AIR = 0.995; // floaty, slow tumble in the air
+    const PHYSICS_SUBSTEPS = 8; // the spring is stiff enough that it needs finer integration steps than one per frame to stay stable
+
+    // Airborne is entirely auto-level — no manual pitch control. This is a
+    // spring-damper pulling the chassis back toward upright (angle 0), so it
+    // naturally rights itself and comes down on its wheels.
+    const AUTO_LEVEL_STIFFNESS = 15;
+    const AUTO_LEVEL_DAMPING = 170;
+
+    const CRASH_FLIP_ANGLE = 2.55; // radians (~146deg) — genuinely upside down, not just past 90
+
+    // ---------------------------------------------------------------
+    // Deterministic pseudo-random helpers (stable terrain / decor)
+    // ---------------------------------------------------------------
+    function hash(n) {
+        const x = Math.sin(n * 12.9898) * 43758.5453;
+        return x - Math.floor(x);
+    }
+
+    function smoothstep(p) { return p * p * (3 - 2 * p); }
+
+    const JUMP_PERIOD = 480;
+    const JUMP_PHASE = 300; // shift so the first ramp is well past the spawn point
+
+    // One source of truth for "which jump slot is this x in, and what does
+    // it look like" — jumpRamp() (the physical terrain) and the coin
+    // placer both need the same per-slot shape, so a mismatch here would
+    // put a coin over the wrong ramp.
+    function jumpSlotAt(x) {
+        const shifted = x + JUMP_PHASE;
+        const idx = Math.floor(shifted / JUMP_PERIOD);
+        const t = shifted - idx * JUMP_PERIOD;
+        // three independent hashes per slot → height, ramp-up length and
+        // launch-face steepness all vary separately, so jumps range from
+        // small mellow bumps to long ramps into big steep launches
+        const hH = hash(idx * 12.9898 + 3.1);
+        const hW = hash(idx * 7.233 + 8.7);
+        const hD = hash(idx * 5.117 + 1.9);
+        return {
+            idx, t,
+            slotStartX: idx * JUMP_PERIOD - JUMP_PHASE,
+            rampHeight: 24 + hH * 52,   // 24–76: hop vs. big air
+            upWidth: 80 + hW * 110,     // 80–190: short punchy vs. long runway
+            downWidth: 14 + hD * 34     // 14–48: knife-edge vs. mellow launch face
+        };
+    }
+
+    function jumpRamp(x) {
+        // a real ramp: a gentle, driveable climb up to a peak, then a short,
+        // steeper launch face down the other side. Both faces are smoothstep
+        // curves, so the slope is continuous everywhere (no knife-edge
+        // discontinuity) — it reads as a wedge you drive up, not a cliff.
+        const s = jumpSlotAt(x);
+        if (s.t < s.upWidth) {
+            return s.rampHeight * smoothstep(s.t / s.upWidth);
+        }
+        const t2 = s.t - s.upWidth;
+        if (t2 < s.downWidth) {
+            return s.rampHeight * (1 - smoothstep(t2 / s.downWidth));
+        }
+        return 0;
+    }
+
+    function terrainHeight(x) {
+        return GROUND_BASE
+            + Math.sin(x * 0.0032 + 1.4) * 38   // big rolling trail hills
+            - jumpRamp(x)                        // subtract: canvas y grows downward, so this is what pokes the ramp up out of the ground instead of digging a pit
+            + Math.sin(x * 0.018 + 2.1) * 3;      // small dirt texture
+    }
+
+    function terrainAngle(x) {
+        const eps = 2;
+        const dy = terrainHeight(x + eps) - terrainHeight(x - eps);
+        return Math.atan2(dy, eps * 2);
+    }
+
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function normalizeAngle(a) {
+        while (a > Math.PI) a -= Math.PI * 2;
+        while (a < -Math.PI) a += Math.PI * 2;
+        return a;
+    }
+
+    // A coin over roughly 60% of jumps, hanging above the ramp's peak at a
+    // height that varies per coin — some are a quick hop, some need a full
+    // boosted run-up, so it's never obvious in advance how much speed a
+    // given one is worth.
+    function coinInfoForSlot(idx) {
+        if (hash(idx * 4.41 + 9.9) <= 0.4) return null;
+        const hW = hash(idx * 7.233 + 8.7);
+        const slotStartX = idx * JUMP_PERIOD - JUMP_PHASE;
+        const upWidth = 80 + hW * 110;
+        const peakX = slotStartX + upWidth;
+        const pastLip = 18 + hash(idx * 6.6 + 4.4) * 45; // how far past the takeoff lip
+        const lift = 50 + hash(idx * 8.8 + 2.2) * 75;     // how high above the peak — the randomness in the challenge
+        const coinX = peakX + pastLip;
+        return { idx, x: coinX, y: terrainHeight(peakX) - lift, r: 11 };
+    }
+
+    // ---------------------------------------------------------------
+    // Game state
+    // ---------------------------------------------------------------
+    let best = 0;
+    try { best = parseFloat(localStorage.getItem('wheelingWildernessBest') || '0'); } catch (e) {}
+
+    const input = { left: false, right: false, boost: false };
+    let state = 'playing'; // playing | crashed
+    let elapsed = 0;
+
+    let jeep, camera, particles, screenShake, lastTime, accumulator;
+    let coins, spawnedCoinIdx, coinScore;
+
+    function resetGame() {
+        const startX = 120;
+        const startAngle = terrainAngle(startX);
+        const startY = terrainHeight(startX) - WHEEL_RADIUS;
+        jeep = {
+            worldX: startX,
+            y: startY,
+            vx: 0,
+            vy: 0,
+            angle: startAngle,
+            angVel: 0,
+            grounded: true,
+            wheelSpin: 0,
+            frontComp: 0,
+            rearComp: 0,
+            // raw per-wheel suspension compression, pre-seeded to the actual
+            // starting compression so the first physics step doesn't see a
+            // spurious damper spike from comparing against an unseeded 0
+            rearRaw: 0,
+            frontRaw: 0,
+            boostMeter: BOOST_METER_MAX,
+            speedCap: MAX_SPEED
+        };
+        const cosA0 = Math.cos(startAngle), sinA0 = Math.sin(startAngle);
+        [['rearRaw', -HALF_WHEELBASE], ['frontRaw', HALF_WHEELBASE]].forEach(([key, lx]) => {
+            const mwx = startX + cosA0 * lx;
+            const mwy = startY + sinA0 * lx;
+            jeep[key] = findWheelCompression(mwx, mwy, cosA0, sinA0).comp;
+        });
+        camera = { x: 0, y: 0 };
+        particles = [];
+        coins = [];
+        spawnedCoinIdx = new Set();
+        coinScore = 0;
+        coinVal.textContent = '0';
+        screenShake = 0;
+        lastTime = performance.now();
+        accumulator = 0;
+        bestVal.textContent = Math.floor(best);
+    }
+
+    // ---------------------------------------------------------------
+    // Coins — spawned deterministically from the same jump slots the
+    // terrain uses, so a coin always lines up with a specific ramp
+    // ---------------------------------------------------------------
+    function ensureCoinsSpawned() {
+        const idxStart = Math.floor((camera.x - 500 + JUMP_PHASE) / JUMP_PERIOD);
+        const idxEnd = Math.floor((camera.x + W + 500 + JUMP_PHASE) / JUMP_PERIOD);
+        for (let idx = idxStart; idx <= idxEnd; idx++) {
+            if (spawnedCoinIdx.has(idx)) continue;
+            spawnedCoinIdx.add(idx);
+            const info = coinInfoForSlot(idx);
+            if (info) coins.push(Object.assign({ collected: false }, info));
+        }
+        for (let i = coins.length - 1; i >= 0; i--) {
+            if (coins[i].x < camera.x - 600) coins.splice(i, 1);
+        }
+    }
+
+    const COIN_COLLECT_PAD = 8; // a little grace beyond the coin's own radius, so a graze still counts
+
+    // True if the coin overlaps ANY part of the truck's silhouette — not
+    // just its center. Rotates the coin into the chassis's own local frame
+    // (same convention as the wheel/suspension math above) and measures to
+    // the nearest point on the truck's bounding box, so the wheels (out at
+    // +-HALF_WHEELBASE) and the roof (up at TRUCK_TOP) count exactly like
+    // the body does.
+    function coinHitsTruck(c) {
+        const dx = c.x - jeep.worldX, dy = c.y - jeep.y;
+        const cosA = Math.cos(jeep.angle), sinA = Math.sin(jeep.angle);
+        const localX = dx * cosA + dy * sinA;
+        const localY = -dx * sinA + dy * cosA;
+        const nx = clamp(localX, BODY_REAR, BODY_FRONT);
+        const ny = clamp(localY, TRUCK_TOP, TRUCK_BOTTOM);
+        const ddx = localX - nx, ddy = localY - ny;
+        const reach = c.r + COIN_COLLECT_PAD;
+        return ddx * ddx + ddy * ddy < reach * reach;
+    }
+
+    function checkCoinCollection() {
+        for (const c of coins) {
+            if (c.collected) continue;
+            if (coinHitsTruck(c)) {
+                c.collected = true;
+                coinScore++;
+                coinVal.textContent = coinScore;
+                for (let i = 0; i < 10; i++) {
+                    particles.push({
+                        x: c.x, y: c.y,
+                        vx: (Math.random() - 0.5) * 4,
+                        vy: -Math.random() * 4 - 1,
+                        life: 25 + Math.random() * 15,
+                        size: 1.5 + Math.random() * 2,
+                        color: '#f4c542'
+                    });
+                }
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Input
+    // ---------------------------------------------------------------
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') { input.left = true; e.preventDefault(); }
+        if (e.code === 'ArrowRight' || e.code === 'KeyD') { input.right = true; e.preventDefault(); }
+        if (e.code === 'Space') { input.boost = true; e.preventDefault(); }
+        if (e.code === 'KeyR' && state === 'crashed') startGame();
+    });
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') input.left = false;
+        if (e.code === 'ArrowRight' || e.code === 'KeyD') input.right = false;
+        if (e.code === 'Space') input.boost = false;
+    });
+
+    function bindHold(el, onDown, onUp) {
+        el.addEventListener('pointerdown', (e) => { e.preventDefault(); onDown(); });
+        el.addEventListener('pointerup', onUp);
+        el.addEventListener('pointerleave', onUp);
+        el.addEventListener('pointercancel', onUp);
+    }
+    bindHold(gasBtn, () => { input.right = true; }, () => { input.right = false; });
+    bindHold(brakeBtn, () => { input.left = true; }, () => { input.left = false; });
+    bindHold(boostBtn, () => { input.boost = true; }, () => { input.boost = false; });
+
+    retryBtn.addEventListener('click', startGame);
+
+    function startGame() {
+        if (state === 'playing') return;
+        resetGame();
+        state = 'playing';
+        crashScreen.classList.add('hidden');
+    }
+
+    function crash() {
+        state = 'crashed';
+        screenShake = 18;
+        flashEl.style.transition = 'none';
+        flashEl.style.opacity = '0.85';
+        requestAnimationFrame(() => {
+            flashEl.style.transition = 'opacity 0.4s ease';
+            flashEl.style.opacity = '0';
+        });
+
+        const dist = Math.floor(jeep.worldX / SCALE);
+        if (dist > best) {
+            best = dist;
+            try { localStorage.setItem('wheelingWildernessBest', String(best)); } catch (e) {}
+        }
+        finalDist.textContent = dist;
+        bestDistEl.textContent = Math.floor(best);
+        bestVal.textContent = Math.floor(best);
+        crashScreen.classList.remove('hidden');
+
+        // tumbling debris
+        for (let i = 0; i < 16; i++) {
+            particles.push({
+                x: jeep.worldX, y: jeep.y,
+                vx: (Math.random() - 0.5) * 6,
+                vy: -Math.random() * 6 - 1,
+                life: 40 + Math.random() * 20,
+                size: 2 + Math.random() * 3,
+                color: Math.random() < 0.5 ? '#8a5a2e' : '#5f636b'
+            });
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Update
+    // ---------------------------------------------------------------
+    const WHEEL_MOUNTS = [
+        { key: 'rearRaw', lx: -HALF_WHEELBASE },
+        { key: 'frontRaw', lx: HALF_WHEELBASE }
+    ];
+
+    // Finds how compressed/drooped a wheel's suspension is by searching along
+    // the chassis's actual local-down direction for where it crosses the
+    // terrain surface. A simple gap/cos(angle) projection blows up near 90°
+    // (dividing by ~0) and falsely reports wheels as "touching" when the
+    // jeep is just spinning sideways in the air — this bisection works
+    // correctly at any orientation, including upside down.
+    function wheelGap(mountWX, mountWY, cosA, sinA, d) {
+        const px = mountWX - sinA * d;
+        const py = mountWY + cosA * d;
+        return (terrainHeight(px) - WHEEL_RADIUS) - py;
+    }
+
+    function findWheelCompression(mountWX, mountWY, cosA, sinA) {
+        const dMin = -MAX_COMPRESS, dMax = MAX_DROOP;
+        const gapAtMin = wheelGap(mountWX, mountWY, cosA, sinA, dMin);
+        const gapAtMax = wheelGap(mountWX, mountWY, cosA, sinA, dMax);
+
+        if (gapAtMin <= 0) return { touching: true, comp: MAX_COMPRESS }; // bottomed out
+        if (gapAtMax > 0) return { touching: false, comp: -MAX_DROOP }; // never reaches the ground
+
+        // gap changes sign somewhere in [dMin, dMax] — bisect to find it
+        let lo = dMin, hi = dMax;
+        for (let i = 0; i < 8; i++) {
+            const mid = (lo + hi) / 2;
+            const g = wheelGap(mountWX, mountWY, cosA, sinA, mid);
+            if (g > 0) lo = mid; else hi = mid;
+        }
+        const d = (lo + hi) / 2;
+        return { touching: true, comp: clamp(-d, -MAX_DROOP, MAX_COMPRESS) };
+    }
+
+    // One physics substep: real spring forces at each wheel, real torque
+    // from their lever arms, real engine-reaction torque from the throttle.
+    // Nothing here scripts the chassis toward the terrain slope — rotation
+    // is entirely a consequence of the forces below, the same way a
+    // suspension-and-wheelie-driven game like Hill Climb Racing works.
+    function physicsSubstep(sdt) {
+        const cosA = Math.cos(jeep.angle), sinA = Math.sin(jeep.angle);
+
+        let netFx = 0, netFy = GRAVITY;
+        let netT = 0;
+        let anyTouch = false;
+
+        for (const wheel of WHEEL_MOUNTS) {
+            const mwx = jeep.worldX + cosA * wheel.lx;
+            const mwy = jeep.y + sinA * wheel.lx;
+            const { touching, comp } = findWheelCompression(mwx, mwy, cosA, sinA);
+            if (touching) anyTouch = true;
+
+            const rate = clamp((comp - jeep[wheel.key]) / sdt, -MAX_DAMP_RATE, MAX_DAMP_RATE);
+            const forceMag = touching ? Math.max(0, SPRING_K * comp + SPRING_DAMP * rate) : 0;
+            jeep[wheel.key] = comp;
+
+            netFy -= forceMag;
+            netT += -(mwx - jeep.worldX) * forceMag;
+        }
+
+        // boost only ever applies while a wheel is actually driving (same
+        // rule as the throttle) — it's meant to be spent building speed
+        // into a ramp, not as a free mid-air height cheat
+        let boosting = false;
+        if (anyTouch) {
+            if (input.right && !input.left) {
+                netFx += DRIVE_FORCE * cosA;
+                netFy += DRIVE_FORCE * sinA;
+                netT += -ENGINE_TORQUE;
+                if (input.boost && jeep.boostMeter > 0) {
+                    boosting = true;
+                    netFx += BOOST_FORCE * cosA;
+                    netFy += BOOST_FORCE * sinA;
+                    jeep.boostMeter = Math.max(0, jeep.boostMeter - BOOST_DRAIN);
+                }
+            } else if (input.left && !input.right) {
+                netFx -= DRIVE_FORCE * cosA;
+                netFy -= DRIVE_FORCE * sinA;
+                netT += ENGINE_TORQUE;
+            } else if (jeep.vx !== 0) {
+                netFx -= Math.sign(jeep.vx) * ROLL_FRICTION;
+            }
+        } else {
+            // auto-level: a spring-damper pulling the chassis back toward
+            // upright, so it rights itself and lands on its wheels without
+            // any input — gas/brake have no effect while airborne
+            const levelError = normalizeAngle(jeep.angle);
+            netT += -AUTO_LEVEL_STIFFNESS * levelError - AUTO_LEVEL_DAMPING * jeep.angVel;
+        }
+        if (!boosting) {
+            jeep.boostMeter = Math.min(BOOST_METER_MAX, jeep.boostMeter + BOOST_REGEN);
+        }
+
+        jeep.vx += netFx * sdt;
+        jeep.vy += netFy * sdt;
+        jeep.angVel += (netT / INERTIA) * sdt;
+
+        const angDamp = anyTouch ? ANGULAR_DAMPING_GROUND : ANGULAR_DAMPING_AIR;
+        jeep.angVel *= Math.pow(angDamp, sdt);
+
+        // the speed ceiling itself eases toward its target instead of
+        // snapping, so easing off the boost bleeds speed off smoothly
+        // rather than hitting an instant wall
+        const targetCap = boosting ? BOOST_MAX_SPEED : MAX_SPEED;
+        jeep.speedCap = lerp(jeep.speedCap, targetCap, 0.06);
+        jeep.vx = clamp(jeep.vx, -MAX_REVERSE_SPEED, jeep.speedCap);
+
+        jeep.worldX += jeep.vx * sdt;
+        jeep.y += jeep.vy * sdt;
+        jeep.angle += jeep.angVel * sdt;
+
+        return anyTouch;
+    }
+
+    function update(dt) {
+        const wasGrounded = jeep.grounded;
+        let anyTouch = jeep.grounded;
+        const sdt = dt / PHYSICS_SUBSTEPS;
+
+        for (let i = 0; i < PHYSICS_SUBSTEPS; i++) {
+            anyTouch = physicsSubstep(sdt);
+
+            // crash only when a wheel is actually touching the ground AND
+            // the jeep is upside down — any other landing, however hard or
+            // steep, just bounces on the suspension
+            if (anyTouch && Math.abs(normalizeAngle(jeep.angle)) > CRASH_FLIP_ANGLE) {
+                crash();
+                return;
+            }
+        }
+
+        jeep.grounded = anyTouch;
+        jeep.wheelSpin += jeep.vx * 0.11 * dt;
+
+        // just touched down — a little screen shake proportional to impact
+        if (anyTouch && !wasGrounded) {
+            screenShake = Math.max(screenShake, Math.min(8, Math.abs(jeep.vy)));
+        }
+
+        // dust while driving on the ground
+        if (anyTouch && Math.abs(jeep.vx) > 0.5 && Math.random() < 0.5) {
+            particles.push({
+                x: jeep.worldX - Math.sign(jeep.vx) * HALF_WHEELBASE,
+                y: terrainHeight(jeep.worldX) - 3,
+                vx: -jeep.vx * 0.3 + (Math.random() - 0.5),
+                vy: -Math.random() * 1.2,
+                life: 20 + Math.random() * 10,
+                size: 1.5 + Math.random() * 2,
+                color: 'rgba(138,90,46,0.5)'
+            });
+        }
+
+        // visual wheel offsets mirror the real physics compression directly
+        jeep.rearComp = -jeep.rearRaw;
+        jeep.frontComp = -jeep.frontRaw;
+
+        // particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vy += 0.12 * dt;
+            p.life -= dt;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        camera.x = jeep.worldX - 260;
+
+        ensureCoinsSpawned();
+        checkCoinCollection();
+        boostFill.style.width = (jeep.boostMeter / BOOST_METER_MAX * 100) + '%';
+        boostFill.classList.toggle('empty', jeep.boostMeter < BOOST_METER_MAX * 0.15);
+
+        // vertical camera: drifts back to the normal ground-level framing
+        // whenever there's slack, but is hard-clamped so the jeep can
+        // never leave the safe viewing band — a soft lerp alone can't
+        // guarantee this because a fast ascent/descent keeps moving the
+        // target faster than the lerp closes the gap. The ground directly
+        // below the jeep is a second, independent floor so it's always
+        // still visible near the bottom of the screen while airborne, even
+        // if that means the jeep itself sits higher up the frame.
+        camera.y += (0 - camera.y) * clamp(0.06 * dt, 0, 1);
+        const groundHere = terrainHeight(jeep.worldX);
+        const minCameraY = Math.max(
+            jeep.y - (H - CAMERA_MARGIN),
+            groundHere - (H - GROUND_BOTTOM_MARGIN)
+        );
+        camera.y = clamp(camera.y, minCameraY, jeep.y - CAMERA_MARGIN);
+
+        if (screenShake > 0) screenShake = Math.max(0, screenShake - dt * 0.8);
+
+        distanceVal.textContent = Math.floor(jeep.worldX / SCALE);
+    }
+
+    // ---------------------------------------------------------------
+    // Drawing
+    // ---------------------------------------------------------------
+    function drawPineTree(sx, sy, scale, color) {
+        ctx.fillStyle = color;
+        const tiers = 3;
+        for (let i = 0; i < tiers; i++) {
+            const tw = (34 - i * 9) * scale;
+            const th = 26 * scale;
+            const ty = sy - i * 20 * scale;
+            ctx.beginPath();
+            ctx.moveTo(sx, ty - th);
+            ctx.lineTo(sx - tw / 2, ty);
+            ctx.lineTo(sx + tw / 2, ty);
+            ctx.closePath();
+            ctx.fill();
+        }
+        ctx.fillRect(sx - 3 * scale, sy - 4 * scale, 6 * scale, 10 * scale);
+    }
+
+    function drawBird(sx, sy, phase) {
+        const flap = Math.sin(phase) * 6;
+        ctx.strokeStyle = 'rgba(31, 74, 64, 0.75)';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(sx - 9, sy + flap);
+        ctx.quadraticCurveTo(sx - 3, sy - 6, sx, sy);
+        ctx.quadraticCurveTo(sx + 3, sy - 6, sx + 9, sy + flap);
+        ctx.stroke();
+    }
+
+    function drawSky() {
+        const grad = ctx.createLinearGradient(0, 0, 0, H);
+        grad.addColorStop(0, '#cdeade');
+        grad.addColorStop(0.55, '#eaf0d3');
+        grad.addColorStop(1, '#f7edc4');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+
+        // birds (gentle parallax + flap)
+        const birdParallax = camera.x * 0.15;
+        const birdSpots = [
+            { bx: 260, by: 90, ph: 0 },
+            { bx: 150, by: 130, ph: 1.4 },
+            { bx: 340, by: 60, ph: 2.6 }
+        ];
+        for (const b of birdSpots) {
+            const sx = ((b.bx - birdParallax) % (W + 80) + (W + 80)) % (W + 80) - 40;
+            drawBird(sx, b.by, elapsed * 0.006 + b.ph);
+        }
+
+        // distant tree ridge (far parallax layer)
+        const farOffset = camera.x * 0.2;
+        const farSpacing = 110;
+        const farStart = Math.floor(farOffset / farSpacing) - 1;
+        const farEnd = Math.floor((farOffset + W) / farSpacing) + 1;
+        for (let b = farStart; b <= farEnd; b++) {
+            const wx = b * farSpacing + hash(b) * 30;
+            const sx = wx - farOffset;
+            if (sx < -40 || sx > W + 40) continue;
+            drawPineTree(sx, 300, 0.85 + hash(b * 3.3) * 0.25, '#3f7a68');
+        }
+
+        // near tree cluster (near parallax layer)
+        const nearOffset = camera.x * 0.45;
+        const nearSpacing = 150;
+        const nearStart = Math.floor(nearOffset / nearSpacing) - 1;
+        const nearEnd = Math.floor((nearOffset + W) / nearSpacing) + 1;
+        for (let b = nearStart; b <= nearEnd; b++) {
+            const wx = b * nearSpacing + hash(b * 1.7) * 40;
+            const sx = wx - nearOffset;
+            if (sx < -50 || sx > W + 50) continue;
+            drawPineTree(sx, 320, 1.1 + hash(b * 5.1) * 0.3, '#245a4a');
+        }
+    }
+
+    function drawTerrain() {
+        ctx.beginPath();
+        ctx.moveTo(0, H);
+        for (let sx = 0; sx <= W; sx += 5) {
+            const wx = camera.x + sx;
+            ctx.lineTo(sx, terrainHeight(wx) - camera.y);
+        }
+        ctx.lineTo(W, H);
+        ctx.closePath();
+        const g = ctx.createLinearGradient(0, GROUND_BASE - 90, 0, H);
+        g.addColorStop(0, '#a8703f');
+        g.addColorStop(0.35, '#8a5a2e');
+        g.addColorStop(1, '#5c3a1c');
+        ctx.fillStyle = g;
+        ctx.fill();
+
+        // rim highlight
+        ctx.beginPath();
+        for (let sx = 0; sx <= W; sx += 5) {
+            const wx = camera.x + sx;
+            const y = terrainHeight(wx) - camera.y;
+            if (sx === 0) ctx.moveTo(sx, y); else ctx.lineTo(sx, y);
+        }
+        ctx.strokeStyle = 'rgba(255,220,170,0.35)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // scrub tufts / pebbles (deterministic by world bucket)
+        const spacing = 65;
+        const startBucket = Math.floor(camera.x / spacing) - 1;
+        const endBucket = Math.floor((camera.x + W) / spacing) + 1;
+        for (let b = startBucket; b <= endBucket; b++) {
+            const wx = b * spacing + hash(b) * spacing;
+            const sx = wx - camera.x;
+            if (sx < -30 || sx > W + 30) continue;
+            const wy = terrainHeight(wx) - camera.y;
+            if (hash(b * 5.7) > 0.55) {
+                // little tuft of grass
+                ctx.strokeStyle = 'rgba(90,120,50,0.6)';
+                ctx.lineWidth = 1.5;
+                for (let k = -1; k <= 1; k++) {
+                    ctx.beginPath();
+                    ctx.moveTo(sx + k * 3, wy);
+                    ctx.lineTo(sx + k * 3 + k * 2, wy - 8);
+                    ctx.stroke();
+                }
+            } else {
+                const size = 2 + hash(b * 3.3) * 4;
+                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                ctx.beginPath();
+                ctx.ellipse(sx, wy - size * 0.2, size, size * 0.6, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+    }
+
+    function drawParticles() {
+        for (const p of particles) {
+            const sx = p.x - camera.x;
+            const sy = p.y - camera.y;
+            ctx.globalAlpha = clamp(p.life / 25, 0, 1);
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(sx, sy, p.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    function drawCoins() {
+        for (const c of coins) {
+            if (c.collected) continue;
+            const sx = c.x - camera.x;
+            if (sx < -30 || sx > W + 30) continue;
+            const sy = c.y - camera.y + Math.sin(elapsed * 0.004 + c.idx) * 3; // gentle bob
+            const spin = elapsed * 0.006 + c.idx * 1.7;
+            const squash = Math.max(Math.abs(Math.cos(spin)), 0.16); // spin illusion via squash/stretch
+
+            ctx.save();
+            ctx.translate(sx, sy);
+            ctx.shadowColor = 'rgba(244,197,66,0.7)';
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = '#f4c542';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, c.r * squash, c.r, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = '#c98f1e';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            if (squash > 0.45) {
+                ctx.fillStyle = 'rgba(255,255,255,0.55)';
+                ctx.beginPath();
+                ctx.ellipse(-c.r * squash * 0.3, -c.r * 0.3, c.r * squash * 0.25, c.r * 0.22, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+    }
+
+    function drawWheel(cx, cy, spin) {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath(); ctx.ellipse(0, WHEEL_RADIUS + 2, WHEEL_RADIUS * 0.9, 4, 0, 0, Math.PI * 2); ctx.fill();
+
+        ctx.fillStyle = '#1c1c1c';
+        ctx.beginPath(); ctx.arc(0, 0, WHEEL_RADIUS, 0, Math.PI * 2); ctx.fill();
+
+        // chunky off-road tread
+        ctx.rotate(spin);
+        ctx.strokeStyle = '#0c0c0c';
+        ctx.lineWidth = 3;
+        for (let i = 0; i < 8; i++) {
+            const a = i * (Math.PI * 2 / 8);
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(a) * (WHEEL_RADIUS - 2), Math.sin(a) * (WHEEL_RADIUS - 2));
+            ctx.lineTo(Math.cos(a) * WHEEL_RADIUS, Math.sin(a) * WHEEL_RADIUS);
+            ctx.stroke();
+        }
+
+        // black TRD-style alloy hub, with spokes instead of a flat disc
+        ctx.fillStyle = '#2b2d31';
+        ctx.beginPath(); ctx.arc(0, 0, WHEEL_RADIUS * 0.42, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#0c0c0c';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.fillStyle = '#111214';
+        for (let i = 0; i < 5; i++) {
+            const a = i * (Math.PI * 2 / 5);
+            const x1 = Math.cos(a) * WHEEL_RADIUS * 0.14, y1 = Math.sin(a) * WHEEL_RADIUS * 0.14;
+            const x2 = Math.cos(a) * WHEEL_RADIUS * 0.4, y2 = Math.sin(a) * WHEEL_RADIUS * 0.4;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.lineWidth = 2.4;
+            ctx.strokeStyle = '#4a4d52';
+            ctx.stroke();
+        }
+        ctx.fillStyle = '#55585e';
+        ctx.beginPath(); ctx.arc(0, 0, WHEEL_RADIUS * 0.1, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+    }
+
+    function drawSuspensionArm(mountX, mountY, wheelX, wheelY) {
+        ctx.strokeStyle = '#3a3d38';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(mountX, mountY); ctx.lineTo(wheelX, wheelY); ctx.stroke();
+    }
+
+    function drawJeep(x, y, angle, frontComp, rearComp, spin) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+
+        const fx = HALF_WHEELBASE, fy = frontComp;
+        const rx = -HALF_WHEELBASE, ry = rearComp;
+
+        // round, transparent wheel-well backdrops, drawn first (furthest
+        // back) so they sit behind both the wheels and the body — just a
+        // soft white halo showing through the gaps, not a mask over the tire
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        const wellRadius = WHEEL_RADIUS + 10;
+        function wheelWell(cx) {
+            ctx.beginPath();
+            ctx.arc(cx, 0, wellRadius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        wheelWell(rx);
+        wheelWell(fx);
+
+        // both wheels drawn before the body, so the body lands on top of
+        // them — that's what makes the tires look like they sink up into
+        // the fenders instead of just hanging underneath
+        drawSuspensionArm(-32, -6 - RIDE_LIFT, rx, ry);
+        drawWheel(rx, ry, spin);
+        drawSuspensionArm(32, -6 - RIDE_LIFT, fx, fy);
+        drawWheel(fx, fy, spin);
+
+        // the cabin rides high above the axle line on tall, loose suspension
+        ctx.save();
+        ctx.translate(0, -RIDE_LIFT);
+
+        // Two flat colors only: BODY (gray) and TRIM (near-black). Built
+        // from a handful of simple blocks — a long low slab for the whole
+        // body length, a box on top for the cab, an outline (not a filled
+        // box) for the rack — the same way a toy truck is built, so the
+        // proportions read as "truck" without needing curved surfacing.
+        const BODY = '#6b6f76';
+        const TRIM = '#1c1c1c';
+
+        // long low body slab: hood, doors and bed sides all at one
+        // consistent height — this is what makes it read as "long truck"
+        // instead of "short SUV"
+        ctx.fillStyle = BODY;
+        ctx.beginPath();
+        ctx.roundRect(BODY_REAR, BELT, BODY_FRONT - BODY_REAR, FLOOR - BELT, 3);
+        ctx.fill();
+
+        // cab box sitting on top of the slab
+        ctx.beginPath();
+        ctx.moveTo(CAB_REAR, BELT);
+        ctx.lineTo(CAB_REAR, ROOF);
+        ctx.lineTo(ROOF_FRONT, ROOF);
+        ctx.lineTo(CAB_FRONT, BELT);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = TRIM;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // window: one pane inset from the cab box, split by a body-colored
+        // pillar so it still reads as two doors
+        ctx.fillStyle = TRIM;
+        ctx.beginPath();
+        ctx.moveTo(CAB_REAR + 4, BELT - 4);
+        ctx.lineTo(CAB_REAR + 4, ROOF + 5);
+        ctx.lineTo(ROOF_FRONT - 2, ROOF + 5);
+        ctx.lineTo(CAB_FRONT - 6, BELT - 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = BODY;
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(CAB_REAR + 15, ROOF + 5); ctx.lineTo(CAB_REAR + 15, BELT - 4); ctx.stroke();
+
+        // side mirror, tucked right against the front pillar so it reads
+        // as attached rather than floating
+        ctx.fillStyle = TRIM;
+        ctx.beginPath();
+        ctx.roundRect(CAB_FRONT - 8, BELT - 12, 7, 6, 1.5);
+        ctx.fill();
+
+        // front fascia: grille and bumper as a single flat nose block at
+        // the tip of the long hood overhang
+        ctx.beginPath();
+        ctx.roundRect(BODY_FRONT - 16, BELT + 2, 16, FLOOR - BELT - 2, 2);
+        ctx.fill();
+
+        // headlight — the one small light accent, since a truck needs a
+        // front to read as a front
+        ctx.fillStyle = '#f2ede0';
+        ctx.beginPath();
+        ctx.roundRect(BODY_FRONT - 13, BELT + 5, 8, 6, 2);
+        ctx.fill();
+
+        // tailgate cap at the tip of the bed overhang
+        ctx.fillStyle = TRIM;
+        ctx.beginPath();
+        ctx.roundRect(BODY_REAR, BELT + 2, 9, FLOOR - BELT - 2, 2);
+        ctx.fill();
+
+        ctx.restore(); // end cabin lift
+
+        ctx.restore();
+    }
+
+    // ---------------------------------------------------------------
+    // Main loop
+    // ---------------------------------------------------------------
+    function frame(t) {
+        const dtMs = Math.min(t - (lastTime || t), 250);
+        lastTime = t;
+        elapsed += dtMs;
+
+        // fixed-timestep physics so behavior doesn't depend on the display's
+        // refresh rate (a 120Hz/144Hz browser would otherwise integrate the
+        // physics in smaller, more numerous steps than a 60Hz one and land
+        // jumps differently for the exact same input)
+        if (state === 'playing') {
+            accumulator = Math.min(accumulator + dtMs / 16.6667, 5);
+            while (accumulator >= 1) {
+                update(1);
+                accumulator -= 1;
+            }
+        }
+
+        ctx.save();
+        if (screenShake > 0.1) {
+            ctx.translate((Math.random() - 0.5) * screenShake, (Math.random() - 0.5) * screenShake);
+        }
+
+        drawSky();
+        drawTerrain();
+        drawCoins();
+
+        const jeepScreenX = jeep.worldX - camera.x;
+        const jeepScreenY = jeep.y - camera.y;
+        drawJeep(jeepScreenX, jeepScreenY, jeep.angle, jeep.frontComp, jeep.rearComp, jeep.wheelSpin);
+        drawParticles();
+
+        ctx.restore();
+
+        requestAnimationFrame(frame);
+    }
+
+    resetGame();
+    requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
