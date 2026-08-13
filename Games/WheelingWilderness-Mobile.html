@@ -3,16 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wheeling Wilderness — Off-Road Trail Climber</title>
-<script>
-    var isMobileUA = /Android|iPhone|iPad|iPod|IEMobile|BlackBerry|webOS|Opera Mini/i.test(navigator.userAgent);
-    // iPadOS reports itself as "Macintosh" in the user agent, so catch it
-    // separately via its telltale combo of touch support + Mac platform.
-    var isIpadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
-    if (isMobileUA || isIpadOS) {
-        location.replace('WheelingWilderness-Mobile.html');
-    }
-</script>
+<title>Wheeling Wilderness Mobile — Off-Road Trail Climber</title>
 <style>
     html, body { touch-action: manipulation; }
     * { box-sizing: border-box; user-select: none; }
@@ -124,9 +115,15 @@
         bottom: 14px;
         left: 0;
         right: 0;
-        display: none;
+        display: flex;
+        align-items: flex-end;
         justify-content: space-between;
         padding: 0 18px;
+        pointer-events: none;
+    }
+    .touch-group {
+        display: flex;
+        gap: 16px;
         pointer-events: none;
     }
     .touch-btn {
@@ -145,10 +142,7 @@
     }
     .touch-btn:active { background: rgba(20, 30, 20, 0.7); }
 
-    @media (hover: none) and (pointer: coarse) {
-        .touch-controls { display: flex; }
-        .hint { display: none; }
-    }
+    .hint { display: none; }
 
     /* --- Overlays --- */
     .overlay {
@@ -239,9 +233,11 @@
         <div class="hint">&rarr; gas &nbsp;&middot;&nbsp; &larr; brake / reverse &nbsp;&middot;&nbsp; SPACE to boost off a ramp &nbsp;&middot;&nbsp; time it right to reach the coins</div>
 
         <div class="touch-controls">
-            <div class="touch-btn" id="brakeBtn">&larr;</div>
             <div class="touch-btn" id="boostBtn">&#9889;</div>
-            <div class="touch-btn" id="gasBtn">&rarr;</div>
+            <div class="touch-group">
+                <div class="touch-btn" id="brakeBtn">&larr;</div>
+                <div class="touch-btn" id="gasBtn">&rarr;</div>
+            </div>
         </div>
 
         <div class="overlay hidden" id="crashScreen">
