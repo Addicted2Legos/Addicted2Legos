@@ -165,7 +165,8 @@
         myArchetype: null,
         xp: 0,
         badges: {},
-        cspVisited: false
+        cspVisited: false,
+        visionVisited: false
     };
 
     function renderArchetypeGrid() {
@@ -267,13 +268,15 @@
         const sourcesFooter = document.getElementById('sources');
         if (sourcesFooter) sourcesFooter.style.display = (tabId === 'tab-archetype') ? 'block' : 'none';
 
-        if (tabId === 'tab-csp') { calculateCSP(); appState.cspVisited = true; updateProgressRing(); }
+        if (tabId === 'tab-csp') { calculateCSP(); appState.cspVisited = true; }
         if (tabId === 'tab-profile') hydrateMyProfileForm();
         if (tabId === 'tab-goals') { renderGoalsGate(); renderGoalsList(); }
         if (tabId === 'tab-ledger') { renderLedgerGate(); renderLedgerList(); renderBalanceSummary(); }
         if (tabId === 'tab-learning') { renderLearningGate(); renderLearningLists(); }
         if (tabId === 'tab-grow') renderGrowGate();
-        if (tabId === 'tab-alignment') renderDialHint();
+        if (tabId === 'tab-alignment') { renderDialHint(); appState.visionVisited = true; }
+
+        updateProgressRing();
     }
 
     function onExpenseSliderInput(field) {
@@ -701,16 +704,23 @@
 
     // ---------------- Gates ----------------
 
+    function renderGateCard(gate, icon, title, detail) {
+        gate.innerHTML = `
+            <span class="gate-icon">${icon}</span>
+            <span class="gate-title">${escapeHtml(title)}</span>
+            <span class="gate-detail">${escapeHtml(detail)}</span>
+        `;
+        gate.style.display = 'block';
+    }
+
     function renderGoalsGate() {
         const gate = document.getElementById('goals-gate');
         const app = document.getElementById('goals-app');
         if (!window.Clerk?.user) {
-            gate.innerText = 'Sign in above to start tracking shared goals.';
-            gate.style.display = 'block';
+            renderGateCard(gate, '🔒', 'Sign in to unlock this', 'Sign in above to start tracking shared goals.');
             app.style.display = 'none';
         } else if (!currentHousehold) {
-            gate.innerText = 'Choose Just Me or With a Partner above to start tracking goals.';
-            gate.style.display = 'block';
+            renderGateCard(gate, '🔒', 'Set up your household first', 'Choose Just Me or With a Partner above to start tracking goals.');
             app.style.display = 'none';
         } else {
             gate.style.display = 'none';
@@ -722,12 +732,10 @@
         const gate = document.getElementById('ledger-gate');
         const app = document.getElementById('ledger-app');
         if (!window.Clerk?.user) {
-            gate.innerText = 'Sign in above to start tracking shared expenses.';
-            gate.style.display = 'block';
+            renderGateCard(gate, '🔒', 'Sign in to unlock this', 'Sign in above to start tracking shared expenses.');
             app.style.display = 'none';
         } else if (!currentHousehold) {
-            gate.innerText = 'Choose With a Partner above to start tracking shared expenses.';
-            gate.style.display = 'block';
+            renderGateCard(gate, '🔒', 'Set up your household first', 'Choose With a Partner above to start tracking shared expenses.');
             app.style.display = 'none';
         } else {
             gate.style.display = 'none';
@@ -739,12 +747,10 @@
         const gate = document.getElementById('learning-gate');
         const app = document.getElementById('learning-app');
         if (!window.Clerk?.user) {
-            gate.innerText = 'Sign in above to start your learning list.';
-            gate.style.display = 'block';
+            renderGateCard(gate, '🔒', 'Sign in to unlock this', 'Sign in above to start your learning list.');
             app.style.display = 'none';
         } else if (!currentHousehold) {
-            gate.innerText = 'Choose Just Me or With a Partner above to start your learning list.';
-            gate.style.display = 'block';
+            renderGateCard(gate, '🔒', 'Set up your household first', 'Choose Just Me or With a Partner above to start your learning list.');
             app.style.display = 'none';
         } else {
             gate.style.display = 'none';
@@ -1129,48 +1135,47 @@
 
     // ---------------- Grow Together ----------------
 
+    const GROW_GATE_MESSAGES = {
+        signedout: { icon: '🔒', title: 'Sign in to unlock this', detail: 'Sign in above to explore this together.' },
+        nohousehold: { icon: '🔒', title: 'Set up your household first', detail: 'Choose With a Partner above to unlock this section.' },
+        solo: { icon: '👥', title: 'Built for two', detail: 'This section is built for two — invite your partner with your household code above to unlock it.' },
+        noprofile: { icon: '🔒', title: 'Finish your profile first', detail: "Set your Financial Personality and My Profile first — we'll use them to tailor what to explore together.", linkTab: 'tab-profile', linkLabel: 'Go to My Profile' },
+        waitingpartner: { icon: '⏳', title: 'Waiting on your partner', detail: 'Waiting on your partner to join with the invite code above.' }
+    };
+
+    function growGateReason() {
+        if (!window.Clerk?.user) return 'signedout';
+        if (!currentHousehold) return 'nohousehold';
+        if (currentHousehold.is_solo) return 'solo';
+        const mine = memberProfilesCache[myUserId()];
+        const profileStarted = !!(appState.myArchetype || (mine?.personal_info && Object.keys(mine.personal_info).length > 0));
+        if (!profileStarted) return 'noprofile';
+        if (currentHousehold.members.length < 2) return 'waitingpartner';
+        return null;
+    }
+
     function renderGrowGate() {
         const gate = document.getElementById('grow-gate');
         const app = document.getElementById('grow-app');
         if (!gate || !app) return;
 
-        if (!window.Clerk?.user) {
-            gate.innerText = 'Sign in above to explore this together.';
-            gate.style.display = 'block';
-            app.style.display = 'none';
-            return;
-        }
-        if (!currentHousehold) {
-            gate.innerText = 'Choose With a Partner above to unlock this section.';
-            gate.style.display = 'block';
-            app.style.display = 'none';
-            return;
-        }
-        if (currentHousehold.is_solo) {
-            gate.innerText = 'This section is built for two — invite your partner with your household code above to unlock it.';
-            gate.style.display = 'block';
-            app.style.display = 'none';
+        const reason = growGateReason();
+        if (!reason) {
+            gate.style.display = 'none';
+            app.style.display = 'block';
+            renderGrowContent();
             return;
         }
 
-        const mine = memberProfilesCache[myUserId()];
-        const profileStarted = !!(appState.myArchetype || (mine?.personal_info && Object.keys(mine.personal_info).length > 0));
-        if (!profileStarted) {
-            gate.innerText = "Set your Financial Personality and My Profile first — we'll use them to tailor what to explore together.";
-            gate.style.display = 'block';
-            app.style.display = 'none';
-            return;
-        }
-        if (currentHousehold.members.length < 2) {
-            gate.innerText = 'Waiting on your partner to join with the invite code above.';
-            gate.style.display = 'block';
-            app.style.display = 'none';
-            return;
-        }
-
-        gate.style.display = 'none';
-        app.style.display = 'block';
-        renderGrowContent();
+        const m = GROW_GATE_MESSAGES[reason];
+        gate.innerHTML = `
+            <span class="gate-icon">${m.icon}</span>
+            <span class="gate-title">${escapeHtml(m.title)}</span>
+            <span class="gate-detail">${escapeHtml(m.detail)}</span>
+            ${m.linkTab ? `<button class="gate-link" onclick="switchTab('${m.linkTab}')">${escapeHtml(m.linkLabel)}</button>` : ''}
+        `;
+        gate.style.display = 'block';
+        app.style.display = 'none';
     }
 
     function computeResonantDynamics() {
@@ -1458,7 +1463,7 @@
 
     function checkProfileStrengthBadges(pct) {
         if (pct >= 50) unlockBadge('profileStarter', '🌱', 'Profile Starter');
-        if (pct >= 100) {
+        if (pct >= 100 && !appState.badges.profileChampion) {
             awardXP(25, 'Profile 100% complete');
             unlockBadge('profileChampion', '🏆', 'Profile Champion');
         }
@@ -1467,16 +1472,48 @@
     function updateProgressRing() {
         const ring = document.getElementById('progress-ring');
         const label = document.getElementById('progress-ring-label');
-        if (!ring || !label) return;
+
+        const isSolo = !!(currentHousehold && currentHousehold.is_solo);
+        const growReason = growGateReason();
+        const profilePct = calcProfileCompletion().pct;
+
         const steps = [
-            !!appState.myArchetype,
-            !!(memberProfilesCache[myUserId()]?.personal_info && Object.keys(memberProfilesCache[myUserId()].personal_info).length > 0),
-            goalsCache.length > 0,
-            learningCache.length > 0,
-            appState.cspVisited
+            { id: 'tab-archetype', done: !!appState.myArchetype },
+            { id: 'tab-profile', done: profilePct >= 100, pct: profilePct },
+            { id: 'tab-csp', done: !!appState.cspVisited },
+            { id: 'tab-alignment', done: !!appState.visionVisited },
+            { id: 'tab-goals', done: goalsCache.length > 0 },
+            { id: 'tab-learning', done: learningCache.length > 0 },
+            { id: 'tab-grow', done: !growReason && !!appState.badges.growthMinded, locked: !!growReason }
         ];
-        const done = steps.filter(Boolean).length;
+        if (!isSolo) steps.push({ id: 'tab-ledger', done: ledgerCache.length > 0 });
+
+        steps.forEach(step => {
+            const el = document.getElementById('step-status-' + step.id);
+            if (!el) return;
+            el.className = 'step-status';
+            if (step.done) {
+                el.classList.add('step-done');
+                el.innerText = '✓';
+            } else if (step.locked) {
+                el.classList.add('step-locked');
+                el.innerText = '🔒';
+            } else if (typeof step.pct === 'number' && step.pct > 0) {
+                el.classList.add('step-pct');
+                el.innerText = step.pct + '%';
+            } else {
+                el.innerText = '';
+            }
+        });
+
+        const done = steps.filter(s => s.done).length;
         const pct = Math.round((done / steps.length) * 100);
-        ring.style.background = `conic-gradient(var(--secondary) ${pct}%, #e0e0e0 0)`;
-        label.innerText = `${done}/${steps.length} steps complete`;
+        if (ring) ring.style.background = `conic-gradient(var(--secondary) ${pct}%, #e0e0e0 0)`;
+        if (label) label.innerText = `${done}/${steps.length} steps complete`;
+
+        if (done === steps.length && !appState.badges.fullyAligned) {
+            awardXP(30, 'Fully aligned — every step complete!');
+            unlockBadge('fullyAligned', '🏅', 'Fully Aligned');
+            renderBadges();
+        }
     }

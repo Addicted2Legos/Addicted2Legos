@@ -94,24 +94,61 @@
             <div id="household-error" style="color:#d32f2f; font-size:0.85rem; margin-top:8px; display:none;"></div>
         </div>
 
-        <div id="progress-panel">
-            <div class="progress-ring" id="progress-ring"><div class="progress-ring-hole"></div></div>
-            <div>
-                <div id="progress-ring-label">0/5 steps complete</div>
-                <div class="badge-shelf" id="badge-shelf"></div>
+        <div class="app-layout">
+        <nav class="step-sidebar">
+            <div id="progress-panel">
+                <div class="progress-ring" id="progress-ring"><div class="progress-ring-hole"></div></div>
+                <div>
+                    <div id="progress-ring-label">0/5 steps complete</div>
+                    <div class="badge-shelf" id="badge-shelf"></div>
+                </div>
             </div>
-        </div>
 
-        <div class="tabs">
-            <button class="tab-btn active" data-tab="tab-archetype" onclick="switchTab('tab-archetype')">1. Financial Personality</button>
-            <button class="tab-btn" data-tab="tab-profile" onclick="switchTab('tab-profile')">2. My Profile</button>
-            <button class="tab-btn" data-tab="tab-csp" onclick="switchTab('tab-csp')">3. Spending Plan</button>
-            <button class="tab-btn" data-tab="tab-alignment" onclick="switchTab('tab-alignment')">4. Vision & Dialogue</button>
-            <button class="tab-btn" data-tab="tab-goals" onclick="switchTab('tab-goals')">5. Goals</button>
-            <button class="tab-btn" data-tab="tab-learning" onclick="switchTab('tab-learning')">6. Learning Together</button>
-            <button class="tab-btn" data-tab="tab-grow" onclick="switchTab('tab-grow')">7. Grow Together</button>
-            <button class="tab-btn" data-tab="tab-ledger" onclick="switchTab('tab-ledger')">8. Ledger</button>
-        </div>
+            <div class="step-nav">
+                <button class="tab-btn active" data-tab="tab-archetype" onclick="switchTab('tab-archetype')">
+                    <span class="step-num">1</span>
+                    <span class="step-label">Financial Personality</span>
+                    <span class="step-status" id="step-status-tab-archetype"></span>
+                </button>
+                <button class="tab-btn" data-tab="tab-profile" onclick="switchTab('tab-profile')">
+                    <span class="step-num">2</span>
+                    <span class="step-label">My Profile</span>
+                    <span class="step-status" id="step-status-tab-profile"></span>
+                </button>
+                <button class="tab-btn" data-tab="tab-csp" onclick="switchTab('tab-csp')">
+                    <span class="step-num">3</span>
+                    <span class="step-label">Spending Plan</span>
+                    <span class="step-status" id="step-status-tab-csp"></span>
+                </button>
+                <button class="tab-btn" data-tab="tab-alignment" onclick="switchTab('tab-alignment')">
+                    <span class="step-num">4</span>
+                    <span class="step-label">Vision & Dialogue</span>
+                    <span class="step-status" id="step-status-tab-alignment"></span>
+                </button>
+                <button class="tab-btn" data-tab="tab-goals" onclick="switchTab('tab-goals')">
+                    <span class="step-num">5</span>
+                    <span class="step-label">Goals</span>
+                    <span class="step-status" id="step-status-tab-goals"></span>
+                </button>
+                <button class="tab-btn" data-tab="tab-learning" onclick="switchTab('tab-learning')">
+                    <span class="step-num">6</span>
+                    <span class="step-label">Learning Together</span>
+                    <span class="step-status" id="step-status-tab-learning"></span>
+                </button>
+                <button class="tab-btn" data-tab="tab-grow" onclick="switchTab('tab-grow')">
+                    <span class="step-num">7</span>
+                    <span class="step-label">Grow Together</span>
+                    <span class="step-status" id="step-status-tab-grow"></span>
+                </button>
+                <button class="tab-btn" data-tab="tab-ledger" onclick="switchTab('tab-ledger')">
+                    <span class="step-num">8</span>
+                    <span class="step-label">Ledger</span>
+                    <span class="step-status" id="step-status-tab-ledger"></span>
+                </button>
+            </div>
+        </nav>
+
+        <div class="step-content">
 
         <!-- TAB 1: Financial Personality (Klontz Money Scripts) -->
         <div id="tab-archetype" class="tab-content active">
@@ -458,6 +495,9 @@
             </ul>
             <p class="disclaimer">This app is inspired by and adapts ideas from the work above. It is not affiliated with, endorsed by, or reviewed by these authors.</p>
         </footer>
+
+        </div>
+        </div>
     </div>
 </div>
 
