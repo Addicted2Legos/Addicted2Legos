@@ -1041,19 +1041,6 @@
         const fx = HALF_WHEELBASE, fy = frontComp;
         const rx = -HALF_WHEELBASE, ry = rearComp;
 
-        // round, transparent wheel-well backdrops, drawn first (furthest
-        // back) so they sit behind both the wheels and the body — just a
-        // soft white halo showing through the gaps, not a mask over the tire
-        ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        const wellRadius = WHEEL_RADIUS + 10;
-        function wheelWell(cx) {
-            ctx.beginPath();
-            ctx.arc(cx, 0, wellRadius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        wheelWell(rx);
-        wheelWell(fx);
-
         // both wheels drawn before the body, so the body lands on top of
         // them — that's what makes the tires look like they sink up into
         // the fenders instead of just hanging underneath
@@ -1081,6 +1068,28 @@
         ctx.beginPath();
         ctx.roundRect(BODY_REAR, BELT, BODY_FRONT - BODY_REAR, FLOOR - BELT, 3);
         ctx.fill();
+
+        // wheel-well notches: actually erase paint from the slab's bottom
+        // edge (destination-out) rather than drawing a colored disc on top,
+        // so the "well" itself is invisible — what reads as a wheel arch is
+        // the real negative space left behind, with the tire showing through
+        // the gap underneath. Clipped to the slab rect so the erase can't
+        // reach down far enough to bite into the tire itself.
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(BODY_REAR, BELT, BODY_FRONT - BODY_REAR, FLOOR - BELT);
+        ctx.clip();
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillStyle = '#000';
+        const wellRadius = WHEEL_RADIUS + 4;
+        const wellCenterY = (FLOOR + RIDE_LIFT) / 2; // halfway back toward the original axle-centered position
+        [rx, fx].forEach((cx) => {
+            ctx.beginPath();
+            ctx.arc(cx, wellCenterY, wellRadius, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
 
         // cab box sitting on top of the slab
         ctx.beginPath();
