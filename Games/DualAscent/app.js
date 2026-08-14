@@ -790,6 +790,7 @@
         document.getElementById('profile-risk').value = mine?.financial_info?.riskTolerance || 'medium';
         document.getElementById('profile-checkin').value = mine?.preferences?.checkinFrequency || 'monthly';
         document.getElementById('profile-style').value = mine?.preferences?.communicationStyle || 'scheduled';
+        updateProfileStrength();
     }
 
     async function saveProfile() {
@@ -830,6 +831,7 @@
         updateProgressRing();
         renderBadges();
         renderGrowGate();
+        checkProfileStrengthBadges(updateProfileStrength());
     }
 
     function renderPartnerProfileSummary() {
@@ -1409,6 +1411,57 @@
             toast.classList.remove('show');
             setTimeout(() => toast.remove(), 300);
         }, 2600);
+    }
+
+    const PROFILE_STRENGTH_FIELDS = [
+        { id: 'profile-name', label: 'Name' },
+        { id: 'profile-age', label: 'Age Range' },
+        { id: 'profile-occupation', label: 'Occupation' },
+        { id: 'profile-income', label: 'Monthly Income' },
+        { id: 'profile-debt', label: 'Total Debt' },
+        { id: 'profile-savings', label: 'Current Savings' }
+    ];
+
+    function calcProfileCompletion() {
+        const results = PROFILE_STRENGTH_FIELDS.map(f => {
+            const el = document.getElementById(f.id);
+            return { ...f, filled: !!(el && el.value.trim()) };
+        });
+        const done = results.filter(f => f.filled).length;
+        return { results, done, total: results.length, pct: Math.round((done / results.length) * 100) };
+    }
+
+    function updateProfileStrength() {
+        const bar = document.getElementById('profile-strength-bar');
+        const pctLabel = document.getElementById('profile-strength-pct');
+        const checklist = document.getElementById('profile-strength-checklist');
+        const msg = document.getElementById('profile-strength-msg');
+        if (!bar || !pctLabel || !checklist) return 0;
+
+        const { results, pct } = calcProfileCompletion();
+        const remaining = results.filter(f => !f.filled).length;
+
+        bar.style.width = `${pct}%`;
+        pctLabel.innerText = `${pct}%`;
+        checklist.innerHTML = results.map(f =>
+            `<span class="strength-chip ${f.filled ? 'done' : ''}">${f.filled ? '✓' : '○'} ${f.label}</span>`
+        ).join('');
+        if (msg) {
+            msg.innerText = pct >= 100
+                ? '🏆 Profile complete — great work!'
+                : pct >= 50
+                    ? `Over halfway there — ${remaining} field${remaining === 1 ? '' : 's'} left to go.`
+                    : 'Fill in a few more details to strengthen your profile.';
+        }
+        return pct;
+    }
+
+    function checkProfileStrengthBadges(pct) {
+        if (pct >= 50) unlockBadge('profileStarter', '🌱', 'Profile Starter');
+        if (pct >= 100) {
+            awardXP(25, 'Profile 100% complete');
+            unlockBadge('profileChampion', '🏆', 'Profile Champion');
+        }
     }
 
     function updateProgressRing() {

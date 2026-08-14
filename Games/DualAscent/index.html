@@ -138,14 +138,26 @@
         <!-- TAB 2: My Profile -->
         <div id="tab-profile" class="tab-content">
             <h2>My Profile</h2>
-            <p>This is your own information — your partner fills in theirs when they sign in on their own device, so you're not sharing one login.</p>
+            <p>This is your own information — your partner fills in theirs when they sign in on their own device, so you're not sharing one login. Even a partial profile is useful, but filling it out 100% unlocks bonus XP and badges.</p>
+
+            <div class="card" id="profile-strength-card">
+                <div class="profile-strength-header">
+                    <h3>Profile Strength</h3>
+                    <span id="profile-strength-pct" class="profile-strength-pct-badge">0%</span>
+                </div>
+                <div class="profile-strength-bar-container">
+                    <div id="profile-strength-bar" class="profile-strength-bar"></div>
+                </div>
+                <div class="profile-strength-checklist" id="profile-strength-checklist"></div>
+                <p id="profile-strength-msg" class="profile-strength-msg"></p>
+            </div>
 
             <div class="card">
                 <h3>Personal Info</h3>
                 <label>Display Name</label>
-                <input type="text" id="profile-name" placeholder="Your name">
+                <input type="text" id="profile-name" placeholder="Your name" oninput="updateProfileStrength()">
                 <label>Age Range</label>
-                <select id="profile-age">
+                <select id="profile-age" onchange="updateProfileStrength()">
                     <option value="">Prefer not to say</option>
                     <option>18-24</option>
                     <option>25-34</option>
@@ -154,17 +166,17 @@
                     <option>55+</option>
                 </select>
                 <label>Occupation</label>
-                <input type="text" id="profile-occupation" placeholder="e.g., Teacher, Nurse, Freelancer">
+                <input type="text" id="profile-occupation" placeholder="e.g., Teacher, Nurse, Freelancer" oninput="updateProfileStrength()">
             </div>
 
             <div class="card">
                 <h3>Financial Info</h3>
                 <label>Your Monthly Income ($)</label>
-                <input type="number" id="profile-income" placeholder="e.g., 4000">
+                <input type="number" id="profile-income" placeholder="e.g., 4000" oninput="updateProfileStrength()">
                 <label>Total Debt ($)</label>
-                <input type="number" id="profile-debt" placeholder="e.g., 12000">
+                <input type="number" id="profile-debt" placeholder="e.g., 12000" oninput="updateProfileStrength()">
                 <label>Current Savings ($)</label>
-                <input type="number" id="profile-savings" placeholder="e.g., 5000">
+                <input type="number" id="profile-savings" placeholder="e.g., 5000" oninput="updateProfileStrength()">
                 <label>Risk Tolerance</label>
                 <select id="profile-risk">
                     <option value="low">Low — I prioritize safety</option>
