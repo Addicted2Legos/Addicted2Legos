@@ -161,16 +161,37 @@
 
     let growExpandedKey = null;
 
+    // Now that each step lives on its own page, a couple of session-only flags
+    // (which tab you've visited, which badges you've earned) need to survive
+    // navigating between pages, so they're mirrored into localStorage.
+    function loadLocalFlag(key) {
+        return localStorage.getItem('dualascent-' + key) === 'true';
+    }
+    function saveLocalFlag(key, value) {
+        localStorage.setItem('dualascent-' + key, value ? 'true' : 'false');
+    }
+    function loadLocalBadges() {
+        try {
+            return JSON.parse(localStorage.getItem('dualascent-badges') || '{}');
+        } catch (e) {
+            return {};
+        }
+    }
+    function saveLocalBadges(badges) {
+        localStorage.setItem('dualascent-badges', JSON.stringify(badges));
+    }
+
     let appState = {
         myArchetype: null,
         xp: 0,
-        badges: {},
-        cspVisited: false,
-        visionVisited: false
+        badges: loadLocalBadges(),
+        cspVisited: loadLocalFlag('csp-visited'),
+        visionVisited: loadLocalFlag('vision-visited')
     };
 
     function renderArchetypeGrid() {
         const grid = document.getElementById('archetype-grid');
+        if (!grid) return;
         grid.innerHTML = Object.keys(ARCHETYPES).map(key => {
             const a = ARCHETYPES[key];
             return `
@@ -198,6 +219,7 @@
 
     function renderQuizQuestions() {
         const wrap = document.getElementById('quiz-questions');
+        if (!wrap) return;
         wrap.innerHTML = QUIZ_QUESTIONS.map((q, i) => `
             <div class="quiz-question">
                 <label>${i + 1}. ${q.text}</label>
@@ -257,25 +279,34 @@
         renderGrowGate();
     }
 
-    function switchTab(tabId) {
-        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-
-        document.getElementById(tabId).classList.add('active');
-        const btn = document.querySelector('.tab-btn[data-tab="' + tabId + '"]');
-        if (btn) btn.classList.add('active');
-
-        const sourcesFooter = document.getElementById('sources');
-        if (sourcesFooter) sourcesFooter.style.display = (tabId === 'tab-archetype') ? 'block' : 'none';
-
-        if (tabId === 'tab-csp') { calculateCSP(); appState.cspVisited = true; }
-        if (tabId === 'tab-profile') hydrateMyProfileForm();
-        if (tabId === 'tab-goals') { renderGoalsGate(); renderGoalsList(); }
-        if (tabId === 'tab-ledger') { renderLedgerGate(); renderLedgerList(); renderBalanceSummary(); }
-        if (tabId === 'tab-learning') { renderLearningGate(); renderLearningLists(); }
-        if (tabId === 'tab-grow') renderGrowGate();
-        if (tabId === 'tab-alignment') { renderDialHint(); appState.visionVisited = true; }
-
+    // Runs the content-loading step that switchTab() used to do when a tab was
+    // activated inside the old single-page layout — now that each step is its
+    // own page, this is called once after the household/profile data is ready.
+    function initPage() {
+        const page = document.body.dataset.page;
+        if (page === 'tab-csp') {
+            calculateCSP();
+            appState.cspVisited = true;
+            saveLocalFlag('csp-visited', true);
+        } else if (page === 'tab-profile') {
+            hydrateMyProfileForm();
+        } else if (page === 'tab-goals') {
+            renderGoalsGate();
+            renderGoalsList();
+        } else if (page === 'tab-ledger') {
+            renderLedgerGate();
+            renderLedgerList();
+            renderBalanceSummary();
+        } else if (page === 'tab-learning') {
+            renderLearningGate();
+            renderLearningLists();
+        } else if (page === 'tab-grow') {
+            renderGrowGate();
+        } else if (page === 'tab-alignment') {
+            renderDialHint();
+            appState.visionVisited = true;
+            saveLocalFlag('vision-visited', true);
+        }
         updateProgressRing();
     }
 
@@ -292,6 +323,7 @@
     }
 
     function calculateCSP() {
+        if (!document.getElementById('net-income')) return;
         const income = parseFloat(document.getElementById('net-income').value) || 1;
         const fixed = parseFloat(document.getElementById('exp-fixed').value) || 0;
         const invest = parseFloat(document.getElementById('exp-invest').value) || 0;
@@ -406,12 +438,13 @@
           })
         : null;
 
-    let currentHousehold = null; // { id, name, invite_code, is_solo, members: [{clerk_user_id, display_name}] }
+    let currentHousehold = null; // { id, name, is_solo, members: [{clerk_user_id, display_name, email, pending_partner_email}] }
     let goalsCache = [];
     let contributionsCache = [];
     let ledgerCache = [];
     let learningCache = [];
     let memberProfilesCache = {}; // clerk_user_id -> { archetype, xp, personal_info, financial_info, preferences }
+    let supportCache = [];
     let realtimeChannel = null;
 
     function myUserId() {
@@ -422,6 +455,10 @@
         const u = window.Clerk?.user;
         if (!u) return 'Me';
         return u.username || u.fullName || u.primaryEmailAddress?.emailAddress || 'Me';
+    }
+
+    function myEmail() {
+        return window.Clerk?.user?.primaryEmailAddress?.emailAddress || '';
     }
 
     function nameFor(clerkUserId) {
@@ -446,6 +483,7 @@
     const userButtonDiv = document.getElementById('user-button');
     const landingGate = document.getElementById('landing-gate');
     const appShell = document.getElementById('app-shell');
+    const stepSidebar = document.getElementById('step-sidebar');
     const householdSetup = document.getElementById('household-setup');
     const householdStatus = document.getElementById('household-status');
     const modeChooser = document.getElementById('mode-chooser');
@@ -478,22 +516,37 @@
         onAuthChange();
     });
 
+    // Each page declares which one it is via <body data-page="...">: "login" for
+    // index.html, "tab-X"/"support" for every other page. That's how a shared
+    // app.js knows whether to show the marketing/sign-in page or an app page,
+    // and it's what keeps signed-out visitors off app pages (and signed-in
+    // visitors off the login page) without a server-side router.
     function onAuthChange() {
         const signedIn = !!window.Clerk?.user;
+        const page = document.body.dataset.page;
         signInBtn.style.display = signedIn ? 'none' : 'inline-flex';
         userButtonDiv.style.display = signedIn ? 'block' : 'none';
-        landingGate.style.display = signedIn ? 'none' : 'block';
-        appShell.style.display = signedIn ? 'block' : 'none';
 
-        if (signedIn) {
-            loadHousehold();
-        } else {
-            currentHousehold = null;
-            renderGoalsGate();
-            renderLedgerGate();
-            renderLearningGate();
-            renderGrowGate();
+        if (page === 'login') {
+            if (landingGate) landingGate.style.display = signedIn ? 'none' : 'block';
+            if (signedIn) window.location.href = 'archetype.html';
+            return;
         }
+
+        if (!signedIn) {
+            window.location.href = 'index.html';
+            return;
+        }
+
+        if (appShell) appShell.style.display = 'block';
+        if (stepSidebar) stepSidebar.style.display = 'block';
+        // Support doesn't need a household set up first, so it's loaded here
+        // rather than at the end of loadHousehold()'s success path.
+        if (page === 'support') {
+            renderSupportGate();
+            loadSupportMessages();
+        }
+        loadHousehold();
     }
 
     async function loadHousehold() {
@@ -537,8 +590,8 @@
 
         const householdId = memberRows[0].household_id;
         const [{ data: hh, error: hhErr }, { data: members, error: membersErr }] = await Promise.all([
-            supabaseClient.from('households').select('id, name, invite_code, is_solo').eq('id', householdId).single(),
-            supabaseClient.from('household_members').select('clerk_user_id, display_name').eq('household_id', householdId)
+            supabaseClient.from('households').select('id, name, is_solo').eq('id', householdId).single(),
+            supabaseClient.from('household_members').select('clerk_user_id, display_name, email, pending_partner_email').eq('household_id', householdId)
         ]);
 
         if (hhErr || membersErr) {
@@ -548,7 +601,7 @@
             return;
         }
 
-        currentHousehold = { id: hh.id, name: hh.name, invite_code: hh.invite_code, is_solo: !!hh.is_solo, members: members || [] };
+        currentHousehold = { id: hh.id, name: hh.name, is_solo: !!hh.is_solo, members: members || [] };
 
         householdError.style.display = 'none';
         modeChooser.style.display = 'none';
@@ -556,9 +609,7 @@
         householdStatus.style.display = 'flex';
         document.getElementById('hh-name-display').innerText = currentHousehold.name || 'Your Household';
         document.getElementById('hh-members-display').innerText = currentHousehold.members.map(m => m.display_name || 'Member').join(' & ');
-        document.getElementById('hh-invite-code').innerText = currentHousehold.invite_code;
-        document.getElementById('hh-invite-wrap').style.display = currentHousehold.is_solo ? 'none' : 'block';
-        document.getElementById('invite-email-template').innerText = buildInviteEmailText();
+        renderPartnerLinkStatus();
 
         applyModeVisibility();
         populatePaidBySelect();
@@ -567,10 +618,7 @@
         loadLedger();
         loadMemberProfiles();
         loadLearningItems();
-        renderGoalsGate();
-        renderLedgerGate();
-        renderLearningGate();
-        renderGrowGate();
+        initPage();
     }
 
     function showModeChooser() {
@@ -596,11 +644,28 @@
         loadHousehold();
     }
 
-    async function handleCreateHousehold() {
+    async function handleLinkPartner(fromEditField) {
         if (!supabaseClient) return;
-        const name = document.getElementById('hh-create-name').value.trim() || 'Our Household';
+        const inputId = fromEditField ? 'hh-partner-email-edit' : 'partner-email-input';
+        const partnerEmail = (document.getElementById(inputId).value || '').trim().toLowerCase();
         householdError.style.display = 'none';
-        const { error } = await supabaseClient.rpc('create_household', { p_name: name, p_display_name: myDisplayName(), p_is_solo: false });
+
+        if (!partnerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(partnerEmail)) {
+            householdError.innerText = "Enter a valid email address for your partner.";
+            householdError.style.display = 'block';
+            return;
+        }
+        if (partnerEmail === myEmail().toLowerCase()) {
+            householdError.innerText = "Enter your partner's email, not your own.";
+            householdError.style.display = 'block';
+            return;
+        }
+
+        const { error } = await supabaseClient.rpc('link_partner_by_email', {
+            p_my_email: myEmail(),
+            p_partner_email: partnerEmail,
+            p_display_name: myDisplayName()
+        });
         if (error) {
             householdError.innerText = error.message;
             householdError.style.display = 'block';
@@ -609,51 +674,21 @@
         loadHousehold();
     }
 
-    async function handleJoinHousehold() {
-        if (!supabaseClient) return;
-        const code = document.getElementById('hh-join-code').value.trim();
-        householdError.style.display = 'none';
-        if (!code) return;
-        const { error } = await supabaseClient.rpc('join_household', { p_invite_code: code, p_display_name: myDisplayName() });
-        if (error) {
-            householdError.innerText = error.message;
-            householdError.style.display = 'block';
+    function renderPartnerLinkStatus() {
+        const wrap = document.getElementById('hh-invite-wrap');
+        if (!currentHousehold || currentHousehold.is_solo) {
+            wrap.style.display = 'none';
             return;
         }
-        loadHousehold();
-    }
-
-    function copyInviteCode() {
-        if (!currentHousehold) return;
-        navigator.clipboard.writeText(currentHousehold.invite_code).then(() => {
-            const chip = document.getElementById('hh-invite-code');
-            const original = chip.innerText;
-            chip.innerText = 'Copied!';
-            setTimeout(() => chip.innerText = original, 1200);
-        });
-    }
-
-    function buildInviteEmailText() {
-        if (!currentHousehold) return '';
-        const link = window.location.origin + window.location.pathname;
-        return `Hi!\n\n`
-            + `${myDisplayName()} invited you to join "${currentHousehold.name}" on DualAscent — an app for getting on the same page about money together.\n\n`
-            + `1. Go to ${link}\n`
-            + `2. Sign in (or create a free account)\n`
-            + `3. Choose "With a Partner", then "Join a Household"\n`
-            + `4. Enter this invite code: ${currentHousehold.invite_code}\n\n`
-            + `See you there!`;
-    }
-
-    function copyInviteEmail() {
-        const text = buildInviteEmailText();
-        if (!text) return;
-        navigator.clipboard.writeText(text).then(() => {
-            const btn = document.getElementById('copy-invite-email-btn');
-            const original = btn.innerText;
-            btn.innerText = 'Copied!';
-            setTimeout(() => btn.innerText = original, 1200);
-        });
+        if (currentHousehold.members.length >= 2) {
+            wrap.style.display = 'none';
+            return;
+        }
+        const mine = currentHousehold.members.find(m => m.clerk_user_id === myUserId());
+        wrap.style.display = 'block';
+        document.getElementById('hh-waiting-email').innerText = mine?.pending_partner_email || 'your partner';
+        document.getElementById('hh-my-email').innerText = mine?.email || myEmail();
+        document.getElementById('hh-partner-email-edit').value = mine?.pending_partner_email || '';
     }
 
     function applyModeVisibility() {
@@ -661,7 +696,8 @@
 
         const ledgerBtn = document.querySelector('.tab-btn[data-tab="tab-ledger"]');
         if (ledgerBtn) ledgerBtn.style.display = isSolo ? 'none' : '';
-        if (isSolo) document.getElementById('tab-ledger').classList.remove('active');
+        const ledgerTab = document.getElementById('tab-ledger');
+        if (isSolo && ledgerTab) ledgerTab.classList.remove('active');
 
         const learnTargetRow = document.getElementById('learn-target-row');
         const suggestedCol = document.getElementById('learning-suggested-col');
@@ -699,6 +735,7 @@
             .on('postgres_changes', { event: '*', schema: 'public', table: 'goal_contributions' }, () => loadGoals())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'member_profiles', filter: `household_id=eq.${currentHousehold.id}` }, () => loadMemberProfiles())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'learning_items', filter: `household_id=eq.${currentHousehold.id}` }, () => loadLearningItems())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'household_members', filter: `household_id=eq.${currentHousehold.id}` }, () => loadHousehold())
             .subscribe();
     }
 
@@ -716,6 +753,7 @@
     function renderGoalsGate() {
         const gate = document.getElementById('goals-gate');
         const app = document.getElementById('goals-app');
+        if (!gate || !app) return;
         if (!window.Clerk?.user) {
             renderGateCard(gate, '🔒', 'Sign in to unlock this', 'Sign in above to start tracking shared goals.');
             app.style.display = 'none';
@@ -731,6 +769,7 @@
     function renderLedgerGate() {
         const gate = document.getElementById('ledger-gate');
         const app = document.getElementById('ledger-app');
+        if (!gate || !app) return;
         if (!window.Clerk?.user) {
             renderGateCard(gate, '🔒', 'Sign in to unlock this', 'Sign in above to start tracking shared expenses.');
             app.style.display = 'none';
@@ -746,11 +785,25 @@
     function renderLearningGate() {
         const gate = document.getElementById('learning-gate');
         const app = document.getElementById('learning-app');
+        if (!gate || !app) return;
         if (!window.Clerk?.user) {
             renderGateCard(gate, '🔒', 'Sign in to unlock this', 'Sign in above to start your learning list.');
             app.style.display = 'none';
         } else if (!currentHousehold) {
             renderGateCard(gate, '🔒', 'Set up your household first', 'Choose Just Me or With a Partner above to start your learning list.');
+            app.style.display = 'none';
+        } else {
+            gate.style.display = 'none';
+            app.style.display = 'block';
+        }
+    }
+
+    function renderSupportGate() {
+        const gate = document.getElementById('support-gate');
+        const app = document.getElementById('support-app');
+        if (!gate || !app) return;
+        if (!window.Clerk?.user) {
+            renderGateCard(gate, '🔒', 'Sign in to unlock this', 'Sign in above to ask a question or leave a comment.');
             app.style.display = 'none';
         } else {
             gate.style.display = 'none';
@@ -786,6 +839,7 @@
     }
 
     function hydrateMyProfileForm() {
+        if (!document.getElementById('profile-name')) return;
         const mine = memberProfilesCache[myUserId()];
         document.getElementById('profile-name').value = mine?.personal_info?.name || (window.Clerk?.user ? myDisplayName() : '');
         document.getElementById('profile-age').value = mine?.personal_info?.ageRange || '';
@@ -1138,9 +1192,9 @@
     const GROW_GATE_MESSAGES = {
         signedout: { icon: '🔒', title: 'Sign in to unlock this', detail: 'Sign in above to explore this together.' },
         nohousehold: { icon: '🔒', title: 'Set up your household first', detail: 'Choose With a Partner above to unlock this section.' },
-        solo: { icon: '👥', title: 'Built for two', detail: 'This section is built for two — invite your partner with your household code above to unlock it.' },
-        noprofile: { icon: '🔒', title: 'Finish your profile first', detail: "Set your Financial Personality and My Profile first — we'll use them to tailor what to explore together.", linkTab: 'tab-profile', linkLabel: 'Go to My Profile' },
-        waitingpartner: { icon: '⏳', title: 'Waiting on your partner', detail: 'Waiting on your partner to join with the invite code above.' }
+        solo: { icon: '👥', title: 'Built for two', detail: 'This section is built for two — connect with your partner\'s email above to unlock it.' },
+        noprofile: { icon: '🔒', title: 'Finish your profile first', detail: "Set your Financial Personality and My Profile first — we'll use them to tailor what to explore together.", linkHref: 'profile.html', linkLabel: 'Go to My Profile' },
+        waitingpartner: { icon: '⏳', title: 'Waiting on your partner', detail: 'Waiting on your partner to enter your email address too — see the status above.' }
     };
 
     function growGateReason() {
@@ -1172,7 +1226,7 @@
             <span class="gate-icon">${m.icon}</span>
             <span class="gate-title">${escapeHtml(m.title)}</span>
             <span class="gate-detail">${escapeHtml(m.detail)}</span>
-            ${m.linkTab ? `<button class="gate-link" onclick="switchTab('${m.linkTab}')">${escapeHtml(m.linkLabel)}</button>` : ''}
+            ${m.linkHref ? `<a class="gate-link" href="${m.linkHref}">${escapeHtml(m.linkLabel)}</a>` : ''}
         `;
         gate.style.display = 'block';
         app.style.display = 'none';
@@ -1342,7 +1396,7 @@
 
         if (currentHousehold.members.length < 2) {
             box.className = 'summary-box';
-            box.innerHTML = 'Invite your partner with the code above to start splitting expenses.';
+            box.innerHTML = 'Connect with your partner\'s email above to start splitting expenses.';
             return;
         }
 
@@ -1377,6 +1431,59 @@
         }
     }
 
+    // ---------------- Support ----------------
+    // A single shared board (not scoped to a household) — anyone signed in can
+    // ask a question or leave a comment, and everyone signed in can read it.
+
+    async function loadSupportMessages() {
+        if (!supabaseClient) return;
+        const { data, error } = await supabaseClient
+            .from('support_messages')
+            .select('id, clerk_user_id, display_name, message, created_at')
+            .order('created_at', { ascending: false })
+            .limit(100);
+
+        if (error) { console.error('Failed to load support messages:', error); return; }
+        supportCache = data || [];
+        renderSupportMessages();
+    }
+
+    async function addSupportMessage() {
+        if (!supabaseClient || !window.Clerk?.user) return;
+        const input = document.getElementById('support-message');
+        if (!input) return;
+        const message = input.value.trim();
+        if (!message) return;
+
+        const { error } = await supabaseClient.from('support_messages').insert({
+            clerk_user_id: myUserId(),
+            display_name: myDisplayName(),
+            message
+        });
+        if (error) { console.error('Failed to post support message:', error); return; }
+
+        input.value = '';
+        loadSupportMessages();
+    }
+
+    function renderSupportMessages() {
+        const container = document.getElementById('support-list');
+        if (!container) return;
+
+        if (supportCache.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:20px 0;">Nothing posted yet — be the first to ask a question or leave a comment.</p>';
+            return;
+        }
+
+        container.innerHTML = supportCache.map(m => `
+            <div class="support-entry">
+                <span class="se-author">${escapeHtml(m.display_name || 'Someone')}</span>
+                <span class="se-date">${new Date(m.created_at).toLocaleString()}</span>
+                <div class="se-message">${escapeHtml(m.message)}</div>
+            </div>
+        `).join('');
+    }
+
     // ---------------- Gamification: XP, badges, progress ring, toasts ----------------
 
     function awardXP(amount, label) {
@@ -1394,6 +1501,7 @@
     function unlockBadge(key, emoji, label) {
         if (appState.badges[key]) return;
         appState.badges[key] = { emoji, label };
+        saveLocalBadges(appState.badges);
         showToast(`Badge unlocked: ${emoji} ${label}`);
         renderBadges();
     }
@@ -1436,6 +1544,23 @@
         return { results, done, total: results.length, pct: Math.round((done / results.length) * 100) };
     }
 
+    // Same six fields as calcProfileCompletion(), but read from the last-saved
+    // member_profiles record instead of live form inputs — the sidebar's
+    // progress ring needs this on every page, not just profile.html, so it
+    // can't depend on DOM fields that only exist there.
+    function calcProfileCompletionPct(profile) {
+        const p = profile || {};
+        const filled = [
+            !!p.personal_info?.name,
+            !!p.personal_info?.ageRange,
+            !!p.personal_info?.occupation,
+            p.financial_info?.monthlyIncome != null,
+            p.financial_info?.debtTotal != null,
+            p.financial_info?.savings != null
+        ].filter(Boolean).length;
+        return Math.round((filled / 6) * 100);
+    }
+
     function updateProfileStrength() {
         const bar = document.getElementById('profile-strength-bar');
         const pctLabel = document.getElementById('profile-strength-pct');
@@ -1475,7 +1600,7 @@
 
         const isSolo = !!(currentHousehold && currentHousehold.is_solo);
         const growReason = growGateReason();
-        const profilePct = calcProfileCompletion().pct;
+        const profilePct = calcProfileCompletionPct(memberProfilesCache[myUserId()]);
 
         const steps = [
             { id: 'tab-archetype', done: !!appState.myArchetype },

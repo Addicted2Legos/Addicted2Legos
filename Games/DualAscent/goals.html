@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goals · DualAscent</title>
+    <!-- Clerk: this app uses its own Clerk application, separate from ClickLasers.html.
+         Replace data-clerk-publishable-key and src domain with the values from that app's dashboard (Configure > API Keys) -->
+    <script
+      async
+      crossorigin="anonymous"
+      data-clerk-publishable-key="pk_test_ZWFzeS1jb3lvdGUtNjAuY2xlcmsuYWNjb3VudHMuZGV2JA"
+      src="https://easy-coyote-60.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+      type="text/javascript"
+    ></script>
+    <!-- Supabase: this app uses its own Supabase project, separate from ClickLasers.html.
+         Replace SUPABASE_URL / SUPABASE_ANON_KEY constants in app.js once your project is set up.
+         Schema additions this version depends on live in DualAscent/Supabase/ — run these in the
+         Supabase SQL editor first: 20260805_dualledger_v2.sql (is_solo, member_profiles, learning_items),
+         then 20260806_dualascent_goal_types.sql (goal_type on goals, for individual vs. shared goals),
+         then 20260807_fix_household_members_recursion.sql (fixes "infinite recursion detected in policy
+         for relation household_members" when loading your household), then 20260813_apply_missing_schema.sql
+         (applies the above tables/columns that were written but never actually run live), then
+         20260815_partner_email_link.sql (replaces the invite-code partner flow with mutual email entry),
+         then 20260815_support_messages.sql (adds the Support page's question/comment board). -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="Images/DualAscentLogoTransparentBackground.png">
+</head>
+<body data-page="tab-goals">
+
+<div class="container">
+<div class="page-shell">
+<nav class="step-sidebar" id="step-sidebar" style="display:none;"></nav>
+
+<div class="main-col">
+    <div id="auth-bar">
+        <a href="support.html" class="support-link">Support</a>
+        <button id="sign-in-btn" class="action-btn clerk-sign-in-trigger" style="margin-top:0;">Sign In</button>
+        <div id="user-button"></div>
+    </div>
+
+    <div id="app-shell" style="display:none;">
+
+        <div id="household-bar">
+            <div id="mode-chooser" style="display:none;">
+                <h3 style="margin-top:0;">How are you using this?</h3>
+                <div class="mode-choice-row">
+                    <button class="action-btn" onclick="handleCreateSoloHousehold()">Just Me</button>
+                    <button class="action-btn secondary-btn" onclick="choosePartnerMode()">With a Partner</button>
+                </div>
+            </div>
+
+            <div id="household-setup" style="display:none;">
+                <div class="setup-col">
+                    <h3 style="margin-top:0;">Connect with a Partner</h3>
+                    <p style="font-size:0.85rem; color:var(--text-muted); margin-top:0;">Enter your partner's email address. Once you've both entered each other's email, you're connected — no invite codes needed. You can keep going on your own steps while you wait.</p>
+                    <label>Partner's Email</label>
+                    <input type="email" id="partner-email-input" placeholder="partner@example.com">
+                    <button class="action-btn" onclick="handleLinkPartner()">Connect</button>
+                </div>
+            </div>
+
+            <div id="household-status">
+                <div>
+                    <div class="hh-name" id="hh-name-display"></div>
+                    <div class="hh-members" id="hh-members-display"></div>
+                </div>
+                <div id="hh-invite-wrap">
+                    <div id="hh-waiting-block">
+                        <p>⏳ Waiting for <strong id="hh-waiting-email"></strong> to enter your email (<span id="hh-my-email"></span>) too.</p>
+                        <label>Change partner's email</label>
+                        <input type="email" id="hh-partner-email-edit">
+                        <button class="action-btn secondary-btn" onclick="handleLinkPartner(true)">Update</button>
+                    </div>
+                </div>
+            </div>
+            <div id="household-error" style="color:#d32f2f; font-size:0.85rem; margin-top:8px; display:none;"></div>
+        </div>
+
+        <div class="step-content">
+
+        <div id="tab-goals" class="tab-content active">
+            <div id="goals-gate" class="gate-message">Sign in above to start tracking shared goals.</div>
+            <div id="goals-app" style="display:none;">
+                <h2>Goals</h2>
+                <p>Set the goal you're working toward together — see exactly how much each of you has contributed.</p>
+
+                <div class="card">
+                    <h3>Add a New Goal</h3>
+                    <label>Goal Title</label>
+                    <input type="text" id="goal-title" placeholder="e.g., Emergency Fund, Hawaii Trip">
+                    <label>Target Amount ($)</label>
+                    <input type="number" id="goal-target" placeholder="5000">
+                    <label>Target Date (optional)</label>
+                    <input type="date" id="goal-date">
+                    <div id="goal-type-row" style="display:none;">
+                        <label>Goal Type</label>
+                        <select id="goal-type">
+                            <option value="shared">Shared — both of us</option>
+                            <option value="individual">Individual — just me</option>
+                        </select>
+                    </div>
+                    <button class="action-btn" onclick="createGoal()">Add Goal</button>
+                </div>
+
+                <div id="goals-list"></div>
+            </div>
+        </div>
+
+        </div>
+    </div>
+</div>
+</div>
+</div>
+
+<img src="Images/DualAscentLogoWide.png" alt="DualAscent" class="page-footer-logo">
+
+<div id="toast-container"></div>
+
+<script src="nav.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>

@@ -49,7 +49,7 @@
         .landing-logo { display: block; width: 200px; height: auto; margin: 24px auto 0 auto; }
 
         /* Step sidebar navigation */
-        .app-layout { display: flex; align-items: flex-start; gap: 28px; }
+        .page-shell { display: flex; align-items: flex-start; gap: 28px; }
 
         .step-sidebar {
             width: 250px;
@@ -57,6 +57,8 @@
             position: sticky;
             top: 20px;
         }
+
+        .main-col { flex: 1; min-width: 0; }
 
         .step-nav {
             display: flex;
@@ -82,6 +84,8 @@
             font-weight: 600;
             color: var(--text-muted);
             cursor: pointer;
+            text-decoration: none;
+            box-sizing: border-box;
         }
 
         .tab-btn:hover { background: var(--primary-light); }
@@ -115,13 +119,11 @@
         .step-status.step-locked { font-size: 0.8rem; opacity: 0.55; }
         .step-status.step-pct { font-size: 0.68rem; font-weight: 700; color: var(--secondary); }
 
-        .step-content { flex: 1; min-width: 0; }
-
         .tab-content { display: none; }
         .tab-content.active { display: block; }
 
         @media (max-width: 780px) {
-            .app-layout { flex-direction: column; }
+            .page-shell { flex-direction: column; }
             .step-sidebar { width: 100%; position: static; }
             .step-nav {
                 flex-direction: row;
@@ -281,6 +283,13 @@
             font-weight: bold;
         }
         #user-button { display: none; }
+        .support-link {
+            color: var(--secondary);
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .support-link:hover { text-decoration: underline; }
 
         /* Progress ring + badges */
         #progress-panel { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
@@ -323,34 +332,12 @@
         #hh-invite-wrap { max-width: 360px; }
         #household-status .hh-name { font-weight: bold; color: var(--secondary); font-size: 1.05rem; }
         #household-status .hh-members { font-size: 0.85rem; color: var(--text-muted); }
-        .invite-code-chip {
-            font-family: monospace;
-            background: var(--primary-light);
-            border: 1px dashed var(--primary);
-            border-radius: 4px;
-            padding: 4px 10px;
-            font-weight: bold;
-            letter-spacing: 1px;
-            cursor: pointer;
-        }
-        .invite-email-block { margin-top: 12px; width: 100%; }
-        .invite-instructions {
-            font-style: italic;
-            color: var(--text-muted);
-            font-size: 0.8rem;
-            margin: 0 0 6px 0;
-        }
-        .invite-email-template {
-            font-family: Georgia, 'Times New Roman', serif;
-            background: #ffffff;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 12px 14px;
-            font-size: 0.9rem;
-            line-height: 1.5;
-            white-space: pre-wrap;
-            color: var(--text-main);
-        }
+        #hh-waiting-block { font-size: 0.85rem; }
+        #hh-waiting-block p { margin: 0 0 8px 0; color: var(--text-muted); }
+        #hh-waiting-block label { margin-top: 8px; }
+        #hh-waiting-block input { max-width: 260px; }
+        #hh-waiting-block .action-btn { padding: 8px 16px; font-size: 0.85rem; margin-top: 8px; }
+        #hh-connected-msg { font-size: 0.9rem; color: var(--primary); font-weight: 600; }
         .gate-message {
             text-align: center;
             color: var(--text-muted);
@@ -400,6 +387,7 @@
         .quiz-question label { margin-top: 0; }
         .likert-row { display: flex; gap: 10px; margin-top: 6px; }
         .likert-opt { display: flex; flex-direction: column; align-items: center; font-weight: 400; font-size: 0.8rem; margin-top: 0; gap: 4px; }
+        .likert-opt input[type="radio"] { width: 22px; height: 22px; accent-color: var(--primary); cursor: pointer; }
         .likert-scale-labels { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
 
         /* Goals */
@@ -439,6 +427,13 @@
         .ledger-entry .le-desc { font-weight: 600; }
         .ledger-entry .le-meta { font-size: 0.8rem; color: var(--text-muted); display: block; }
         .ledger-entry .le-amount { font-weight: bold; text-align: right; white-space: nowrap; }
+
+        /* Support page */
+        .support-entry { padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+        .support-entry:last-child { border-bottom: none; }
+        .support-entry .se-author { font-weight: 600; }
+        .support-entry .se-date { font-size: 0.75rem; color: var(--text-muted); margin-left: 6px; }
+        .support-entry .se-message { margin-top: 4px; white-space: pre-wrap; }
 
         /* Grow Together */
         .dynamic-card {
