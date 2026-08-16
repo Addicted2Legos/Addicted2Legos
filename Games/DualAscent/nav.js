@@ -3,69 +3,59 @@
 // keeps it working from a plain file:// open, no server required), so this
 // script tag must be included before app.js in each page.
 (function () {
-    const mount = document.getElementById('step-sidebar');
-    if (!mount) return;
-
-    mount.innerHTML = `
-        <div id="progress-panel">
-            <div class="progress-ring" id="progress-ring"><div class="progress-ring-hole"></div></div>
-            <div>
-                <div id="progress-ring-label">0/5 steps complete</div>
-                <div class="badge-shelf" id="badge-shelf"></div>
-            </div>
-        </div>
-
-        <div class="step-nav">
-            <a class="tab-btn" data-tab="tab-archetype" href="archetype.html">
-                <span class="step-num">1</span>
-                <span class="step-label">Financial Personality</span>
-                <span class="step-status" id="step-status-tab-archetype"></span>
-            </a>
-            <a class="tab-btn" data-tab="tab-profile" href="profile.html">
-                <span class="step-num">2</span>
-                <span class="step-label">My Profile</span>
-                <span class="step-status" id="step-status-tab-profile"></span>
-            </a>
-            <a class="tab-btn" data-tab="tab-csp" href="csp.html">
-                <span class="step-num">3</span>
-                <span class="step-label">Spending Plan</span>
-                <span class="step-status" id="step-status-tab-csp"></span>
-            </a>
-            <a class="tab-btn" data-tab="tab-alignment" href="alignment.html">
-                <span class="step-num">4</span>
-                <span class="step-label">Vision & Dialogue</span>
-                <span class="step-status" id="step-status-tab-alignment"></span>
-            </a>
-            <a class="tab-btn" data-tab="tab-goals" href="goals.html">
-                <span class="step-num">5</span>
-                <span class="step-label">Goals</span>
-                <span class="step-status" id="step-status-tab-goals"></span>
-            </a>
-            <a class="tab-btn" data-tab="tab-household" href="household.html">
-                <span class="step-num">6</span>
-                <span class="step-label">Household</span>
-                <span class="step-status" id="step-status-tab-household"></span>
-            </a>
-            <a class="tab-btn" data-tab="tab-learning" href="learning.html">
-                <span class="step-num">7</span>
-                <span class="step-label">Learning Together</span>
-                <span class="step-status" id="step-status-tab-learning"></span>
-            </a>
-            <a class="tab-btn" data-tab="tab-grow" href="grow.html">
-                <span class="step-num">8</span>
-                <span class="step-label">Grow Together</span>
-                <span class="step-status" id="step-status-tab-grow"></span>
-            </a>
-            <a class="tab-btn" data-tab="tab-ledger" href="ledger.html">
-                <span class="step-num">9</span>
-                <span class="step-label">Ledger</span>
-                <span class="step-status" id="step-status-tab-ledger"></span>
-            </a>
-        </div>
-    `;
+    // Single source of truth for the step order, shared by the left sidebar
+    // and the top-of-page Previous/Next nav below.
+    const STEPS = [
+        { tab: 'tab-archetype', href: 'financialpersonality.html', label: 'Financial Personality' },
+        { tab: 'tab-profile', href: 'myprofile.html', label: 'My Profile' },
+        { tab: 'tab-csp', href: 'spendingplan.html', label: 'Spending Plan' },
+        { tab: 'tab-alignment', href: 'visiondialogue.html', label: 'Vision & Dialogue' },
+        { tab: 'tab-goals', href: 'goals.html', label: 'Goals' },
+        { tab: 'tab-household', href: 'household.html', label: 'Household' },
+        { tab: 'tab-learning', href: 'learningtogether.html', label: 'Learning Together' },
+        { tab: 'tab-grow', href: 'growtogether.html', label: 'Grow Together' },
+        { tab: 'tab-ledger', href: 'ledger.html', label: 'Ledger' }
+    ];
 
     const currentPage = document.body.dataset.page;
-    mount.querySelectorAll('.tab-btn').forEach(btn => {
-        if (btn.dataset.tab === currentPage) btn.classList.add('active');
-    });
+
+    const sidebarMount = document.getElementById('step-sidebar');
+    if (sidebarMount) {
+        sidebarMount.innerHTML = `
+            <div id="progress-panel">
+                <div class="progress-ring" id="progress-ring"><div class="progress-ring-hole"></div></div>
+                <div>
+                    <div id="progress-ring-label">0/5 steps complete</div>
+                    <div class="badge-shelf" id="badge-shelf"></div>
+                </div>
+            </div>
+
+            <div class="step-nav">
+                ${STEPS.map((step, i) => `
+                    <a class="tab-btn" data-tab="${step.tab}" href="${step.href}">
+                        <span class="step-num">${i + 1}</span>
+                        <span class="step-label">${step.label}</span>
+                        <span class="step-status" id="step-status-${step.tab}"></span>
+                    </a>
+                `).join('')}
+            </div>
+        `;
+
+        sidebarMount.querySelectorAll('.tab-btn').forEach(btn => {
+            if (btn.dataset.tab === currentPage) btn.classList.add('active');
+        });
+    }
+
+    const stepNavMount = document.getElementById('page-step-nav');
+    if (stepNavMount) {
+        const currentIndex = STEPS.findIndex(step => step.tab === currentPage);
+        if (currentIndex !== -1) {
+            const prevStep = STEPS[currentIndex - 1];
+            const nextStep = STEPS[currentIndex + 1];
+            stepNavMount.innerHTML = `
+                ${prevStep ? `<a class="action-btn secondary-btn page-step-prev" href="${prevStep.href}">← Previous</a>` : '<span></span>'}
+                ${nextStep ? `<a class="action-btn page-step-next" href="${nextStep.href}">Next →</a>` : ''}
+            `;
+        }
+    }
 })();

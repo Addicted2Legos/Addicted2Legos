@@ -293,6 +293,18 @@
         }
         .archetype-banner-link:hover { text-decoration: underline; }
 
+        /* Top-of-page Previous/Next step nav */
+        .page-step-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .page-step-nav:empty { display: none; margin-bottom: 0; }
+        .page-step-nav .action-btn { margin-top: 0; text-decoration: none; display: inline-block; text-align: center; }
+        .page-step-nav .page-step-next { margin-left: auto; }
+
         /* Auth bar */
         #auth-bar {
             display: flex;

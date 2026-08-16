@@ -620,7 +620,7 @@
 
         if (page === 'login') {
             if (landingGate) landingGate.style.display = signedIn ? 'none' : 'block';
-            if (signedIn) window.location.href = 'archetype.html';
+            if (signedIn) window.location.href = 'financialpersonality.html';
             return;
         }
 
@@ -1421,7 +1421,7 @@
         signedout: { icon: '🔒', title: 'Sign in to unlock this', detail: 'Sign in above to explore this together.' },
         nohousehold: { icon: '⏳', title: "Couldn't load your account", detail: 'Try refreshing the page — if it keeps happening, check the Household tab.', linkHref: 'household.html', linkLabel: 'Go to Household Setup' },
         solo: { icon: '👥', title: 'Built for two', detail: 'This section is built for two — connect with your partner\'s email to unlock it.', linkHref: 'household.html', linkLabel: 'Go to Household Setup' },
-        noprofile: { icon: '🔒', title: 'Finish your profile first', detail: "Set your Financial Personality and My Profile first — we'll use them to tailor what to explore together.", linkHref: 'profile.html', linkLabel: 'Go to My Profile' },
+        noprofile: { icon: '🔒', title: 'Finish your profile first', detail: "Set your Financial Personality and My Profile first — we'll use them to tailor what to explore together.", linkHref: 'myprofile.html', linkLabel: 'Go to My Profile' },
         waitingpartner: { icon: '⏳', title: 'Waiting on your partner', detail: 'Waiting on your partner to enter your email address too — check your household status.', linkHref: 'household.html', linkLabel: 'Go to Household Setup' }
     };
 
@@ -1774,7 +1774,7 @@
 
     // Same six fields as calcProfileCompletion(), but read from the last-saved
     // member_profiles record instead of live form inputs — the sidebar's
-    // progress ring needs this on every page, not just profile.html, so it
+    // progress ring needs this on every page, not just myprofile.html, so it
     // can't depend on DOM fields that only exist there.
     function calcProfileCompletionPct(profile) {
         const p = profile || {};
