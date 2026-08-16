@@ -385,7 +385,7 @@
 
     async function saveCSP() {
         if (!supabaseClient || !currentHousehold) {
-            showToast('⚠️ Set up your household first, on the Household tab.');
+            showToast("⚠️ Couldn't reach your account yet — try refreshing the page.");
             return;
         }
         const netIncome = parseFloat(document.getElementById('net-income').value) || 0;
@@ -487,7 +487,7 @@
 
     async function saveVisionAndDials() {
         if (!supabaseClient || !currentHousehold) {
-            showToast('⚠️ Set up your household first, on the Household tab.');
+            showToast("⚠️ Couldn't reach your account yet — try refreshing the page.");
             return;
         }
         const visionText = document.getElementById('vision-text').value.trim();
@@ -677,14 +677,25 @@
         }
 
         if (!memberRows || memberRows.length === 0) {
-            currentHousehold = null;
-            showModeChooser();
-            renderGoalsGate();
-            renderLedgerGate();
-            renderLearningGate();
-            renderGrowGate();
-            updateProgressRing();
-            return;
+            // New sign-in with no household yet — default to "just me" straight
+            // away instead of making Profile/Spending Plan/Vision (steps 2-4)
+            // wait on a manual choice on the Household tab (step 6). Anyone who
+            // wants to add a partner later still can, from the Household tab.
+            const { error: createErr } = await supabaseClient.rpc('create_household', {
+                p_name: 'My Finances', p_display_name: myDisplayName(), p_is_solo: true
+            });
+            if (createErr) {
+                console.error('Failed to auto-create household:', createErr);
+                showHouseholdError("We couldn't set up your account right now. Try refreshing the page — if it keeps happening, let us know.");
+                showModeChooser();
+                renderGoalsGate();
+                renderLedgerGate();
+                renderLearningGate();
+                renderGrowGate();
+                updateProgressRing();
+                return;
+            }
+            return loadHousehold();
         }
 
         const householdId = memberRows[0].household_id;
@@ -712,6 +723,8 @@
         if (nameDisplay) nameDisplay.innerText = currentHousehold.name || 'Your Household';
         const membersDisplay = document.getElementById('hh-members-display');
         if (membersDisplay) membersDisplay.innerText = currentHousehold.members.map(m => m.display_name || 'Member').join(' & ');
+        const soloBlock = document.getElementById('hh-solo-block');
+        if (soloBlock) soloBlock.style.display = currentHousehold.is_solo ? 'block' : 'none';
         renderPartnerLinkStatus();
 
         applyModeVisibility();
@@ -734,6 +747,13 @@
     function choosePartnerMode() {
         if (!modeChooser) return;
         modeChooser.style.display = 'none';
+        if (householdSetup) householdSetup.style.display = 'flex';
+    }
+
+    // Lets someone who's already set up solo (the default) add a partner later,
+    // from the household-status view rather than the first-run mode-chooser.
+    function showPartnerSetupFromStatus() {
+        if (householdStatus) householdStatus.style.display = 'none';
         if (householdSetup) householdSetup.style.display = 'flex';
     }
 
@@ -911,7 +931,7 @@
             renderGateCard(gate, '🔒', 'Sign in to unlock this', 'Sign in above to start tracking shared goals.');
             app.style.display = 'none';
         } else if (!currentHousehold) {
-            renderGateCard(gate, '🔒', 'Set up your household first', 'Choose Just Me or With a Partner to start tracking goals.', 'household.html', 'Go to Household Setup');
+            renderGateCard(gate, '⏳', "Couldn't load your account", 'Try refreshing the page — if it keeps happening, check the Household tab.', 'household.html', 'Go to Household Setup');
             app.style.display = 'none';
         } else {
             gate.style.display = 'none';
@@ -927,7 +947,7 @@
             renderGateCard(gate, '🔒', 'Sign in to unlock this', 'Sign in above to start tracking shared expenses.');
             app.style.display = 'none';
         } else if (!currentHousehold) {
-            renderGateCard(gate, '🔒', 'Set up your household first', 'Choose With a Partner to start tracking shared expenses.', 'household.html', 'Go to Household Setup');
+            renderGateCard(gate, '⏳', "Couldn't load your account", 'Try refreshing the page — if it keeps happening, check the Household tab.', 'household.html', 'Go to Household Setup');
             app.style.display = 'none';
         } else {
             gate.style.display = 'none';
@@ -943,7 +963,7 @@
             renderGateCard(gate, '🔒', 'Sign in to unlock this', 'Sign in above to start your learning list.');
             app.style.display = 'none';
         } else if (!currentHousehold) {
-            renderGateCard(gate, '🔒', 'Set up your household first', 'Choose Just Me or With a Partner to start your learning list.', 'household.html', 'Go to Household Setup');
+            renderGateCard(gate, '⏳', "Couldn't load your account", 'Try refreshing the page — if it keeps happening, check the Household tab.', 'household.html', 'Go to Household Setup');
             app.style.display = 'none';
         } else {
             gate.style.display = 'none';
@@ -1009,7 +1029,7 @@
 
     async function saveProfile() {
         if (!currentHousehold) {
-            showToast('⚠️ Set up your household first, on the Household tab.');
+            showToast("⚠️ Couldn't reach your account yet — try refreshing the page.");
             return;
         }
         const personal = {
@@ -1399,7 +1419,7 @@
 
     const GROW_GATE_MESSAGES = {
         signedout: { icon: '🔒', title: 'Sign in to unlock this', detail: 'Sign in above to explore this together.' },
-        nohousehold: { icon: '🔒', title: 'Set up your household first', detail: 'Choose With a Partner to unlock this section.', linkHref: 'household.html', linkLabel: 'Go to Household Setup' },
+        nohousehold: { icon: '⏳', title: "Couldn't load your account", detail: 'Try refreshing the page — if it keeps happening, check the Household tab.', linkHref: 'household.html', linkLabel: 'Go to Household Setup' },
         solo: { icon: '👥', title: 'Built for two', detail: 'This section is built for two — connect with your partner\'s email to unlock it.', linkHref: 'household.html', linkLabel: 'Go to Household Setup' },
         noprofile: { icon: '🔒', title: 'Finish your profile first', detail: "Set your Financial Personality and My Profile first — we'll use them to tailor what to explore together.", linkHref: 'profile.html', linkLabel: 'Go to My Profile' },
         waitingpartner: { icon: '⏳', title: 'Waiting on your partner', detail: 'Waiting on your partner to enter your email address too — check your household status.', linkHref: 'household.html', linkLabel: 'Go to Household Setup' }

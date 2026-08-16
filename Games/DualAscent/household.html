@@ -22,7 +22,9 @@
          for relation household_members" when loading your household), then 20260813_apply_missing_schema.sql
          (applies the above tables/columns that were written but never actually run live), then
          20260815_partner_email_link.sql (replaces the invite-code partner flow with mutual email entry),
-         then 20260815_support_messages.sql (adds the Support page's question/comment board). -->
+         then 20260815_support_messages.sql (adds the Support page's question/comment board),
+         then 20260815_solo_partner_upgrade.sql (fixes linking a partner from an already-solo
+         household so it correctly flips is_solo and unlocks shared features). -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" type="image/png" href="Images/DualAscentLogoTransparentBackground.png">
@@ -85,6 +87,10 @@
                     <div>
                         <div class="hh-name" id="hh-name-display"></div>
                         <div class="hh-members" id="hh-members-display"></div>
+                        <div id="hh-solo-block" style="display:none; margin-top:10px;">
+                            <p style="font-size:0.85rem; color:var(--text-muted); margin:0 0 8px 0;">You're using DualAscent on your own.</p>
+                            <button class="action-btn secondary-btn" onclick="showPartnerSetupFromStatus()">Connect with a Partner</button>
+                        </div>
                     </div>
                     <div id="hh-invite-wrap">
                         <div id="hh-waiting-block">
