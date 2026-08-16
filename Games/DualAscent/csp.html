@@ -65,19 +65,19 @@
                     <div class="card">
                         <h3>Monthly Expenses ($)</h3>
 
-                        <label>Fixed Costs (Housing, Bills, Min. Debt, Groceries)</label>
+                        <label><span class="dot seg-fixed"></span> Fixed Costs (Housing, Bills, Min. Debt, Groceries)</label>
                         <input type="number" id="exp-fixed" value="3300" oninput="calculateCSP()">
                         <input type="range" id="exp-fixed-slider" min="0" max="6000" step="10" value="3300" oninput="onExpenseSliderInput('fixed')">
 
-                        <label>Investments (401k, Roth IRA, Brokerage)</label>
+                        <label><span class="dot seg-invest"></span> Investments (401k, Roth IRA, Brokerage)</label>
                         <input type="number" id="exp-invest" value="600" oninput="calculateCSP()">
                         <input type="range" id="exp-invest-slider" min="0" max="2000" step="10" value="600" oninput="onExpenseSliderInput('invest')">
 
-                        <label>Savings (Emergency Fund, Travel, Big Goals)</label>
+                        <label><span class="dot seg-savings"></span> Savings (Emergency Fund, Travel, Big Goals)</label>
                         <input type="number" id="exp-savings" value="600" oninput="calculateCSP()">
                         <input type="range" id="exp-savings-slider" min="0" max="2000" step="10" value="600" oninput="onExpenseSliderInput('savings')">
 
-                        <label>Guilt-Free Spending (Dining, Hobbies, Fun)</label>
+                        <label><span class="dot seg-guiltfree"></span> Guilt-Free Spending (Dining, Hobbies, Fun)</label>
                         <input type="number" id="exp-guiltfree" value="1500" oninput="calculateCSP()">
                         <input type="range" id="exp-guiltfree-slider" min="0" max="3000" step="10" value="1500" oninput="onExpenseSliderInput('guiltfree')">
                     </div>

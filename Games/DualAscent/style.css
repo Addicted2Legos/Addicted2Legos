@@ -237,7 +237,7 @@
         }
 
         .legend-item { display: flex; align-items: center; gap: 5px; }
-        .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; vertical-align: middle; margin-right: 2px; margin-top: -2px; }
 
         .summary-box {
             background: var(--primary-light);
