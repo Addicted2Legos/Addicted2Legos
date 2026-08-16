@@ -286,6 +286,7 @@
     function initPage() {
         const page = document.body.dataset.page;
         if (page === 'tab-csp') {
+            hydrateCSPForm();
             calculateCSP();
             appState.cspVisited = true;
             saveLocalFlag('csp-visited', true);
@@ -304,7 +305,7 @@
         } else if (page === 'tab-grow') {
             renderGrowGate();
         } else if (page === 'tab-alignment') {
-            renderDialHint();
+            hydrateVisionForm();
             appState.visionVisited = true;
             saveLocalFlag('vision-visited', true);
         }
@@ -365,6 +366,45 @@
         }
 
         document.getElementById('csp-feedback').innerHTML = feedback;
+    }
+
+    // Fills the CSP form from the last-saved household budget (if any) — runs
+    // before calculateCSP() so the percentages reflect the saved numbers
+    // instead of the form's hardcoded HTML defaults.
+    function hydrateCSPForm() {
+        const incomeEl = document.getElementById('net-income');
+        if (!incomeEl) return;
+        const b = currentHousehold?.cspBudget;
+        if (!b) return;
+        if (b.netIncome != null) incomeEl.value = b.netIncome;
+        if (b.fixed != null) document.getElementById('exp-fixed').value = b.fixed;
+        if (b.invest != null) document.getElementById('exp-invest').value = b.invest;
+        if (b.savings != null) document.getElementById('exp-savings').value = b.savings;
+        if (b.guiltfree != null) document.getElementById('exp-guiltfree').value = b.guiltfree;
+    }
+
+    async function saveCSP() {
+        if (!supabaseClient || !currentHousehold) {
+            showToast('⚠️ Set up your household first, on the Household tab.');
+            return;
+        }
+        const netIncome = parseFloat(document.getElementById('net-income').value) || 0;
+        const fixed = parseFloat(document.getElementById('exp-fixed').value) || 0;
+        const invest = parseFloat(document.getElementById('exp-invest').value) || 0;
+        const savings = parseFloat(document.getElementById('exp-savings').value) || 0;
+        const guiltfree = parseFloat(document.getElementById('exp-guiltfree').value) || 0;
+
+        const { error } = await supabaseClient.rpc('save_household_budget', {
+            p_net_income: netIncome, p_fixed: fixed, p_invest: invest, p_savings: savings, p_guiltfree: guiltfree
+        });
+        if (error) {
+            console.error('Failed to save spending plan:', error);
+            showToast('⚠️ Could not save your spending plan: ' + error.message);
+            return;
+        }
+        currentHousehold.cspBudget = { netIncome, fixed, invest, savings, guiltfree };
+        showToast('✅ Spending plan saved');
+        awardXP(5, 'Spending plan saved');
     }
 
     function generateSummary() {
@@ -429,6 +469,53 @@
             : `<strong>Worth a look:</strong> as ${escapeHtml(archTitle)}, you might expect to lean toward ${hint.dials.map(escapeHtml).join(' or ')}. ${escapeHtml(hint.note)}`;
     }
 
+    // Fills the vision text (shared, from the household) and dial picks (mine
+    // alone, from my member profile) from what was last saved.
+    function hydrateVisionForm() {
+        const visionEl = document.getElementById('vision-text');
+        if (!visionEl) return;
+        visionEl.value = currentHousehold?.visionText || '';
+
+        const mine = memberProfilesCache[myUserId()];
+        const myDialEl = document.getElementById('my-dial');
+        const partnerDialEl = document.getElementById('partner-dial');
+        if (myDialEl && mine?.vision_info?.myDial) myDialEl.value = mine.vision_info.myDial;
+        if (partnerDialEl && mine?.vision_info?.partnerDialGuess) partnerDialEl.value = mine.vision_info.partnerDialGuess;
+
+        renderDialHint();
+    }
+
+    async function saveVisionAndDials() {
+        if (!supabaseClient || !currentHousehold) {
+            showToast('⚠️ Set up your household first, on the Household tab.');
+            return;
+        }
+        const visionText = document.getElementById('vision-text').value.trim();
+        const myDial = document.getElementById('my-dial').value;
+        const partnerDialEl = document.getElementById('partner-dial');
+        const partnerDialGuess = partnerDialEl ? partnerDialEl.value : '';
+
+        const [{ error: visionError }, { error: dialError }] = await Promise.all([
+            supabaseClient.rpc('save_household_vision', { p_vision_text: visionText }),
+            supabaseClient.from('member_profiles').upsert({
+                household_id: currentHousehold.id,
+                clerk_user_id: myUserId(),
+                vision_info: { myDial, partnerDialGuess }
+            }, { onConflict: 'household_id,clerk_user_id' })
+        ]);
+
+        if (visionError || dialError) {
+            console.error('Failed to save vision/dials:', visionError || dialError);
+            showToast('⚠️ Could not save: ' + (visionError || dialError).message);
+            return;
+        }
+
+        currentHousehold.visionText = visionText;
+        memberProfilesCache[myUserId()] = { ...(memberProfilesCache[myUserId()] || {}), vision_info: { myDial, partnerDialGuess } };
+        showToast('✅ Vision & Dialogue saved');
+        awardXP(5, 'Vision & Dialogue saved');
+    }
+
     // ================= Clerk + Supabase =================
     const SUPABASE_URL = 'https://bvweuydrpildjxjmcpxa.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_-cbUrULpA-JAXXQy38W_5Q_fGgz7z-w';
@@ -482,6 +569,7 @@
 
     const signInBtn = document.getElementById('sign-in-btn');
     const userButtonDiv = document.getElementById('user-button');
+    const supportLink = document.querySelector('.support-link');
     const landingGate = document.getElementById('landing-gate');
     const appShell = document.getElementById('app-shell');
     const stepSidebar = document.getElementById('step-sidebar');
@@ -528,10 +616,11 @@
         const page = document.body.dataset.page;
         signInBtn.style.display = signedIn ? 'none' : 'inline-flex';
         userButtonDiv.style.display = signedIn ? 'block' : 'none';
+        if (supportLink) supportLink.style.display = signedIn ? 'inline-block' : 'none';
 
         if (page === 'login') {
             if (landingGate) landingGate.style.display = signedIn ? 'none' : 'block';
-            if (signedIn) window.location.href = 'household.html';
+            if (signedIn) window.location.href = 'archetype.html';
             return;
         }
 
@@ -600,7 +689,7 @@
 
         const householdId = memberRows[0].household_id;
         const [{ data: hh, error: hhErr }, { data: members, error: membersErr }] = await Promise.all([
-            supabaseClient.from('households').select('id, name, is_solo').eq('id', householdId).single(),
+            supabaseClient.from('households').select('id, name, is_solo, csp_budget, vision_text').eq('id', householdId).single(),
             supabaseClient.from('household_members').select('clerk_user_id, display_name, email, pending_partner_email').eq('household_id', householdId)
         ]);
 
@@ -610,7 +699,10 @@
             return;
         }
 
-        currentHousehold = { id: hh.id, name: hh.name, is_solo: !!hh.is_solo, members: members || [] };
+        currentHousehold = {
+            id: hh.id, name: hh.name, is_solo: !!hh.is_solo, members: members || [],
+            cspBudget: hh.csp_budget || null, visionText: hh.vision_text || ''
+        };
 
         if (householdError) householdError.style.display = 'none';
         if (modeChooser) modeChooser.style.display = 'none';
@@ -878,7 +970,7 @@
         if (!supabaseClient || !currentHousehold) return;
         const { data, error } = await supabaseClient
             .from('member_profiles')
-            .select('clerk_user_id, archetype, xp, personal_info, financial_info, preferences')
+            .select('clerk_user_id, archetype, xp, personal_info, financial_info, preferences, vision_info')
             .eq('household_id', currentHousehold.id);
 
         if (error) { console.error('Failed to load member profiles:', error); return; }
@@ -893,6 +985,7 @@
         }
 
         hydrateMyProfileForm();
+        hydrateVisionForm();
         renderPartnerProfileSummary();
         checkTeamPlayerBadge();
         updateProgressRing();
@@ -945,7 +1038,7 @@
             }, { onConflict: 'household_id,clerk_user_id' });
             if (error) {
                 console.error('Failed to save profile:', error);
-                showToast('⚠️ Could not save your profile — please try again.');
+                showToast('⚠️ Could not save your profile: ' + error.message);
                 return;
             }
         }
@@ -1829,12 +1922,12 @@
         const profilePct = calcProfileCompletionPct(memberProfilesCache[myUserId()]);
 
         const steps = [
-            { id: 'tab-household', done: !!currentHousehold },
             { id: 'tab-archetype', done: !!appState.myArchetype },
             { id: 'tab-profile', done: profilePct >= 100, pct: profilePct },
             { id: 'tab-csp', done: !!appState.cspVisited },
             { id: 'tab-alignment', done: !!appState.visionVisited },
             { id: 'tab-goals', done: goalsCache.length > 0 },
+            { id: 'tab-household', done: !!currentHousehold },
             { id: 'tab-learning', done: learningCache.length > 0 },
             { id: 'tab-grow', done: !growReason && !!appState.badges.growthMinded, locked: !!growReason }
         ];

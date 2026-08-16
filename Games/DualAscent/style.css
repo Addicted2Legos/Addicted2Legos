@@ -313,6 +313,7 @@
         }
         #user-button { display: none; }
         .support-link {
+            display: none;
             color: var(--secondary);
             font-size: 0.9rem;
             font-weight: 600;
