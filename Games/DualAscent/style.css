@@ -263,6 +263,35 @@
         }
         .strength-chip.done { background: var(--primary-light); color: var(--primary); border-color: var(--primary); font-weight: 600; }
         .profile-strength-msg { font-size: 0.85rem; color: var(--text-muted); margin: 8px 0 0 0; }
+        #archetype-suggest-wrap { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+        #archetype-suggest-wrap .action-btn { margin-top: 0; padding: 9px 16px; font-size: 0.85rem; }
+        #archetype-suggest-result { margin-top: 12px; }
+        #archetype-suggest-result .archetype-suggest-actions { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+        #archetype-suggest-result .archetype-suggest-actions .action-btn { margin-top: 0; }
+
+        /* Financial Personality banner, shown at the top of every signed-in page */
+        .archetype-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            background: var(--primary-light);
+            border: 1px solid var(--primary);
+            border-radius: 8px;
+            padding: 10px 16px;
+            margin-bottom: 15px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        .archetype-banner-link {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--secondary);
+            text-decoration: none;
+            flex-shrink: 0;
+        }
+        .archetype-banner-link:hover { text-decoration: underline; }
 
         /* Auth bar */
         #auth-bar {
@@ -329,7 +358,7 @@
         #household-setup label { margin-top: 0; }
         #household-setup .action-btn { padding: 10px 18px; font-size: 0.9rem; }
         #household-status { display: none; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
-        #hh-invite-wrap { max-width: 360px; }
+        #hh-invite-wrap { max-width: 480px; width: 100%; }
         #household-status .hh-name { font-weight: bold; color: var(--secondary); font-size: 1.05rem; }
         #household-status .hh-members { font-size: 0.85rem; color: var(--text-muted); }
         #hh-waiting-block { font-size: 0.85rem; }
@@ -338,6 +367,25 @@
         #hh-waiting-block input { max-width: 260px; }
         #hh-waiting-block .action-btn { padding: 8px 16px; font-size: 0.85rem; margin-top: 8px; }
         #hh-connected-msg { font-size: 0.9rem; color: var(--primary); font-weight: 600; }
+        .partner-selected-line { font-size: 0.85rem; color: var(--text-main); margin: 0 0 6px 0; }
+        .invite-email-block { margin-top: 12px; width: 100%; }
+        .invite-instructions {
+            font-style: italic;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            margin: 0 0 6px 0;
+        }
+        .invite-email-template {
+            font-family: Georgia, 'Times New Roman', serif;
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px 14px;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            color: var(--text-main);
+        }
         .gate-message {
             text-align: center;
             color: var(--text-muted);

@@ -259,7 +259,8 @@
     async function saveArchetype(script) {
         appState.myArchetype = script;
         renderArchetypeSelection();
-        document.getElementById('archetype-continue').style.display = 'block';
+        const continueEl = document.getElementById('archetype-continue');
+        if (continueEl) continueEl.style.display = 'block';
 
         if (supabaseClient && currentHousehold) {
             const { error } = await supabaseClient.from('member_profiles').upsert({
@@ -661,6 +662,11 @@
             return;
         }
 
+        // Show the entered address as "selected" right away, before waiting on
+        // the round trip — the invite template is useful even if the connect
+        // call below fails, since the person still typed a real address.
+        if (!fromEditField) renderPartnerSelected(partnerEmail);
+
         const { error } = await supabaseClient.rpc('link_partner_by_email', {
             p_my_email: myEmail(),
             p_partner_email: partnerEmail,
@@ -674,6 +680,44 @@
         loadHousehold();
     }
 
+    function renderPartnerSelected(partnerEmail) {
+        const wrap = document.getElementById('partner-selected-wrap');
+        const emailEl = document.getElementById('partner-selected-email');
+        const templateBox = document.getElementById('setup-invite-email-template');
+        if (!wrap || !emailEl || !templateBox) return;
+        emailEl.innerText = partnerEmail;
+        templateBox.innerText = buildInviteEmailText(partnerEmail);
+        wrap.style.display = 'block';
+    }
+
+    // Usable both before a household exists (right after entering an email) and
+    // after (the "waiting on your partner" panel) — takes the target email as a
+    // parameter instead of reading it off currentHousehold so it works either way.
+    function buildInviteEmailText(partnerEmail) {
+        const link = new URL('index.html', window.location.href).href;
+        return `Hi!\n\n`
+            + `${myDisplayName()} would like to connect with you on DualAscent — an app for getting on the same page about money together.\n\n`
+            + `1. Go to ${link}\n`
+            + `2. Sign in (or create a free account)\n`
+            + `3. Choose "With a Partner"\n`
+            + `4. Enter this email address: ${myEmail()}\n\n`
+            + `Once you've entered my email and I've entered yours (${partnerEmail}), we'll be automatically connected — no invite code needed.\n\n`
+            + `See you there!`;
+    }
+
+    function copyInviteEmail(context) {
+        const boxId = context === 'setup' ? 'setup-invite-email-template' : 'status-invite-email-template';
+        const btnId = context === 'setup' ? 'setup-copy-invite-email-btn' : 'status-copy-invite-email-btn';
+        const box = document.getElementById(boxId);
+        const btn = document.getElementById(btnId);
+        if (!box || !btn) return;
+        navigator.clipboard.writeText(box.innerText).then(() => {
+            const original = btn.innerText;
+            btn.innerText = 'Copied!';
+            setTimeout(() => btn.innerText = original, 1200);
+        });
+    }
+
     function renderPartnerLinkStatus() {
         const wrap = document.getElementById('hh-invite-wrap');
         if (!currentHousehold || currentHousehold.is_solo) {
@@ -685,10 +729,13 @@
             return;
         }
         const mine = currentHousehold.members.find(m => m.clerk_user_id === myUserId());
+        const partnerEmail = mine?.pending_partner_email || '';
         wrap.style.display = 'block';
-        document.getElementById('hh-waiting-email').innerText = mine?.pending_partner_email || 'your partner';
+        document.getElementById('hh-waiting-email').innerText = partnerEmail || 'your partner';
         document.getElementById('hh-my-email').innerText = mine?.email || myEmail();
-        document.getElementById('hh-partner-email-edit').value = mine?.pending_partner_email || '';
+        document.getElementById('hh-partner-email-edit').value = partnerEmail;
+        const templateBox = document.getElementById('status-invite-email-template');
+        if (templateBox) templateBox.innerText = buildInviteEmailText(partnerEmail || 'them');
     }
 
     function applyModeVisibility() {
@@ -1583,6 +1630,8 @@
                     ? `Over halfway there — ${remaining} field${remaining === 1 ? '' : 's'} left to go.`
                     : 'Fill in a few more details to strengthen your profile.';
         }
+        const suggestWrap = document.getElementById('archetype-suggest-wrap');
+        if (suggestWrap) suggestWrap.style.display = pct >= 100 ? 'block' : 'none';
         return pct;
     }
 
@@ -1594,7 +1643,116 @@
         }
     }
 
+    // A lightweight, transparent heuristic over the financial/preference fields
+    // in a complete profile — not a clinical instrument, same spirit as the
+    // Financial Personality quiz. Surfaced by the "Analyze My Profile" button,
+    // which only appears once Profile Strength hits 100%.
+    function suggestArchetypeFromProfile(profile) {
+        const fin = profile?.financial_info || {};
+        const pref = profile?.preferences || {};
+        const income = Number(fin.monthlyIncome) || 0;
+        const debt = Number(fin.debtTotal) || 0;
+        const savings = Number(fin.savings) || 0;
+        const risk = fin.riskTolerance || '';
+        const checkin = pref.checkinFrequency || '';
+        const style = pref.communicationStyle || '';
+
+        if (!risk && !checkin && !style && !income && !debt && !savings) {
+            return { key: null, rationale: '' };
+        }
+
+        const scores = {};
+        Object.keys(ARCHETYPES).forEach(k => scores[k] = 0);
+        const bump = (key, n) => { scores[key] += n; };
+        const notes = [];
+
+        if (risk === 'low') { bump('Loyalist', 2); bump('Investigator', 1); notes.push('a low risk tolerance'); }
+        if (risk === 'high') { bump('Enthusiast', 2); bump('Achiever', 1); bump('Challenger', 1); notes.push('a high risk tolerance'); }
+        if (risk === 'medium') { bump('Individualist', 1); bump('Helper', 1); }
+
+        if (checkin === 'weekly') { bump('Perfectionist', 2); bump('Investigator', 1); notes.push('checking in on your money weekly'); }
+        if (checkin === 'rarely') { bump('Peacemaker', 2); bump('Individualist', 1); notes.push('rarely checking in on your money'); }
+
+        if (style === 'scheduled') { bump('Perfectionist', 1); bump('Loyalist', 1); }
+        if (style === 'asneeded') { bump('Enthusiast', 1); bump('Individualist', 1); }
+
+        if (income > 0) {
+            const debtRatio = debt / income;
+            const savingsRatio = savings / income;
+            if (debtRatio >= 3) { bump('Enthusiast', 2); bump('Peacemaker', 1); notes.push('debt that runs several months of income'); }
+            if (debtRatio === 0 && savings > 0) { bump('Investigator', 1); bump('Loyalist', 1); }
+            if (savingsRatio >= 6) { bump('Loyalist', 2); bump('Investigator', 1); notes.push(`savings that cover ${Math.round(savingsRatio)}+ months of income`); }
+            if (savingsRatio < 1 && debtRatio < 3) { bump('Enthusiast', 1); }
+        }
+
+        const max = Math.max(...Object.values(scores));
+        if (max === 0) return { key: null, rationale: '' };
+        const top = Object.keys(scores).filter(k => scores[k] === max);
+        const rationale = notes.length ? `Based on ${notes.join(', ')}.` : 'Based on the financial details in your profile.';
+        return { key: top[0], rationale };
+    }
+
+    function analyzeArchetypeSuggestion() {
+        const box = document.getElementById('archetype-suggest-result');
+        if (!box) return;
+        const mine = memberProfilesCache[myUserId()];
+        const { key: suggested, rationale } = suggestArchetypeFromProfile(mine);
+        const current = appState.myArchetype;
+
+        box.style.display = 'block';
+
+        if (!suggested) {
+            box.innerHTML = `<p>We need a bit more financial detail — risk tolerance, check-in habits, income, debt, and savings — before we can suggest a match.</p>`;
+            return;
+        }
+
+        if (suggested === current) {
+            box.innerHTML = `
+                <p>Your profile still lines up with <strong>${ARCHETYPES[current].title} ${ARCHETYPES[current].emoji}</strong> — no change suggested.</p>
+                <p style="font-size:0.8rem; color:var(--text-muted);">${rationale}</p>
+            `;
+            return;
+        }
+
+        box.innerHTML = `
+            <p>Based on your profile, you might actually be more of a <strong>${ARCHETYPES[suggested].title} ${ARCHETYPES[suggested].emoji}</strong>${current ? ` rather than ${ARCHETYPES[current].title} ${ARCHETYPES[current].emoji}` : ''}.</p>
+            <p style="font-size:0.8rem; color:var(--text-muted);">${rationale}</p>
+            <div class="archetype-suggest-actions">
+                <button class="action-btn" onclick="acceptArchetypeSuggestion('${suggested}')">Update to ${ARCHETYPES[suggested].title}</button>
+                <button class="action-btn secondary-btn" onclick="dismissArchetypeSuggestion()">${current ? `Keep ${ARCHETYPES[current].title}` : 'Not now'}</button>
+            </div>
+        `;
+    }
+
+    function acceptArchetypeSuggestion(key) {
+        saveArchetype(key);
+        const box = document.getElementById('archetype-suggest-result');
+        if (box) box.style.display = 'none';
+    }
+
+    function dismissArchetypeSuggestion() {
+        const box = document.getElementById('archetype-suggest-result');
+        if (box) box.style.display = 'none';
+    }
+
+    // Shown at the top of every signed-in page, via the #archetype-banner shell
+    // that's part of each page's own markup (unlike the sidebar, it's simple
+    // enough not to need injecting from nav.js).
+    function renderArchetypeBanner() {
+        const banner = document.getElementById('archetype-banner');
+        const text = document.getElementById('archetype-banner-text');
+        if (!banner || !text) return;
+        if (!appState.myArchetype || !ARCHETYPES[appState.myArchetype]) {
+            banner.style.display = 'none';
+            return;
+        }
+        const a = ARCHETYPES[appState.myArchetype];
+        text.innerText = `Your Financial Personality: ${a.emoji} ${a.title}`;
+        banner.style.display = 'flex';
+    }
+
     function updateProgressRing() {
+        renderArchetypeBanner();
         const ring = document.getElementById('progress-ring');
         const label = document.getElementById('progress-ring-label');
 
