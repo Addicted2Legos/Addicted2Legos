@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ledger · DualAscent</title>
+    <title>Connected Accounts · DualAscent</title>
     <!-- Clerk: this app uses its own Clerk application, separate from ClickLasers.html.
          Replace data-clerk-publishable-key and src domain with the values from that app's dashboard (Configure > API Keys) -->
     <script
@@ -29,15 +29,16 @@
          link_partner_by_email failing on every new household with a "null value
          in column "created_by"" error — this is why nothing could save for a
          new sign-in: no household ever got created), then 20260816_linkedin_connection.sql
-         (adds the linkedin_* columns the Connected Accounts page reads and writes). That page
-         also needs the linkedin-oauth-exchange Supabase Edge Function deployed (see
-         Supabase/functions/linkedin-oauth-exchange/index.ts) and the LINKEDIN_CLIENT_ID
-         constant in app.js set to a real LinkedIn Developer App's Client ID. -->
+         (adds the linkedin_* columns this page reads and writes). This page also needs the
+         linkedin-oauth-exchange Supabase Edge Function deployed (see
+         Supabase/functions/linkedin-oauth-exchange/index.ts for deploy steps) and the
+         LINKEDIN_CLIENT_ID constant in app.js set to a real LinkedIn Developer App's Client ID
+         before "Connect LinkedIn" will work. -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" type="image/png" href="Images/DualAscentLogoTransparentBackground.png">
 </head>
-<body data-page="tab-ledger">
+<body data-page="tab-connected">
 
 <div class="container">
 <div class="page-shell">
@@ -53,8 +54,6 @@
 
     <div id="app-shell" style="display:none;">
 
-        <div id="page-step-nav" class="page-step-nav"></div>
-
         <div id="archetype-banner" class="archetype-banner" style="display:none;">
             <span id="archetype-banner-text"></span>
             <a href="financialpersonality.html" class="archetype-banner-link">Update →</a>
@@ -62,31 +61,29 @@
 
         <div class="step-content">
 
-        <div id="tab-ledger" class="tab-content active">
-            <div id="ledger-gate" class="gate-message">Sign in above to start tracking shared expenses.</div>
-            <div id="ledger-app" style="display:none;">
-                <h2>Household Ledger</h2>
-                <p>Log shared expenses and always know exactly who owes whom.</p>
+        <div id="tab-connected" class="tab-content active">
+            <h2>Connected Accounts</h2>
+            <p>Optionally connect your LinkedIn account to verify it's really you and add a bit of professional context to your own profile.</p>
 
-                <div id="balance-summary" class="summary-box"></div>
+            <div class="card">
+                <h3>LinkedIn</h3>
+                <p style="margin-top:-6px; color:var(--text-muted); font-size:0.9rem;">
+                    LinkedIn's public sign-in only shares your name, email, and profile photo with apps like this
+                    one — it does not give us your job title, employer, salary, or anything else about your
+                    finances. We don't try to estimate income, net worth, or spending from anything here.
+                </p>
+                <div id="connected-accounts-body"></div>
+            </div>
 
-                <div class="card">
-                    <h3>Add an Expense</h3>
-                    <label>Description</label>
-                    <input type="text" id="ledger-desc" placeholder="e.g., Groceries, Electric Bill">
-                    <label>Amount ($)</label>
-                    <input type="number" id="ledger-amount" placeholder="80.00">
-                    <label>Paid By</label>
-                    <select id="ledger-paid-by"></select>
-                    <label>Payer's Share (%) <span style="font-weight:normal; color:var(--text-muted);">— default 50/50, edit for an uneven split</span></label>
-                    <input type="number" id="ledger-share-pct" value="50" min="0" max="100">
-                    <button class="action-btn" onclick="addLedgerEntry()">Add Expense</button>
-                </div>
-
-                <div class="card">
-                    <h3>Recent Entries</h3>
-                    <div id="ledger-list"></div>
-                </div>
+            <div class="card">
+                <h3>Professional Headline (optional)</h3>
+                <p style="margin-top:-6px; color:var(--text-muted); font-size:0.9rem;">
+                    Since LinkedIn won't share your job title with us automatically, you can type it in here if
+                    you'd like it reflected on your profile. Entirely optional, and only visible to your household.
+                </p>
+                <label>Headline / Job Title</label>
+                <input type="text" id="linkedin-headline" placeholder="e.g., Senior Product Manager at Acme Co.">
+                <button class="action-btn" onclick="saveLinkedInHeadline()">Save</button>
             </div>
         </div>
 

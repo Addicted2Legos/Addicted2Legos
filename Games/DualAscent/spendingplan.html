@@ -28,7 +28,11 @@
          then 20260815_fix_household_created_by.sql (fixes create_household /
          link_partner_by_email failing on every new household with a "null value
          in column "created_by"" error — this is why nothing could save for a
-         new sign-in: no household ever got created). -->
+         new sign-in: no household ever got created), then 20260816_linkedin_connection.sql
+         (adds the linkedin_* columns the Connected Accounts page reads and writes). That page
+         also needs the linkedin-oauth-exchange Supabase Edge Function deployed (see
+         Supabase/functions/linkedin-oauth-exchange/index.ts) and the LINKEDIN_CLIENT_ID
+         constant in app.js set to a real LinkedIn Developer App's Client ID. -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" type="image/png" href="Images/DualAscentLogoTransparentBackground.png">
@@ -41,6 +45,7 @@
 
 <div class="main-col">
     <div id="auth-bar">
+        <a href="connectedaccounts.html" class="support-link">Connected Accounts</a>
         <a href="support.html" class="support-link">Support</a>
         <button id="sign-in-btn" class="action-btn clerk-sign-in-trigger" style="margin-top:0;">Sign In</button>
         <div id="user-button"></div>

@@ -308,6 +308,9 @@
             hydrateVisionForm();
             appState.visionVisited = true;
             saveLocalFlag('vision-visited', true);
+        } else if (page === 'tab-connected') {
+            handleLinkedInCallback();
+            renderConnectedAccounts();
         }
         updateProgressRing();
     }
@@ -526,12 +529,22 @@
           })
         : null;
 
+    // Connected Accounts (LinkedIn): the Client ID is public, same as the Clerk/
+    // Supabase keys above — set it to the Client ID from your LinkedIn Developer
+    // App (linkedin.com/developers/apps), which must also have "Sign In with
+    // LinkedIn using OpenID Connect" added as a product, and this exact page's
+    // URL (computed below as LINKEDIN_REDIRECT_URI) added under Auth > Authorized
+    // redirect URLs. The Client Secret goes in the linkedin-oauth-exchange Edge
+    // Function's secrets, never here.
+    const LINKEDIN_CLIENT_ID = 'REPLACE-ME-LINKEDIN-CLIENT-ID';
+    const LINKEDIN_REDIRECT_URI = window.location.origin + window.location.pathname;
+
     let currentHousehold = null; // { id, name, is_solo, members: [{clerk_user_id, display_name, email, pending_partner_email}] }
     let goalsCache = [];
     let contributionsCache = [];
     let ledgerCache = [];
     let learningCache = [];
-    let memberProfilesCache = {}; // clerk_user_id -> { archetype, xp, personal_info, financial_info, preferences }
+    let memberProfilesCache = {}; // clerk_user_id -> { archetype, xp, personal_info, financial_info, preferences, linkedin_sub, linkedin_name, linkedin_email, linkedin_photo_url, linkedin_headline, linkedin_connected_at }
     let supportCache = [];
     let realtimeChannel = null;
 
@@ -569,7 +582,7 @@
 
     const signInBtn = document.getElementById('sign-in-btn');
     const userButtonDiv = document.getElementById('user-button');
-    const supportLink = document.querySelector('.support-link');
+    const supportLinks = document.querySelectorAll('.support-link');
     const landingGate = document.getElementById('landing-gate');
     const appShell = document.getElementById('app-shell');
     const stepSidebar = document.getElementById('step-sidebar');
@@ -589,6 +602,7 @@
         renderArchetypeGrid();
         renderQuizQuestions();
         renderCommonGoals();
+        renderSuggestedLearningTopics();
 
         if (!window.Clerk) return; // Clerk script not loaded (key not configured yet)
         await window.Clerk.load({
@@ -616,7 +630,7 @@
         const page = document.body.dataset.page;
         signInBtn.style.display = signedIn ? 'none' : 'inline-flex';
         userButtonDiv.style.display = signedIn ? 'block' : 'none';
-        if (supportLink) supportLink.style.display = signedIn ? 'inline-block' : 'none';
+        supportLinks.forEach(el => el.style.display = signedIn ? 'inline-block' : 'none');
 
         if (page === 'login') {
             if (landingGate) landingGate.style.display = signedIn ? 'none' : 'block';
@@ -990,7 +1004,7 @@
         if (!supabaseClient || !currentHousehold) return;
         const { data, error } = await supabaseClient
             .from('member_profiles')
-            .select('clerk_user_id, archetype, xp, personal_info, financial_info, preferences, vision_info')
+            .select('clerk_user_id, archetype, xp, personal_info, financial_info, preferences, vision_info, linkedin_sub, linkedin_name, linkedin_email, linkedin_photo_url, linkedin_headline, linkedin_connected_at')
             .eq('household_id', currentHousehold.id);
 
         if (error) { console.error('Failed to load member profiles:', error); return; }
@@ -1007,6 +1021,7 @@
         hydrateMyProfileForm();
         hydrateVisionForm();
         renderPartnerProfileSummary();
+        renderConnectedAccounts();
         checkTeamPlayerBadge();
         updateProgressRing();
         renderGrowGate();
@@ -1113,6 +1128,173 @@
             return p && p.archetype && p.personal_info && Object.keys(p.personal_info).length > 0;
         });
         if (allSet) unlockBadge('teamPlayer', '🤝', 'Team Player');
+    }
+
+    // ---------------- Connected Accounts (LinkedIn) ----------------
+    //
+    // Deliberately narrow scope: this verifies identity and, if the person
+    // chooses to type one in, records a professional headline. It does not
+    // pull job history, connections, or posts, and never estimates income,
+    // net worth, or spending from any of it — LinkedIn's public sign-in API
+    // doesn't expose that, and we wouldn't build toward it if it did.
+
+    function connectLinkedIn() {
+        if (!LINKEDIN_CLIENT_ID || LINKEDIN_CLIENT_ID.indexOf('REPLACE-ME') !== -1) {
+            showToast('⚠️ LinkedIn sign-in is not set up yet on this app.');
+            return;
+        }
+        const state = (window.crypto?.randomUUID ? window.crypto.randomUUID() : String(Math.random()).slice(2));
+        sessionStorage.setItem('linkedin_oauth_state', state);
+        const params = new URLSearchParams({
+            response_type: 'code',
+            client_id: LINKEDIN_CLIENT_ID,
+            redirect_uri: LINKEDIN_REDIRECT_URI,
+            state,
+            scope: 'openid profile email'
+        });
+        window.location.href = 'https://www.linkedin.com/oauth/v2/authorization?' + params.toString();
+    }
+
+    // Runs on every load of the Connected Accounts tab. Only does anything
+    // when the URL has the ?code=...&state=... LinkedIn just redirected back
+    // with — otherwise it's a no-op.
+    async function handleLinkedInCallback() {
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('code');
+        const oauthError = params.get('error');
+        if (!code && !oauthError) return;
+
+        // Strip the OAuth params immediately so a refresh doesn't replay them.
+        window.history.replaceState({}, document.title, LINKEDIN_REDIRECT_URI);
+
+        if (oauthError) {
+            showToast('LinkedIn connection was cancelled.');
+            return;
+        }
+
+        const expectedState = sessionStorage.getItem('linkedin_oauth_state');
+        sessionStorage.removeItem('linkedin_oauth_state');
+        if (!params.get('state') || params.get('state') !== expectedState) {
+            showToast('⚠️ LinkedIn connection failed a security check — please try again.');
+            return;
+        }
+        if (!supabaseClient || !currentHousehold) {
+            showToast("⚠️ Couldn't finish connecting LinkedIn — try again after the page finishes loading.");
+            return;
+        }
+
+        const { data, error: fnError } = await supabaseClient.functions.invoke('linkedin-oauth-exchange', {
+            body: { code, redirect_uri: LINKEDIN_REDIRECT_URI }
+        });
+        if (fnError || !data) {
+            console.error('LinkedIn exchange failed:', fnError);
+            showToast('⚠️ Could not connect LinkedIn: ' + (fnError?.message || 'unknown error'));
+            return;
+        }
+
+        const linkedinFields = {
+            linkedin_sub: data.sub || null,
+            linkedin_name: data.name || null,
+            linkedin_email: data.email || null,
+            linkedin_photo_url: data.picture || null,
+            linkedin_connected_at: new Date().toISOString()
+        };
+
+        const { error: saveErr } = await supabaseClient.from('member_profiles').upsert({
+            household_id: currentHousehold.id,
+            clerk_user_id: myUserId(),
+            ...linkedinFields
+        }, { onConflict: 'household_id,clerk_user_id' });
+        if (saveErr) {
+            console.error('Failed to save LinkedIn connection:', saveErr);
+            showToast('⚠️ Connected to LinkedIn, but could not save it: ' + saveErr.message);
+            return;
+        }
+
+        memberProfilesCache[myUserId()] = { ...(memberProfilesCache[myUserId()] || {}), ...linkedinFields };
+        showToast('✅ LinkedIn connected');
+        awardXP(5, 'LinkedIn connected');
+        renderConnectedAccounts();
+    }
+
+    async function disconnectLinkedIn() {
+        if (!supabaseClient || !currentHousehold) return;
+        const clearedFields = {
+            linkedin_sub: null, linkedin_name: null, linkedin_email: null,
+            linkedin_photo_url: null, linkedin_connected_at: null
+        };
+        const { error } = await supabaseClient.from('member_profiles')
+            .update(clearedFields)
+            .eq('household_id', currentHousehold.id)
+            .eq('clerk_user_id', myUserId());
+        if (error) {
+            console.error('Failed to disconnect LinkedIn:', error);
+            showToast('⚠️ Could not disconnect: ' + error.message);
+            return;
+        }
+        memberProfilesCache[myUserId()] = { ...(memberProfilesCache[myUserId()] || {}), ...clearedFields };
+        showToast('LinkedIn disconnected');
+        renderConnectedAccounts();
+    }
+
+    // The headline is always typed in by hand — LinkedIn's API doesn't hand us
+    // job title/employer — so this only ever saves what the person entered
+    // themselves. It also offers to copy that into My Profile's Occupation
+    // field, but only if Occupation is still blank, so it never overwrites
+    // something they already filled in there.
+    async function saveLinkedInHeadline() {
+        if (!supabaseClient || !currentHousehold) {
+            showToast("⚠️ Couldn't reach your account yet — try refreshing the page.");
+            return;
+        }
+        const headline = document.getElementById('linkedin-headline').value.trim();
+        const mine = memberProfilesCache[myUserId()] || {};
+        const fillsOccupation = headline && !mine.personal_info?.occupation;
+        const updatedPersonal = fillsOccupation
+            ? { ...(mine.personal_info || {}), occupation: headline }
+            : mine.personal_info;
+
+        const { error } = await supabaseClient.from('member_profiles').upsert({
+            household_id: currentHousehold.id,
+            clerk_user_id: myUserId(),
+            linkedin_headline: headline || null,
+            ...(fillsOccupation ? { personal_info: updatedPersonal } : {})
+        }, { onConflict: 'household_id,clerk_user_id' });
+        if (error) {
+            console.error('Failed to save LinkedIn headline:', error);
+            showToast('⚠️ Could not save: ' + error.message);
+            return;
+        }
+
+        memberProfilesCache[myUserId()] = { ...mine, linkedin_headline: headline || null, personal_info: updatedPersonal || mine.personal_info };
+        showToast('✅ Saved' + (fillsOccupation ? ' — also added to your Occupation in My Profile' : ''));
+        hydrateMyProfileForm();
+        renderConnectedAccounts();
+    }
+
+    function renderConnectedAccounts() {
+        const wrap = document.getElementById('connected-accounts-body');
+        const headlineEl = document.getElementById('linkedin-headline');
+        if (!wrap && !headlineEl) return;
+
+        const mine = memberProfilesCache[myUserId()] || {};
+        const connected = !!mine.linkedin_connected_at;
+
+        if (wrap) {
+            wrap.innerHTML = connected ? `
+                <div class="linkedin-connected-card">
+                    ${mine.linkedin_photo_url ? `<img src="${escapeHtml(mine.linkedin_photo_url)}" alt="" class="linkedin-avatar">` : ''}
+                    <div>
+                        <div class="linkedin-name">${escapeHtml(mine.linkedin_name || 'LinkedIn connected')}</div>
+                        ${mine.linkedin_email ? `<div class="linkedin-email">${escapeHtml(mine.linkedin_email)}</div>` : ''}
+                        <div class="linkedin-connected-date">Connected ${new Date(mine.linkedin_connected_at).toLocaleDateString()}</div>
+                    </div>
+                    <button class="action-btn secondary-btn" style="margin-top:0;" onclick="disconnectLinkedIn()">Disconnect</button>
+                </div>
+            ` : `<button class="action-btn" style="margin-top:0;" onclick="connectLinkedIn()">🔗 Connect LinkedIn</button>`;
+        }
+
+        if (headlineEl) headlineEl.value = mine.linkedin_headline || '';
     }
 
     // ---------------- Goals ----------------
@@ -1332,6 +1514,55 @@
     }
 
     // ---------------- Learning Together ----------------
+
+    const SUGGESTED_LEARNING_TOPICS = [
+        { category: 'Talking About Money', topic: 'How to have a money conversation without it turning into a fight', note: 'A structure for check-ins so tension does not derail the conversation.' },
+        { category: 'Talking About Money', topic: "Understanding each other's money history", note: 'The habits we grew up around often explain our reactions better than logic does.' },
+        { category: 'Talking About Money', topic: 'Setting a recurring money date', note: 'Regular, low-stakes check-ins keep small issues from becoming big blowups.' },
+        { category: 'Budgeting & Spending', topic: 'The 50/30/20 budgeting framework', note: 'A simple starting split between needs, wants, and savings or debt.' },
+        { category: 'Budgeting & Spending', topic: 'Building a guilt-free spending number', note: 'A number you can both spend freely without guilt or a fight about it.' },
+        { category: 'Budgeting & Spending', topic: 'Zero-based budgeting basics', note: 'Give every dollar a job before the month starts.' },
+        { category: 'Debt & Credit', topic: 'Debt snowball vs. debt avalanche', note: 'Two payoff strategies — one for momentum, one for the math.' },
+        { category: 'Debt & Credit', topic: 'How credit scores actually work', note: 'What moves the number, and why it matters for big purchases together.' },
+        { category: 'Debt & Credit', topic: 'Combined vs. separate accounts', note: 'There is no universally right answer — just tradeoffs worth naming together.' },
+        { category: 'Saving & Investing', topic: 'How compound interest works', note: 'Why starting early, even small, tends to beat starting later and bigger.' },
+        { category: 'Saving & Investing', topic: 'Emergency fund basics', note: 'How much to save and where to keep it, so a surprise expense stays a hiccup.' },
+        { category: 'Saving & Investing', topic: '401(k) match and retirement basics', note: 'Employer matching is often free money that is easy to leave on the table.' },
+        { category: 'Saving & Investing', topic: 'Index funds vs. individual stocks', note: 'A low-effort, low-drama way to start investing together.' },
+        { category: 'Planning Ahead', topic: 'Life insurance basics', note: 'What it actually protects against, and whether you need it yet.' },
+        { category: 'Planning Ahead', topic: 'Wills and beneficiaries', note: 'The paperwork that makes sure your wishes decide what happens, not default state law.' },
+        { category: 'Planning Ahead', topic: 'Filing taxes jointly or separately', note: 'Worth understanding before your first tax season as a couple.' },
+        { category: 'Planning Ahead', topic: 'A shared process for big purchases', note: 'Agree on how large decisions get made so they never feel unilateral.' }
+    ];
+
+    function renderSuggestedLearningTopics() {
+        const wrap = document.getElementById('suggested-topics-list');
+        if (!wrap) return;
+        const categories = [...new Set(SUGGESTED_LEARNING_TOPICS.map(t => t.category))];
+        wrap.innerHTML = categories.map(cat => `
+            <div class="suggested-topics-category">${escapeHtml(cat)}</div>
+            <div class="suggested-topics-grid">
+                ${SUGGESTED_LEARNING_TOPICS.map((t, i) => t.category === cat ? `
+                    <button type="button" class="suggested-topic-chip" onclick="useSuggestedTopic(${i})">
+                        <span class="suggested-topic-title">${escapeHtml(t.topic)}</span>
+                        <span class="suggested-topic-note">${escapeHtml(t.note)}</span>
+                    </button>
+                ` : '').join('')}
+            </div>
+        `).join('');
+    }
+
+    function useSuggestedTopic(i) {
+        const t = SUGGESTED_LEARNING_TOPICS[i];
+        if (!t) return;
+        const topicEl = document.getElementById('learn-topic');
+        const noteEl = document.getElementById('learn-note');
+        if (!topicEl || !noteEl) return;
+        topicEl.value = t.topic;
+        noteEl.value = t.note;
+        topicEl.focus();
+        topicEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
 
     async function addLearningItem() {
         if (!supabaseClient || !currentHousehold) return;

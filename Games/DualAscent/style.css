@@ -542,6 +542,51 @@
         .dc-detail li { margin-bottom: 6px; }
         .dc-source { margin-top: 10px; font-size: 0.75rem; color: var(--text-muted); font-style: italic; }
 
+        /* Learning Together: suggested topics */
+        .suggested-topics-category {
+            margin: 16px 0 8px 0; font-size: 0.78rem; font-weight: 700; color: var(--secondary);
+            text-transform: uppercase; letter-spacing: 0.4px;
+        }
+        .suggested-topics-category:first-child { margin-top: 0; }
+        .suggested-topics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 10px;
+        }
+        .suggested-topic-chip {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 3px;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: #ffffff;
+            cursor: pointer;
+            text-align: left;
+            font-family: inherit;
+            transition: border-color 0.15s ease, background 0.15s ease;
+        }
+        .suggested-topic-chip:hover { border-color: var(--primary); background: var(--primary-light); }
+        .suggested-topic-title { font-size: 0.85rem; font-weight: 600; color: var(--text-main); }
+        .suggested-topic-note { font-size: 0.78rem; color: var(--text-muted); line-height: 1.35; }
+
+        /* Connected Accounts */
+        .linkedin-connected-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: #fafafa;
+            flex-wrap: wrap;
+        }
+        .linkedin-avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+        .linkedin-name { font-weight: 600; font-size: 0.95rem; }
+        .linkedin-email, .linkedin-connected-date { font-size: 0.8rem; color: var(--text-muted); }
+        .linkedin-connected-card .action-btn { margin-left: auto; }
+
         /* Sources footer */
         #sources { margin-top: 10px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--text-muted); }
         #sources h3 { color: var(--text-main); font-size: 0.95rem; margin-bottom: 8px; }
