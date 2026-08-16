@@ -47,56 +47,6 @@
             <a href="archetype.html" class="archetype-banner-link">Update →</a>
         </div>
 
-        <div id="household-bar">
-            <div id="mode-chooser" style="display:none;">
-                <h3 style="margin-top:0;">How are you using this?</h3>
-                <div class="mode-choice-row">
-                    <button class="action-btn" onclick="handleCreateSoloHousehold()">Just Me</button>
-                    <button class="action-btn secondary-btn" onclick="choosePartnerMode()">With a Partner</button>
-                </div>
-            </div>
-
-            <div id="household-setup" style="display:none;">
-                <div class="setup-col">
-                    <h3 style="margin-top:0;">Connect with a Partner</h3>
-                    <p style="font-size:0.85rem; color:var(--text-muted); margin-top:0;">Enter your partner's email address. Once you've both entered each other's email, you're connected — no invite codes needed. You can keep going on your own steps while you wait.</p>
-                    <label>Partner's Email</label>
-                    <input type="email" id="partner-email-input" placeholder="partner@example.com">
-                    <button class="action-btn" onclick="handleLinkPartner()">Connect</button>
-
-                    <div id="partner-selected-wrap" style="display:none; margin-top:14px;">
-                        <p class="partner-selected-line">Partner selected: <strong id="partner-selected-email"></strong></p>
-                        <div class="invite-email-block">
-                            <p class="invite-instructions">Copy the message below and send it to your partner so they know what to do:</p>
-                            <div class="invite-email-template" id="setup-invite-email-template"></div>
-                            <button class="action-btn secondary-btn" id="setup-copy-invite-email-btn" onclick="copyInviteEmail('setup')">Copy Invite Message</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="household-status">
-                <div>
-                    <div class="hh-name" id="hh-name-display"></div>
-                    <div class="hh-members" id="hh-members-display"></div>
-                </div>
-                <div id="hh-invite-wrap">
-                    <div id="hh-waiting-block">
-                        <p>⏳ Waiting for <strong id="hh-waiting-email"></strong> to enter your email (<span id="hh-my-email"></span>) too.</p>
-                        <div class="invite-email-block">
-                            <p class="invite-instructions">Copy the message below and send it to your partner so they know what to do:</p>
-                            <div class="invite-email-template" id="status-invite-email-template"></div>
-                            <button class="action-btn secondary-btn" id="status-copy-invite-email-btn" onclick="copyInviteEmail('status')">Copy Invite Message</button>
-                        </div>
-                        <label>Change partner's email</label>
-                        <input type="email" id="hh-partner-email-edit">
-                        <button class="action-btn secondary-btn" onclick="handleLinkPartner(true)">Update</button>
-                    </div>
-                </div>
-            </div>
-            <div id="household-error" style="color:#d32f2f; font-size:0.85rem; margin-top:8px; display:none;"></div>
-        </div>
-
         <div class="step-content">
 
         <div id="tab-support" class="tab-content active">

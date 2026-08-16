@@ -500,6 +500,7 @@
     window.addEventListener('load', async () => {
         renderArchetypeGrid();
         renderQuizQuestions();
+        renderCommonGoals();
 
         if (!window.Clerk) return; // Clerk script not loaded (key not configured yet)
         await window.Clerk.load({
@@ -530,7 +531,7 @@
 
         if (page === 'login') {
             if (landingGate) landingGate.style.display = signedIn ? 'none' : 'block';
-            if (signedIn) window.location.href = 'archetype.html';
+            if (signedIn) window.location.href = 'household.html';
             return;
         }
 
@@ -550,10 +551,18 @@
         loadHousehold();
     }
 
+    // The household-bar UI (mode-chooser/household-setup/household-status)
+    // only exists in the DOM on household.html now, not on every page — these
+    // elements are null everywhere else, so every touch below is guarded.
+    function showHouseholdError(msg) {
+        if (!householdError) return;
+        householdError.innerText = msg;
+        householdError.style.display = 'block';
+    }
+
     async function loadHousehold() {
         if (!supabaseClient) {
-            householdError.innerText = "Couldn't connect to the database — check your connection and reload the page.";
-            householdError.style.display = 'block';
+            showHouseholdError("Couldn't connect to the database — check your connection and reload the page.");
             renderGoalsGate();
             renderLedgerGate();
             renderLearningGate();
@@ -569,8 +578,7 @@
 
         if (memberErr) {
             console.error('Failed to load household membership:', memberErr);
-            householdError.innerText = "We couldn't load your household right now. Try refreshing the page — if it keeps happening, let us know.";
-            householdError.style.display = 'block';
+            showHouseholdError("We couldn't load your household right now. Try refreshing the page — if it keeps happening, let us know.");
             showModeChooser();
             renderGoalsGate();
             renderLedgerGate();
@@ -586,6 +594,7 @@
             renderLedgerGate();
             renderLearningGate();
             renderGrowGate();
+            updateProgressRing();
             return;
         }
 
@@ -597,19 +606,20 @@
 
         if (hhErr || membersErr) {
             console.error('Failed to load household:', hhErr || membersErr);
-            householdError.innerText = "We couldn't load your household right now. Try refreshing the page — if it keeps happening, let us know.";
-            householdError.style.display = 'block';
+            showHouseholdError("We couldn't load your household right now. Try refreshing the page — if it keeps happening, let us know.");
             return;
         }
 
         currentHousehold = { id: hh.id, name: hh.name, is_solo: !!hh.is_solo, members: members || [] };
 
-        householdError.style.display = 'none';
-        modeChooser.style.display = 'none';
-        householdSetup.style.display = 'none';
-        householdStatus.style.display = 'flex';
-        document.getElementById('hh-name-display').innerText = currentHousehold.name || 'Your Household';
-        document.getElementById('hh-members-display').innerText = currentHousehold.members.map(m => m.display_name || 'Member').join(' & ');
+        if (householdError) householdError.style.display = 'none';
+        if (modeChooser) modeChooser.style.display = 'none';
+        if (householdSetup) householdSetup.style.display = 'none';
+        if (householdStatus) householdStatus.style.display = 'flex';
+        const nameDisplay = document.getElementById('hh-name-display');
+        if (nameDisplay) nameDisplay.innerText = currentHousehold.name || 'Your Household';
+        const membersDisplay = document.getElementById('hh-members-display');
+        if (membersDisplay) membersDisplay.innerText = currentHousehold.members.map(m => m.display_name || 'Member').join(' & ');
         renderPartnerLinkStatus();
 
         applyModeVisibility();
@@ -623,14 +633,16 @@
     }
 
     function showModeChooser() {
+        if (!modeChooser) return;
         modeChooser.style.display = 'block';
-        householdSetup.style.display = 'none';
-        householdStatus.style.display = 'none';
+        if (householdSetup) householdSetup.style.display = 'none';
+        if (householdStatus) householdStatus.style.display = 'none';
     }
 
     function choosePartnerMode() {
+        if (!modeChooser) return;
         modeChooser.style.display = 'none';
-        householdSetup.style.display = 'flex';
+        if (householdSetup) householdSetup.style.display = 'flex';
     }
 
     async function handleCreateSoloHousehold() {
@@ -720,6 +732,7 @@
 
     function renderPartnerLinkStatus() {
         const wrap = document.getElementById('hh-invite-wrap');
+        if (!wrap) return;
         if (!currentHousehold || currentHousehold.is_solo) {
             wrap.style.display = 'none';
             return;
@@ -788,11 +801,12 @@
 
     // ---------------- Gates ----------------
 
-    function renderGateCard(gate, icon, title, detail) {
+    function renderGateCard(gate, icon, title, detail, linkHref, linkLabel) {
         gate.innerHTML = `
             <span class="gate-icon">${icon}</span>
             <span class="gate-title">${escapeHtml(title)}</span>
             <span class="gate-detail">${escapeHtml(detail)}</span>
+            ${linkHref ? `<a class="gate-link" href="${linkHref}">${escapeHtml(linkLabel)}</a>` : ''}
         `;
         gate.style.display = 'block';
     }
@@ -805,7 +819,7 @@
             renderGateCard(gate, '🔒', 'Sign in to unlock this', 'Sign in above to start tracking shared goals.');
             app.style.display = 'none';
         } else if (!currentHousehold) {
-            renderGateCard(gate, '🔒', 'Set up your household first', 'Choose Just Me or With a Partner above to start tracking goals.');
+            renderGateCard(gate, '🔒', 'Set up your household first', 'Choose Just Me or With a Partner to start tracking goals.', 'household.html', 'Go to Household Setup');
             app.style.display = 'none';
         } else {
             gate.style.display = 'none';
@@ -821,7 +835,7 @@
             renderGateCard(gate, '🔒', 'Sign in to unlock this', 'Sign in above to start tracking shared expenses.');
             app.style.display = 'none';
         } else if (!currentHousehold) {
-            renderGateCard(gate, '🔒', 'Set up your household first', 'Choose With a Partner above to start tracking shared expenses.');
+            renderGateCard(gate, '🔒', 'Set up your household first', 'Choose With a Partner to start tracking shared expenses.', 'household.html', 'Go to Household Setup');
             app.style.display = 'none';
         } else {
             gate.style.display = 'none';
@@ -837,7 +851,7 @@
             renderGateCard(gate, '🔒', 'Sign in to unlock this', 'Sign in above to start your learning list.');
             app.style.display = 'none';
         } else if (!currentHousehold) {
-            renderGateCard(gate, '🔒', 'Set up your household first', 'Choose Just Me or With a Partner above to start your learning list.');
+            renderGateCard(gate, '🔒', 'Set up your household first', 'Choose Just Me or With a Partner to start your learning list.', 'household.html', 'Go to Household Setup');
             app.style.display = 'none';
         } else {
             gate.style.display = 'none';
@@ -901,7 +915,10 @@
     }
 
     async function saveProfile() {
-        if (!currentHousehold) return;
+        if (!currentHousehold) {
+            showToast('⚠️ Set up your household first, on the Household tab.');
+            return;
+        }
         const personal = {
             name: document.getElementById('profile-name').value.trim() || myDisplayName(),
             ageRange: document.getElementById('profile-age').value,
@@ -926,11 +943,16 @@
                 financial_info: financial,
                 preferences: preferences
             }, { onConflict: 'household_id,clerk_user_id' });
-            if (error) console.error('Failed to save profile:', error);
+            if (error) {
+                console.error('Failed to save profile:', error);
+                showToast('⚠️ Could not save your profile — please try again.');
+                return;
+            }
         }
 
         memberProfilesCache[myUserId()] = { ...(memberProfilesCache[myUserId()] || {}), personal_info: personal, financial_info: financial, preferences: preferences };
 
+        showToast('✅ Profile saved to your account');
         awardXP(10, 'Profile saved');
         unlockBadge('allSetUp', '📝', 'All Set Up');
         checkTeamPlayerBadge();
@@ -981,6 +1003,52 @@
     }
 
     // ---------------- Goals ----------------
+
+    const COMMON_GOALS = [
+        { title: 'Emergency Fund', amount: 10000 },
+        { title: 'Down Payment on a House', amount: 40000 },
+        { title: 'New Car', amount: 25000 },
+        { title: 'Wedding', amount: 20000 },
+        { title: 'Dream Vacation', amount: 5000 },
+        { title: 'Home Renovation', amount: 15000 },
+        { title: 'Pay Off Credit Card Debt', amount: 5000 },
+        { title: 'Pay Off Student Loans', amount: 20000 },
+        { title: 'Pay Off Car Loan', amount: 10000 },
+        { title: 'Retirement Boost', amount: 50000 },
+        { title: "Kids' College Fund", amount: 30000 },
+        { title: 'New Baby / Nursery', amount: 3000 },
+        { title: 'Home Furniture', amount: 5000 },
+        { title: 'Holiday Gifts Fund', amount: 1500 },
+        { title: 'Medical or Dental Expenses', amount: 3000 },
+        { title: 'Start a Business', amount: 10000 },
+        { title: 'Adopt a Pet', amount: 1000 },
+        { title: 'New Laptop or Tech', amount: 2000 },
+        { title: 'Investment Property Down Payment', amount: 50000 },
+        { title: 'Just-Because Fun Fund', amount: 2000 }
+    ];
+
+    function renderCommonGoals() {
+        const grid = document.getElementById('common-goals-grid');
+        if (!grid) return;
+        grid.innerHTML = COMMON_GOALS.map((g, i) => `
+            <button type="button" class="common-goal-chip" onclick="useCommonGoal(${i})">
+                <span class="common-goal-title">${escapeHtml(g.title)}</span>
+                <span class="common-goal-amount">$${g.amount.toLocaleString()}</span>
+            </button>
+        `).join('');
+    }
+
+    function useCommonGoal(i) {
+        const g = COMMON_GOALS[i];
+        if (!g) return;
+        const titleEl = document.getElementById('goal-title');
+        const targetEl = document.getElementById('goal-target');
+        if (!titleEl || !targetEl) return;
+        titleEl.value = g.title;
+        targetEl.value = g.amount;
+        titleEl.focus();
+        titleEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
 
     async function createGoal() {
         if (!supabaseClient || !currentHousehold) return;
@@ -1238,10 +1306,10 @@
 
     const GROW_GATE_MESSAGES = {
         signedout: { icon: '🔒', title: 'Sign in to unlock this', detail: 'Sign in above to explore this together.' },
-        nohousehold: { icon: '🔒', title: 'Set up your household first', detail: 'Choose With a Partner above to unlock this section.' },
-        solo: { icon: '👥', title: 'Built for two', detail: 'This section is built for two — connect with your partner\'s email above to unlock it.' },
+        nohousehold: { icon: '🔒', title: 'Set up your household first', detail: 'Choose With a Partner to unlock this section.', linkHref: 'household.html', linkLabel: 'Go to Household Setup' },
+        solo: { icon: '👥', title: 'Built for two', detail: 'This section is built for two — connect with your partner\'s email to unlock it.', linkHref: 'household.html', linkLabel: 'Go to Household Setup' },
         noprofile: { icon: '🔒', title: 'Finish your profile first', detail: "Set your Financial Personality and My Profile first — we'll use them to tailor what to explore together.", linkHref: 'profile.html', linkLabel: 'Go to My Profile' },
-        waitingpartner: { icon: '⏳', title: 'Waiting on your partner', detail: 'Waiting on your partner to enter your email address too — see the status above.' }
+        waitingpartner: { icon: '⏳', title: 'Waiting on your partner', detail: 'Waiting on your partner to enter your email address too — check your household status.', linkHref: 'household.html', linkLabel: 'Go to Household Setup' }
     };
 
     function growGateReason() {
@@ -1443,7 +1511,7 @@
 
         if (currentHousehold.members.length < 2) {
             box.className = 'summary-box';
-            box.innerHTML = 'Connect with your partner\'s email above to start splitting expenses.';
+            box.innerHTML = 'Connect with your partner\'s email to start splitting expenses.<br><a class="gate-link" href="household.html">Go to Household Setup</a>';
             return;
         }
 
@@ -1761,6 +1829,7 @@
         const profilePct = calcProfileCompletionPct(memberProfilesCache[myUserId()]);
 
         const steps = [
+            { id: 'tab-household', done: !!currentHousehold },
             { id: 'tab-archetype', done: !!appState.myArchetype },
             { id: 'tab-profile', done: profilePct >= 100, pct: profilePct },
             { id: 'tab-csp', done: !!appState.cspVisited },

@@ -16,43 +16,48 @@
         </div>
 
         <div class="step-nav">
-            <a class="tab-btn" data-tab="tab-archetype" href="archetype.html">
+            <a class="tab-btn" data-tab="tab-household" href="household.html">
                 <span class="step-num">1</span>
+                <span class="step-label">Household</span>
+                <span class="step-status" id="step-status-tab-household"></span>
+            </a>
+            <a class="tab-btn" data-tab="tab-archetype" href="archetype.html">
+                <span class="step-num">2</span>
                 <span class="step-label">Financial Personality</span>
                 <span class="step-status" id="step-status-tab-archetype"></span>
             </a>
             <a class="tab-btn" data-tab="tab-profile" href="profile.html">
-                <span class="step-num">2</span>
+                <span class="step-num">3</span>
                 <span class="step-label">My Profile</span>
                 <span class="step-status" id="step-status-tab-profile"></span>
             </a>
             <a class="tab-btn" data-tab="tab-csp" href="csp.html">
-                <span class="step-num">3</span>
+                <span class="step-num">4</span>
                 <span class="step-label">Spending Plan</span>
                 <span class="step-status" id="step-status-tab-csp"></span>
             </a>
             <a class="tab-btn" data-tab="tab-alignment" href="alignment.html">
-                <span class="step-num">4</span>
+                <span class="step-num">5</span>
                 <span class="step-label">Vision & Dialogue</span>
                 <span class="step-status" id="step-status-tab-alignment"></span>
             </a>
             <a class="tab-btn" data-tab="tab-goals" href="goals.html">
-                <span class="step-num">5</span>
+                <span class="step-num">6</span>
                 <span class="step-label">Goals</span>
                 <span class="step-status" id="step-status-tab-goals"></span>
             </a>
             <a class="tab-btn" data-tab="tab-learning" href="learning.html">
-                <span class="step-num">6</span>
+                <span class="step-num">7</span>
                 <span class="step-label">Learning Together</span>
                 <span class="step-status" id="step-status-tab-learning"></span>
             </a>
             <a class="tab-btn" data-tab="tab-grow" href="grow.html">
-                <span class="step-num">7</span>
+                <span class="step-num">8</span>
                 <span class="step-label">Grow Together</span>
                 <span class="step-status" id="step-status-tab-grow"></span>
             </a>
             <a class="tab-btn" data-tab="tab-ledger" href="ledger.html">
-                <span class="step-num">8</span>
+                <span class="step-num">9</span>
                 <span class="step-label">Ledger</span>
                 <span class="step-status" id="step-status-tab-ledger"></span>
             </a>
