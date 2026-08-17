@@ -742,6 +742,21 @@
         renderPartnerLinkStatus();
         renderPartnerConfirmedBanner();
 
+        // Rows left waiting on a partner from before invite codes existed (or
+        // from before this device last regenerated one) have partner_link_code
+        // = null in the database. Mint one now instead of leaving the invite
+        // panel stuck showing "ask them to resend once they have one" forever.
+        const mine = currentHousehold.members.find(m => m.clerk_user_id === myUserId());
+        if (!currentHousehold.is_solo && currentHousehold.members.length < 2
+            && mine?.pending_partner_email && !mine.partner_link_code) {
+            const { error: backfillErr } = await supabaseClient.rpc('link_partner_by_email', {
+                p_my_email: mine.email || myEmail(),
+                p_partner_email: mine.pending_partner_email,
+                p_display_name: mine.display_name || myDisplayName()
+            });
+            if (!backfillErr) return loadHousehold();
+        }
+
         applyModeVisibility();
         populatePaidBySelect();
         subscribeRealtime();
