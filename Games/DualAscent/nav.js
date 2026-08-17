@@ -19,20 +19,16 @@
 
     const currentPage = document.body.dataset.page;
 
-    // Admin link + notification badge, injected into every page's auth bar so
-    // it shows up wherever an admin happens to be — hidden by default, app.js
-    // reveals it (and fills the badge) once it confirms the signed-in user is
-    // actually an admin. Injected here rather than hand-copied into every
-    // page's HTML, same reasoning as the step sidebar below.
+    // Admin link + notification badge, injected right next to the account
+    // picture so it shows up wherever an admin happens to be — hidden by
+    // default, app.js reveals it (and fills the badge) once it confirms the
+    // signed-in user is actually an admin. Injected here rather than
+    // hand-copied into every page's HTML, same reasoning as the sidebar below.
     const authBar = document.getElementById('auth-bar');
-    if (authBar && !document.getElementById('admin-nav-link')) {
-        const supportLink = authBar.querySelector('a.support-link');
+    const userButton = document.getElementById('user-button');
+    if (authBar && userButton && !document.getElementById('admin-nav-link')) {
         const adminLinkHtml = `<a href="admin.html" class="support-link" id="admin-nav-link" style="display:none;">Admin<span id="admin-badge" class="admin-badge" style="display:none;"></span></a>`;
-        if (supportLink) {
-            supportLink.insertAdjacentHTML('afterend', adminLinkHtml);
-        } else {
-            authBar.insertAdjacentHTML('afterbegin', adminLinkHtml);
-        }
+        userButton.insertAdjacentHTML('beforebegin', adminLinkHtml);
     }
 
     const sidebarMount = document.getElementById('step-sidebar');
@@ -54,6 +50,13 @@
                         <span class="step-status" id="step-status-${step.tab}"></span>
                     </a>
                 `).join('')}
+            </div>
+
+            <div class="step-nav step-nav-extra">
+                <a class="tab-btn" data-tab="tab-connected" href="connectedaccounts.html">
+                    <span class="step-num">🔗</span>
+                    <span class="step-label">Connected Accounts</span>
+                </a>
             </div>
         `;
 
