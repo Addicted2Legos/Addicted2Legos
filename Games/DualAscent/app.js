@@ -536,7 +536,7 @@
     // URL (computed below as LINKEDIN_REDIRECT_URI) added under Auth > Authorized
     // redirect URLs. The Client Secret goes in the linkedin-oauth-exchange Edge
     // Function's secrets, never here.
-    const LINKEDIN_CLIENT_ID = 'REPLACE-ME-LINKEDIN-CLIENT-ID';
+    const LINKEDIN_CLIENT_ID = '86x1renc6hktng';
     const LINKEDIN_REDIRECT_URI = window.location.origin + window.location.pathname;
 
     let currentHousehold = null; // { id, name, is_solo, members: [{clerk_user_id, display_name, email, pending_partner_email}] }
@@ -715,7 +715,7 @@
         const householdId = memberRows[0].household_id;
         const [{ data: hh, error: hhErr }, { data: members, error: membersErr }] = await Promise.all([
             supabaseClient.from('households').select('id, name, is_solo, csp_budget, vision_text').eq('id', householdId).single(),
-            supabaseClient.from('household_members').select('clerk_user_id, display_name, email, pending_partner_email').eq('household_id', householdId)
+            supabaseClient.from('household_members').select('clerk_user_id, display_name, email, pending_partner_email, partner_link_code').eq('household_id', householdId)
         ]);
 
         if (hhErr || membersErr) {
@@ -740,6 +740,7 @@
         const soloBlock = document.getElementById('hh-solo-block');
         if (soloBlock) soloBlock.style.display = currentHousehold.is_solo ? 'block' : 'none';
         renderPartnerLinkStatus();
+        renderPartnerConfirmedBanner();
 
         applyModeVisibility();
         populatePaidBySelect();
@@ -786,7 +787,9 @@
     async function handleLinkPartner(fromEditField) {
         if (!supabaseClient) return;
         const inputId = fromEditField ? 'hh-partner-email-edit' : 'partner-email-input';
+        const codeInputId = fromEditField ? 'hh-partner-code-edit' : 'partner-code-input';
         const partnerEmail = (document.getElementById(inputId).value || '').trim().toLowerCase();
+        const partnerCode = (document.getElementById(codeInputId)?.value || '').trim().toUpperCase();
         householdError.style.display = 'none';
 
         if (!partnerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(partnerEmail)) {
@@ -800,46 +803,50 @@
             return;
         }
 
-        // Show the entered address as "selected" right away, before waiting on
-        // the round trip — the invite template is useful even if the connect
-        // call below fails, since the person still typed a real address.
-        if (!fromEditField) renderPartnerSelected(partnerEmail);
-
-        const { error } = await supabaseClient.rpc('link_partner_by_email', {
+        const { data, error } = await supabaseClient.rpc('link_partner_by_email', {
             p_my_email: myEmail(),
             p_partner_email: partnerEmail,
-            p_display_name: myDisplayName()
+            p_display_name: myDisplayName(),
+            p_partner_code: partnerCode || null
         });
         if (error) {
             householdError.innerText = error.message;
             householdError.style.display = 'block';
             return;
         }
+
+        // Show the entered address plus the code to send them — needed either
+        // way in case this call didn't connect us (they haven't sent us their
+        // code yet, or we didn't have theirs).
+        if (!fromEditField) renderPartnerSelected(partnerEmail, data?.[0]?.my_link_code || '');
         loadHousehold();
     }
 
-    function renderPartnerSelected(partnerEmail) {
+    function renderPartnerSelected(partnerEmail, code) {
         const wrap = document.getElementById('partner-selected-wrap');
         const emailEl = document.getElementById('partner-selected-email');
         const templateBox = document.getElementById('setup-invite-email-template');
         if (!wrap || !emailEl || !templateBox) return;
         emailEl.innerText = partnerEmail;
-        templateBox.innerText = buildInviteEmailText(partnerEmail);
+        templateBox.innerText = buildInviteEmailText(partnerEmail, code);
         wrap.style.display = 'block';
     }
 
     // Usable both before a household exists (right after entering an email) and
-    // after (the "waiting on your partner" panel) — takes the target email as a
-    // parameter instead of reading it off currentHousehold so it works either way.
-    function buildInviteEmailText(partnerEmail) {
+    // after (the "waiting on your partner" panel) — takes the target email and
+    // your current invite code as parameters instead of reading them off
+    // currentHousehold so it works either way.
+    function buildInviteEmailText(partnerEmail, code) {
         const link = new URL('index.html', window.location.href).href;
         return `Hi!\n\n`
             + `${myDisplayName()} would like to connect with you on DualAscent — an app for getting on the same page about money together.\n\n`
             + `1. Go to ${link}\n`
             + `2. Sign in (or create a free account)\n`
             + `3. Choose "With a Partner"\n`
-            + `4. Enter this email address: ${myEmail()}\n\n`
-            + `Once you've entered my email and I've entered yours (${partnerEmail}), we'll be automatically connected — no invite code needed.\n\n`
+            + `4. Enter this email address: ${myEmail()}\n`
+            + `5. Enter this invite code: ${code || '(ask them to resend once they have one)'}\n\n`
+            + `Both the email and the code are required — that way nobody else can connect to my account just by knowing my email address.\n\n`
+            + `Once you've entered my email and code, and I've entered yours (${partnerEmail}), we'll be automatically connected.\n\n`
             + `See you there!`;
     }
 
@@ -873,8 +880,26 @@
         document.getElementById('hh-waiting-email').innerText = partnerEmail || 'your partner';
         document.getElementById('hh-my-email').innerText = mine?.email || myEmail();
         document.getElementById('hh-partner-email-edit').value = partnerEmail;
+        const codeEditEl = document.getElementById('hh-partner-code-edit');
+        if (codeEditEl) codeEditEl.value = '';
         const templateBox = document.getElementById('status-invite-email-template');
-        if (templateBox) templateBox.innerText = buildInviteEmailText(partnerEmail || 'them');
+        if (templateBox) templateBox.innerText = buildInviteEmailText(partnerEmail || 'them', mine?.partner_link_code || '');
+    }
+
+    // Shown at the top of the Household page once a partner has actually
+    // entered your email AND your invite code (and vice versa) — distinct from
+    // just having 2+ members, so it's clear the connection was verified, not
+    // just assumed.
+    function renderPartnerConfirmedBanner() {
+        const banner = document.getElementById('partner-confirmed-banner');
+        if (!banner) return;
+        const connected = !!currentHousehold && !currentHousehold.is_solo && currentHousehold.members.length >= 2;
+        banner.style.display = connected ? 'flex' : 'none';
+        if (connected) {
+            const partner = currentHousehold.members.find(m => m.clerk_user_id !== myUserId());
+            const nameEl = document.getElementById('partner-confirmed-name');
+            if (nameEl) nameEl.innerText = partner?.display_name || 'your partner';
+        }
     }
 
     function applyModeVisibility() {
