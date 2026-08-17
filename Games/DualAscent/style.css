@@ -435,6 +435,73 @@
         }
         .gate-link:hover { background-color: #0d47a1; }
 
+        /* Admin nav link + notification badge */
+        .admin-badge {
+            display: inline-block;
+            background: #d32f2f;
+            color: #fff;
+            font-size: 0.68rem;
+            font-weight: 700;
+            line-height: 1;
+            padding: 3px 6px;
+            border-radius: 10px;
+            margin-left: 4px;
+            vertical-align: middle;
+        }
+
+        /* Admin dashboard */
+        .admin-stats-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+        .admin-stat-tile {
+            flex: 1; min-width: 150px;
+            background: var(--primary-light);
+            border: 1px solid var(--primary);
+            border-radius: 8px;
+            padding: 16px 18px;
+            text-align: center;
+        }
+        .admin-stat-tile .admin-stat-value { font-size: 1.8rem; font-weight: 700; color: var(--primary); display: block; }
+        .admin-stat-tile .admin-stat-label { font-size: 0.8rem; color: var(--text-muted); }
+        .admin-nav-links { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+        .admin-nav-links .action-btn { margin-top: 0; text-decoration: none; display: inline-block; }
+
+        /* Admin tables (error log, admin roster) */
+        .admin-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .admin-table th {
+            text-align: left; padding: 8px 10px; border-bottom: 2px solid var(--border);
+            color: var(--text-muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em;
+        }
+        .admin-table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+        .error-log-row { cursor: pointer; }
+        .error-log-row:hover { background: var(--primary-light); }
+        .error-log-row.error-log-resolved { color: var(--text-muted); }
+        .error-log-when { white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .error-log-message { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .error-severity-chip {
+            font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+            text-transform: uppercase;
+        }
+        .error-severity-error { background: #fdecea; color: #d32f2f; }
+        .error-severity-warning { background: #fff8e1; color: #b8860b; }
+        .error-severity-info { background: var(--primary-light); color: var(--primary); }
+
+        /* Error detail view */
+        .error-detail-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+        .error-detail-nav .action-btn { margin-top: 0; padding: 8px 16px; font-size: 0.85rem; }
+        #error-detail-position { font-size: 0.85rem; color: var(--text-muted); }
+        .error-detail-field { margin-bottom: 14px; }
+        .error-detail-field label { display: block; margin: 0 0 4px 0; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); font-weight: 700; }
+        .error-detail-field .error-detail-value {
+            font-size: 0.9rem; color: var(--text-main); word-break: break-word;
+        }
+        .error-detail-field pre.error-detail-value {
+            background: #fafafa; border: 1px solid var(--border); border-radius: 6px;
+            padding: 10px 12px; white-space: pre-wrap; font-size: 0.82rem; margin: 0; font-family: Menlo, Consolas, monospace;
+        }
+        #error-detail-resolved-info { font-size: 0.82rem; color: var(--primary); font-weight: 600; }
+
+        /* Admin roster */
+        #admin-invite-link-wrap { margin-top: 16px; }
+
         /* Financial personality (archetype) */
         .archetype-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 14px; margin: 16px 0; }
         .archetype-card {

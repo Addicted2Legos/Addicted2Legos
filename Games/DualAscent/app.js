@@ -268,7 +268,7 @@
                 clerk_user_id: myUserId(),
                 archetype: script
             }, { onConflict: 'household_id,clerk_user_id' });
-            if (error) console.error('Failed to save archetype:', error);
+            if (error) logAndConsoleError('Failed to save archetype:', error);
         }
         memberProfilesCache[myUserId()] = { ...(memberProfilesCache[myUserId()] || {}), archetype: script };
 
@@ -401,7 +401,7 @@
             p_net_income: netIncome, p_fixed: fixed, p_invest: invest, p_savings: savings, p_guiltfree: guiltfree
         });
         if (error) {
-            console.error('Failed to save spending plan:', error);
+            logAndConsoleError('Failed to save spending plan:', error);
             showToast('⚠️ Could not save your spending plan: ' + error.message);
             return;
         }
@@ -508,7 +508,7 @@
         ]);
 
         if (visionError || dialError) {
-            console.error('Failed to save vision/dials:', visionError || dialError);
+            logAndConsoleError('Failed to save vision/dials:', visionError || dialError);
             showToast('⚠️ Could not save: ' + (visionError || dialError).message);
             return;
         }
@@ -561,6 +561,57 @@
     function myEmail() {
         return window.Clerk?.user?.primaryEmailAddress?.emailAddress || '';
     }
+
+    // ---------------- Error logging (feeds the Admin > Error Log page) ----------------
+
+    async function logError(details) {
+        if (!supabaseClient) return;
+        try {
+            await supabaseClient.from('error_logs').insert({
+                severity: details.severity || 'error',
+                source: details.source || 'unknown',
+                message: String(details.message || '').slice(0, 4000),
+                stack: details.stack ? String(details.stack).slice(0, 8000) : null,
+                page: window.location.pathname,
+                url: window.location.href,
+                user_agent: navigator.userAgent,
+                clerk_user_id: myUserId(),
+                context: details.context || null
+            });
+        } catch (e) {
+            // Never let logging itself break the page.
+            console.error('Failed to write to error_logs:', e);
+        }
+    }
+
+    // Every handled failure in this file (a failed save, a failed load) calls
+    // this instead of console.error directly, so it shows up in the Admin
+    // Error Log too -- not just the uncaught exceptions caught below.
+    function logAndConsoleError(label, err) {
+        console.error(label + ':', err);
+        logError({
+            source: label,
+            message: (err && (err.message || err.error_description || err.details)) || String(err),
+            stack: err && err.stack,
+            context: (err && typeof err === 'object') ? { raw: JSON.stringify(err).slice(0, 2000) } : null
+        });
+    }
+
+    window.addEventListener('error', (e) => {
+        logError({
+            source: 'window.onerror',
+            message: e.message,
+            stack: e.error && e.error.stack,
+            context: { filename: e.filename, lineno: e.lineno, colno: e.colno }
+        });
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+        logError({
+            source: 'unhandledrejection',
+            message: String((e.reason && e.reason.message) || e.reason),
+            stack: e.reason && e.reason.stack
+        });
+    });
 
     function nameFor(clerkUserId) {
         if (!currentHousehold) return clerkUserId;
@@ -638,6 +689,22 @@
             return;
         }
 
+        // Bouncing straight to index.html like every other page would drop
+        // the ?token=... this page depends on. Instead, stay put and let the
+        // existing sign-in button (already visible above) handle it — Clerk's
+        // sign-in redirect preserves the full current URL, so the token
+        // survives and handleAcceptAdminInvite() runs once signed in.
+        if (page === 'admin-accept') {
+            if (appShell) appShell.style.display = 'block';
+            const statusEl = document.getElementById('admin-accept-status');
+            if (!signedIn) {
+                if (statusEl) statusEl.innerText = 'Sign in above to accept this admin invite.';
+                return;
+            }
+            handleAcceptAdminInvite();
+            return;
+        }
+
         if (!signedIn) {
             window.location.href = 'index.html';
             return;
@@ -645,11 +712,22 @@
 
         if (appShell) appShell.style.display = 'block';
         if (stepSidebar) stepSidebar.style.display = 'block';
+        checkAdminStatus();
         // Support doesn't need a household set up first, so it's loaded here
         // rather than at the end of loadHousehold()'s success path.
         if (page === 'support') {
             renderSupportGate();
             loadSupportMessages();
+        }
+        // Same reasoning for the admin pages -- they aren't household-scoped
+        // either. (admin-accept.html is handled earlier above, before the
+        // sign-in redirect, since it needs to preserve its ?token=.)
+        if (page === 'admin') {
+            loadAdminDashboard();
+        } else if (page === 'admin-errors') {
+            loadErrorLogs();
+        } else if (page === 'admin-admins') {
+            loadAdminRoster();
         }
         loadHousehold();
     }
@@ -680,7 +758,7 @@
             .limit(1);
 
         if (memberErr) {
-            console.error('Failed to load household membership:', memberErr);
+            logAndConsoleError('Failed to load household membership:', memberErr);
             showHouseholdError("We couldn't load your household right now. Try refreshing the page — if it keeps happening, let us know.");
             showModeChooser();
             renderGoalsGate();
@@ -699,7 +777,7 @@
                 p_name: 'My Finances', p_display_name: myDisplayName(), p_is_solo: true
             });
             if (createErr) {
-                console.error('Failed to auto-create household:', createErr);
+                logAndConsoleError('Failed to auto-create household:', createErr);
                 showHouseholdError("We couldn't set up your account right now. Try refreshing the page — if it keeps happening, let us know.");
                 showModeChooser();
                 renderGoalsGate();
@@ -719,7 +797,7 @@
         ]);
 
         if (hhErr || membersErr) {
-            console.error('Failed to load household:', hhErr || membersErr);
+            logAndConsoleError('Failed to load household:', hhErr || membersErr);
             showHouseholdError("We couldn't load your household right now. Try refreshing the page — if it keeps happening, let us know.");
             return;
         }
@@ -841,7 +919,7 @@
         // Show the entered address plus the code to send them — needed either
         // way in case this call didn't connect us (they haven't sent us their
         // code yet, or we didn't have theirs).
-        if (!fromEditField) renderPartnerSelected(partnerEmail, data?.[0]?.my_link_code || '');
+        if (!fromEditField) renderPartnerSelected(partnerEmail, data?.[0]?.out_link_code || '');
         loadHousehold();
     }
 
@@ -851,6 +929,8 @@
         const templateBox = document.getElementById('setup-invite-email-template');
         if (!wrap || !emailEl || !templateBox) return;
         emailEl.innerText = partnerEmail;
+        const codeEl = document.getElementById('setup-my-link-code');
+        if (codeEl) codeEl.innerText = code || '';
         templateBox.innerText = buildInviteEmailText(partnerEmail, code);
         wrap.style.display = 'block';
     }
@@ -905,6 +985,8 @@
         document.getElementById('hh-partner-email-edit').value = partnerEmail;
         const codeEditEl = document.getElementById('hh-partner-code-edit');
         if (codeEditEl) codeEditEl.value = '';
+        const myCodeEl = document.getElementById('hh-my-link-code');
+        if (myCodeEl) myCodeEl.innerText = mine?.partner_link_code || '';
         const templateBox = document.getElementById('status-invite-email-template');
         if (templateBox) templateBox.innerText = buildInviteEmailText(partnerEmail || 'them', mine?.partner_link_code || '');
     }
@@ -1055,7 +1137,7 @@
             .select('clerk_user_id, archetype, xp, personal_info, financial_info, preferences, vision_info, linkedin_sub, linkedin_name, linkedin_email, linkedin_photo_url, linkedin_headline, linkedin_connected_at')
             .eq('household_id', currentHousehold.id);
 
-        if (error) { console.error('Failed to load member profiles:', error); return; }
+        if (error) { logAndConsoleError('Failed to load member profiles:', error); return; }
         memberProfilesCache = {};
         (data || []).forEach(row => memberProfilesCache[row.clerk_user_id] = row);
 
@@ -1120,7 +1202,7 @@
                 preferences: preferences
             }, { onConflict: 'household_id,clerk_user_id' });
             if (error) {
-                console.error('Failed to save profile:', error);
+                logAndConsoleError('Failed to save profile:', error);
                 showToast('⚠️ Could not save your profile: ' + error.message);
                 return;
             }
@@ -1235,7 +1317,7 @@
             body: { code, redirect_uri: LINKEDIN_REDIRECT_URI }
         });
         if (fnError || !data) {
-            console.error('LinkedIn exchange failed:', fnError);
+            logAndConsoleError('LinkedIn exchange failed:', fnError);
             showToast('⚠️ Could not connect LinkedIn: ' + (fnError?.message || 'unknown error'));
             return;
         }
@@ -1254,7 +1336,7 @@
             ...linkedinFields
         }, { onConflict: 'household_id,clerk_user_id' });
         if (saveErr) {
-            console.error('Failed to save LinkedIn connection:', saveErr);
+            logAndConsoleError('Failed to save LinkedIn connection:', saveErr);
             showToast('⚠️ Connected to LinkedIn, but could not save it: ' + saveErr.message);
             return;
         }
@@ -1276,7 +1358,7 @@
             .eq('household_id', currentHousehold.id)
             .eq('clerk_user_id', myUserId());
         if (error) {
-            console.error('Failed to disconnect LinkedIn:', error);
+            logAndConsoleError('Failed to disconnect LinkedIn:', error);
             showToast('⚠️ Could not disconnect: ' + error.message);
             return;
         }
@@ -1309,7 +1391,7 @@
             ...(fillsOccupation ? { personal_info: updatedPersonal } : {})
         }, { onConflict: 'household_id,clerk_user_id' });
         if (error) {
-            console.error('Failed to save LinkedIn headline:', error);
+            logAndConsoleError('Failed to save LinkedIn headline:', error);
             showToast('⚠️ Could not save: ' + error.message);
             return;
         }
@@ -1410,7 +1492,7 @@
             goal_type: goalType,
             created_by: myUserId()
         });
-        if (error) { console.error('Failed to create goal:', error); return; }
+        if (error) { logAndConsoleError('Failed to create goal:', error); return; }
 
         document.getElementById('goal-title').value = '';
         document.getElementById('goal-target').value = '';
@@ -1432,7 +1514,7 @@
             clerk_user_id: myUserId(),
             amount
         });
-        if (error) { console.error('Failed to add contribution:', error); return; }
+        if (error) { logAndConsoleError('Failed to add contribution:', error); return; }
         input.value = '';
         loadGoals();
     }
@@ -1445,7 +1527,7 @@
             .eq('household_id', currentHousehold.id)
             .order('created_at', { ascending: true });
 
-        if (goalsErr) { console.error('Failed to load goals:', goalsErr); return; }
+        if (goalsErr) { logAndConsoleError('Failed to load goals:', goalsErr); return; }
         goalsCache = goals || [];
 
         if (goalsCache.length === 0) {
@@ -1462,7 +1544,7 @@
             .select('goal_id, clerk_user_id, amount')
             .in('goal_id', goalIds);
 
-        if (contribErr) { console.error('Failed to load contributions:', contribErr); return; }
+        if (contribErr) { logAndConsoleError('Failed to load contributions:', contribErr); return; }
         contributionsCache = contributions || [];
 
         renderGoalsList();
@@ -1628,7 +1710,7 @@
             topic,
             note: note || null
         });
-        if (error) { console.error('Failed to add learning item:', error); return; }
+        if (error) { logAndConsoleError('Failed to add learning item:', error); return; }
 
         document.getElementById('learn-topic').value = '';
         document.getElementById('learn-note').value = '';
@@ -1639,7 +1721,7 @@
     async function markLearningDone(id) {
         if (!supabaseClient) return;
         const { error } = await supabaseClient.from('learning_items').update({ status: 'done' }).eq('id', id);
-        if (error) { console.error('Failed to update learning item:', error); return; }
+        if (error) { logAndConsoleError('Failed to update learning item:', error); return; }
         await loadLearningItems();
 
         const myId = myUserId();
@@ -1656,7 +1738,7 @@
             .eq('household_id', currentHousehold.id)
             .order('created_at', { ascending: false });
 
-        if (error) { console.error('Failed to load learning items:', error); return; }
+        if (error) { logAndConsoleError('Failed to load learning items:', error); return; }
         learningCache = data || [];
         renderLearningLists();
         updateProgressRing();
@@ -1849,7 +1931,7 @@
             payer_share_pct: isNaN(sharePct) ? 50 : sharePct,
             created_by: myUserId()
         });
-        if (error) { console.error('Failed to add ledger entry:', error); return; }
+        if (error) { logAndConsoleError('Failed to add ledger entry:', error); return; }
 
         document.getElementById('ledger-desc').value = '';
         document.getElementById('ledger-amount').value = '';
@@ -1865,7 +1947,7 @@
             .eq('household_id', currentHousehold.id)
             .order('created_at', { ascending: false });
 
-        if (error) { console.error('Failed to load ledger:', error); return; }
+        if (error) { logAndConsoleError('Failed to load ledger:', error); return; }
         ledgerCache = data || [];
         renderLedgerList();
         renderBalanceSummary();
@@ -1950,7 +2032,7 @@
             .order('created_at', { ascending: false })
             .limit(100);
 
-        if (error) { console.error('Failed to load support messages:', error); return; }
+        if (error) { logAndConsoleError('Failed to load support messages:', error); return; }
         supportCache = data || [];
         renderSupportMessages();
     }
@@ -1967,7 +2049,7 @@
             display_name: myDisplayName(),
             message
         });
-        if (error) { console.error('Failed to post support message:', error); return; }
+        if (error) { logAndConsoleError('Failed to post support message:', error); return; }
 
         input.value = '';
         loadSupportMessages();
@@ -2001,7 +2083,7 @@
                 .update({ xp: appState.xp })
                 .eq('household_id', currentHousehold.id)
                 .eq('clerk_user_id', myUserId())
-                .then(({ error }) => { if (error) console.error('Failed to save XP:', error); });
+                .then(({ error }) => { if (error) logAndConsoleError('Failed to save XP:', error); });
         }
     }
 
@@ -2260,4 +2342,378 @@
             unlockBadge('fullyAligned', '🏅', 'Fully Aligned');
             renderBadges();
         }
+    }
+
+    // ---------------- Admin ----------------
+    // Client-side gating here is UX only -- the real boundary is RLS (every
+    // admin table/column is gated on is_admin()/my_admin_role() server-side),
+    // so a non-admin who navigates straight to an admin page sees an empty
+    // gate, not real data.
+
+    let myAdminRole = null; // null | 'read' | 'manage' | 'full'
+    let myAdminRolePromise = null;
+    let adminRealtimeChannel = null;
+    let errorLogsCache = [];
+    let currentErrorLogIndex = -1;
+    let adminRosterCache = [];
+
+    // Memoized so every admin page's loader can await this without firing a
+    // separate round trip each time.
+    function getMyAdminRole() {
+        if (!myAdminRolePromise) {
+            myAdminRolePromise = supabaseClient
+                ? supabaseClient.rpc('my_admin_role').then(({ data, error }) => {
+                    if (error) { logAndConsoleError('Failed to check admin role', error); return null; }
+                    return data || null;
+                  })
+                : Promise.resolve(null);
+        }
+        return myAdminRolePromise;
+    }
+
+    // Called from onAuthChange() on every signed-in page (not just admin
+    // pages) so the Admin nav link + notification badge appear wherever an
+    // admin happens to be, not only once they're already in the admin section.
+    async function checkAdminStatus() {
+        const role = await getMyAdminRole();
+        myAdminRole = role;
+        const navLink = document.getElementById('admin-nav-link');
+        if (navLink) navLink.style.display = role ? 'inline-block' : 'none';
+        if (role) {
+            refreshAdminBadge();
+            subscribeAdminRealtime();
+        }
+    }
+
+    async function refreshAdminBadge() {
+        if (!supabaseClient || !myAdminRole) return;
+        const seenErrors = localStorage.getItem('dualascent-admin-seen-errors') || '1970-01-01T00:00:00.000Z';
+        const seenSupport = localStorage.getItem('dualascent-admin-seen-support') || '1970-01-01T00:00:00.000Z';
+        const [{ count: errCount }, { count: supportCount }] = await Promise.all([
+            supabaseClient.from('error_logs').select('id', { count: 'exact', head: true }).gt('created_at', seenErrors),
+            supabaseClient.from('support_messages').select('id', { count: 'exact', head: true }).gt('created_at', seenSupport)
+        ]);
+        const total = (errCount || 0) + (supportCount || 0);
+        const badge = document.getElementById('admin-badge');
+        if (!badge) return;
+        if (total > 0) {
+            badge.innerText = total > 99 ? '99+' : String(total);
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    function markAdminSeen(kind) {
+        localStorage.setItem('dualascent-admin-seen-' + kind, new Date().toISOString());
+        refreshAdminBadge();
+    }
+
+    // One realtime channel, subscribed once per page load, covers both
+    // notification sources so an admin gets a live toast/badge update no
+    // matter where in the site they are.
+    function subscribeAdminRealtime() {
+        if (!supabaseClient || adminRealtimeChannel) return;
+        adminRealtimeChannel = supabaseClient.channel('admin-notifications')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'error_logs' }, (payload) => {
+                refreshAdminBadge();
+                if (document.body.dataset.page === 'admin-errors') {
+                    loadErrorLogs();
+                } else {
+                    showToast('🆕 New error logged: ' + String(payload.new?.message || '').slice(0, 80));
+                }
+            })
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages' }, (payload) => {
+                refreshAdminBadge();
+                if (document.body.dataset.page !== 'support') {
+                    showToast('🆕 New support message from ' + (payload.new?.display_name || 'someone'));
+                }
+            })
+            .subscribe();
+    }
+
+    // ---- Dashboard ----
+
+    async function loadAdminDashboard() {
+        const role = await getMyAdminRole();
+        const gate = document.getElementById('admin-gate');
+        const content = document.getElementById('admin-dashboard-content');
+        if (!role) {
+            if (gate) gate.style.display = 'block';
+            if (content) content.style.display = 'none';
+            return;
+        }
+        if (gate) gate.style.display = 'none';
+        if (content) content.style.display = 'block';
+
+        const [{ count: unresolvedCount }, { count: totalErrorCount }, { count: supportCount }] = await Promise.all([
+            supabaseClient.from('error_logs').select('id', { count: 'exact', head: true }).eq('resolved', false),
+            supabaseClient.from('error_logs').select('id', { count: 'exact', head: true }),
+            supabaseClient.from('support_messages').select('id', { count: 'exact', head: true })
+        ]);
+        document.getElementById('admin-stat-unresolved').innerText = unresolvedCount ?? 0;
+        document.getElementById('admin-stat-total-errors').innerText = totalErrorCount ?? 0;
+        document.getElementById('admin-stat-support').innerText = supportCount ?? 0;
+
+        const roleLabel = document.getElementById('admin-my-role');
+        if (roleLabel) roleLabel.innerText = role;
+
+        const rosterLink = document.getElementById('admin-roster-link');
+        if (rosterLink) rosterLink.style.display = (role === 'full') ? 'inline-block' : 'none';
+    }
+
+    // ---- Error log ----
+
+    async function loadErrorLogs() {
+        const role = await getMyAdminRole();
+        const gate = document.getElementById('admin-gate');
+        const content = document.getElementById('error-log-content');
+        if (!role) {
+            if (gate) gate.style.display = 'block';
+            if (content) content.style.display = 'none';
+            return;
+        }
+        if (gate) gate.style.display = 'none';
+        if (content) content.style.display = 'block';
+
+        const { data, error } = await supabaseClient
+            .from('error_logs')
+            .select('id, created_at, severity, source, message, stack, page, url, user_agent, clerk_user_id, context, resolved, resolved_by, resolved_at')
+            .order('created_at', { ascending: true })
+            .limit(500);
+        if (error) { logAndConsoleError('Failed to load error logs', error); return; }
+        errorLogsCache = data || [];
+        markAdminSeen('errors');
+
+        // Re-render the open detail view in place if we were viewing one when
+        // a realtime refresh fired, instead of silently kicking back to the list.
+        if (currentErrorLogIndex >= 0 && currentErrorLogIndex < errorLogsCache.length) {
+            renderErrorDetail();
+        } else {
+            renderErrorLogList();
+        }
+    }
+
+    function renderErrorLogList() {
+        const listWrap = document.getElementById('error-log-list-wrap');
+        const detailWrap = document.getElementById('error-log-detail-wrap');
+        if (detailWrap) detailWrap.style.display = 'none';
+        if (!listWrap) return;
+        listWrap.style.display = 'block';
+        currentErrorLogIndex = -1;
+
+        const tbody = document.getElementById('error-log-rows');
+        if (!tbody) return;
+        if (errorLogsCache.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:20px;">No errors logged yet.</td></tr>';
+            return;
+        }
+        // errorLogsCache is oldest-first (so Prev/Next math below is simple
+        // index math) -- reverse just for display, newest at the top.
+        tbody.innerHTML = errorLogsCache.map((row, idx) => idx).reverse().map(idx => {
+            const row = errorLogsCache[idx];
+            const when = new Date(row.created_at).toLocaleString();
+            return `<tr class="error-log-row${row.resolved ? ' error-log-resolved' : ''}" onclick="openErrorDetail(${idx})">
+                <td class="error-log-when">${escapeHtml(when)}</td>
+                <td><span class="error-severity-chip error-severity-${escapeHtml(row.severity)}">${escapeHtml(row.severity)}</span></td>
+                <td>${escapeHtml(row.source || '')}</td>
+                <td class="error-log-message">${escapeHtml((row.message || '').slice(0, 100))}</td>
+                <td>${row.resolved ? '✅ Resolved' : '—'}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    function openErrorDetail(index) {
+        currentErrorLogIndex = index;
+        renderErrorDetail();
+    }
+
+    function renderErrorDetail() {
+        const row = errorLogsCache[currentErrorLogIndex];
+        const listWrap = document.getElementById('error-log-list-wrap');
+        const detailWrap = document.getElementById('error-log-detail-wrap');
+        if (!row || !detailWrap) return;
+        if (listWrap) listWrap.style.display = 'none';
+        detailWrap.style.display = 'block';
+
+        document.getElementById('error-detail-when').innerText = new Date(row.created_at).toLocaleString();
+        document.getElementById('error-detail-severity').innerText = row.severity;
+        document.getElementById('error-detail-source').innerText = row.source || '';
+        document.getElementById('error-detail-message').innerText = row.message || '';
+        document.getElementById('error-detail-stack').innerText = row.stack || '(none)';
+        document.getElementById('error-detail-page').innerText = row.page || '';
+        document.getElementById('error-detail-url').innerText = row.url || '';
+        document.getElementById('error-detail-user-agent').innerText = row.user_agent || '';
+        document.getElementById('error-detail-user').innerText = row.clerk_user_id || '(not signed in)';
+        document.getElementById('error-detail-context').innerText = row.context ? JSON.stringify(row.context, null, 2) : '(none)';
+        document.getElementById('error-detail-resolved-info').innerText = row.resolved
+            ? `Resolved by ${row.resolved_by || 'someone'} on ${row.resolved_at ? new Date(row.resolved_at).toLocaleString() : 'unknown date'}`
+            : '';
+
+        const resolveBtn = document.getElementById('error-detail-resolve-btn');
+        if (resolveBtn) {
+            resolveBtn.innerText = row.resolved ? 'Mark Unresolved' : 'Mark Resolved';
+            resolveBtn.style.display = (myAdminRole === 'manage' || myAdminRole === 'full') ? 'inline-block' : 'none';
+        }
+
+        const prevBtn = document.getElementById('error-detail-prev-btn');
+        const nextBtn = document.getElementById('error-detail-next-btn');
+        // List displays newest-first, so "Older" steps the index down and
+        // "Newer" steps it up -- both walk the same chronological cache.
+        if (prevBtn) prevBtn.disabled = currentErrorLogIndex <= 0;
+        if (nextBtn) nextBtn.disabled = currentErrorLogIndex >= errorLogsCache.length - 1;
+        document.getElementById('error-detail-position').innerText = `${currentErrorLogIndex + 1} of ${errorLogsCache.length}`;
+    }
+
+    function navigateErrorDetail(delta) {
+        const next = currentErrorLogIndex + delta;
+        if (next < 0 || next >= errorLogsCache.length) return;
+        openErrorDetail(next);
+    }
+
+    async function toggleErrorResolved() {
+        const row = errorLogsCache[currentErrorLogIndex];
+        if (!row) return;
+        const newResolved = !row.resolved;
+        const { error } = await supabaseClient.from('error_logs').update({
+            resolved: newResolved,
+            resolved_by: newResolved ? myUserId() : null,
+            resolved_at: newResolved ? new Date().toISOString() : null
+        }).eq('id', row.id);
+        if (error) { logAndConsoleError('Failed to update error resolution', error); showToast('⚠️ Could not update: ' + error.message); return; }
+        row.resolved = newResolved;
+        row.resolved_by = newResolved ? myUserId() : null;
+        row.resolved_at = newResolved ? new Date().toISOString() : null;
+        renderErrorDetail();
+        showToast(newResolved ? '✅ Marked resolved' : 'Marked unresolved');
+    }
+
+    // ---- Admin roster ----
+
+    async function loadAdminRoster() {
+        const role = await getMyAdminRole();
+        const gate = document.getElementById('admin-gate');
+        const content = document.getElementById('admin-roster-content');
+        if (!role) {
+            if (gate) gate.style.display = 'block';
+            if (content) content.style.display = 'none';
+            return;
+        }
+        if (gate) gate.style.display = 'none';
+        if (content) content.style.display = 'block';
+
+        const inviteForm = document.getElementById('admin-invite-form');
+        if (inviteForm) inviteForm.style.display = (role === 'full') ? 'block' : 'none';
+
+        const { data, error } = await supabaseClient
+            .from('app_admins')
+            .select('id, email, display_name, role, activated_at, created_at')
+            .order('created_at', { ascending: true });
+        if (error) { logAndConsoleError('Failed to load admin roster', error); return; }
+        adminRosterCache = data || [];
+        renderAdminRoster();
+    }
+
+    function renderAdminRoster() {
+        const tbody = document.getElementById('admin-roster-rows');
+        if (!tbody) return;
+        const canManage = myAdminRole === 'full';
+        tbody.innerHTML = adminRosterCache.map(a => `
+            <tr>
+                <td>${escapeHtml(a.display_name || a.email)}</td>
+                <td>${escapeHtml(a.email)}</td>
+                <td>
+                    ${canManage
+                        ? `<select onchange="handleUpdateAdminRole('${a.id}', this.value)">
+                            ${['read', 'manage', 'full'].map(r => `<option value="${r}" ${r === a.role ? 'selected' : ''}>${r}</option>`).join('')}
+                           </select>`
+                        : escapeHtml(a.role)}
+                </td>
+                <td>${a.activated_at ? '✅ Active' : '⏳ Invited, not yet accepted'}</td>
+                <td>${canManage ? `<button class="action-btn secondary-btn" style="margin-top:0; padding:6px 12px; font-size:0.8rem;" onclick="handleRemoveAdmin('${a.id}')">Remove</button>` : ''}</td>
+            </tr>
+        `).join('');
+    }
+
+    async function handleInviteAdmin() {
+        const emailEl = document.getElementById('admin-invite-email');
+        const roleEl = document.getElementById('admin-invite-role');
+        const errorEl = document.getElementById('admin-invite-error');
+        if (!emailEl || !roleEl) return;
+        const email = emailEl.value.trim().toLowerCase();
+        const role = roleEl.value;
+        if (errorEl) errorEl.style.display = 'none';
+
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            if (errorEl) { errorEl.innerText = 'Enter a valid email address.'; errorEl.style.display = 'block'; }
+            return;
+        }
+
+        const { data, error } = await supabaseClient.rpc('invite_admin', { p_email: email, p_role: role });
+        if (error) {
+            if (errorEl) { errorEl.innerText = error.message; errorEl.style.display = 'block'; }
+            return;
+        }
+
+        const token = data?.[0]?.out_invite_token || '';
+        const link = new URL('admin-accept.html', window.location.href).href + '?token=' + encodeURIComponent(token);
+        const wrap = document.getElementById('admin-invite-link-wrap');
+        const linkBox = document.getElementById('admin-invite-link-template');
+        if (linkBox) linkBox.innerText = `Hi!\n\n${myDisplayName()} is inviting you to help administer DualAscent (role: ${role}).\n\nGo to this link while signed in to accept:\n${link}\n\nKeep this link private -- anyone who opens it gets ${role} admin access.`;
+        if (wrap) wrap.style.display = 'block';
+
+        emailEl.value = '';
+        loadAdminRoster();
+    }
+
+    function copyAdminInviteLink() {
+        const box = document.getElementById('admin-invite-link-template');
+        const btn = document.getElementById('admin-invite-copy-btn');
+        if (!box || !btn) return;
+        navigator.clipboard.writeText(box.innerText).then(() => {
+            const original = btn.innerText;
+            btn.innerText = 'Copied!';
+            setTimeout(() => btn.innerText = original, 1200);
+        });
+    }
+
+    async function handleUpdateAdminRole(id, role) {
+        const { error } = await supabaseClient.rpc('update_admin_role', { p_id: id, p_role: role });
+        if (error) { logAndConsoleError('Failed to update admin role', error); showToast('⚠️ Could not update role: ' + error.message); loadAdminRoster(); return; }
+        showToast('✅ Role updated');
+        loadAdminRoster();
+    }
+
+    async function handleRemoveAdmin(id) {
+        if (!confirm('Remove this admin? They will lose access immediately.')) return;
+        const { error } = await supabaseClient.rpc('remove_admin', { p_id: id });
+        if (error) { logAndConsoleError('Failed to remove admin', error); showToast('⚠️ Could not remove admin: ' + error.message); return; }
+        showToast('✅ Admin removed');
+        loadAdminRoster();
+    }
+
+    // ---- Accept invite ----
+
+    async function handleAcceptAdminInvite() {
+        const statusEl = document.getElementById('admin-accept-status');
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+        if (!token) {
+            if (statusEl) statusEl.innerText = "This invite link is missing its code — ask whoever invited you to resend it.";
+            return;
+        }
+        const { data, error } = await supabaseClient.rpc('accept_admin_invite', { p_token: token });
+        if (error) {
+            if (statusEl) statusEl.innerText = 'Something went wrong: ' + error.message;
+            logAndConsoleError('Failed to accept admin invite', error);
+            return;
+        }
+        if (!data) {
+            if (statusEl) statusEl.innerText = "This invite link isn't valid — it may have already been used, or the email it was sent to already has an active admin. Ask whoever invited you to send a new one.";
+            return;
+        }
+        if (statusEl) statusEl.innerText = "You're in! Redirecting to the admin dashboard...";
+        myAdminRolePromise = null;
+        checkAdminStatus();
+        setTimeout(() => { window.location.href = 'admin.html'; }, 1500);
     }

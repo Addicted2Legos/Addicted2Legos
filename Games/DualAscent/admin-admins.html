@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Admins · DualAscent</title>
+    <!-- Clerk: this app uses its own Clerk application, separate from ClickLasers.html.
+         Replace data-clerk-publishable-key and src domain with the values from that app's dashboard (Configure > API Keys) -->
+    <script
+      async
+      crossorigin="anonymous"
+      data-clerk-publishable-key="pk_test_ZWFzeS1jb3lvdGUtNjAuY2xlcmsuYWNjb3VudHMuZGV2JA"
+      src="https://easy-coyote-60.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+      type="text/javascript"
+    ></script>
+    <!-- Supabase: this app uses its own Supabase project, separate from ClickLasers.html.
+         Needs 20260816_admin_and_error_log.sql applied — see admin.html's comment for details. -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="Images/DualAscentLogoTransparentBackground.png">
+</head>
+<body data-page="admin-admins">
+
+<div class="container">
+<div class="page-shell">
+<nav class="step-sidebar" id="step-sidebar" style="display:none;"></nav>
+
+<div class="main-col">
+    <div id="auth-bar">
+        <a href="connectedaccounts.html" class="support-link">Connected Accounts</a>
+        <a href="support.html" class="support-link">Support</a>
+        <button id="sign-in-btn" class="action-btn clerk-sign-in-trigger" style="margin-top:0;">Sign In</button>
+        <div id="user-button"></div>
+    </div>
+
+    <div id="app-shell" style="display:none;">
+
+        <div class="step-content">
+
+        <div id="tab-admin-admins" class="tab-content active">
+            <h2>Manage Admins</h2>
+            <p><a href="admin.html">← Back to Admin</a></p>
+
+            <div id="admin-gate" class="gate-message" style="display:none;">
+                <span class="gate-icon">🔒</span>
+                <span class="gate-title">Admins only</span>
+                <span class="gate-detail">You don't have admin access on this account.</span>
+            </div>
+
+            <div id="admin-roster-content" style="display:none;">
+
+                <div id="admin-invite-form" class="card" style="display:none;">
+                    <h3>Invite a New Admin</h3>
+                    <p style="font-size:0.85rem; color:var(--text-muted); margin-top:0;">This creates a private, one-time invite link for the email you enter. Only "full" admins can invite, change roles, or remove other admins.</p>
+                    <label>Email</label>
+                    <input type="email" id="admin-invite-email" placeholder="teammate@example.com">
+                    <label>Role</label>
+                    <select id="admin-invite-role">
+                        <option value="read">Read — can view the error log and support activity</option>
+                        <option value="manage">Manage — read, plus can resolve errors</option>
+                        <option value="full">Full — manage, plus can invite/remove other admins</option>
+                    </select>
+                    <button class="action-btn" onclick="handleInviteAdmin()">Create Invite</button>
+                    <div id="admin-invite-error" style="color:#d32f2f; font-size:0.85rem; margin-top:8px; display:none;"></div>
+
+                    <div id="admin-invite-link-wrap" style="display:none;">
+                        <p class="invite-instructions">Copy this and send it to them privately (email, DM, etc.) — whoever opens this link while signed in gets admin access, so don't post it anywhere public:</p>
+                        <div class="invite-email-template" id="admin-invite-link-template"></div>
+                        <button class="action-btn secondary-btn" id="admin-invite-copy-btn" onclick="copyAdminInviteLink()">Copy Invite Link</button>
+                    </div>
+                </div>
+
+                <div class="card" style="overflow-x:auto;">
+                    <h3>Current Admins</h3>
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-roster-rows"></tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+
+        </div>
+    </div>
+</div>
+</div>
+</div>
+
+<img src="Images/DualAscentLogoWide.png" alt="DualAscent" class="page-footer-logo">
+
+<div id="toast-container"></div>
+
+<script src="nav.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>

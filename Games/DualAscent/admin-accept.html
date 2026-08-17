@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accept Admin Invite · DualAscent</title>
+    <!-- Clerk: this app uses its own Clerk application, separate from ClickLasers.html.
+         Replace data-clerk-publishable-key and src domain with the values from that app's dashboard (Configure > API Keys) -->
+    <script
+      async
+      crossorigin="anonymous"
+      data-clerk-publishable-key="pk_test_ZWFzeS1jb3lvdGUtNjAuY2xlcmsuYWNjb3VudHMuZGV2JA"
+      src="https://easy-coyote-60.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+      type="text/javascript"
+    ></script>
+    <!-- Supabase: this app uses its own Supabase project, separate from ClickLasers.html.
+         Needs 20260816_admin_and_error_log.sql applied — see admin.html's comment for details. -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="Images/DualAscentLogoTransparentBackground.png">
+</head>
+<body data-page="admin-accept">
+
+<div class="container">
+<div class="page-shell">
+<nav class="step-sidebar" id="step-sidebar" style="display:none;"></nav>
+
+<div class="main-col">
+    <div id="auth-bar">
+        <a href="connectedaccounts.html" class="support-link">Connected Accounts</a>
+        <a href="support.html" class="support-link">Support</a>
+        <button id="sign-in-btn" class="action-btn clerk-sign-in-trigger" style="margin-top:0;">Sign In</button>
+        <div id="user-button"></div>
+    </div>
+
+    <div id="app-shell" style="display:none;">
+
+        <div class="step-content">
+
+        <div id="tab-admin-accept" class="tab-content active">
+            <h2>Accept Admin Invite</h2>
+            <div class="card">
+                <p id="admin-accept-status">Checking your invite…</p>
+            </div>
+        </div>
+
+        </div>
+    </div>
+</div>
+</div>
+</div>
+
+<img src="Images/DualAscentLogoWide.png" alt="DualAscent" class="page-footer-logo">
+
+<div id="toast-container"></div>
+
+<script src="nav.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>

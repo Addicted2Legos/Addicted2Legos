@@ -19,6 +19,22 @@
 
     const currentPage = document.body.dataset.page;
 
+    // Admin link + notification badge, injected into every page's auth bar so
+    // it shows up wherever an admin happens to be — hidden by default, app.js
+    // reveals it (and fills the badge) once it confirms the signed-in user is
+    // actually an admin. Injected here rather than hand-copied into every
+    // page's HTML, same reasoning as the step sidebar below.
+    const authBar = document.getElementById('auth-bar');
+    if (authBar && !document.getElementById('admin-nav-link')) {
+        const supportLink = authBar.querySelector('a.support-link');
+        const adminLinkHtml = `<a href="admin.html" class="support-link" id="admin-nav-link" style="display:none;">Admin<span id="admin-badge" class="admin-badge" style="display:none;"></span></a>`;
+        if (supportLink) {
+            supportLink.insertAdjacentHTML('afterend', adminLinkHtml);
+        } else {
+            authBar.insertAdjacentHTML('afterbegin', adminLinkHtml);
+        }
+    }
+
     const sidebarMount = document.getElementById('step-sidebar');
     if (sidebarMount) {
         sidebarMount.innerHTML = `

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin · DualAscent</title>
+    <!-- Clerk: this app uses its own Clerk application, separate from ClickLasers.html.
+         Replace data-clerk-publishable-key and src domain with the values from that app's dashboard (Configure > API Keys) -->
+    <script
+      async
+      crossorigin="anonymous"
+      data-clerk-publishable-key="pk_test_ZWFzeS1jb3lvdGUtNjAuY2xlcmsuYWNjb3VudHMuZGV2JA"
+      src="https://easy-coyote-60.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+      type="text/javascript"
+    ></script>
+    <!-- Supabase: this app uses its own Supabase project, separate from ClickLasers.html.
+         Replace SUPABASE_URL / SUPABASE_ANON_KEY constants in app.js once your project is set up.
+         Schema additions this version depends on live in DualAscent/Supabase/ — see the earlier
+         migration files for the base app schema. This page additionally needs
+         20260816_admin_and_error_log.sql (app_admins roster + roles, error_logs table, and the
+         is_admin/invite_admin/accept_admin_invite/update_admin_role/remove_admin functions) run
+         after everything else. That migration seeds one bootstrap "full" admin by clerk_user_id —
+         read the comment at the bottom of that file before running it. -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="Images/DualAscentLogoTransparentBackground.png">
+</head>
+<body data-page="admin">
+
+<div class="container">
+<div class="page-shell">
+<nav class="step-sidebar" id="step-sidebar" style="display:none;"></nav>
+
+<div class="main-col">
+    <div id="auth-bar">
+        <a href="connectedaccounts.html" class="support-link">Connected Accounts</a>
+        <a href="support.html" class="support-link">Support</a>
+        <button id="sign-in-btn" class="action-btn clerk-sign-in-trigger" style="margin-top:0;">Sign In</button>
+        <div id="user-button"></div>
+    </div>
+
+    <div id="app-shell" style="display:none;">
+
+        <div class="step-content">
+
+        <div id="tab-admin" class="tab-content active">
+            <h2>Admin</h2>
+            <p>Site-wide admin tools — error log, support activity, and the admin roster.</p>
+
+            <div id="admin-gate" class="gate-message" style="display:none;">
+                <span class="gate-icon">🔒</span>
+                <span class="gate-title">Admins only</span>
+                <span class="gate-detail">You don't have admin access on this account. If you think that's wrong, ask an existing full admin to invite you.</span>
+            </div>
+
+            <div id="admin-dashboard-content" style="display:none;">
+                <div class="admin-stats-row">
+                    <div class="admin-stat-tile">
+                        <span class="admin-stat-value" id="admin-stat-unresolved">—</span>
+                        <span class="admin-stat-label">Unresolved Errors</span>
+                    </div>
+                    <div class="admin-stat-tile">
+                        <span class="admin-stat-value" id="admin-stat-total-errors">—</span>
+                        <span class="admin-stat-label">Total Errors Logged</span>
+                    </div>
+                    <div class="admin-stat-tile">
+                        <span class="admin-stat-value" id="admin-stat-support">—</span>
+                        <span class="admin-stat-label">Support Messages</span>
+                    </div>
+                </div>
+
+                <div class="admin-nav-links">
+                    <a href="admin-errors.html" class="action-btn">View Error Log</a>
+                    <a href="support.html" class="action-btn secondary-btn">View Support Messages</a>
+                    <a href="admin-admins.html" class="action-btn secondary-btn" id="admin-roster-link" style="display:none;">Manage Admins</a>
+                </div>
+
+                <p style="font-size:0.85rem; color:var(--text-muted);">Signed in with admin role: <strong id="admin-my-role">—</strong></p>
+            </div>
+        </div>
+
+        </div>
+    </div>
+</div>
+</div>
+</div>
+
+<img src="Images/DualAscentLogoWide.png" alt="DualAscent" class="page-footer-logo">
+
+<div id="toast-container"></div>
+
+<script src="nav.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
