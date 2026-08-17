@@ -85,7 +85,7 @@
                         <label>Partner's Email</label>
                         <input type="email" id="partner-email-input" placeholder="partner@example.com">
                         <label>Their invite code (if they've already sent you one)</label>
-                        <input type="text" id="partner-code-input" placeholder="e.g. 7F3K2Q" maxlength="6" style="text-transform:uppercase;">
+                        <input type="text" id="partner-code-input" placeholder="e.g. 4F1B2C" maxlength="6" autocapitalize="characters" autocomplete="off" oninput="sanitizeCodeInput(this)">
                         <button class="action-btn" onclick="handleLinkPartner()">Connect</button>
 
                         <div id="partner-selected-wrap" style="display:none; margin-top:14px;">
@@ -114,7 +114,7 @@
                                 <label>Change partner's email</label>
                                 <input type="email" id="hh-partner-email-edit">
                                 <label>Their invite code (if they've already sent you one)</label>
-                                <input type="text" id="hh-partner-code-edit" placeholder="e.g. 7F3K2Q" maxlength="6" style="text-transform:uppercase;">
+                                <input type="text" id="hh-partner-code-edit" placeholder="e.g. 4F1B2C" maxlength="6" autocapitalize="characters" autocomplete="off" oninput="sanitizeCodeInput(this)">
                                 <button class="action-btn secondary-btn" onclick="handleLinkPartner(true)">Update</button>
                             </div>
                             <p>⏳ Waiting for <strong id="hh-waiting-email"></strong> to enter your email (<span id="hh-my-email"></span>) and your invite code too.</p>

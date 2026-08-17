@@ -784,6 +784,14 @@
         loadHousehold();
     }
 
+    // Invite codes are always 6 hex characters (0-9, A-F) — link_partner_by_email
+    // generates them from md5(). Strip anything else as the person types instead
+    // of silently failing to match later on a typo or a pasted stray character.
+    function sanitizeCodeInput(el) {
+        const cleaned = el.value.toUpperCase().replace(/[^0-9A-F]/g, '').slice(0, 6);
+        if (cleaned !== el.value) el.value = cleaned;
+    }
+
     async function handleLinkPartner(fromEditField) {
         if (!supabaseClient) return;
         const inputId = fromEditField ? 'hh-partner-email-edit' : 'partner-email-input';
