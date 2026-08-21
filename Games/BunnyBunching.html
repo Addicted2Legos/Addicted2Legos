@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+<title>Bunny Bunching</title>
+<style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+        touch-action: manipulation;
+        overscroll-behavior: none;
+    }
+    body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(#bfe6ff 0%, #eaf7ff 55%, #eaf7ff 100%);
+        font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+        color: #3b2a20;
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    .page { width: 100%; max-width: 920px; padding: 18px; }
+
+    header { text-align: center; margin-bottom: 10px; }
+    h1 { margin: 0 0 4px 0; font-size: 2rem; color: #6b3f2a; text-shadow: 1px 1px 0 #fff; }
+    header p { margin: 0; color: #5a4636; font-size: 0.95rem; }
+
+    .stat-bar {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 14px 0;
+    }
+    .stat-tile {
+        background: #fff;
+        border: 2px solid #e0c9a6;
+        border-radius: 10px;
+        padding: 8px 16px;
+        text-align: center;
+        min-width: 92px;
+        box-shadow: 0 2px 0 #d8c3a0;
+    }
+    .stat-tile .stat-value { display: block; font-size: 1.25rem; font-weight: 700; color: #6b3f2a; }
+    .stat-tile .stat-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: #8a7156; }
+    #countdown-tile.warn .stat-value { color: #c0392b; animation: pulse 0.6s infinite; }
+
+    .game-wrap {
+        position: relative;
+        width: 100%;
+        height: 560px;
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 8px 22px rgba(80, 50, 20, 0.25);
+        border: 4px solid #7a5230;
+    }
+
+    .hillside {
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 420px;
+        background:
+            radial-gradient(circle at 20% 15%, rgba(255,255,255,0.5), transparent 40%),
+            linear-gradient(#8bd97a 0%, #6cbf5c 60%, #57ab48 100%);
+        overflow: hidden;
+    }
+    .hillside::before, .hillside::after {
+        content: "";
+        position: absolute;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.35);
+    }
+    .hillside::before { width: 220px; height: 220px; top: -140px; left: -60px; }
+    .hillside::after { width: 160px; height: 160px; top: -110px; right: 10%; }
+
+    .flower { position: absolute; font-size: 14px; opacity: 0.85; pointer-events: none; user-select: none; }
+
+    /* Net-swipe effect -- a one-shot burst spawned right where you tap a bunny */
+    .net-swipe-fx {
+        position: absolute;
+        width: 46px; height: 46px;
+        pointer-events: none;
+        transform: translate(-50%, -55%);
+        z-index: 50;
+    }
+    .net-swipe-fx .net-hoop {
+        width: 34px; height: 34px;
+        border-radius: 50%;
+        border: 3px solid #8a5a2b;
+        background:
+            repeating-linear-gradient(45deg, rgba(255,255,255,0.55) 0 2px, transparent 2px 6px),
+            repeating-linear-gradient(-45deg, rgba(255,255,255,0.55) 0 2px, transparent 2px 6px);
+        background-color: rgba(255,255,255,0.18);
+        margin: 0 auto;
+        animation: netSwipe 0.35s ease-out forwards;
+    }
+    .net-swipe-fx .net-stick { width: 3px; height: 20px; background: #6b4423; margin: -2px auto 0; }
+
+    .truck {
+        position: absolute;
+        left: 0; right: 0; bottom: 0; top: 420px;
+        background: #d8bd8a;
+        border-top: 4px solid #7a5230;
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+        padding: 10px 16px 12px;
+    }
+    .truck-cab {
+        flex-shrink: 0;
+        width: 70px;
+        height: 78px;
+        background: #d94f4f;
+        border-radius: 8px 8px 0 0;
+        position: relative;
+        margin-bottom: 8px;
+        border: 2px solid #a83636;
+    }
+    .truck-cab::before {
+        content: "";
+        position: absolute;
+        top: 10px; left: 10px; right: 10px;
+        height: 26px;
+        background: #bfe6ff;
+        border-radius: 4px;
+        border: 2px solid #a83636;
+    }
+    .truck-cab::after {
+        content: "";
+        position: absolute;
+        bottom: -14px; left: 8px;
+        width: 18px; height: 18px;
+        background: #333;
+        border-radius: 50%;
+        box-shadow: 40px 0 0 #333;
+    }
+
+    .truck-bed {
+        flex: 1;
+        display: flex;
+        gap: 8px;
+        background: #a97c50;
+        border: 2px solid #7a5230;
+        border-radius: 6px;
+        padding: 8px;
+        position: relative;
+    }
+    .truck-bed::after {
+        content: "";
+        position: absolute;
+        bottom: -16px; right: 20px;
+        width: 18px; height: 18px;
+        background: #333;
+        border-radius: 50%;
+        box-shadow: 60px 0 0 #333;
+    }
+
+    .crate {
+        flex: 1;
+        min-width: 0;
+        height: 84px;
+        border-radius: 6px;
+        border: 3px dashed rgba(255,255,255,0.7);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #4a3220;
+        text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+        transition: transform 0.12s, box-shadow 0.12s;
+        cursor: pointer;
+    }
+    .crate .crate-count { font-size: 1.1rem; }
+    .crate:active { transform: scale(0.95); }
+    .crate.crate-armed { box-shadow: 0 0 0 4px rgba(255,255,0,0.7) inset; }
+    .crate.crate-white  { background: #f2f2f2; }
+    .crate.crate-brown  { background: #b5875c; }
+    .crate.crate-gray   { background: #b0b0b0; }
+    .crate.crate-pink   { background: #f3aecb; }
+
+    /* ---- Bunny ---- */
+    .bunny {
+        position: absolute;
+        width: 44px;
+        height: 44px;
+        touch-action: manipulation;
+        cursor: pointer;
+        z-index: 5;
+        transition: left 1.6s ease-in-out, top 1.6s ease-in-out, transform 0.15s;
+    }
+    .bunny.selected {
+        z-index: 40;
+        transform: scale(1.15);
+        animation: selectPulse 0.7s ease-in-out infinite;
+    }
+    .bunny.hopping .bunny-shape { animation: hop 0.45s ease-in-out; }
+    .bunny.rejected { animation: shake 0.4s ease-in-out; }
+    .bunny.caught { animation: poof 0.3s ease-in forwards; }
+
+    .bunny-shape { position: relative; width: 100%; height: 100%; }
+    .bunny-ear {
+        position: absolute;
+        width: 9px; height: 22px;
+        background: var(--bunny-color);
+        border-radius: 50% 50% 40% 40%;
+        top: -14px;
+        border: 2px solid rgba(0,0,0,0.15);
+    }
+    .bunny-ear::after {
+        content: "";
+        position: absolute;
+        inset: 3px 2.5px;
+        background: #ffd7e3;
+        border-radius: 50% 50% 40% 40%;
+    }
+    .bunny-ear.left { left: 7px; transform: rotate(-12deg); }
+    .bunny-ear.right { right: 7px; transform: rotate(12deg); }
+    .bunny-body {
+        position: absolute;
+        bottom: 0; left: 0; right: 0;
+        height: 34px;
+        background: var(--bunny-color);
+        border-radius: 50%;
+        border: 2px solid rgba(0,0,0,0.15);
+    }
+    .bunny-eye { position: absolute; width: 4px; height: 4px; background: #2a2a2a; border-radius: 50%; top: 14px; }
+    .bunny-eye.left { left: 12px; }
+    .bunny-eye.right { right: 12px; }
+    .bunny-nose { position: absolute; width: 5px; height: 4px; background: #e77; border-radius: 50%; top: 18px; left: 50%; transform: translateX(-50%); }
+    .bunny-tail { position: absolute; width: 10px; height: 10px; background: #fff; border-radius: 50%; bottom: 2px; right: -3px; border: 1px solid rgba(0,0,0,0.1); }
+    .bunny.selected .bunny-body { box-shadow: 0 0 0 4px rgba(255, 221, 0, 0.85); }
+
+    @keyframes hop {
+        0% { transform: translateY(0) scaleY(1); }
+        35% { transform: translateY(-10px) scaleY(1.08); }
+        60% { transform: translateY(0) scaleY(0.9); }
+        100% { transform: translateY(0) scaleY(1); }
+    }
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-6px); }
+        75% { transform: translateX(6px); }
+    }
+    @keyframes poof {
+        to { transform: scale(0); opacity: 0; }
+    }
+    @keyframes netSwipe {
+        0% { transform: rotate(0deg) scale(0.6); opacity: 1; }
+        60% { transform: rotate(-25deg) scale(1.25); opacity: 1; }
+        100% { transform: rotate(-10deg) scale(1.1); opacity: 0; }
+    }
+    @keyframes selectPulse {
+        0%, 100% { transform: scale(1.15); }
+        50% { transform: scale(1.28); }
+    }
+    @keyframes pulse {
+        0%, 100% { opacity: 1; } 50% { opacity: 0.4; }
+    }
+
+    #toast-container {
+        position: fixed;
+        top: 16px; left: 50%;
+        transform: translateX(-50%);
+        display: flex; flex-direction: column; gap: 6px;
+        z-index: 200;
+        pointer-events: none;
+    }
+    .toast {
+        background: #3b2a20; color: #fff; padding: 8px 16px; border-radius: 20px;
+        font-size: 0.85rem; font-weight: 600; opacity: 0; transform: translateY(-8px);
+        transition: opacity 0.25s, transform 0.25s;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    .overlay {
+        position: absolute; inset: 0;
+        background: rgba(40, 25, 15, 0.72);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 100;
+    }
+    .overlay.hidden { display: none; }
+    .overlay-card {
+        background: #fff8ee;
+        border-radius: 14px;
+        padding: 28px 34px;
+        text-align: center;
+        max-width: 320px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+    .overlay-card h2 { margin: 0 0 10px 0; color: #6b3f2a; }
+    .overlay-card p { margin: 4px 0; }
+    .overlay-card button {
+        margin-top: 16px;
+        background: #6cbf5c;
+        color: #fff;
+        border: none;
+        padding: 10px 22px;
+        font-size: 1rem;
+        font-weight: 700;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+    .overlay-card button:hover { background: #57ab48; }
+</style>
+</head>
+<body>
+
+<div class="page">
+    <header>
+        <h1>🐇 Bunny Bunching 🐇</h1>
+        <p>Tap a bunny, then tap its matching crate on the truck — sort them fast before the hillside gets out of hand.</p>
+    </header>
+
+    <div class="stat-bar">
+        <div class="stat-tile"><span class="stat-value" id="stat-score">0</span><span class="stat-label">Score</span></div>
+        <div class="stat-tile"><span class="stat-value" id="stat-sorted">0</span><span class="stat-label">Sorted</span></div>
+        <div class="stat-tile"><span class="stat-value" id="stat-hill">12</span><span class="stat-label">On the Hill</span></div>
+        <div class="stat-tile" id="countdown-tile"><span class="stat-value" id="stat-countdown">10s</span><span class="stat-label">Next Litter</span></div>
+    </div>
+
+    <div class="game-wrap" id="gameWrap">
+        <div class="hillside" id="hillside"></div>
+
+        <div class="truck">
+            <div class="truck-cab"></div>
+            <div class="truck-bed" id="truckBed">
+                <div class="crate crate-white" data-color="white"><span>White</span><span class="crate-count" id="count-white">0</span></div>
+                <div class="crate crate-brown" data-color="brown"><span>Brown</span><span class="crate-count" id="count-brown">0</span></div>
+                <div class="crate crate-gray" data-color="gray"><span>Gray</span><span class="crate-count" id="count-gray">0</span></div>
+                <div class="crate crate-pink" data-color="pink"><span>Pink</span><span class="crate-count" id="count-pink">0</span></div>
+            </div>
+        </div>
+
+        <div class="overlay hidden" id="gameOverOverlay">
+            <div class="overlay-card">
+                <h2>🐇💥 The Hillside is Overrun!</h2>
+                <p>Final Score: <strong id="final-score">0</strong></p>
+                <p>Bunnies Sorted: <strong id="final-sorted">0</strong></p>
+                <button onclick="restartGame()">Try Again</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+    const COLORS = {
+        white: '#f2f2f2',
+        brown: '#a9764f',
+        gray:  '#9e9e9e',
+        pink:  '#e8a0bf'
+    };
+    const COLOR_KEYS = Object.keys(COLORS);
+    const LITTER_INTERVAL = 10000;
+    const LITTER_CHANCE = 0.5;
+    const MAX_HILL_POPULATION = 144;
+    const STARTING_BUNNIES = 12;
+    const BUNNY_SIZE = 44;
+
+    const hillside = document.getElementById('hillside');
+    const gameWrap = document.getElementById('gameWrap');
+    const overlay = document.getElementById('gameOverOverlay');
+
+    let bunnies = [];       // { id, color, el, wanderTimer }
+    let selectedBunny = null;
+    let nextBunnyId = 1;
+    let score = 0;
+    let sortedTotal = 0;
+    let sortedByColor = { white: 0, brown: 0, gray: 0, pink: 0 };
+    let nextLitterAt = Date.now() + LITTER_INTERVAL;
+    let gameOver = false;
+    let litterInterval = null;
+    let countdownInterval = null;
+
+    function randRange(min, max) { return min + Math.random() * (max - min); }
+    function pickColor() { return COLOR_KEYS[Math.floor(Math.random() * COLOR_KEYS.length)]; }
+
+    function hillBounds() {
+        const wrapRect = gameWrap.getBoundingClientRect();
+        const hillRect = hillside.getBoundingClientRect();
+        return {
+            minX: hillRect.left - wrapRect.left + 4,
+            maxX: hillRect.right - wrapRect.left - BUNNY_SIZE - 4,
+            minY: hillRect.top - wrapRect.top + 4,
+            maxY: hillRect.bottom - wrapRect.top - BUNNY_SIZE - 4
+        };
+    }
+
+    function spawnBunny(color, nearX, nearY) {
+        const b = document.createElement('div');
+        b.className = 'bunny';
+        b.style.setProperty('--bunny-color', COLORS[color]);
+        b.innerHTML = `
+            <div class="bunny-shape">
+                <div class="bunny-ear left"></div>
+                <div class="bunny-ear right"></div>
+                <div class="bunny-body">
+                    <div class="bunny-eye left"></div>
+                    <div class="bunny-eye right"></div>
+                    <div class="bunny-nose"></div>
+                    <div class="bunny-tail"></div>
+                </div>
+            </div>`;
+        gameWrap.appendChild(b);
+
+        const bounds = hillBounds();
+        let x, y;
+        if (nearX != null) {
+            x = clamp(nearX + randRange(-40, 40), bounds.minX, bounds.maxX);
+            y = clamp(nearY + randRange(-30, 30), bounds.minY, bounds.maxY);
+        } else {
+            x = randRange(bounds.minX, bounds.maxX);
+            y = randRange(bounds.minY, bounds.maxY);
+        }
+        b.style.left = x + 'px';
+        b.style.top = y + 'px';
+
+        const bunny = { id: nextBunnyId++, color, el: b, wanderTimer: null };
+        bunnies.push(bunny);
+        attachTapHandler(bunny);
+        scheduleWander(bunny);
+        return bunny;
+    }
+
+    function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+    function scheduleWander(bunny) {
+        clearTimeout(bunny.wanderTimer);
+        bunny.wanderTimer = setTimeout(() => {
+            if (bunny.selected || bunny.removed) return;
+            wander(bunny);
+            scheduleWander(bunny);
+        }, randRange(1800, 4200));
+    }
+
+    function wander(bunny) {
+        const bounds = hillBounds();
+        const x = randRange(bounds.minX, bounds.maxX);
+        const y = randRange(bounds.minY, bounds.maxY);
+        bunny.el.style.left = x + 'px';
+        bunny.el.style.top = y + 'px';
+        bunny.el.classList.remove('hopping');
+        void bunny.el.offsetWidth;
+        bunny.el.classList.add('hopping');
+    }
+
+    // ---- Tap to select, tap a crate to sort ----
+    function attachTapHandler(bunny) {
+        bunny.el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (gameOver) return;
+            if (selectedBunny === bunny) {
+                deselectBunny();
+                return;
+            }
+            selectBunny(bunny);
+        });
+    }
+
+    function selectBunny(bunny) {
+        if (selectedBunny) deselectAll();
+        selectedBunny = bunny;
+        bunny.selected = true;
+        clearTimeout(bunny.wanderTimer);
+        bunny.el.classList.add('selected');
+        setCratesArmed(true);
+        showNetSwipeAt(bunny.el.style.left, bunny.el.style.top);
+    }
+
+    function deselectBunny() {
+        if (!selectedBunny) return;
+        deselectAll();
+    }
+
+    function deselectAll() {
+        if (selectedBunny && !selectedBunny.removed) {
+            selectedBunny.el.classList.remove('selected');
+            selectedBunny.selected = false;
+            scheduleWander(selectedBunny);
+        }
+        selectedBunny = null;
+        setCratesArmed(false);
+    }
+
+    function setCratesArmed(armed) {
+        document.querySelectorAll('.crate').forEach(c => c.classList.toggle('crate-armed', armed));
+    }
+
+    // Tapping empty hillside (not a bunny) cancels the current selection.
+    hillside.addEventListener('click', () => { if (selectedBunny) deselectBunny(); });
+
+    document.querySelectorAll('.crate').forEach(crate => {
+        crate.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (gameOver || !selectedBunny) return;
+            const bunny = selectedBunny;
+            selectedBunny = null;
+            setCratesArmed(false);
+            if (crate.dataset.color === bunny.color) {
+                catchBunny(bunny, crate.dataset.color);
+            } else {
+                rejectBunny(bunny);
+            }
+        });
+    });
+
+    function catchBunny(bunny, color) {
+        bunny.removed = true;
+        bunny.el.classList.remove('selected');
+        bunny.el.classList.add('caught');
+        setTimeout(() => bunny.el.remove(), 300);
+        bunnies = bunnies.filter(b => b.id !== bunny.id);
+
+        score += 10;
+        sortedTotal++;
+        sortedByColor[color]++;
+        document.getElementById('count-' + color).textContent = sortedByColor[color];
+        updateStats();
+        showToast('✅ Sorted a ' + color + ' bunny! +10');
+    }
+
+    function rejectBunny(bunny) {
+        score = Math.max(0, score - 5);
+        updateStats();
+        bunny.selected = false;
+        bunny.el.classList.remove('selected', 'rejected');
+        void bunny.el.offsetWidth;
+        bunny.el.classList.add('rejected');
+        showToast('❌ Wrong crate! That one was ' + bunny.color);
+        scheduleWander(bunny);
+    }
+
+    // One-shot net-swipe burst shown right where a bunny gets tapped/caught.
+    function showNetSwipeAt(left, top) {
+        const fx = document.createElement('div');
+        fx.className = 'net-swipe-fx';
+        fx.style.left = 'calc(' + left + ' + ' + (BUNNY_SIZE / 2) + 'px)';
+        fx.style.top = 'calc(' + top + ' + ' + (BUNNY_SIZE / 2) + 'px)';
+        fx.innerHTML = '<div class="net-hoop"></div><div class="net-stick"></div>';
+        gameWrap.appendChild(fx);
+        setTimeout(() => fx.remove(), 350);
+    }
+
+    // ---- Replication ----
+    function replicateBunnies() {
+        if (gameOver) return;
+        const litter = [];
+        bunnies.slice().forEach(b => {
+            if (Math.random() < LITTER_CHANCE) {
+                const rect = b.el.getBoundingClientRect();
+                const wrapRect = gameWrap.getBoundingClientRect();
+                litter.push(spawnBunny(b.color, rect.left - wrapRect.left, rect.top - wrapRect.top));
+            }
+        });
+        if (litter.length > 0) {
+            showToast('🐰✨ ' + litter.length + ' new bunn' + (litter.length === 1 ? 'y' : 'ies') + ' born!');
+        } else {
+            showToast('🐰 Quiet litter this time — no newborns.');
+        }
+        updateStats();
+        checkOverpopulation();
+    }
+
+    function checkOverpopulation() {
+        if (bunnies.length >= MAX_HILL_POPULATION) {
+            triggerGameOver();
+        }
+    }
+
+    // ---- Stats / toasts ----
+    function updateStats() {
+        document.getElementById('stat-score').textContent = score;
+        document.getElementById('stat-sorted').textContent = sortedTotal;
+        document.getElementById('stat-hill').textContent = bunnies.length;
+    }
+
+    function showToast(message) {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = message;
+        container.appendChild(toast);
+        requestAnimationFrame(() => toast.classList.add('show'));
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 2200);
+    }
+
+    function tickCountdown() {
+        const remaining = Math.max(0, Math.ceil((nextLitterAt - Date.now()) / 1000));
+        document.getElementById('stat-countdown').textContent = remaining + 's';
+        document.getElementById('countdown-tile').classList.toggle('warn', remaining <= 5);
+    }
+
+    // ---- Game over / restart ----
+    function triggerGameOver() {
+        gameOver = true;
+        clearInterval(litterInterval);
+        clearInterval(countdownInterval);
+        setCratesArmed(false);
+        document.getElementById('final-score').textContent = score;
+        document.getElementById('final-sorted').textContent = sortedTotal;
+        overlay.classList.remove('hidden');
+    }
+
+    function restartGame() {
+        bunnies.forEach(b => { clearTimeout(b.wanderTimer); b.el.remove(); });
+        bunnies = [];
+        selectedBunny = null;
+        setCratesArmed(false);
+        score = 0;
+        sortedTotal = 0;
+        sortedByColor = { white: 0, brown: 0, gray: 0, pink: 0 };
+        COLOR_KEYS.forEach(c => document.getElementById('count-' + c).textContent = '0');
+        gameOver = false;
+        overlay.classList.add('hidden');
+        updateStats();
+        startGame();
+    }
+
+    function startGame() {
+        for (let i = 0; i < STARTING_BUNNIES; i++) spawnBunny(pickColor());
+        updateStats();
+        nextLitterAt = Date.now() + LITTER_INTERVAL;
+        litterInterval = setInterval(() => {
+            replicateBunnies();
+            nextLitterAt = Date.now() + LITTER_INTERVAL;
+        }, LITTER_INTERVAL);
+        countdownInterval = setInterval(tickCountdown, 250);
+        tickCountdown();
+    }
+
+    startGame();
+</script>
+
+</body>
+</html>
