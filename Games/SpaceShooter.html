@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Void Runner — Pixi.js Demo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.15.0/pixi.min.js"></script>
+<style>
+  :root{
+    --bg-deep: #05060f;
+    --bg-mid: #0b0e1f;
+    --accent-cyan: #4be3ff;
+    --accent-magenta: #ff3fa4;
+    --accent-amber: #ffcc55;
+    --ui-line: rgba(255,255,255,0.12);
+    --text-dim: rgba(255,255,255,0.55);
+  }
+  html,body{
+    margin:0; padding:0; height:100%; overflow:hidden;
+    background: radial-gradient(ellipse at 50% 20%, var(--bg-mid), var(--bg-deep) 70%);
+    font-family: 'Courier New', monospace;
+    color:#fff;
+  }
+  #game-wrap{
+    position:relative;
+    width:100%; height:100vh;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #game-container{
+    position:relative;
+    border: 1px solid var(--ui-line);
+    box-shadow: 0 0 60px rgba(75,227,255,0.08), inset 0 0 80px rgba(0,0,0,0.6);
+    border-radius: 4px;
+    overflow:hidden;
+  }
+  canvas{ display:block; }
+
+  #hud{
+    position:absolute; top:0; left:0; right:0;
+    display:flex; justify-content:space-between;
+    padding: 14px 18px;
+    pointer-events:none;
+    z-index: 5;
+  }
+  .hud-block{
+    letter-spacing: 2px;
+    font-size: 12px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .hud-value{
+    font-size: 20px;
+    color: var(--accent-cyan);
+    text-shadow: 0 0 10px rgba(75,227,255,0.6);
+    letter-spacing: 1px;
+  }
+  #hud-right{ text-align:right; }
+  .hud-value.warn{ color: var(--accent-magenta); text-shadow: 0 0 10px rgba(255,63,164,0.6); }
+
+  #healthbar-track{
+    width: 160px; height:6px;
+    background: rgba(255,255,255,0.1);
+    margin-top:6px;
+    border-radius: 3px;
+    overflow:hidden;
+  }
+  #healthbar-fill{
+    height:100%;
+    width:100%;
+    background: linear-gradient(90deg, var(--accent-magenta), var(--accent-amber));
+    transition: width 0.15s ease-out;
+  }
+
+  #overlay{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background: rgba(5,6,15,0.82);
+    z-index: 10;
+    text-align:center;
+    gap: 18px;
+  }
+  #overlay h1{
+    margin:0;
+    font-size: 34px;
+    letter-spacing: 6px;
+    font-weight: 400;
+    color: #fff;
+    text-shadow: 0 0 20px var(--accent-cyan);
+  }
+  #overlay p{
+    margin:0;
+    color: var(--text-dim);
+    font-size: 13px;
+    letter-spacing: 1px;
+    max-width: 380px;
+    line-height: 1.6;
+  }
+  #overlay button{
+    font-family: inherit;
+    background: transparent;
+    border: 1px solid var(--accent-cyan);
+    color: var(--accent-cyan);
+    padding: 10px 28px;
+    font-size: 13px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor:pointer;
+    border-radius: 2px;
+    transition: all 0.15s ease;
+  }
+  #overlay button:hover{
+    background: var(--accent-cyan);
+    color: #05060f;
+    box-shadow: 0 0 25px rgba(75,227,255,0.5);
+  }
+  #overlay.hidden{ display:none; }
+
+  #footer-note{
+    position:absolute; bottom:10px; left:0; right:0;
+    text-align:center;
+    font-size:10px;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.25);
+    z-index: 5;
+    pointer-events:none;
+  }
+</style>
+</head>
+<body>
+
+<div id="game-wrap">
+  <div id="game-container">
+    <div id="hud">
+      <div class="hud-block">
+        Score
+        <div class="hud-value" id="score-val">0</div>
+      </div>
+      <div id="hud-right" class="hud-block">
+        Hull
+        <div class="hud-value" id="health-val">100</div>
+        <div id="healthbar-track"><div id="healthbar-fill"></div></div>
+      </div>
+    </div>
+
+    <div id="overlay">
+      <h1>VOID RUNNER</h1>
+      <p>
+        Arrow keys / WASD to move. Space to fire.<br>
+        A small graphics-technique demo: parallax starfield, glow &amp; bloom,
+        particle explosions, screen shake, and sprite tweening — all in Pixi.js / WebGL.
+      </p>
+      <button id="start-btn">Launch</button>
+    </div>
+
+    <div id="footer-note">PIXI.JS · WEBGL · PARTICLES · BLOOM · SCREEN SHAKE</div>
+  </div>
+</div>
+
+<script>
+(async () => {
+  const WIDTH = 720, HEIGHT = 540;
+
+  const app = new PIXI.Application();
+  await app.init({ width: WIDTH, height: HEIGHT, backgroundAlpha: 0, antialias: true, resolution: Math.min(window.devicePixelRatio || 1, 2) });
+  document.getElementById('game-container').prepend(app.canvas);
+
+  // ---------- WORLD CONTAINER (for screen shake) ----------
+  const world = new PIXI.Container();
+  app.stage.addChild(world);
+
+  // ================= PARALLAX STARFIELD =================
+  const starLayers = [];
+  function makeStarLayer(count, speed, size, alpha){
+    const g = new PIXI.Container();
+    const stars = [];
+    for(let i=0;i<count;i++){
+      const s = new PIXI.Graphics();
+      const r = size * (0.5 + Math.random()*0.8);
+      s.circle(0,0,r).fill({color:0xffffff, alpha: alpha*(0.5+Math.random()*0.5)});
+      s.x = Math.random()*WIDTH;
+      s.y = Math.random()*HEIGHT;
+      g.addChild(s);
+      stars.push(s);
+    }
+    world.addChild(g);
+    starLayers.push({container:g, stars, speed});
+  }
+  makeStarLayer(60, 0.4, 1.0, 0.5);
+  makeStarLayer(35, 0.9, 1.4, 0.75);
+  makeStarLayer(18, 1.8, 2.0, 1.0);
+
+  // Nebula glow blobs (soft radial gradients via blur filter)
+  const nebula = new PIXI.Container();
+  world.addChild(nebula);
+  const blurFilter = new PIXI.BlurFilter({ strength: 24 });
+  function makeNebulaBlob(x,y,r,color,alpha){
+    const b = new PIXI.Graphics();
+    b.circle(0,0,r).fill({color, alpha});
+    b.x = x; b.y = y;
+    b.filters = [blurFilter];
+    nebula.addChild(b);
+    return b;
+  }
+  makeNebulaBlob(120, 100, 90, 0x4be3ff, 0.10);
+  makeNebulaBlob(560, 400, 110, 0xff3fa4, 0.08);
+  makeNebulaBlob(600, 90, 70, 0xffcc55, 0.07);
+
+  // ================= GLOW TEXTURE (for bloom-ish sprites) =================
+  function makeGlowTexture(color, size=128){
+    const g = new PIXI.Graphics();
+    const steps = 10;
+    for(let i=steps;i>0;i--){
+      const alpha = (1-i/steps)*0.35;
+      g.circle(size/2,size/2,(size/2)*(i/steps)).fill({color, alpha});
+    }
+    return app.renderer.generateTexture(g);
+  }
+  const cyanGlow = makeGlowTexture(0x4be3ff);
+  const magentaGlow = makeGlowTexture(0xff3fa4);
+  const amberGlow = makeGlowTexture(0xffcc55);
+
+  // ================= PLAYER SHIP =================
+  const player = new PIXI.Container();
+  player.x = WIDTH/2; player.y = HEIGHT - 80;
+  world.addChild(player);
+
+  const engineGlow = new PIXI.Sprite(cyanGlow);
+  engineGlow.anchor.set(0.5);
+  engineGlow.scale.set(0.5);
+  engineGlow.y = 16;
+  engineGlow.blendMode = 'add';
+  player.addChild(engineGlow);
+
+  const shipBody = new PIXI.Graphics();
+  shipBody.poly([0,-18, 12,14, 0,8, -12,14]).fill({color:0xdfefff})
+           .poly([0,-18, 12,14, 0,8, -12,14]).stroke({width:1.5, color:0x4be3ff, alpha:0.9});
+  shipBody.circle(0,-2,4).fill({color:0x4be3ff, alpha:0.9});
+  player.addChild(shipBody);
+
+  // ================= BULLETS / ENEMIES / PARTICLES POOLS =================
+  const bullets = [];
+  const enemies = [];
+  const particles = [];
+
+  function spawnBullet(x,y){
+    const c = new PIXI.Container();
+    const glow = new PIXI.Sprite(cyanGlow);
+    glow.anchor.set(0.5); glow.scale.set(0.28); glow.blendMode='add';
+    const core = new PIXI.Graphics().rect(-2,-8,4,16).fill({color:0xffffff});
+    c.addChild(glow, core);
+    c.x = x; c.y = y;
+    world.addChild(c);
+    bullets.push(c);
+  }
+
+  function spawnEnemy(){
+    const c = new PIXI.Container();
+    const glow = new PIXI.Sprite(magentaGlow);
+    glow.anchor.set(0.5); glow.scale.set(0.55); glow.blendMode='add';
+    const body = new PIXI.Graphics();
+    body.poly([0,16, 12,-12, 0,-4, -12,-12]).fill({color:0x2a1830})
+        .poly([0,16, 12,-12, 0,-4, -12,-12]).stroke({width:1.5, color:0xff3fa4, alpha:0.9});
+    c.addChild(glow, body);
+    c.x = 40 + Math.random()*(WIDTH-80);
+    c.y = -30;
+    c.vy = 1.2 + Math.random()*1.4;
+    c.vx = (Math.random()-0.5)*1.2;
+    c.hp = 1;
+    world.addChild(c);
+    enemies.push(c);
+  }
+
+  function spawnExplosion(x,y,color=0xffcc55, count=18){
+    const tex = color===0xffcc55 ? amberGlow : (color===0xff3fa4 ? magentaGlow : cyanGlow);
+    for(let i=0;i<count;i++){
+      const p = new PIXI.Sprite(tex);
+      p.anchor.set(0.5);
+      p.blendMode = 'add';
+      const scale = 0.12 + Math.random()*0.22;
+      p.scale.set(scale);
+      p.x = x; p.y = y;
+      const angle = Math.random()*Math.PI*2;
+      const speed = 1.5 + Math.random()*4;
+      p.vx = Math.cos(angle)*speed;
+      p.vy = Math.sin(angle)*speed;
+      p.life = 1.0;
+      p.decay = 0.02 + Math.random()*0.03;
+      world.addChild(p);
+      particles.push(p);
+    }
+  }
+
+  // ================= INPUT =================
+  const keys = {};
+  window.addEventListener('keydown', e => {
+    keys[e.code] = true;
+    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+  });
+  window.addEventListener('keyup', e => keys[e.code] = false);
+
+  let fireCooldown = 0;
+
+  // ================= SCREEN SHAKE =================
+  let shakeAmount = 0;
+  function addShake(amt){ shakeAmount = Math.min(shakeAmount + amt, 18); }
+
+  // ================= GAME STATE =================
+  let score = 0, health = 100, running = false, spawnTimer = 0, elapsed=0;
+  const scoreEl = document.getElementById('score-val');
+  const healthEl = document.getElementById('health-val');
+  const healthFill = document.getElementById('healthbar-fill');
+
+  function updateHUD(){
+    scoreEl.textContent = score;
+    healthEl.textContent = Math.max(0,Math.round(health));
+    healthEl.classList.toggle('warn', health < 35);
+    healthFill.style.width = Math.max(0,health) + '%';
+  }
+
+  function damagePlayer(amount){
+    health -= amount;
+    addShake(10);
+    player.tint = 0xff6666;
+    setTimeout(()=>{ player.tint = 0xffffff; }, 90);
+    if(health <= 0){
+      health = 0;
+      running = false;
+      spawnExplosion(player.x, player.y, 0xffcc55, 40);
+      player.visible = false;
+      showOverlay('MISSION LOST', `Final score: ${score}`, 'Try Again');
+    }
+    updateHUD();
+  }
+
+  // ================= OVERLAY =================
+  const overlay = document.getElementById('overlay');
+  const startBtn = document.getElementById('start-btn');
+  function showOverlay(title, msg, btnLabel){
+    overlay.querySelector('h1').textContent = title;
+    overlay.querySelector('p').innerHTML = msg;
+    startBtn.textContent = btnLabel;
+    overlay.classList.remove('hidden');
+  }
+  function hideOverlay(){ overlay.classList.add('hidden'); }
+
+  function resetGame(){
+    for(const b of bullets) world.removeChild(b);
+    for(const en of enemies) world.removeChild(en);
+    for(const p of particles) world.removeChild(p);
+    bullets.length = 0; enemies.length = 0; particles.length = 0;
+    score = 0; health = 100; elapsed = 0; spawnTimer = 0;
+    player.x = WIDTH/2; player.y = HEIGHT-80;
+    player.visible = true;
+    updateHUD();
+  }
+
+  startBtn.addEventListener('click', () => {
+    resetGame();
+    hideOverlay();
+    running = true;
+  });
+
+  // ================= MAIN LOOP =================
+  app.ticker.add((ticker) => {
+    const dt = ticker.deltaTime;
+
+    // Parallax stars always drift for ambience, even on menu
+    for(const layer of starLayers){
+      for(const s of layer.stars){
+        s.y += layer.speed * dt;
+        if(s.y > HEIGHT){ s.y = -2; s.x = Math.random()*WIDTH; }
+      }
+    }
+    // subtle nebula pulse
+    elapsed += dt*0.01;
+    nebula.children.forEach((b,i)=>{
+      b.alpha = (0.06 + 0.04*Math.sin(elapsed + i)) ;
+    });
+
+    if(!running){
+      // screen shake decay even when idle
+      world.x = 0; world.y = 0;
+      return;
+    }
+
+    // ---- player movement ----
+    const speed = 4.2;
+    if(keys['ArrowLeft']||keys['KeyA']) player.x -= speed*dt;
+    if(keys['ArrowRight']||keys['KeyD']) player.x += speed*dt;
+    if(keys['ArrowUp']||keys['KeyW']) player.y -= speed*dt;
+    if(keys['ArrowDown']||keys['KeyS']) player.y += speed*dt;
+    player.x = Math.max(20, Math.min(WIDTH-20, player.x));
+    player.y = Math.max(40, Math.min(HEIGHT-30, player.y));
+
+    // engine glow pulse
+    engineGlow.scale.set(0.45 + Math.sin(elapsed*8)*0.05);
+
+    // slight tilt toward movement
+    const targetRot = (keys['ArrowLeft']||keys['KeyA']) ? -0.25 : (keys['ArrowRight']||keys['KeyD']) ? 0.25 : 0;
+    shipBody.rotation += (targetRot - shipBody.rotation)*0.2;
+
+    // ---- firing ----
+    fireCooldown -= dt;
+    if((keys['Space']) && fireCooldown <= 0){
+      spawnBullet(player.x - 8, player.y - 10);
+      spawnBullet(player.x + 8, player.y - 10);
+      fireCooldown = 8;
+    }
+
+    // ---- spawn enemies ----
+    spawnTimer -= dt;
+    if(spawnTimer <= 0){
+      spawnEnemy();
+      spawnTimer = Math.max(18, 55 - score*0.15);
+    }
+
+    // ---- update bullets ----
+    for(let i=bullets.length-1;i>=0;i--){
+      const b = bullets[i];
+      b.y -= 9*dt;
+      if(b.y < -20){ world.removeChild(b); bullets.splice(i,1); continue; }
+    }
+
+    // ---- update enemies ----
+    for(let i=enemies.length-1;i>=0;i--){
+      const en = enemies[i];
+      en.y += en.vy*dt;
+      en.x += en.vx*dt;
+      en.rotation = Math.sin(elapsed*3 + i)*0.1;
+      if(en.y > HEIGHT+30){ world.removeChild(en); enemies.splice(i,1); continue; }
+
+      // collide with player
+      const dx = en.x-player.x, dy = en.y-player.y;
+      if(player.visible && Math.hypot(dx,dy) < 24){
+        spawnExplosion(en.x, en.y, 0xff3fa4, 16);
+        world.removeChild(en); enemies.splice(i,1);
+        damagePlayer(18);
+        continue;
+      }
+
+      // collide with bullets
+      for(let j=bullets.length-1;j>=0;j--){
+        const b = bullets[j];
+        const bdx = en.x-b.x, bdy = en.y-b.y;
+        if(Math.hypot(bdx,bdy) < 18){
+          world.removeChild(b); bullets.splice(j,1);
+          en.hp -= 1;
+          if(en.hp<=0){
+            spawnExplosion(en.x, en.y, 0xffcc55, 22);
+            addShake(4);
+            world.removeChild(en); enemies.splice(i,1);
+            score += 10;
+            updateHUD();
+          }
+          break;
+        }
+      }
+    }
+
+    // ---- update particles ----
+    for(let i=particles.length-1;i>=0;i--){
+      const p = particles[i];
+      p.x += p.vx*dt; p.y += p.vy*dt;
+      p.vx *= 0.94; p.vy *= 0.94;
+      p.life -= p.decay*dt;
+      p.alpha = Math.max(p.life,0);
+      p.scale.set(p.scale.x*1.01);
+      if(p.life <= 0){ world.removeChild(p); particles.splice(i,1); }
+    }
+
+    // ---- screen shake ----
+    if(shakeAmount > 0.1){
+      world.x = (Math.random()-0.5)*shakeAmount;
+      world.y = (Math.random()-0.5)*shakeAmount;
+      shakeAmount *= 0.85;
+    } else {
+      world.x = 0; world.y = 0;
+    }
+  });
+
+})();
+</script>
+</body>
+</html>
