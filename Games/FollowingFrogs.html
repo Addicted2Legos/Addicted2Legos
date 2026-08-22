@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+<title>Following Frogs</title>
+<style>
+    * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        user-select: none;
+        -webkit-user-select: none;
+    }
+    html, body {
+        touch-action: manipulation;
+        overscroll-behavior: none;
+        overflow: hidden;
+        height: 100%;
+        margin: 0;
+    }
+    body {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 12px;
+        background: radial-gradient(circle at 50% 0%, #3fae66 0%, #2c8f57 35%, #1f6e46 100%);
+        font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+        color: #eafff0;
+    }
+
+    header { text-align: center; }
+    h1 {
+        margin: 0 0 2px;
+        font-size: 1.6rem;
+        color: #fffbe0;
+        text-shadow: 0 2px 0 #0d4d2c, 0 4px 10px rgba(0,0,0,0.35);
+        letter-spacing: 0.02em;
+    }
+    header p {
+        margin: 0;
+        font-size: 0.78rem;
+        color: #d9f7e2;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+
+    .stat-bar {
+        display: flex;
+        gap: 8px;
+        width: min(94vw, 720px);
+    }
+    .stat-tile {
+        flex: 1 1 0;
+        min-width: 0;
+        background: rgba(9, 46, 27, 0.55);
+        border: 2px solid rgba(255,255,255,0.18);
+        border-radius: 10px;
+        padding: 6px 4px;
+        text-align: center;
+        box-shadow: 0 2px 0 rgba(0,0,0,0.2) inset;
+    }
+    .stat-value { display: block; font-size: 1.15rem; font-weight: 700; color: #ffe066; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+    .stat-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em; color: #cdeed8; }
+
+    .game-wrap {
+        position: relative;
+        width: min(94vw, 78vh, 720px);
+        aspect-ratio: 1 / 1;
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 14px 34px rgba(0,0,0,0.4);
+        border: 5px solid #164a2c;
+        touch-action: none;
+    }
+    canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+        background: #2c8f57;
+    }
+
+    .overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(8, 36, 22, 0.82);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 20;
+        padding: 20px;
+        text-align: center;
+    }
+    .overlay.hidden { display: none; }
+    .overlay-card {
+        background: #fffdf4;
+        color: #234d34;
+        border-radius: 16px;
+        padding: 22px 26px;
+        max-width: 340px;
+        box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+    }
+    .overlay-card h2 { margin: 0 0 8px; font-size: 1.35rem; color: #1f6e46; }
+    .overlay-card p { margin: 6px 0; font-size: 0.9rem; line-height: 1.4; }
+    .overlay-card .new-best { color: #d68a00; font-weight: 700; }
+    .overlay-card button {
+        margin-top: 14px;
+        background: #57c84d;
+        color: #fff;
+        border: none;
+        padding: 11px 26px;
+        font-size: 1rem;
+        font-weight: 700;
+        border-radius: 10px;
+        cursor: pointer;
+        box-shadow: 0 3px 0 #2f8a2a;
+        touch-action: manipulation;
+    }
+    .overlay-card button:active { transform: translateY(2px); box-shadow: 0 1px 0 #2f8a2a; }
+
+    footer {
+        font-size: 0.68rem;
+        color: #cdeed8;
+        text-align: center;
+        opacity: 0.85;
+    }
+</style>
+</head>
+<body>
+
+<header>
+    <h1>🐸 Following Frogs 🐸</h1>
+    <p>Lead your froggy parade around the pond, snack on flies, dodge the rocks!</p>
+</header>
+
+<div class="stat-bar">
+    <div class="stat-tile"><span class="stat-value" id="stat-score">0</span><span class="stat-label">Score</span></div>
+    <div class="stat-tile"><span class="stat-value" id="stat-frogs">3</span><span class="stat-label">Frogs</span></div>
+    <div class="stat-tile"><span class="stat-value" id="stat-best">0</span><span class="stat-label">Best</span></div>
+</div>
+
+<div class="game-wrap" id="gameWrap">
+    <canvas id="canvas" width="800" height="800"></canvas>
+
+    <div class="overlay" id="startOverlay">
+        <div class="overlay-card">
+            <h2>Ribbit! Ready to hop?</h2>
+            <p>🖱️ / 👆 Drag or move over the pond to steer your lead frog.</p>
+            <p>🪰 Gobble flies to grow your line of froggy friends.</p>
+            <p>🪨 Bump a rock or log and you'll lose your last buddy — so weave carefully!</p>
+            <button id="startBtn">Start Hopping</button>
+        </div>
+    </div>
+
+    <div class="overlay hidden" id="overOverlay">
+        <div class="overlay-card">
+            <h2 id="overTitle">😢 Ribbit... Game Over!</h2>
+            <p>Flies eaten: <strong id="finalScore">0</strong></p>
+            <p>Longest line: <strong id="finalFrogs">0</strong> frogs</p>
+            <p id="newBestMsg" class="new-best" style="display:none;">🎉 New best score!</p>
+            <button id="retryBtn">Hop Again</button>
+        </div>
+    </div>
+</div>
+
+<footer>Works with mouse or touch &mdash; keep your finger on the pond to steer.</footer>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const CW = canvas.width, CH = canvas.height;
+const CENTER = { x: CW / 2, y: CH / 2 };
+
+const PALETTE = ['#7ed957', '#8fd694', '#a7e8bf', '#ffe066', '#6fcf97', '#c9f2c1'];
+const LEADER_COLOR = '#4fae4a';
+const SEGMENT_GAP = 14;
+const BASE_SPEED = 3.0;
+const MAX_FLIES = 5;
+const WALL_MARGIN = 34;
+
+let state = 'START';
+let score = 0;
+let bestScore = Number(localStorage.getItem('followingFrogsBest') || 0);
+let frame = 0;
+let invulnTimer = 0;
+let maxObstacles = 6;
+
+const head = { x: CENTER.x, y: CENTER.y, angle: -Math.PI / 2, radius: 23, speed: BASE_SPEED };
+const pointer = { x: head.x, y: head.y };
+const keys = {};
+let history = [];
+let followers = [];
+let obstacles = [];
+let flies = [];
+let decorations = [];
+let particles = [];
+
+function rand(min, max) { return min + Math.random() * (max - min); }
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function newBlinker() { return { timer: rand(90, 240), closed: 0 }; }
+
+function makeFollower(index, x, y) {
+    return {
+        x, y, angle: 0,
+        radius: 17 + (index % 3) * 1.4,
+        color: PALETTE[index % PALETTE.length],
+        spotSeed: Math.random() * Math.PI * 2,
+        blink: newBlinker(),
+        legPhase: Math.random() * Math.PI * 2
+    };
+}
+
+function setupWorld() {
+    head.x = CENTER.x;
+    head.y = CENTER.y;
+    head.angle = -Math.PI / 2;
+    head.speed = BASE_SPEED;
+    pointer.x = head.x;
+    pointer.y = head.y;
+    history = [];
+
+    followers = [makeFollower(0, head.x, head.y + 30), makeFollower(1, head.x, head.y + 55)];
+
+    decorations = [];
+    for (let i = 0; i < 6; i++) {
+        decorations.push({ x: rand(40, CW - 40), y: rand(40, CH - 40), r: rand(20, 34) });
+    }
+
+    obstacles = [];
+    placeObstacles(maxObstacles);
+
+    flies = [];
+    for (let i = 0; i < 3; i++) trySpawnFly();
+
+    particles = [];
+    score = 0;
+    invulnTimer = 90;
+    updateHUD();
+}
+
+function placeObstacles(count) {
+    let attempts = 0;
+    while (obstacles.length < count && attempts < 600) {
+        attempts++;
+        const type = Math.random() < 0.5 ? 'rock' : 'log';
+        const r = type === 'rock' ? rand(22, 36) : rand(24, 32);
+        const p = { x: rand(70, CW - 70), y: rand(70, CH - 70) };
+        if (dist(p, CENTER) < 150) continue;
+        let ok = true;
+        for (const o of obstacles) {
+            if (dist(p, o) < r + o.r + 40) { ok = false; break; }
+        }
+        if (ok) obstacles.push({ x: p.x, y: p.y, r, type, rot: rand(0, Math.PI * 2) });
+    }
+}
+
+function addObstacleIfDue() {
+    if (obstacles.length >= maxObstacles) return;
+    let attempts = 0;
+    while (attempts < 60) {
+        attempts++;
+        const type = Math.random() < 0.5 ? 'rock' : 'log';
+        const r = type === 'rock' ? rand(22, 36) : rand(24, 32);
+        const p = { x: rand(70, CW - 70), y: rand(70, CH - 70) };
+        if (dist(p, head) < 160) continue;
+        let ok = true;
+        for (const o of obstacles) if (dist(p, o) < r + o.r + 40) { ok = false; break; }
+        if (ok) { obstacles.push({ x: p.x, y: p.y, r, type, rot: rand(0, Math.PI * 2) }); return; }
+    }
+}
+
+function trySpawnFly() {
+    if (flies.length >= MAX_FLIES) return;
+    let attempts = 0;
+    while (attempts < 40) {
+        attempts++;
+        const p = { x: rand(36, CW - 36), y: rand(36, CH - 36) };
+        if (dist(p, head) < 110) continue;
+        let ok = true;
+        for (const o of obstacles) if (dist(p, o) < o.r + 30) { ok = false; break; }
+        for (const f of flies) if (dist(p, f) < 44) { ok = false; break; }
+        if (ok) { flies.push({ x: p.x, y: p.y, phase: Math.random() * Math.PI * 2 }); return; }
+    }
+}
+
+function addFollower() {
+    const tail = followers[followers.length - 1] || head;
+    followers.push(makeFollower(followers.length, tail.x, tail.y));
+}
+
+function spawnParticles(x, y, color, count) {
+    for (let i = 0; i < count; i++) {
+        const a = rand(0, Math.PI * 2);
+        const spd = rand(1, 3.4);
+        particles.push({ x, y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, life: 26, color });
+    }
+}
+
+function updateHUD() {
+    document.getElementById('stat-score').textContent = score;
+    document.getElementById('stat-frogs').textContent = followers.length + 1;
+    document.getElementById('stat-best').textContent = bestScore;
+}
+
+function setPointerFromClient(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = CW / rect.width;
+    const scaleY = CH / rect.height;
+    pointer.x = (clientX - rect.left) * scaleX;
+    pointer.y = (clientY - rect.top) * scaleY;
+}
+
+canvas.addEventListener('mousemove', (e) => setPointerFromClient(e.clientX, e.clientY));
+canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (e.touches.length > 0) setPointerFromClient(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (e.touches.length > 0) setPointerFromClient(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+
+window.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
+window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+// iOS/Safari still fires zoom on rapid double-taps even with viewport locking; swallow the second tap.
+let lastTouchEnd = 0;
+document.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 350) e.preventDefault();
+    lastTouchEnd = now;
+}, { passive: false });
+document.addEventListener('dblclick', (e) => e.preventDefault());
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+
+function stepHead() {
+    const kx = (keys['d'] || keys['arrowright'] ? 1 : 0) - (keys['a'] || keys['arrowleft'] ? 1 : 0);
+    const ky = (keys['s'] || keys['arrowdown'] ? 1 : 0) - (keys['w'] || keys['arrowup'] ? 1 : 0);
+    let targetX = pointer.x, targetY = pointer.y;
+    if (kx !== 0 || ky !== 0) {
+        const len = Math.hypot(kx, ky) || 1;
+        targetX = head.x + (kx / len) * 200;
+        targetY = head.y + (ky / len) * 200;
+    }
+
+    const dx = targetX - head.x, dy = targetY - head.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 4) {
+        const desired = Math.atan2(dy, dx);
+        let diff = desired - head.angle;
+        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+        const maxTurn = 0.085;
+        head.angle += clamp(diff, -maxTurn, maxTurn);
+    }
+
+    head.speed = BASE_SPEED + Math.min(score / 1800, 1) * 1.1;
+    head.x += Math.cos(head.angle) * head.speed;
+    head.y += Math.sin(head.angle) * head.speed;
+    head.x = clamp(head.x, WALL_MARGIN, CW - WALL_MARGIN);
+    head.y = clamp(head.y, WALL_MARGIN, CH - WALL_MARGIN);
+
+    history.unshift({ x: head.x, y: head.y, angle: head.angle });
+    const needed = (followers.length + 2) * SEGMENT_GAP + 5;
+    if (history.length > needed) history.length = needed;
+}
+
+function stepFollowers() {
+    followers.forEach((f, i) => {
+        const idx = Math.min((i + 1) * SEGMENT_GAP, history.length - 1);
+        const target = history[idx] || head;
+        f.x = target.x;
+        f.y = target.y;
+        f.angle = target.angle;
+    });
+}
+
+function stepBlink(b) {
+    if (b.closed > 0) { b.closed--; return; }
+    b.timer--;
+    if (b.timer <= 0) { b.closed = 6; b.timer = rand(120, 260); }
+}
+
+function stepCollisions() {
+    if (invulnTimer > 0) { invulnTimer--; return; }
+    for (const o of obstacles) {
+        const minDist = head.radius + o.r - 6;
+        if (dist(head, o) < minDist) {
+            const angleAway = Math.atan2(head.y - o.y, head.x - o.x);
+            head.x += Math.cos(angleAway) * 18;
+            head.y += Math.sin(angleAway) * 18;
+            spawnParticles(head.x, head.y, '#ffffff', 10);
+            if (followers.length > 0) {
+                const lost = followers.pop();
+                spawnParticles(lost.x, lost.y, lost.color, 14);
+                invulnTimer = 75;
+                updateHUD();
+            } else {
+                triggerGameOver();
+            }
+            return;
+        }
+    }
+}
+
+function stepFlies() {
+    for (let i = flies.length - 1; i >= 0; i--) {
+        const fl = flies[i];
+        if (dist(head, fl) < head.radius + 14) {
+            flies.splice(i, 1);
+            addFollower();
+            score += 10;
+            spawnParticles(fl.x, fl.y, '#ffe066', 12);
+            updateHUD();
+            if (score > 0 && score % 150 === 0) { maxObstacles = Math.min(maxObstacles + 1, 14); addObstacleIfDue(); }
+        }
+    }
+    if (frame % 70 === 0 || flies.length < 2) trySpawnFly();
+}
+
+function stepParticles() {
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx; p.y += p.vy; p.vx *= 0.94; p.vy *= 0.94; p.life--;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+}
+
+function triggerGameOver() {
+    state = 'OVER';
+    let isNew = false;
+    if (score > bestScore) { bestScore = score; localStorage.setItem('followingFrogsBest', String(bestScore)); isNew = true; }
+    document.getElementById('finalScore').textContent = score;
+    document.getElementById('finalFrogs').textContent = followers.length + 1;
+    document.getElementById('newBestMsg').style.display = isNew ? 'block' : 'none';
+    document.getElementById('overOverlay').classList.remove('hidden');
+    updateHUD();
+}
+
+function startGame() {
+    setupWorld();
+    state = 'PLAYING';
+    document.getElementById('startOverlay').classList.add('hidden');
+    document.getElementById('overOverlay').classList.add('hidden');
+}
+
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('retryBtn').addEventListener('click', startGame);
+
+function update() {
+    frame++;
+    if (state === 'START') {
+        const t = performance.now() * 0.0006;
+        pointer.x = CENTER.x + Math.cos(t) * CW * 0.28;
+        pointer.y = CENTER.y + Math.sin(t * 1.3) * CH * 0.28;
+    }
+    stepHead();
+    stepFollowers();
+    [head, ...followers].forEach(f => stepBlink(f.blink || (f.blink = newBlinker())));
+    stepParticles();
+    if (state === 'PLAYING') {
+        stepCollisions();
+        stepFlies();
+    }
+}
+
+function drawBackground() {
+    const grad = ctx.createRadialGradient(CENTER.x, CENTER.y, 60, CENTER.x, CENTER.y, CW * 0.75);
+    grad.addColorStop(0, '#3fae66');
+    grad.addColorStop(1, '#1f7a4a');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, CW, CH);
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 5; i++) {
+        ctx.beginPath();
+        ctx.arc(CENTER.x, CENTER.y, 90 + i * 70, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+
+    decorations.forEach(d => {
+        ctx.fillStyle = 'rgba(30, 110, 66, 0.55)';
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, d.r, 0.4, Math.PI * 2 - 0.4);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.10)';
+        ctx.beginPath();
+        ctx.arc(d.x - d.r * 0.3, d.y - d.r * 0.3, d.r * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+    });
+}
+
+function drawObstacles() {
+    obstacles.forEach(o => {
+        ctx.save();
+        ctx.translate(o.x, o.y);
+        ctx.rotate(o.rot);
+        if (o.type === 'rock') {
+            const g = ctx.createRadialGradient(-o.r * 0.3, -o.r * 0.3, 2, 0, 0, o.r);
+            g.addColorStop(0, '#9a9a92');
+            g.addColorStop(1, '#5f5d54');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            for (let i = 0; i < 7; i++) {
+                const a = (i / 7) * Math.PI * 2;
+                const r = o.r * rand(0.85, 1.05);
+                ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+            }
+            ctx.closePath();
+            ctx.fill();
+        } else {
+            ctx.fillStyle = '#8a5a34';
+            ctx.beginPath();
+            ctx.roundRect(-o.r * 1.5, -o.r * 0.55, o.r * 3, o.r * 1.1, o.r * 0.55);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+            ctx.lineWidth = 2;
+            for (let i = -1; i <= 1; i++) {
+                ctx.beginPath();
+                ctx.moveTo(-o.r * 1.3, i * o.r * 0.3);
+                ctx.lineTo(o.r * 1.3, i * o.r * 0.3);
+                ctx.stroke();
+            }
+            ctx.fillStyle = '#6b4423';
+            ctx.beginPath();
+            ctx.ellipse(o.r * 1.5, 0, o.r * 0.3, o.r * 0.55, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    });
+}
+
+function drawFlies() {
+    const t = performance.now() * 0.02;
+    flies.forEach(fl => {
+        const bob = Math.sin(t + fl.phase) * 4;
+        const wing = Math.sin(t * 2 + fl.phase) * 5;
+        ctx.save();
+        ctx.translate(fl.x, fl.y + bob);
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.beginPath();
+        ctx.ellipse(-4, -wing, 6, 3, 0.5, 0, Math.PI * 2);
+        ctx.ellipse(4, -wing, 6, 3, -0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#2b2b2b';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 6, 4.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#5b3fa0';
+        ctx.beginPath();
+        ctx.arc(0, -2, 2.3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    });
+}
+
+function drawParticles() {
+    particles.forEach(p => {
+        ctx.globalAlpha = Math.max(0, p.life / 26);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    });
+}
+
+function drawFrog(f, isLeader) {
+    const r = f.radius;
+    const t = performance.now() * 0.01;
+    const kick = Math.sin(t * 1.6 + f.legPhase) * 0.5 + 0.5;
+    const squash = 1 + Math.sin(t * 1.6 + f.legPhase) * 0.04;
+
+    ctx.save();
+    ctx.translate(f.x, f.y);
+    ctx.rotate(f.angle);
+    ctx.scale(squash, 1 / squash);
+
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.beginPath();
+    ctx.ellipse(0, r * 0.75, r * 0.9, r * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = shade(f.color, -18);
+    [-1, 1].forEach(side => {
+        ctx.beginPath();
+        ctx.ellipse(-r * 0.25, side * r * (0.55 + kick * 0.15), r * 0.42, r * 0.24, side * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    const bodyGrad = ctx.createRadialGradient(-r * 0.2, -r * 0.3, r * 0.1, 0, 0, r);
+    bodyGrad.addColorStop(0, shade(f.color, 22));
+    bodyGrad.addColorStop(1, f.color);
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = shade(f.color, 30);
+    ctx.beginPath();
+    ctx.ellipse(r * 0.15, r * 0.35, r * 0.55, r * 0.35, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = shade(f.color, -12);
+    for (let i = 0; i < 3; i++) {
+        const a = f.spotSeed + i * 2.1;
+        ctx.beginPath();
+        ctx.ellipse(Math.cos(a) * r * 0.5, Math.sin(a) * r * 0.5 - r * 0.15, r * 0.12, r * 0.09, a, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    [-1, 1].forEach(side => {
+        ctx.beginPath();
+        ctx.ellipse(r * 0.35, side * r * (0.5 + kick * 0.2), r * 0.32, r * 0.18, side * 0.4, 0, Math.PI * 2);
+        ctx.fillStyle = f.color;
+        ctx.fill();
+    });
+
+    const eyeY = -r * 0.55;
+    const eyeSpread = r * 0.42;
+    const blinkClosed = f.blink && f.blink.closed > 0;
+    [-1, 1].forEach(side => {
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(-r * 0.15, eyeY + side * eyeSpread, r * 0.26, blinkClosed ? r * 0.04 : r * 0.26, 0, 0, Math.PI * 2);
+        ctx.fill();
+        if (!blinkClosed) {
+            ctx.fillStyle = '#22301f';
+            ctx.beginPath();
+            ctx.arc(-r * 0.08, eyeY + side * eyeSpread, r * 0.11, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            ctx.beginPath();
+            ctx.arc(-r * 0.03, eyeY + side * eyeSpread - r * 0.04, r * 0.04, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    });
+
+    ctx.strokeStyle = '#22301f';
+    ctx.lineWidth = Math.max(1.5, r * 0.06);
+    ctx.beginPath();
+    ctx.arc(r * 0.15, r * 0.05, r * 0.34, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255,140,160,0.35)';
+    [-1, 1].forEach(side => {
+        ctx.beginPath();
+        ctx.ellipse(-r * 0.1, side * r * 0.35, r * 0.14, r * 0.09, 0, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    if (isLeader) {
+        ctx.fillStyle = '#e0455f';
+        ctx.beginPath();
+        ctx.ellipse(-r * 0.65, -eyeSpread * 0.05, r * 0.16, r * 0.1, -0.5, 0, Math.PI * 2);
+        ctx.ellipse(-r * 0.65, eyeSpread * 0.05, r * 0.16, r * 0.1, 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#b8324a';
+        ctx.beginPath();
+        ctx.arc(-r * 0.65, 0, r * 0.08, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+}
+
+function shade(hex, percent) {
+    const n = parseInt(hex.slice(1), 16);
+    let r = (n >> 16) + Math.round(255 * (percent / 100));
+    let g = ((n >> 8) & 0xff) + Math.round(255 * (percent / 100));
+    let b = (n & 0xff) + Math.round(255 * (percent / 100));
+    r = clamp(r, 0, 255); g = clamp(g, 0, 255); b = clamp(b, 0, 255);
+    return `rgb(${r},${g},${b})`;
+}
+
+function draw() {
+    drawBackground();
+    drawObstacles();
+    drawFlies();
+    for (let i = followers.length - 1; i >= 0; i--) drawFrog(followers[i], false);
+    if (invulnTimer > 0 && Math.floor(frame / 5) % 2 === 0) ctx.globalAlpha = 0.4;
+    drawFrog({ x: head.x, y: head.y, angle: head.angle, radius: head.radius, color: LEADER_COLOR, spotSeed: 1.2, blink: head.blink, legPhase: 0 }, true);
+    ctx.globalAlpha = 1;
+    drawParticles();
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+setupWorld();
+loop();
+</script>
+</body>
+</html>
