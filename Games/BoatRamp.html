@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Boat Ramp Rush</title>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<style>
+  :root{
+    --sky:#bfe8ff;
+    --sun:#ffb454;
+    --panel:rgba(12,26,38,0.72);
+    --panel-line:rgba(255,255,255,0.16);
+    --text-dim:rgba(255,255,255,0.65);
+    --good:#34d399;
+    --warn:#fbbf24;
+    --bad:#f87171;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; height:100%; overflow:hidden;
+    background:#052033;
+    font-family:'Trebuchet MS', system-ui, sans-serif;
+    color:#f0f9ff;
+    touch-action:manipulation;
+    -webkit-user-select:none; user-select:none;
+  }
+  #app{ position:relative; width:100vw; height:100vh; }
+  #stage{ position:absolute; inset:0; z-index:0; }
+  #stage canvas{ display:block; width:100%; height:100%; }
+
+  #hud{ position:absolute; inset:0; z-index:5; pointer-events:none; display:flex; flex-direction:column; justify-content:space-between; }
+
+  .hud-top{ display:flex; justify-content:space-between; align-items:flex-start; padding:10px 12px; gap:8px; }
+  .stat-card{ background:var(--panel); border:1px solid var(--panel-line); border-radius:12px; padding:7px 12px; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); box-shadow:0 8px 20px rgba(0,0,0,0.3); pointer-events:auto; }
+  .stat-label{ font-size:10px; letter-spacing:1.2px; text-transform:uppercase; color:var(--text-dim); }
+  .stat-value{ font-size:20px; font-weight:800; color:#fff; line-height:1.1; }
+  .combo-chip{ display:inline-block; margin-top:2px; font-size:11px; font-weight:700; color:#052033; background:linear-gradient(90deg,#ffe08a,#ffb454); padding:1px 8px; border-radius:10px; }
+
+  .lanes-card{ display:flex; gap:6px; }
+  .lane-pill{ display:flex; flex-direction:column; align-items:center; gap:2px; padding:4px 8px; border-radius:8px; background:rgba(255,255,255,0.06); min-width:42px; }
+  .lane-pill .n{ font-size:9px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; }
+  .lane-dot{ width:14px; height:14px; border-radius:50%; border:2px solid rgba(255,255,255,0.5); }
+  .lane-pill .s{ font-size:9px; font-weight:700; }
+  .lane-pill.busy .s{ color:var(--bad); }
+  .lane-pill.free .s{ color:var(--good); }
+
+  .meter-card{ min-width:120px; }
+  .meter-track{ width:100%; height:10px; border-radius:6px; background:rgba(255,255,255,0.12); overflow:hidden; margin-top:4px; border:1px solid rgba(255,255,255,0.1); }
+  .meter-fill{ height:100%; width:0%; background:linear-gradient(90deg,#34d399,#fbbf24,#f87171); transition:width 0.2s ease; }
+
+  .hud-toast{ align-self:center; margin-top:2px; pointer-events:none; }
+  .toast-msg{ display:inline-block; background:rgba(5,32,51,0.85); border:1px solid rgba(255,255,255,0.25); color:#ffe9b0; font-weight:700; font-size:13px; padding:6px 16px; border-radius:20px; opacity:0; transform:translateY(-6px); transition:opacity 0.25s ease, transform 0.25s ease; box-shadow:0 6px 18px rgba(0,0,0,0.35); }
+  .toast-msg.show{ opacity:1; transform:translateY(0); }
+
+  .hud-bottom{ display:flex; flex-direction:column; align-items:center; gap:4px; padding:0 8px 10px; }
+  .tray-label{ font-size:10.5px; color:var(--text-dim); letter-spacing:1px; text-transform:uppercase; pointer-events:none; }
+  .tray{ pointer-events:auto; display:flex; gap:8px; overflow-x:auto; max-width:100%; padding:6px; background:var(--panel); border:1px solid var(--panel-line); border-radius:16px; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); box-shadow:0 10px 26px rgba(0,0,0,0.35); scrollbar-width:none; }
+  .tray::-webkit-scrollbar{ display:none; }
+  .tray-card{ flex:0 0 auto; width:58px; height:70px; border-radius:12px; border:2px solid rgba(255,255,255,0.25); background:rgba(255,255,255,0.05); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; cursor:pointer; font-family:inherit; position:relative; animation:pop 0.25s ease; }
+  @keyframes pop{ from{ transform:scale(0.4); opacity:0; } to{ transform:scale(1); opacity:1; } }
+  .tray-card .icon{ width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; box-shadow:inset 0 0 0 2px rgba(255,255,255,0.4); }
+  .tray-card .badge{ font-size:8px; font-weight:800; letter-spacing:0.5px; color:var(--text-dim); text-transform:uppercase; }
+  .tray-card.hot{ border-color:#ffe08a; box-shadow:0 0 12px rgba(255,224,138,0.7); }
+  .tray-card.vip{ border-color:#fff2b0; }
+  .tray-card.shake{ animation:shake 0.35s ease; }
+  @keyframes shake{ 0%,100%{ transform:translateX(0); } 20%{ transform:translateX(-6px); } 40%{ transform:translateX(6px); } 60%{ transform:translateX(-4px); } 80%{ transform:translateX(4px); } }
+  .tray-empty{ font-size:11px; color:var(--text-dim); padding:14px 22px; }
+
+  .icon-btn{ position:absolute; z-index:6; pointer-events:auto; width:38px; height:38px; border-radius:50%; background:var(--panel); border:1px solid var(--panel-line); color:#fff; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(6px); }
+  #muteBtn{ top:10px; right:10px; }
+  #pauseBtn{ top:54px; right:10px; }
+
+  .overlay{ position:absolute; inset:0; z-index:10; display:none; align-items:center; justify-content:center; background:rgba(3,12,20,0.86); padding:18px; }
+  .overlay.active{ display:flex; }
+  .card{ max-width:420px; width:100%; background:linear-gradient(160deg,#0d3350,#0a2338); border:1px solid rgba(255,255,255,0.18); border-radius:20px; padding:24px 24px 20px; text-align:center; box-shadow:0 24px 60px rgba(0,0,0,0.55); max-height:90vh; overflow-y:auto; }
+  .card h1{ margin:0 0 4px; font-size:26px; color:#ffe08a; text-shadow:0 0 18px rgba(255,180,84,0.45); }
+  .card .sub{ color:var(--text-dim); font-size:13px; margin-bottom:14px; }
+  .rules{ text-align:left; font-size:12.5px; line-height:1.55; color:#dff3ff; background:rgba(255,255,255,0.05); border-radius:12px; padding:10px 14px; margin:10px 0 16px; }
+  .rules li{ margin-bottom:4px; }
+  .best{ font-size:12px; color:var(--text-dim); margin-top:2px; }
+  .stats-row{ display:flex; justify-content:space-around; margin:14px 0; }
+  .stats-row div{ text-align:center; }
+  .stats-row .n{ font-size:24px; font-weight:800; color:#ffe08a; }
+  .stats-row .l{ font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; }
+  button.cta{ margin-top:6px; padding:12px 30px; border-radius:14px; border:none; background:linear-gradient(90deg,#3fd0ff,#34d399); color:#053; color:#04222f; font-weight:800; font-size:15px; cursor:pointer; font-family:inherit; box-shadow:0 10px 24px rgba(52,211,153,0.35); width:100%; }
+  button.cta:active{ filter:brightness(0.92); }
+  button.ghost{ margin-top:8px; padding:9px 20px; border-radius:12px; border:1px solid rgba(255,255,255,0.25); background:transparent; color:#fff; font-size:13px; cursor:pointer; font-family:inherit; width:100%; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage"></div>
+
+  <div id="hud">
+    <div class="hud-top">
+      <div class="stat-card">
+        <div class="stat-label">Score</div>
+        <div class="stat-value" id="scoreVal">0</div>
+        <div class="combo-chip" id="comboChip" style="display:none;">Combo x1</div>
+      </div>
+      <div class="stat-card lanes-card" id="lanesCard"></div>
+      <div class="stat-card meter-card">
+        <div class="stat-label">Backup</div>
+        <div class="meter-track"><div class="meter-fill" id="meterFill"></div></div>
+      </div>
+    </div>
+
+    <div class="hud-toast"><div class="toast-msg" id="toast"></div></div>
+
+    <div class="hud-bottom">
+      <div class="tray-label">Tap to send it down the ramp</div>
+      <div id="tray" class="tray"></div>
+    </div>
+  </div>
+
+  <button id="muteBtn" class="icon-btn">🔊</button>
+  <button id="pauseBtn" class="icon-btn">⏸</button>
+
+  <div id="startOverlay" class="overlay active">
+    <div class="card">
+      <h1>🚤 Boat Ramp Rush</h1>
+      <div class="sub">Run the state park boat launch.</div>
+      <ul class="rules">
+        <li>Colored trucks pull up, show paperwork, and pass the mussel inspection automatically.</li>
+        <li>The ramp is wide enough for <b>3 trucks at a time</b>. Tap a card in the tray to send that truck or boat backing down an open spot.</li>
+        <li>Each spot's overhead flag shows its <b>hot color</b> &mdash; match it for bonus points and a splashy combo.</li>
+        <li>Boats that launch head out on the lake, then come back needing a ride &mdash; their matching truck fetches them.</li>
+        <li>Don't let the lines back up, or the Backup meter fills and your shift ends!</li>
+      </ul>
+      <div class="best" id="startBest">Best score: 0</div>
+      <button class="cta" id="startBtn">Start Shift</button>
+    </div>
+  </div>
+
+  <div id="gameoverOverlay" class="overlay">
+    <div class="card">
+      <h1>🌅 Shift Over</h1>
+      <div class="sub" id="overReason">The line backed up past the highway.</div>
+      <div class="stats-row">
+        <div><div class="n" id="finalScore">0</div><div class="l">Score</div></div>
+        <div><div class="n" id="finalBest">0</div><div class="l">Best</div></div>
+        <div><div class="n" id="finalCombo">0</div><div class="l">Best Combo</div></div>
+      </div>
+      <button class="cta" id="retryBtn">Run It Again</button>
+    </div>
+  </div>
+
+  <div id="pauseOverlay" class="overlay">
+    <div class="card">
+      <h1>⏸ Paused</h1>
+      <div class="sub">Take a breather. The lake isn't going anywhere.</div>
+      <button class="cta" id="resumeBtn">Resume</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ---------------------------------------------------------------- */
+/* CONFIG                                                            */
+/* ---------------------------------------------------------------- */
+
+const PALETTE = [
+  { key:'red',    hex:0xef4444, emoji:'🚚' },
+  { key:'blue',   hex:0x3b82f6, emoji:'🚚' },
+  { key:'amber',  hex:0xf59e0b, emoji:'🚚' },
+  { key:'green',  hex:0x22c55e, emoji:'🚚' },
+  { key:'purple', hex:0xa855f7, emoji:'🚚' },
+  { key:'pink',   hex:0xec4899, emoji:'🚚' },
+];
+const VIP = { key:'vip', hex:0xfff2b0, emoji:'🚚' };
+const UNLOCK_SCORES = [0,0,0,700,1800,3200];
+
+const LANES_X = [-5.2, 0, 5.2];
+const Z = {
+  spawn:-34, checkA:-24, checkB:-18, holdFront:-12,
+  laneHead:-4, rampMid:2, waterEdge:7, dockFront:9,
+  lakeNear:12, lakeFar:26, exitEnd:-34, apron:-10
+};
+const ENTRANCE_X = -4;
+const EXIT_X = -13;
+const RAMP_WIDTH = 15.5;
+const PARK = { x0:9, x1:31, z0:-31, z1:-13 };
+const MAX_QUEUE = 6;
+const BUFFER_TOTAL = 3;
+const RATE_UP = 2.4;
+const RATE_DOWN = 5.5;
+
+let scoreHighKey = 'boatRampHighScore';
+
+/* ---------------------------------------------------------------- */
+/* THREE SETUP                                                       */
+/* ---------------------------------------------------------------- */
+
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xbfe8ff);
+scene.fog = new THREE.Fog(0xbfe8ff, 42, 105);
+
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth/window.innerHeight, 0.5, 260);
+function placeCamera(){
+  camera.position.set(2, 34, 30);
+  camera.lookAt(2, 0, -6);
+}
+placeCamera();
+
+function onResize(){
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+window.addEventListener('resize', onResize);
+onResize();
+
+scene.add(new THREE.HemisphereLight(0xbfe8ff, 0x3f6b3a, 1.05));
+const sun = new THREE.DirectionalLight(0xfff2d0, 1.4);
+sun.position.set(28, 46, 18);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1536, 1536);
+sun.shadow.camera.left = -55; sun.shadow.camera.right = 55;
+sun.shadow.camera.top = 55; sun.shadow.camera.bottom = -55;
+sun.shadow.camera.near = 5; sun.shadow.camera.far = 130;
+sun.shadow.bias = -0.0015;
+scene.add(sun);
+scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+
+/* ---------------------------------------------------------------- */
+/* SIGN TEXTURE HELPER                                               */
+/* ---------------------------------------------------------------- */
+
+function makeSign(text, bg='#0d3350', fg='#ffe08a', w=256, h=96){
+  const c = document.createElement('canvas'); c.width=w; c.height=h;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = bg; ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 6; ctx.strokeRect(3,3,w-6,h-6);
+  ctx.fillStyle = fg; ctx.font = 'bold 30px Trebuchet MS, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  wrapText(ctx, text, w/2, h/2, w-24, 32);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+function wrapText(ctx, text, x, y, maxWidth, lineHeight){
+  const words = text.split(' ');
+  let line = '', lines = [];
+  for (const word of words){
+    const test = line + word + ' ';
+    if (ctx.measureText(test).width > maxWidth && line){ lines.push(line); line = word + ' '; }
+    else line = test;
+  }
+  lines.push(line);
+  const startY = y - (lines.length-1)*lineHeight/2;
+  lines.forEach((l,i)=> ctx.fillText(l.trim(), x, startY + i*lineHeight));
+}
+function makeSignMesh(text, x, z, opts={}){
+  const w = opts.w ?? 3.2, h = opts.h ?? 1.2;
+  const tex = makeSign(text, opts.bg, opts.fg);
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w,h), new THREE.MeshStandardMaterial({ map:tex, roughness:0.7 }));
+  mesh.position.set(x, opts.y ?? 3.2, z);
+  mesh.castShadow = true;
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09, (opts.y ?? 3.2), 8), new THREE.MeshStandardMaterial({ color:0x6b4a2f, roughness:0.9 }));
+  post.position.set(x, (opts.y ?? 3.2)/2, z);
+  post.castShadow = true;
+  const g = new THREE.Group(); g.add(post, mesh);
+  return g;
+}
+
+/* ---------------------------------------------------------------- */
+/* ENVIRONMENT                                                       */
+/* ---------------------------------------------------------------- */
+
+const grass = new THREE.Mesh(
+  new THREE.PlaneGeometry(120, 120),
+  new THREE.MeshStandardMaterial({ color:0x4c9a4a, roughness:1 })
+);
+grass.rotation.x = -Math.PI/2;
+grass.position.y = -0.02;
+grass.receiveShadow = true;
+scene.add(grass);
+
+const waterUniforms = {
+  time: { value:0 },
+  colorDeep: { value:new THREE.Color(0x0f6fa8) },
+  colorShallow: { value:new THREE.Color(0x3fb8d8) },
+};
+const waterMat = new THREE.ShaderMaterial({
+  uniforms: waterUniforms,
+  vertexShader: `
+    varying vec2 vUv;
+    varying float vElev;
+    uniform float time;
+    void main(){
+      vUv = uv;
+      vec3 pos = position;
+      float e = sin(pos.x*0.16 + time*1.2)*0.4 + sin(pos.y*0.22 - time*1.6)*0.28 + sin((pos.x+pos.y)*0.1 + time*0.8)*0.2;
+      pos.z += e;
+      vElev = e;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(pos,1.0);
+    }
+  `,
+  fragmentShader: `
+    varying vec2 vUv;
+    varying float vElev;
+    uniform float time;
+    uniform vec3 colorDeep;
+    uniform vec3 colorShallow;
+    float rand(vec2 c){ return fract(sin(dot(c, vec2(12.9898,78.233)))*43758.5453); }
+    void main(){
+      float t = smoothstep(-0.4, 0.6, vElev);
+      vec3 base = mix(colorDeep, colorShallow, t);
+      vec2 cell = vUv*140.0 + vec2(time*1.3, time*0.7);
+      float sp = rand(floor(cell));
+      float spark = step(0.9935, sp) * (0.6+0.4*sin(time*6.0+sp*40.0));
+      vec3 col = base + spark*vec3(1.0,1.0,0.95);
+      gl_FragColor = vec4(col, 0.94);
+    }
+  `,
+  transparent: true,
+});
+const water = new THREE.Mesh(new THREE.PlaneGeometry(100, 60, 80, 50), waterMat);
+water.rotation.x = -Math.PI/2;
+water.position.set(0, 0.02, 22);
+scene.add(water);
+
+const rampMat = new THREE.MeshStandardMaterial({ color:0xb7bcc4, roughness:0.95 });
+const roadMat = new THREE.MeshStandardMaterial({ color:0x565b63, roughness:0.95 });
+const lotMat = new THREE.MeshStandardMaterial({ color:0x6b6f76, roughness:0.95 });
+const stripeMat = new THREE.MeshStandardMaterial({ color:0xf4d35e });
+
+/* One wide boat ramp, big enough for all 3 trucks to back down side by side */
+const ramp = new THREE.Mesh(new THREE.BoxGeometry(RAMP_WIDTH, 0.12, 17), rampMat);
+ramp.position.set(0, 0.02, 3.5);
+ramp.receiveShadow = true;
+scene.add(ramp);
+[-2.6, 2.6].forEach(dx=>{
+  const stripe = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 17), stripeMat);
+  stripe.rotation.x = -Math.PI/2;
+  stripe.position.set(dx, 0.09, 3.5);
+  scene.add(stripe);
+});
+scene.add(makeSignMesh('BOAT RAMP', 0, Z.laneHead - 1.5, { w:2.8, h:1, y:2.4 }));
+
+/* Entrance road (in) and exit road (out), running down from the top */
+const entranceRoad = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.1, 30), roadMat);
+entranceRoad.position.set(ENTRANCE_X, 0.01, -21);
+entranceRoad.receiveShadow = true;
+scene.add(entranceRoad);
+
+const exitRoad = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.1, 30), roadMat);
+exitRoad.position.set(EXIT_X, 0.01, -21);
+exitRoad.receiveShadow = true;
+scene.add(exitRoad);
+
+/* Apron ties the entrance, exit, ramp head and parking lot together */
+const apron = new THREE.Mesh(new THREE.BoxGeometry(38, 0.1, 10), roadMat);
+apron.position.set(3.5, 0.008, Z.apron - 3);
+apron.receiveShadow = true;
+scene.add(apron);
+
+/* Parking lot sits up top, alongside the entrance */
+const parkingLot = new THREE.Mesh(new THREE.BoxGeometry(PARK.x1-PARK.x0, 0.1, PARK.z1-PARK.z0), lotMat);
+parkingLot.position.set((PARK.x0+PARK.x1)/2, 0.005, (PARK.z0+PARK.z1)/2);
+parkingLot.receiveShadow = true;
+scene.add(parkingLot);
+scene.add(makeSignMesh('PARKING', (PARK.x0+PARK.x1)/2, PARK.z1 + 2.4, { w:3.2, h:1 }));
+
+scene.add(makeSignMesh('STATE PARK\nBOAT RAMP', ENTRANCE_X, Z.spawn + 2, { w:4.4, h:1.7, y:3.6, bg:'#0d3350', fg:'#8fe3ff' }));
+scene.add(makeSignMesh('PAPERWORK CHECK', ENTRANCE_X, Z.checkA, { w:3.2, h:1 }));
+scene.add(makeSignMesh('MUSSEL INSPECTION', ENTRANCE_X, Z.checkB, { w:3.4, h:1 }));
+
+function makeTree(x,z,scale=1){
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.32,1.6,8), new THREE.MeshStandardMaterial({ color:0x6b4a2f, roughness:1 }));
+  trunk.position.y = 0.8; trunk.castShadow = true;
+  const leafColors = [0x2f8f4e, 0x39a35c, 0x2a7d45];
+  const leaf = new THREE.Mesh(new THREE.ConeGeometry(1.5,2.6,9), new THREE.MeshStandardMaterial({ color:leafColors[Math.floor(Math.random()*leafColors.length)], roughness:0.9 }));
+  leaf.position.y = 2.4; leaf.castShadow = true;
+  g.add(trunk, leaf);
+  g.position.set(x,0,z);
+  g.scale.setScalar(scale);
+  return g;
+}
+const treeSpots = [
+  [-24,-30],[-28,-18],[-20,-22],[-34,-16],[-30,-30],
+  [36,-30],[40,-20],[33,-34],
+  [0,-30],[6,-34],[-8,-24],
+  [16,-34],[24,-34]
+];
+treeSpots.forEach(([x,z])=> scene.add(makeTree(x,z, 0.8+Math.random()*0.5)));
+
+/* Overhead gantry with a hot-color flag over each of the 3 ramp slots
+   (elevated above truck height so nothing sits in the driving path) */
+const gantryZ = Z.laneHead - 1.6;
+const gantryPostMat = new THREE.MeshStandardMaterial({ color:0xe5e7eb, roughness:0.5, metalness:0.3 });
+const beam = new THREE.Mesh(new THREE.BoxGeometry(RAMP_WIDTH+1.4, 0.32, 0.32), gantryPostMat);
+beam.position.set(0, 4.1, gantryZ);
+beam.castShadow = true;
+scene.add(beam);
+[-1,1].forEach(side=>{
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,4.1,8), gantryPostMat);
+  post.position.set(side*(RAMP_WIDTH/2+0.4), 2.05, gantryZ);
+  post.castShadow = true;
+  scene.add(post);
+});
+
+const laneFlags = LANES_X.map((x)=>{
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.0,0.65), new THREE.MeshStandardMaterial({ color:0xffffff, side:THREE.DoubleSide, emissive:0x111111, emissiveIntensity:0.2 }));
+  flag.position.set(x, 3.5, gantryZ+0.35);
+  scene.add(flag);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(1.7,1.95,32), new THREE.MeshStandardMaterial({ color:0x34d399, transparent:true, opacity:0.7, side:THREE.DoubleSide }));
+  ring.rotation.x = -Math.PI/2;
+  ring.position.set(x, 0.05, Z.laneHead);
+  scene.add(ring);
+  return { flag, ring };
+});
+
+/* ---------------------------------------------------------------- */
+/* VEHICLE BUILDERS                                                  */
+/* ---------------------------------------------------------------- */
+
+function makeWheel(){
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.42,0.34,12), new THREE.MeshStandardMaterial({ color:0x1f2430, roughness:0.9 }));
+  mesh.rotation.z = Math.PI/2;
+  mesh.castShadow = true;
+  return mesh;
+}
+
+function makeTruck(hex){
+  const g = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color:hex, roughness:0.4, metalness:0.25 });
+  const trimMat = new THREE.MeshStandardMaterial({ color:0xe8ecf1, roughness:0.6 });
+  const glassMat = new THREE.MeshStandardMaterial({ color:0xaee3ff, roughness:0.15, metalness:0.3, emissive:0x0e2433, emissiveIntensity:0.25 });
+
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.1,1.4,1.9), bodyMat);
+  cab.position.set(0,0.95,-3.0); cab.castShadow = true; cab.receiveShadow = true;
+  const cabTop = new THREE.Mesh(new THREE.BoxGeometry(1.9,0.85,1.5), bodyMat);
+  cabTop.position.set(0,1.78,-3.15); cabTop.castShadow = true;
+  const windshield = new THREE.Mesh(new THREE.BoxGeometry(1.72,0.62,0.1), glassMat);
+  windshield.position.set(0,1.75,-2.42);
+  const bed = new THREE.Mesh(new THREE.BoxGeometry(2.1,0.55,2.0), trimMat);
+  bed.position.set(0,0.6,-0.7); bed.castShadow = true; bed.receiveShadow = true;
+
+  g.add(cab, cabTop, windshield, bed);
+  [[-0.95,-3.6],[0.95,-3.6],[-0.95,-1.7],[0.95,-1.7]].forEach(([x,z])=>{
+    const w = makeWheel(); w.position.set(x,0.42,z); g.add(w);
+  });
+
+  const trailer = new THREE.Group();
+  const bunkBed = new THREE.Mesh(new THREE.BoxGeometry(1.7,0.14,3.6), new THREE.MeshStandardMaterial({ color:0x8a8f98, roughness:0.7, metalness:0.3 }));
+  bunkBed.position.set(0,0.42,1.9); bunkBed.castShadow = true; bunkBed.receiveShadow = true;
+  const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.14,0.1,1.2), new THREE.MeshStandardMaterial({ color:0x555a61 }));
+  tongue.position.set(0,0.38,0.1);
+  trailer.add(bunkBed, tongue);
+  [[-0.85,2.6],[0.85,2.6]].forEach(([x,z])=>{
+    const w = makeWheel(); w.scale.setScalar(0.75); w.position.set(x,0.32,z); trailer.add(w);
+  });
+  g.add(trailer);
+
+  g.userData.bunkPos = new THREE.Vector3(0, 0.68, 1.9);
+  g.userData.bodyMat = bodyMat;
+  return g;
+}
+
+function makeHull(hex){
+  const g = new THREE.Group();
+  const hullMat = new THREE.MeshStandardMaterial({ color:0xf3f6fa, roughness:0.35, metalness:0.15 });
+  const accentMat = new THREE.MeshStandardMaterial({ color:hex, roughness:0.4, metalness:0.2 });
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.5,0.55,3.0), hullMat);
+  body.position.y = 0.32; body.castShadow = true; body.receiveShadow = true;
+  const bow = new THREE.Mesh(new THREE.ConeGeometry(0.85,1.1,4), hullMat);
+  bow.rotation.x = -Math.PI/2; bow.rotation.y = Math.PI/4;
+  bow.scale.set(1,1,0.72);
+  bow.position.set(0,0.32,-1.85);
+  bow.castShadow = true;
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.56,0.16,2.6), accentMat);
+  stripe.position.set(0,0.42,0.05);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.5,0.9), accentMat);
+  cabin.position.set(0,0.86,0.4); cabin.castShadow = true;
+  const flagPole = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.9,6), new THREE.MeshStandardMaterial({ color:0xffffff }));
+  flagPole.position.set(0,0.9,1.55);
+  const pennant = new THREE.Mesh(new THREE.PlaneGeometry(0.4,0.26), new THREE.MeshStandardMaterial({ color:hex, side:THREE.DoubleSide }));
+  pennant.position.set(0.2,1.25,1.55);
+
+  g.add(body, bow, stripe, cabin, flagPole, pennant);
+  g.userData.bobSeed = Math.random()*10;
+  return g;
+}
+
+/* ---------------------------------------------------------------- */
+/* PATH MOVER                                                        */
+/* ---------------------------------------------------------------- */
+
+class Mover{
+  constructor(obj, waypoints){
+    this.obj = obj;
+    this.wps = waypoints;
+    this.idx = 0;
+    this.done = waypoints.length < 2;
+    this.wait = 0;
+    if (waypoints.length){ obj.position.set(waypoints[0].x, waypoints[0].y ?? obj.position.y, waypoints[0].z); }
+  }
+  update(dt){
+    if (this.done) return;
+    if (this.wait > 0){ this.wait -= dt; return; }
+    const target = this.wps[this.idx+1];
+    if (!target){ this.done = true; return; }
+    const o = this.obj;
+    const dx = target.x - o.position.x, dz = target.z - o.position.z;
+    const dist = Math.hypot(dx,dz);
+    const spd = target.speed ?? 6;
+    if (dist < 0.08){
+      o.position.x = target.x; o.position.z = target.z;
+      if (target.y != null) o.position.y = target.y;
+      if (target.facing != null) o.rotation.y = target.facing;
+      this.idx++;
+      if (target.onArrive) target.onArrive();
+      this.wait = target.wait || 0;
+      return;
+    }
+    const step = Math.min(dist, spd*dt);
+    o.position.x += dx/dist*step;
+    o.position.z += dz/dist*step;
+    if (target.y != null) o.position.y += (target.y - o.position.y)*Math.min(1, dt*4);
+    if (!target.lockFacing){
+      const desired = Math.atan2(-dx/dist, -dz/dist);
+      let diff = ((desired - o.rotation.y + Math.PI) % (Math.PI*2)) - Math.PI;
+      o.rotation.y += diff*Math.min(1, dt*6);
+    }
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* PARTICLES                                                         */
+/* ---------------------------------------------------------------- */
+
+const bursts = [];
+function spawnBurst(pos, color, count=14, opts={}){
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(count*3);
+  const vel = [];
+  for (let i=0;i<count;i++){
+    positions[i*3]=pos.x; positions[i*3+1]=pos.y+0.2; positions[i*3+2]=pos.z;
+    const a = Math.random()*Math.PI*2;
+    const spd = (opts.spread ?? 3) * (0.4+Math.random()*0.8);
+    vel.push(new THREE.Vector3(Math.cos(a)*spd, (opts.up ?? 4)*(0.6+Math.random()*0.6), Math.sin(a)*spd));
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(positions,3));
+  const mat = new THREE.PointsMaterial({ color: color, size: opts.size ?? 0.32, transparent:true, opacity:1, depthWrite:false, blending: THREE.AdditiveBlending });
+  const pts = new THREE.Points(geo, mat);
+  scene.add(pts);
+  bursts.push({ pts, vel, life: opts.life ?? 0.9, age:0, gravity: opts.gravity ?? 9 });
+}
+function updateBursts(dt){
+  for (let i=bursts.length-1;i>=0;i--){
+    const b = bursts[i];
+    b.age += dt;
+    const pos = b.pts.geometry.attributes.position;
+    for (let j=0;j<b.vel.length;j++){
+      const v = b.vel[j];
+      v.y -= b.gravity*dt;
+      pos.array[j*3] += v.x*dt;
+      pos.array[j*3+1] += v.y*dt;
+      pos.array[j*3+2] += v.z*dt;
+    }
+    pos.needsUpdate = true;
+    b.pts.material.opacity = Math.max(0, 1 - b.age/b.life);
+    if (b.age >= b.life){ scene.remove(b.pts); b.pts.geometry.dispose(); b.pts.material.dispose(); bursts.splice(i,1); }
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* GAME STATE                                                        */
+/* ---------------------------------------------------------------- */
+
+let running = false, paused = false;
+let score = 0, combo = 0, bestCombo = 0, comboTimer = 0;
+let frustration = 0;
+let unlockedCount = 3;
+let spawnTimer = 2.5, promoteTimer = 2, hotColorTimer = 0;
+let uid = 0;
+let muted = false;
+
+const launchQueue = [];   // units waiting at holding area, not yet in a lane
+const retrieveQueue = []; // boats waiting at dock, matching truck confirmed
+const parkingPool = [];   // idle trucks {color,hex,group,id,stall}
+const lakePool = [];      // boats out on lake {color,hex,group,id,floatT,ready}
+const tray = [];          // combined queue-facing list mirrored to DOM: {kind,color,hex,id,ref}
+
+const lanes = LANES_X.map((x,i)=>({ index:i, x, state:'free', hotColor: PALETTE[i % PALETTE.length].key, job:null }));
+
+const parkingStalls = [];
+for (let row=0; row<3; row++){
+  for (let col=0; col<5; col++){
+    parkingStalls.push({ x: PARK.x0 + 2.2 + col*4.4, z: PARK.z0 + 3 + row*7, taken:false });
+  }
+}
+
+function unlockedPalette(){ return PALETTE.slice(0, unlockedCount); }
+function randomColor(){
+  if (Math.random() < 0.06) return VIP;
+  const p = unlockedPalette();
+  return p[Math.floor(Math.random()*p.length)];
+}
+
+/* ---------------------------------------------------------------- */
+/* SPAWNING: LAUNCH SIDE                                             */
+/* ---------------------------------------------------------------- */
+
+function holdSlotPos(i){ return { x:ENTRANCE_X, z: Z.holdFront - i*2.8 }; }
+
+function spawnLaunchUnit(){
+  if (launchQueue.length >= MAX_QUEUE) return;
+  const c = randomColor();
+  const group = makeTruck(c.hex);
+  scene.add(group);
+  const hull = makeHull(c.hex);
+  hull.position.copy(group.userData.bunkPos);
+  group.add(hull);
+  group.userData.hull = hull;
+
+  const unit = { id: uid++, kind:'launch', color:c.key, hex:c.hex, group, mover:null, state:'entering' };
+  const path = [
+    { x:ENTRANCE_X, z:Z.spawn },
+    { x:ENTRANCE_X, z:Z.checkA, speed:6, wait:0.35 },
+    { x:ENTRANCE_X, z:Z.checkB, speed:6, wait:0.45, facing:Math.PI },
+  ];
+  unit.mover = new Mover(group, path);
+  launchQueue.push(unit);
+}
+
+/* ---------------------------------------------------------------- */
+/* SPAWNING: RETRIEVE SIDE                                           */
+/* ---------------------------------------------------------------- */
+
+function dockSlotPos(i){ return { x:-18, z: Z.dockFront + i*2.4 }; }
+
+function tryPromoteLakeBoats(){
+  if (retrieveQueue.length >= MAX_QUEUE) return;
+  for (const boat of lakePool){
+    if (boat.promoted) continue;
+    if (boat.floatT < boat.readyAt) continue;
+    const truckIdx = parkingPool.findIndex(t => t.color === boat.color);
+    if (truckIdx === -1) continue;
+    boat.promoted = true;
+    const truck = parkingPool.splice(truckIdx,1)[0];
+    freeStall(truck.stall);
+    boat.reservedTruck = truck;
+    const i = retrieveQueue.length;
+    const p = dockSlotPos(i);
+    boat.mover = new Mover(boat.group, [
+      { x:boat.group.position.x, z:boat.group.position.z },
+      { x:p.x, z:p.z, speed:3.2 },
+    ]);
+    retrieveQueue.push(boat);
+    return;
+  }
+}
+
+function freeStall(stall){ if (stall) stall.taken = false; }
+function claimStall(){
+  const s = parkingStalls.find(s=>!s.taken);
+  if (s) s.taken = true;
+  return s || parkingStalls[0];
+}
+
+/* ---------------------------------------------------------------- */
+/* TRAY SYNC                                                         */
+/* ---------------------------------------------------------------- */
+
+function rebuildTray(){
+  tray.length = 0;
+  launchQueue.forEach(u=>{
+    if (u.state === 'holding') tray.push({ kind:'launch', color:u.color, hex:u.hex, id:u.id, ref:u });
+  });
+  retrieveQueue.forEach(b=>{
+    if (b.dockReady) tray.push({ kind:'retrieve', color:b.color, hex:b.hex, id:b.id, ref:b });
+  });
+}
+
+const trayEl = document.getElementById('tray');
+function renderTray(){
+  trayEl.innerHTML = '';
+  if (!tray.length){
+    const d = document.createElement('div');
+    d.className = 'tray-empty';
+    d.textContent = 'All clear — waiting on the next arrival...';
+    trayEl.appendChild(d);
+    return;
+  }
+  tray.forEach(item=>{
+    const btn = document.createElement('button');
+    const isHot = lanes.some(l=> l.state==='free' && (l.hotColor === item.color || item.color==='vip'));
+    btn.className = 'tray-card' + (isHot ? ' hot' : '') + (item.color==='vip' ? ' vip' : '');
+    const hexStr = '#' + item.hex.toString(16).padStart(6,'0');
+    btn.innerHTML = `<span class="icon" style="background:${hexStr}">${item.kind==='launch' ? '🚚' : '⛵'}</span><span class="badge">${item.kind==='launch' ? 'Launch' : 'Pickup'}</span>`;
+    btn.addEventListener('click', ()=> trySend(item, btn));
+    trayEl.appendChild(btn);
+  });
+}
+
+/* ---------------------------------------------------------------- */
+/* SEND / LANE LOGIC                                                 */
+/* ---------------------------------------------------------------- */
+
+function pickLane(color){
+  const free = lanes.filter(l=>l.state==='free');
+  if (!free.length) return null;
+  const hot = free.find(l=> l.hotColor===color || color==='vip');
+  return hot || free[0];
+}
+
+function trySend(item, btnEl){
+  const lane = pickLane(item.color);
+  if (!lane){
+    if (btnEl){ btnEl.classList.add('shake'); setTimeout(()=>btnEl && btnEl.classList.remove('shake'), 360); }
+    playTone(140, 0.12, 'square');
+    nudgeFrustration(2);
+    return;
+  }
+  const bonus = (lane.hotColor === item.color) || item.color === 'vip';
+  lane.state = 'busy';
+
+  if (item.kind === 'launch'){
+    const idx = launchQueue.indexOf(item.ref);
+    if (idx>-1) launchQueue.splice(idx,1);
+    startLaunchJob(item.ref, lane, bonus);
+  } else {
+    const idx = retrieveQueue.indexOf(item.ref);
+    if (idx>-1) retrieveQueue.splice(idx,1);
+    startRetrieveJob(item.ref, lane, bonus);
+  }
+  rebuildTray(); renderTray(); syncLaneHUD();
+  playTone(bonus ? 660 : 480, 0.14, 'triangle');
+}
+
+function completeSend(points, bonus, splashPos, hex){
+  combo++;
+  bestCombo = Math.max(bestCombo, combo);
+  comboTimer = 6;
+  const mult = Math.min(3, 1 + Math.floor(combo/3)*0.25);
+  const gained = Math.round((points + (bonus?60:0)) * mult);
+  score += gained;
+  frustration = Math.max(0, frustration - 4);
+  updateHUD();
+  spawnBurst(splashPos, bonus ? 0xffe08a : hex, bonus ? 22 : 14, { spread:bonus?4.5:3, up:bonus?6:4, life:bonus?1.1:0.8 });
+  playTone(bonus ? 880 : 720, 0.15, 'sine');
+  maybeUnlock();
+}
+
+function nudgeFrustration(v){ frustration = Math.min(100, frustration+v); combo = 0; updateHUD(); }
+
+/* ---- Launch job: truck backs down, boat detaches & drifts, truck parks ---- */
+function startLaunchJob(unit, lane, bonus){
+  unit.state = 'launching';
+  const x = lane.x;
+  const group = unit.group;
+  const hull = group.userData.hull;
+
+  group.userData.bodyMat.emissive = new THREE.Color(0x000000);
+
+  const path = [
+    { x:group.position.x, z:group.position.z },
+    { x, z:Z.laneHead, speed:6.5, facing:0, wait:0.25 },
+    { x, z:Z.waterEdge, speed:2.8, wait:0.15, lockFacing:true, onArrive: ()=> detachBoat() },
+  ];
+  unit.mover = new Mover(group, path);
+
+  function detachBoat(){
+    const worldPos = new THREE.Vector3(); hull.getWorldPosition(worldPos);
+    scene.attach(hull);
+    spawnBurst(new THREE.Vector3(x,0.3,Z.waterEdge+1), 0xffffff, 20, { spread:4, up:3.5, life:0.7 });
+    playTone(300, 0.2, 'sawtooth');
+
+    const restX = -28 + Math.random()*56;
+    const restZ = Z.lakeNear + Math.random()*(Z.lakeFar-Z.lakeNear);
+    const boatMover = new Mover(hull, [
+      { x:worldPos.x, z:worldPos.z, y:0.15 },
+      { x, z:Z.waterEdge+3, speed:2.6, y:0.15 },
+      { x:restX, z:restZ, speed:2.2, y:0.15 },
+    ]);
+    const lakeEntry = { id: uid++, color: unit.color, hex: unit.hex, group: hull, mover: boatMover, floatT:0, readyAt: 9+Math.random()*7, promoted:false };
+    lakePool.push(lakeEntry);
+
+    const stall = claimStall();
+    group.userData.hull = null;
+    const parkPath = [
+      { x:group.position.x, z:group.position.z },
+      { x, z:Z.laneHead, speed:4 },
+      { x:3.5, z:Z.apron, speed:6 },
+      { x:stall.x, z:PARK.z1+1, speed:6 },
+      { x:stall.x, z:stall.z, speed:4, onArrive: ()=>{
+        parkingPool.push({ color:unit.color, hex:unit.hex, group, id:unit.id, stall });
+        lane.state = 'free';
+        syncLaneHUD();
+      } },
+    ];
+    unit.mover = new Mover(group, parkPath);
+    completeSend(100, bonus, new THREE.Vector3(x,0.3,Z.waterEdge), unit.hex);
+  }
+
+  activeUnits.push(unit);
+}
+
+/* ---- Retrieve job: matching truck + boat meet, hitch, drive out ---- */
+function startRetrieveJob(boat, lane, bonus){
+  boat.state = 'retrieving';
+  const x = lane.x;
+  const truckGroup = boat.reservedTruck.group;
+  const truckHex = boat.reservedTruck.hex;
+  const job = { arrived:0 };
+
+  const boatMover = new Mover(boat.group, [
+    { x:boat.group.position.x, z:boat.group.position.z, y:0.15 },
+    { x, z:Z.waterEdge, speed:3.4, y:0.15 },
+    { x, z:Z.rampMid+1.4, speed:2.2, y:0.15, wait:0.2, onArrive: ()=> arrived() },
+  ]);
+  boat.mover = boatMover;
+
+  const truckMover = new Mover(truckGroup, [
+    { x:truckGroup.position.x, z:truckGroup.position.z },
+    { x:truckGroup.position.x, z:PARK.z1+1, speed:5 },
+    { x:3.5, z:Z.apron, speed:6 },
+    { x, z:Z.laneHead, speed:5, facing:0, wait:0.2 },
+    { x, z:Z.rampMid, speed:3.2, wait:0.2, lockFacing:true, onArrive: ()=> arrived() },
+  ]);
+  const truckUnit = { id:'t'+boat.id, kind:'truckMove', group:truckGroup, mover:truckMover };
+  activeUnits.push(truckUnit);
+  activeUnits.push({ id:'b'+boat.id, kind:'boatMove', group:boat.group, mover:boatMover });
+
+  function arrived(){
+    job.arrived++;
+    if (job.arrived < 2) return;
+    truckGroup.attach(boat.group);
+    boat.group.userData.settleFrom = boat.group.position.clone();
+    boat.group.userData.settleTo = truckGroup.userData.bunkPos.clone();
+    boat.group.userData.settleT = 0;
+    spawnBurst(new THREE.Vector3(x,0.5,Z.rampMid), 0x34d399, 16, { spread:2.5, up:4, life:0.7 });
+    playTone(520, 0.16, 'triangle');
+
+    const exitPath = [
+      { x:truckGroup.position.x, z:truckGroup.position.z },
+      { x, z:Z.laneHead, speed:5 },
+      { x:EXIT_X, z:Z.apron, speed:6 },
+      { x:EXIT_X, z:Z.exitEnd, speed:7, onArrive: ()=>{
+        scene.remove(truckGroup);
+        removeActive(truckUnit.id);
+      } },
+    ];
+    truckUnit.mover = new Mover(truckGroup, exitPath);
+    lane.state = 'free';
+    syncLaneHUD();
+    completeSend(160, bonus, new THREE.Vector3(x,0.3,Z.rampMid), truckHex);
+  }
+
+  activeUnits.push({ id:'j'+boat.id, kind:'settleTick', boatGroup:boat.group, done:false });
+}
+
+const activeUnits = [];
+function removeActive(id){
+  const i = activeUnits.findIndex(u=>u.id===id);
+  if (i>-1) activeUnits.splice(i,1);
+}
+
+/* ---------------------------------------------------------------- */
+/* HUD                                                                */
+/* ---------------------------------------------------------------- */
+
+const lanesCard = document.getElementById('lanesCard');
+function syncLaneHUD(){
+  lanesCard.innerHTML = '';
+  lanes.forEach((l,i)=>{
+    const el = document.createElement('div');
+    el.className = 'lane-pill ' + l.state;
+    const hex = '#' + (PALETTE.find(p=>p.key===l.hotColor)?.hex || 0xffffff).toString(16).padStart(6,'0');
+    el.innerHTML = `<div class="n">Lane ${i+1}</div><div class="lane-dot" style="background:${hex}"></div><div class="s">${l.state==='free'?'Free':'Busy'}</div>`;
+    lanesCard.appendChild(el);
+  });
+}
+
+function updateHUD(){
+  document.getElementById('scoreVal').textContent = score;
+  const chip = document.getElementById('comboChip');
+  if (combo >= 2){
+    chip.style.display = 'inline-block';
+    chip.textContent = `Combo x${(1+Math.floor(combo/3)*0.25).toFixed(2).replace(/\.?0+$/,'')}`;
+  } else chip.style.display = 'none';
+  document.getElementById('meterFill').style.width = frustration + '%';
+}
+
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=> el.classList.remove('show'), 2000);
+}
+
+function maybeUnlock(){
+  if (unlockedCount < PALETTE.length && score >= UNLOCK_SCORES[unlockedCount]){
+    const c = PALETTE[unlockedCount];
+    unlockedCount++;
+    toast(`New truck color unlocked!`);
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* AUDIO (tiny WebAudio blips, no assets)                             */
+/* ---------------------------------------------------------------- */
+
+let actx = null;
+function ensureAudio(){ if (!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); }
+function playTone(freq, dur, type='sine'){
+  if (muted) return;
+  try{
+    ensureAudio();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, actx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.18, actx.currentTime+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime+dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(); o.stop(actx.currentTime+dur+0.02);
+  }catch(e){}
+}
+
+/* ---------------------------------------------------------------- */
+/* MAIN LOOP                                                         */
+/* ---------------------------------------------------------------- */
+
+const clock = new THREE.Clock();
+
+function updateLaunchQueueStates(){
+  launchQueue.forEach((u,i)=>{
+    if (u.state === 'entering' && u.mover.done){
+      u.state = 'holding';
+      const p = holdSlotPos(i);
+      u.mover = new Mover(u.group, [{x:u.group.position.x, z:u.group.position.z}, {x:p.x, z:p.z, speed:5}]);
+    } else if (u.state === 'holding'){
+      const p = holdSlotPos(i);
+      if (Math.abs(u.group.position.z - p.z) > 0.15 && (!u.mover || u.mover.done)){
+        u.mover = new Mover(u.group, [{x:u.group.position.x, z:u.group.position.z}, {x:p.x, z:p.z, speed:5}]);
+      }
+    }
+  });
+}
+
+function updateRetrieveQueueStates(){
+  retrieveQueue.forEach((b,i)=>{
+    if (b.state !== 'retrieving'){
+      if (b.mover && b.mover.done && !b.dockReady){
+        b.dockReady = true;
+      }
+      const p = dockSlotPos(i);
+      if (b.dockReady && Math.abs(b.group.position.z - p.z) > 0.15 && (!b.mover || b.mover.done)){
+        b.mover = new Mover(b.group, [{x:b.group.position.x, z:b.group.position.z}, {x:p.x, z:p.z, speed:2.6}]);
+      }
+    }
+  });
+}
+
+let lastTrayHash = '';
+function maybeRebuildTray(){
+  rebuildTray();
+  const hash = tray.map(t=>t.id+':'+t.kind).join(',') + '|' + lanes.map(l=>l.state+l.hotColor).join(',');
+  if (hash !== lastTrayHash){ lastTrayHash = hash; renderTray(); }
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  waterUniforms.time.value += dt;
+
+  laneFlags.forEach((f,i)=>{
+    f.flag.rotation.y = Math.sin(performance.now()*0.003 + i)*0.25;
+    const l = lanes[i];
+    const hex = PALETTE.find(p=>p.key===l.hotColor)?.hex ?? 0xffffff;
+    f.flag.material.color.setHex(hex);
+    f.ring.material.color.setHex(l.state==='free' ? 0x34d399 : 0xf87171);
+    f.ring.material.opacity = 0.5 + Math.sin(performance.now()*0.004+i)*0.2;
+  });
+
+  lakePool.forEach(b=>{
+    if (!b.promoted){
+      b.floatT += dt;
+      b.group.position.y = 0.15 + Math.sin(performance.now()*0.0015 + b.group.userData.bobSeed)*0.08;
+      b.group.rotation.z = Math.sin(performance.now()*0.001+b.group.userData.bobSeed)*0.04;
+    }
+    if (b.mover && !b.mover.done) b.mover.update(dt);
+  });
+
+  updateBursts(dt);
+
+  if (running && !paused){
+    spawnTimer -= dt;
+    const interval = Math.max(2.2, 5.5 - score/1000*0.5);
+    if (spawnTimer <= 0){ spawnLaunchUnit(); spawnTimer = interval; }
+
+    promoteTimer -= dt;
+    if (promoteTimer <= 0){ tryPromoteLakeBoats(); promoteTimer = 0.8; }
+
+    hotColorTimer -= dt;
+    if (hotColorTimer <= 0){
+      hotColorTimer = 6.5;
+      lanes.forEach(l=>{
+        if (l.state==='free'){ const p = unlockedPalette(); l.hotColor = p[Math.floor(Math.random()*p.length)].key; }
+      });
+    }
+
+    launchQueue.forEach(u=> u.mover && u.mover.update(dt));
+    updateLaunchQueueStates();
+    retrieveQueue.forEach(b=> b.mover && b.mover.update(dt));
+    updateRetrieveQueueStates();
+    for (let i=activeUnits.length-1;i>=0;i--){
+      const u = activeUnits[i];
+      if (u.kind === 'settleTick'){
+        const bg = u.boatGroup;
+        if (bg.userData.settleT != null && bg.userData.settleT < 1){
+          bg.userData.settleT = Math.min(1, bg.userData.settleT + dt*2.2);
+          bg.position.lerpVectors(bg.userData.settleFrom, bg.userData.settleTo, bg.userData.settleT);
+          bg.rotation.y += (0 - bg.rotation.y)*Math.min(1,dt*4);
+        } else if (bg.userData.settleT != null){
+          activeUnits.splice(i,1);
+        }
+        continue;
+      }
+      if (u.mover) u.mover.update(dt);
+      if (u.mover && u.mover.done){ activeUnits.splice(i,1); }
+    }
+
+    if (comboTimer > 0){ comboTimer -= dt; if (comboTimer<=0) combo = 0; }
+
+    const backlog = Math.max(0, launchQueue.length - BUFFER_TOTAL) + Math.max(0, retrieveQueue.filter(b=>b.dockReady).length - 1);
+    if (backlog > 0) frustration = Math.min(100, frustration + backlog*RATE_UP*dt);
+    else frustration = Math.max(0, frustration - RATE_DOWN*dt);
+    updateHUD();
+
+    if (frustration >= 100){ endGame('The line backed up onto the highway!'); }
+
+    maybeRebuildTray();
+  }
+
+  renderer.render(scene, camera);
+}
+animate();
+
+/* ---------------------------------------------------------------- */
+/* GAME FLOW                                                         */
+/* ---------------------------------------------------------------- */
+
+function resetGame(){
+  [...launchQueue, ...retrieveQueue].forEach(u=> u.group && scene.remove(u.group));
+  activeUnits.forEach(u=> u.group && u.group.parent && scene.remove(u.group));
+  lakePool.forEach(b=> b.group && scene.remove(b.group));
+  parkingPool.forEach(t=> t.group && scene.remove(t.group));
+  launchQueue.length = 0; retrieveQueue.length = 0; lakePool.length = 0; parkingPool.length = 0; activeUnits.length = 0; tray.length = 0;
+  parkingStalls.forEach(s=> s.taken=false);
+  lanes.forEach((l,i)=>{ l.state='free'; l.hotColor = PALETTE[i%PALETTE.length].key; });
+  score = 0; combo = 0; bestCombo = 0; comboTimer = 0; frustration = 0; unlockedCount = 3;
+  spawnTimer = 1.5; promoteTimer = 2; hotColorTimer = 1;
+  updateHUD(); syncLaneHUD(); renderTray();
+}
+
+function startGame(){
+  resetGame();
+  running = true; paused = false;
+  document.getElementById('startOverlay').classList.remove('active');
+  document.getElementById('gameoverOverlay').classList.remove('active');
+}
+
+function endGame(reason){
+  if (!running) return;
+  running = false;
+  const best = Math.max(score, parseInt(localStorage.getItem(scoreHighKey)||'0',10));
+  localStorage.setItem(scoreHighKey, String(best));
+  document.getElementById('overReason').textContent = reason;
+  document.getElementById('finalScore').textContent = score;
+  document.getElementById('finalBest').textContent = best;
+  document.getElementById('finalCombo').textContent = bestCombo;
+  document.getElementById('gameoverOverlay').classList.add('active');
+  playTone(160, 0.5, 'sawtooth');
+}
+
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('retryBtn').addEventListener('click', startGame);
+document.getElementById('startBest').textContent = 'Best score: ' + (localStorage.getItem(scoreHighKey) || 0);
+
+document.getElementById('muteBtn').addEventListener('click', (e)=>{
+  muted = !muted;
+  e.currentTarget.textContent = muted ? '🔇' : '🔊';
+});
+
+const pauseBtn = document.getElementById('pauseBtn');
+const pauseOverlay = document.getElementById('pauseOverlay');
+pauseBtn.addEventListener('click', ()=>{
+  if (!running) return;
+  paused = true;
+  pauseOverlay.classList.add('active');
+});
+document.getElementById('resumeBtn').addEventListener('click', ()=>{
+  paused = false;
+  pauseOverlay.classList.remove('active');
+});
+
+updateHUD();
+syncLaneHUD();
+renderTray();
+</script>
+</body>
+</html>
