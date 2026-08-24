@@ -124,22 +124,6 @@
   <button id="muteBtn" class="icon-btn">🔊</button>
   <button id="pauseBtn" class="icon-btn">⏸</button>
 
-  <div id="startOverlay" class="overlay active">
-    <div class="card">
-      <h1>🚤 Boat Ramp Rush</h1>
-      <div class="sub">Run the state park boat launch.</div>
-      <ul class="rules">
-        <li>Colored trucks pull up, show paperwork, and pass the mussel inspection automatically.</li>
-        <li>The ramp is wide enough for <b>3 trucks at a time</b>. Tap a card in the tray to send that truck or boat backing down an open spot.</li>
-        <li>Each spot's overhead flag shows its <b>hot color</b> &mdash; match it for bonus points and a splashy combo.</li>
-        <li>Boats that launch head out on the lake, then come back needing a ride &mdash; their matching truck fetches them.</li>
-        <li>Don't let the lines back up, or the Backup meter fills and your shift ends!</li>
-      </ul>
-      <div class="best" id="startBest">Best score: 0</div>
-      <button class="cta" id="startBtn">Start Shift</button>
-    </div>
-  </div>
-
   <div id="gameoverOverlay" class="overlay">
     <div class="card">
       <h1>🌅 Shift Over</h1>
@@ -485,7 +469,7 @@ function makeWheel(){
   return mesh;
 }
 
-function makeTruck(hex){
+function makeCab(hex){
   const g = new THREE.Group();
   const bodyMat = new THREE.MeshStandardMaterial({ color:hex, roughness:0.4, metalness:0.25 });
   const trimMat = new THREE.MeshStandardMaterial({ color:0xe8ecf1, roughness:0.6 });
@@ -504,22 +488,54 @@ function makeTruck(hex){
   [[-0.95,-3.6],[0.95,-3.6],[-0.95,-1.7],[0.95,-1.7]].forEach(([x,z])=>{
     const w = makeWheel(); w.position.set(x,0.42,z); g.add(w);
   });
-
-  const trailer = new THREE.Group();
-  const bunkBed = new THREE.Mesh(new THREE.BoxGeometry(1.7,0.14,3.6), new THREE.MeshStandardMaterial({ color:0x8a8f98, roughness:0.7, metalness:0.3 }));
-  bunkBed.position.set(0,0.42,1.9); bunkBed.castShadow = true; bunkBed.receiveShadow = true;
-  const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.14,0.1,1.2), new THREE.MeshStandardMaterial({ color:0x555a61 }));
-  tongue.position.set(0,0.38,0.1);
-  trailer.add(bunkBed, tongue);
-  [[-0.85,2.6],[0.85,2.6]].forEach(([x,z])=>{
-    const w = makeWheel(); w.scale.setScalar(0.75); w.position.set(x,0.32,z); trailer.add(w);
-  });
-  g.add(trailer);
-
-  g.userData.bunkPos = new THREE.Vector3(0, 0.68, 1.9);
   g.userData.bodyMat = bodyMat;
   return g;
 }
+
+/* Trailer is a separate object, pivoting around its own axle (not rigidly
+   glued to the cab) so it can swing wide and lag realistically on turns.
+   TRAILER_ROD is the fixed hitch-to-axle distance a real tow bar keeps. */
+const TRAILER_ROD = 2.6;
+function makeTrailer(){
+  const g = new THREE.Group();
+  const bunkBed = new THREE.Mesh(new THREE.BoxGeometry(1.7,0.14,3.6), new THREE.MeshStandardMaterial({ color:0x8a8f98, roughness:0.7, metalness:0.3 }));
+  bunkBed.position.set(0,0.42,-0.7); bunkBed.castShadow = true; bunkBed.receiveShadow = true;
+  const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.14,0.1,1.2), new THREE.MeshStandardMaterial({ color:0x555a61 }));
+  tongue.position.set(0,0.38,-2.5);
+  g.add(bunkBed, tongue);
+  [[-0.85,0],[0.85,0]].forEach(([x,z])=>{
+    const w = makeWheel(); w.scale.setScalar(0.75); w.position.set(x,0.32,z); g.add(w);
+  });
+  g.userData.bunkPos = new THREE.Vector3(0, 0.68, -0.7);
+  return g;
+}
+
+/* Snap a freshly-created trailer directly behind its cab, matching heading */
+function attachTrailer(cab, trailer){
+  trailer.position.set(
+    cab.position.x + Math.sin(cab.rotation.y)*TRAILER_ROD,
+    cab.position.y,
+    cab.position.z + Math.cos(cab.rotation.y)*TRAILER_ROD
+  );
+  trailer.rotation.y = cab.rotation.y;
+}
+
+/* Each frame, the trailer's axle stays exactly TRAILER_ROD from the cab's
+   hitch point, swinging toward whichever side keeps that distance with the
+   least motion - this is what produces the realistic pivot/lag on turns */
+function updateTrailerFollow(cab, trailer){
+  const dx = cab.position.x - trailer.position.x;
+  const dz = cab.position.z - trailer.position.z;
+  const dist = Math.hypot(dx, dz);
+  if (dist < 0.0001) return;
+  const ux = dx/dist, uz = dz/dist;
+  trailer.position.x = cab.position.x - ux*TRAILER_ROD;
+  trailer.position.z = cab.position.z - uz*TRAILER_ROD;
+  trailer.position.y = cab.position.y;
+  trailer.rotation.y = Math.atan2(-ux, -uz);
+}
+
+const activeRigs = [];
 
 function makeHull(hex){
   const g = new THREE.Group();
@@ -552,15 +568,17 @@ function makeHull(hex){
 /* ---------------------------------------------------------------- */
 
 class Mover{
-  constructor(obj, waypoints){
+  constructor(obj, waypoints, opts={}){
     this.obj = obj;
     this.wps = waypoints;
     this.idx = 0;
     this.done = waypoints.length < 2;
     this.wait = 0;
+    this.radius = opts.radius ?? 1.6;
+    this.blockedFor = 0;
     if (waypoints.length){ obj.position.set(waypoints[0].x, waypoints[0].y ?? obj.position.y, waypoints[0].z); }
   }
-  update(dt){
+  update(dt, obstacles){
     if (this.done) return;
     if (this.wait > 0){ this.wait -= dt; return; }
     const target = this.wps[this.idx+1];
@@ -579,8 +597,18 @@ class Mover{
       return;
     }
     const step = Math.min(dist, spd*dt);
-    o.position.x += dx/dist*step;
-    o.position.z += dz/dist*step;
+    const nx = o.position.x + dx/dist*step;
+    const nz = o.position.z + dz/dist*step;
+    /* brake instead of driving through another truck or boat that's
+       currently occupying the spot just ahead - but if two vehicles ever
+       end up deadlocked on each other, don't let either get stuck forever */
+    if (obstacles && this.blockedFor < 2.5 && isBlocked(nx, nz, this.radius, o, obstacles)){
+      this.blockedFor += dt;
+      return;
+    }
+    this.blockedFor = 0;
+    o.position.x = nx;
+    o.position.z = nz;
     if (target.y != null) o.position.y += (target.y - o.position.y)*Math.min(1, dt*4);
     if (!target.lockFacing){
       const desired = Math.atan2(-dx/dist, -dz/dist);
@@ -588,6 +616,16 @@ class Mover{
       o.rotation.y += diff*Math.min(1, dt*6);
     }
   }
+}
+function isBlocked(x, z, radius, self, obstacles){
+  for (let i=0; i<obstacles.length; i++){
+    const ob = obstacles[i];
+    if (ob.ref === self) continue;
+    const dx = x-ob.x, dz = z-ob.z;
+    const minD = radius + ob.r;
+    if (dx*dx + dz*dz < minD*minD) return true;
+  }
+  return false;
 }
 
 /* ---------------------------------------------------------------- */
@@ -676,14 +714,22 @@ function holdSlotPos(i){
 function spawnLaunchUnit(){
   if (launchQueue.length >= MAX_QUEUE) return;
   const c = randomColor();
-  const group = makeTruck(c.hex);
+  const group = makeCab(c.hex);
+  group.position.set(SPAWN_X, 0, Z.spawn);
+  group.rotation.y = Math.PI;
   scene.add(group);
-  const hull = makeHull(c.hex);
-  hull.position.copy(group.userData.bunkPos);
-  group.add(hull);
-  group.userData.hull = hull;
 
-  const unit = { id: uid++, kind:'launch', color:c.key, hex:c.hex, group, mover:null, state:'entering' };
+  const trailer = makeTrailer();
+  attachTrailer(group, trailer);
+  scene.add(trailer);
+  activeRigs.push({ cab:group, trailer });
+
+  const hull = makeHull(c.hex);
+  hull.position.copy(trailer.userData.bunkPos);
+  trailer.add(hull);
+  trailer.userData.hull = hull;
+
+  const unit = { id: uid++, kind:'launch', color:c.key, hex:c.hex, group, trailer, mover:null, state:'entering' };
   const path = [
     { x:SPAWN_X, z:Z.spawn },
     { x:SPAWN_X, z:Z.gate, speed:5, wait:0.3 },
@@ -718,7 +764,7 @@ function tryPromoteLakeBoats(){
     boat.mover = new Mover(boat.group, [
       { x:boat.group.position.x, z:boat.group.position.z },
       { x:p.x, z:p.z, speed:3.2 },
-    ]);
+    ], { radius:1.1 });
     /* leave lakePool now that it's queued - otherwise this boat's mover
        would get updated twice a frame (once here, once via retrieveQueue) */
     lakePool.splice(lakePool.indexOf(boat), 1);
@@ -825,7 +871,8 @@ function startLaunchJob(unit, lane, bonus){
   unit.state = 'launching';
   const x = lane.x;
   const group = unit.group;
-  const hull = group.userData.hull;
+  const trailer = unit.trailer;
+  const hull = trailer.userData.hull;
 
   group.userData.bodyMat.emissive = new THREE.Color(0x000000);
 
@@ -848,12 +895,12 @@ function startLaunchJob(unit, lane, bonus){
       { x:worldPos.x, z:worldPos.z, y:0.15 },
       { x, z:Z.waterEdge+3, speed:2.6, y:0.15 },
       { x:restX, z:restZ, speed:2.2, y:0.15 },
-    ]);
+    ], { radius:1.1 });
     const lakeEntry = { id: uid++, color: unit.color, hex: unit.hex, group: hull, mover: boatMover, floatT:0, readyAt: 9+Math.random()*7, promoted:false };
     lakePool.push(lakeEntry);
 
     const stall = claimStall();
-    group.userData.hull = null;
+    trailer.userData.hull = null;
     const parkPath = [
       { x:group.position.x, z:group.position.z },
       { x, z:Z.laneHead, speed:4, onArrive: ()=>{
@@ -862,10 +909,9 @@ function startLaunchJob(unit, lane, bonus){
         lane.state = 'free';
         syncLaneHUD();
       } },
-      { x:3.5, z:Z.apron, speed:6 },
       { x:stall.x, z:PARK.z1+1, speed:6 },
       { x:stall.x, z:stall.z, speed:4, onArrive: ()=>{
-        parkingPool.push({ color:unit.color, hex:unit.hex, group, id:unit.id, stall });
+        parkingPool.push({ color:unit.color, hex:unit.hex, group, trailer, id:unit.id, stall });
       } },
     ];
     unit.mover = new Mover(group, parkPath);
@@ -881,13 +927,13 @@ function startRetrieveJob(boat, lane, bonus){
   boat.state = 'retrieving';
   const x = lane.x;
   const truckGroup = boat.reservedTruck.group;
+  const trailerGroup = boat.reservedTruck.trailer;
   const truckHex = boat.reservedTruck.hex;
   const hitchZ = Z.waterEdge;
 
   const truckMover = new Mover(truckGroup, [
     { x:truckGroup.position.x, z:truckGroup.position.z },
     { x:truckGroup.position.x, z:PARK.z1+1, speed:5 },
-    { x:3.5, z:Z.apron, speed:6 },
     { x, z:Z.laneHead, speed:5, facing:0, wait:0.2 },
     { x, z:hitchZ, speed:3.2, wait:0.15, lockFacing:true, onArrive: ()=> truckInWater() },
   ]);
@@ -895,19 +941,22 @@ function startRetrieveJob(boat, lane, bonus){
   activeUnits.push(truckUnit);
 
   function truckInWater(){
-    /* only now does the boat leave its idle spot in the bay */
+    /* only now does the boat leave its idle spot in the bay - it swings out
+       to line up square with the trailer's lane, then drives straight in */
+    const lineupZ = hitchZ + 5;
     const boatMover = new Mover(boat.group, [
       { x:boat.group.position.x, z:boat.group.position.z, y:0.15 },
-      { x, z:hitchZ, speed:2.4, y:0.15, wait:0.15, onArrive: ()=> hitch() },
-    ]);
+      { x, z:lineupZ, speed:2.6, y:0.15 },
+      { x, z:hitchZ, speed:2.1, y:0.15, wait:0.15, onArrive: ()=> hitch() },
+    ], { radius:1.1 });
     boat.mover = boatMover;
     activeUnits.push({ id:'b'+boat.id, kind:'boatMove', group:boat.group, mover:boatMover });
   }
 
   function hitch(){
-    truckGroup.attach(boat.group);
+    trailerGroup.attach(boat.group);
     boat.group.userData.settleFrom = boat.group.position.clone();
-    boat.group.userData.settleTo = truckGroup.userData.bunkPos.clone();
+    boat.group.userData.settleTo = trailerGroup.userData.bunkPos.clone();
     boat.group.userData.settleT = 0;
     spawnBurst(new THREE.Vector3(x,0.5,hitchZ), 0x34d399, 16, { spread:2.5, up:4, life:0.7 });
     playTone(520, 0.16, 'triangle');
@@ -918,6 +967,9 @@ function startRetrieveJob(boat, lane, bonus){
       { x:EXIT_X, z:Z.apron, speed:6 },
       { x:EXIT_X, z:Z.exitEnd, speed:7, onArrive: ()=>{
         scene.remove(truckGroup);
+        scene.remove(trailerGroup);
+        const ri = activeRigs.findIndex(r=>r.cab===truckGroup);
+        if (ri>-1) activeRigs.splice(ri,1);
         removeActive(truckUnit.id);
       } },
     ];
@@ -934,6 +986,22 @@ const activeUnits = [];
 function removeActive(id){
   const i = activeUnits.findIndex(u=>u.id===id);
   if (i>-1) activeUnits.splice(i,1);
+}
+
+/* Snapshot of every truck/boat position this frame, used so vehicles brake
+   for each other instead of driving through one another */
+function collectObstacles(){
+  const list = [];
+  const TRUCK_R = 1.9, BOAT_R = 1.1;
+  launchQueue.forEach(u=> list.push({ x:u.group.position.x, z:u.group.position.z, r:TRUCK_R, ref:u.group }));
+  retrieveQueue.forEach(b=> list.push({ x:b.group.position.x, z:b.group.position.z, r:BOAT_R, ref:b.group }));
+  lakePool.forEach(b=> list.push({ x:b.group.position.x, z:b.group.position.z, r:BOAT_R, ref:b.group }));
+  parkingPool.forEach(t=> list.push({ x:t.group.position.x, z:t.group.position.z, r:TRUCK_R, ref:t.group }));
+  activeUnits.forEach(u=>{
+    if (!u.group) return;
+    list.push({ x:u.group.position.x, z:u.group.position.z, r: u.kind==='boatMove' ? BOAT_R : TRUCK_R, ref:u.group });
+  });
+  return list;
 }
 
 /* ---------------------------------------------------------------- */
@@ -1028,7 +1096,7 @@ function updateRetrieveQueueStates(){
       }
       const p = dockSlotPos(i);
       if (b.dockReady && Math.abs(b.group.position.z - p.z) > 0.15 && (!b.mover || b.mover.done)){
-        b.mover = new Mover(b.group, [{x:b.group.position.x, z:b.group.position.z}, {x:p.x, z:p.z, speed:2.6}]);
+        b.mover = new Mover(b.group, [{x:b.group.position.x, z:b.group.position.z}, {x:p.x, z:p.z, speed:2.6}], { radius:1.1 });
       }
     }
   });
@@ -1055,13 +1123,15 @@ function animate(){
     f.ring.material.opacity = 0.5 + Math.sin(performance.now()*0.004+i)*0.2;
   });
 
+  const obstacles = collectObstacles();
+
   lakePool.forEach(b=>{
     if (!b.promoted){
       b.floatT += dt;
       b.group.position.y = 0.15 + Math.sin(performance.now()*0.0015 + b.group.userData.bobSeed)*0.08;
       b.group.rotation.z = Math.sin(performance.now()*0.001+b.group.userData.bobSeed)*0.04;
     }
-    if (b.mover && !b.mover.done) b.mover.update(dt);
+    if (b.mover && !b.mover.done) b.mover.update(dt, obstacles);
   });
 
   updateBursts(dt);
@@ -1082,9 +1152,9 @@ function animate(){
       });
     }
 
-    launchQueue.forEach(u=> u.mover && u.mover.update(dt));
+    launchQueue.forEach(u=> u.mover && u.mover.update(dt, obstacles));
     updateLaunchQueueStates();
-    retrieveQueue.forEach(b=> b.mover && b.mover.update(dt));
+    retrieveQueue.forEach(b=> b.mover && b.mover.update(dt, obstacles));
     updateRetrieveQueueStates();
     for (let i=activeUnits.length-1;i>=0;i--){
       const u = activeUnits[i];
@@ -1099,7 +1169,7 @@ function animate(){
         }
         continue;
       }
-      if (u.mover) u.mover.update(dt);
+      if (u.mover) u.mover.update(dt, obstacles);
       if (u.mover && u.mover.done){ activeUnits.splice(i,1); }
     }
 
@@ -1115,6 +1185,8 @@ function animate(){
     maybeRebuildTray();
   }
 
+  activeRigs.forEach(r=> updateTrailerFollow(r.cab, r.trailer));
+
   renderer.render(scene, camera);
 }
 animate();
@@ -1128,6 +1200,8 @@ function resetGame(){
   activeUnits.forEach(u=> u.group && u.group.parent && scene.remove(u.group));
   lakePool.forEach(b=> b.group && scene.remove(b.group));
   parkingPool.forEach(t=> t.group && scene.remove(t.group));
+  activeRigs.forEach(r=> r.trailer && scene.remove(r.trailer));
+  activeRigs.length = 0;
   launchQueue.length = 0; retrieveQueue.length = 0; lakePool.length = 0; parkingPool.length = 0; activeUnits.length = 0; tray.length = 0;
   parkingStalls.forEach(s=> s.taken=false);
   lanes.forEach((l,i)=>{ l.state='free'; l.hotColor = PALETTE[i%PALETTE.length].key; });
@@ -1139,7 +1213,6 @@ function resetGame(){
 function startGame(){
   resetGame();
   running = true; paused = false;
-  document.getElementById('startOverlay').classList.remove('active');
   document.getElementById('gameoverOverlay').classList.remove('active');
 }
 
@@ -1156,9 +1229,7 @@ function endGame(reason){
   playTone(160, 0.5, 'sawtooth');
 }
 
-document.getElementById('startBtn').addEventListener('click', startGame);
 document.getElementById('retryBtn').addEventListener('click', startGame);
-document.getElementById('startBest').textContent = 'Best score: ' + (localStorage.getItem(scoreHighKey) || 0);
 
 document.getElementById('muteBtn').addEventListener('click', (e)=>{
   muted = !muted;
@@ -1177,9 +1248,7 @@ document.getElementById('resumeBtn').addEventListener('click', ()=>{
   pauseOverlay.classList.remove('active');
 });
 
-updateHUD();
-syncLaneHUD();
-renderTray();
+startGame();
 </script>
 </body>
 </html>
