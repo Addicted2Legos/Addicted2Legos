@@ -182,8 +182,8 @@
 
     <div class="overlay" id="startOverlay">
         <div class="overlay-card">
-            <h2>🧺 Time for a picnic march!</h2>
-            <p>🐜 Ants stream from the anthill to the picnic, single file. Twigs, pebbles, puddles and toys keep landing in their way!</p>
+            <h2>🐜 Time for the big crossing!</h2>
+            <p>🐜 Ants stream out of the grass, single file, and cross the sidewalk, park strip and street to reach the anthill on the far side. Twigs, pebbles, puddles and toys keep landing in their way!</p>
             <p>👆 Tap an obstacle to toss it aside and unstick the line. Clear a big backup for a bonus!</p>
             <p>🦆🐔🕊️ Duck, chicken and pigeon families waddle the lawn, sidewalk and street on their own &mdash; mom in front, five babies trailing behind. Tap a stuck mom (❗) to shoo the family onward.</p>
             <p>⚠️ If the line backs up too long, anthill morale crashes &mdash; keep it flowing!</p>
@@ -209,8 +209,10 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const CW = canvas.width, CH = canvas.height;
 
-const LAWN_BOTTOM = 190;
-const SIDEWALK_BOTTOM = 410;
+const LAWN_BOTTOM = 130;
+const SIDEWALK_BOTTOM = 270;
+const PARKSTRIP_BOTTOM = 340;
+const STREET_BOTTOM = 560;
 
 function rand(min, max) { return min + Math.random() * (max - min); }
 function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
@@ -224,16 +226,15 @@ function shade(hex, percent) {
     return `rgb(${r},${g},${b})`;
 }
 
-// ---------- Path (anthill -> picnic), built as a smooth Catmull-Rom spline ----------
+// ---------- Route (grass -> sidewalk -> park strip -> street -> anthill), an invisible
+// Catmull-Rom spline the ants and obstacle-blocking logic follow. Not drawn on screen.
 const WAYPOINTS = [
-    { x: 30, y: 300 },
-    { x: 150, y: 105 },
-    { x: 280, y: 305 },
-    { x: 420, y: 525 },
-    { x: 560, y: 300 },
-    { x: 705, y: 120 },
-    { x: 855, y: 300 },
-    { x: 880, y: 300 }
+    { x: 430, y: 25 },
+    { x: 495, y: 165 },
+    { x: 385, y: 300 },
+    { x: 465, y: 435 },
+    { x: 400, y: 555 },
+    { x: 430, y: 582 }
 ];
 
 function crPoint(p0, p1, p2, p3, t) {
@@ -260,8 +261,8 @@ function buildPath(waypoints, samplesPerSeg) {
 }
 
 const path = buildPath(WAYPOINTS, 36);
-const ANTHILL = path.pts[0];
-const FOOD = path.pts[path.pts.length - 1];
+const START = path.pts[0];
+const ANTHILL = path.pts[path.pts.length - 1];
 
 function pointAtS(s) {
     s = clamp(s, 0, path.length);
@@ -289,15 +290,22 @@ function nearestSOnPath(px, py) {
 
 // ---------- Static scenery ----------
 const flowers = [];
-for (let i = 0; i < 20; i++) {
+for (let i = 0; i < 16; i++) {
     flowers.push({ x: rand(20, CW - 20), y: rand(14, LAWN_BOTTOM - 14), color: ['#ff6fa5', '#ffe066', '#c48bff', '#ff9f4d'][Math.floor(Math.random() * 4)] });
 }
+for (let i = 0; i < 10; i++) {
+    flowers.push({ x: rand(20, CW - 20), y: rand(STREET_BOTTOM + 10, CH - 12), color: ['#ff6fa5', '#ffe066', '#c48bff', '#ff9f4d'][Math.floor(Math.random() * 4)] });
+}
 const cracks = [];
-for (let i = 0; i < 6; i++) {
-    cracks.push({ x: rand(60, CW - 60), y1: rand(LAWN_BOTTOM + 15, SIDEWALK_BOTTOM - 40), len: rand(30, 70), ang: rand(-0.6, 0.6) });
+for (let i = 0; i < 5; i++) {
+    cracks.push({ x: rand(60, CW - 60), y1: rand(LAWN_BOTTOM + 12, SIDEWALK_BOTTOM - 26), len: rand(24, 55), ang: rand(-0.6, 0.6) });
 }
 const joints = [];
 for (let x = 40; x < CW; x += 95) joints.push(x + rand(-6, 6));
+const trees = [];
+for (let i = 0; i < 5; i++) {
+    trees.push({ x: 70 + i * 190 + rand(-20, 20), y: (SIDEWALK_BOTTOM + PARKSTRIP_BOTTOM) / 2 });
+}
 
 // ---------- Game constants ----------
 const ANT_SPEED = 1.7;
@@ -438,8 +446,8 @@ function spawnObstacle() {
     if (obstacles.length >= maxObstacles) return;
     for (let attempts = 0; attempts < 40; attempts++) {
         const x = rand(45, CW - 45), y = rand(30, CH - 30);
-        if (dist({ x, y }, ANTHILL) < 150) continue;
-        if (dist({ x, y }, FOOD) < 110) continue;
+        if (dist({ x, y }, START) < 100) continue;
+        if (dist({ x, y }, ANTHILL) < 110) continue;
         let overlap = false;
         for (const o of obstacles) if (dist(o, { x, y }) < 48) { overlap = true; break; }
         if (overlap) continue;
@@ -509,7 +517,7 @@ function stepAnts() {
             ants.splice(i, 1);
             score += 5;
             deliveredThisWave++;
-            spawnParticles(FOOD.x, FOOD.y, '#ffe066', 8);
+            spawnParticles(ANTHILL.x, ANTHILL.y, '#ffe066', 8);
             if (deliveredThisWave >= waveGoal) completeWave();
             updateHUD();
         }
@@ -534,7 +542,7 @@ function completeWave() {
     score += 40 * wave;
     bannerText = `🎉 Wave ${wave}! The march speeds up!`;
     bannerTimer = 150;
-    spawnParticles(FOOD.x, FOOD.y, '#ffd93d', 30);
+    spawnParticles(ANTHILL.x, ANTHILL.y, '#ffd93d', 30);
 }
 
 // ---------- Critter families (mom + babies) ----------
@@ -654,21 +662,29 @@ function drawBackground() {
     ctx.fillRect(0, 0, CW, LAWN_BOTTOM);
     ctx.fillStyle = '#b9bcb4';
     ctx.fillRect(0, LAWN_BOTTOM, CW, SIDEWALK_BOTTOM - LAWN_BOTTOM);
+    ctx.fillStyle = '#5fae5a';
+    ctx.fillRect(0, SIDEWALK_BOTTOM, CW, PARKSTRIP_BOTTOM - SIDEWALK_BOTTOM);
     ctx.fillStyle = '#3d4148';
-    ctx.fillRect(0, SIDEWALK_BOTTOM, CW, CH - SIDEWALK_BOTTOM);
+    ctx.fillRect(0, PARKSTRIP_BOTTOM, CW, STREET_BOTTOM - PARKSTRIP_BOTTOM);
+    ctx.fillStyle = '#5fae5a';
+    ctx.fillRect(0, STREET_BOTTOM, CW, CH - STREET_BOTTOM);
 
     ctx.fillStyle = '#4c9a49';
     ctx.fillRect(0, LAWN_BOTTOM - 6, CW, 6);
     ctx.fillStyle = '#8c8f88';
     ctx.fillRect(0, SIDEWALK_BOTTOM, CW, 5);
+    ctx.fillStyle = '#8c8f88';
+    ctx.fillRect(0, PARKSTRIP_BOTTOM - 5, CW, 5);
+    ctx.fillStyle = '#4c9a49';
+    ctx.fillRect(0, STREET_BOTTOM, CW, 6);
 
     ctx.strokeStyle = 'rgba(255,255,255,0.85)';
     ctx.lineWidth = 4;
     ctx.setLineDash([26, 20]);
     ctx.lineDashOffset = -frame * 0.4;
     ctx.beginPath();
-    ctx.moveTo(0, SIDEWALK_BOTTOM + (CH - SIDEWALK_BOTTOM) / 2);
-    ctx.lineTo(CW, SIDEWALK_BOTTOM + (CH - SIDEWALK_BOTTOM) / 2);
+    ctx.moveTo(0, PARKSTRIP_BOTTOM + (STREET_BOTTOM - PARKSTRIP_BOTTOM) / 2);
+    ctx.lineTo(CW, PARKSTRIP_BOTTOM + (STREET_BOTTOM - PARKSTRIP_BOTTOM) / 2);
     ctx.stroke();
     ctx.setLineDash([]);
 
@@ -680,6 +696,15 @@ function drawBackground() {
         ctx.moveTo(c.x, c.y1);
         ctx.lineTo(c.x + Math.cos(c.ang) * c.len, c.y1 + Math.sin(c.ang) * c.len);
         ctx.stroke();
+    });
+
+    trees.forEach(t => {
+        ctx.fillStyle = '#6b4423';
+        ctx.fillRect(t.x - 3, t.y - 6, 6, 20);
+        ctx.fillStyle = '#3f8a45';
+        ctx.beginPath(); ctx.arc(t.x, t.y - 16, 16, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#4fa855';
+        ctx.beginPath(); ctx.arc(t.x - 5, t.y - 20, 10, 0, Math.PI * 2); ctx.fill();
     });
 
     flowers.forEach(f => {
@@ -695,56 +720,37 @@ function drawBackground() {
     });
 }
 
-function drawPath() {
-    ctx.strokeStyle = 'rgba(151, 111, 60, 0.85)';
-    ctx.lineWidth = 12;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    path.pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(198, 156, 96, 0.7)';
-    ctx.lineWidth = 6;
-    ctx.stroke();
-}
-
-function drawAnthill() {
-    ctx.fillStyle = '#7a5230';
-    ctx.beginPath();
-    ctx.ellipse(ANTHILL.x, ANTHILL.y + 6, 34, 22, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#8f6238';
-    ctx.beginPath();
-    ctx.ellipse(ANTHILL.x, ANTHILL.y - 6, 26, 20, 0, 0, Math.PI * 2);
-    ctx.fill();
+function drawStartHole() {
+    ctx.save();
+    ctx.translate(START.x, START.y);
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.beginPath(); ctx.ellipse(0, 3, 11, 5, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#2b1c10';
-    ctx.beginPath();
-    ctx.ellipse(ANTHILL.x, ANTHILL.y, 9, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, 0, 7, 4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
 }
 
-function drawFood() {
+function drawAnthillGoal() {
     const pct = clamp(deliveredThisWave / waveGoal, 0, 1);
     ctx.strokeStyle = 'rgba(255,255,255,0.4)';
     ctx.lineWidth = 6;
-    ctx.beginPath(); ctx.arc(FOOD.x, FOOD.y, 32, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(ANTHILL.x, ANTHILL.y, 34, 0, Math.PI * 2); ctx.stroke();
     ctx.strokeStyle = '#ffd93d';
     ctx.lineWidth = 6;
-    ctx.beginPath(); ctx.arc(FOOD.x, FOOD.y, 32, -Math.PI / 2, -Math.PI / 2 + pct * Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(ANTHILL.x, ANTHILL.y, 34, -Math.PI / 2, -Math.PI / 2 + pct * Math.PI * 2); ctx.stroke();
 
-    ctx.save();
-    ctx.translate(FOOD.x, FOOD.y);
-    ctx.fillStyle = '#e6e6e6';
-    ctx.beginPath(); ctx.moveTo(-18, -2); ctx.lineTo(18, -2); ctx.lineTo(14, 4); ctx.lineTo(-14, 4); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#e0455f';
-    ctx.fillRect(-14, -1, 28, 3);
-    ctx.fillStyle = '#b5834a';
-    ctx.beginPath(); ctx.roundRect(-17, 4, 34, 15, 4); ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 1.5;
-    for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(-17, 4 + (i + 1.5) * 4); ctx.lineTo(17, 4 + (i + 1.5) * 4); ctx.stroke(); }
-    ctx.strokeStyle = '#8a5f30'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(0, 2, 15, Math.PI, Math.PI * 2); ctx.stroke();
-    ctx.restore();
+    ctx.fillStyle = '#7a5230';
+    ctx.beginPath();
+    ctx.ellipse(ANTHILL.x, ANTHILL.y + 6, 30, 20, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#8f6238';
+    ctx.beginPath();
+    ctx.ellipse(ANTHILL.x, ANTHILL.y - 5, 23, 18, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#2b1c10';
+    ctx.beginPath();
+    ctx.ellipse(ANTHILL.x, ANTHILL.y, 8, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
 }
 
 function drawObstacle(o) {
@@ -966,9 +972,8 @@ function drawBanner() {
 
 function draw() {
     drawBackground();
-    drawPath();
-    drawAnthill();
-    drawFood();
+    drawStartHole();
+    drawAnthillGoal();
     obstacles.forEach(drawObstacle);
     families.forEach(fam => {
         for (let i = fam.babies.length - 1; i >= 0; i--) drawBaby(fam.babies[i], fam.species.babyPalette, fam.species.footColor);
