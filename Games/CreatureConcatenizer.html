@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+<title>Creature Concatenizer</title>
+<style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+        touch-action: manipulation;
+        overscroll-behavior: none;
+        overflow: hidden;
+        height: 100%;
+    }
+    body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(160deg, #2b1055 0%, #4b1d7a 35%, #7b2f8f 65%, #b34a8f 100%);
+        font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+        color: #fff;
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    .page {
+        width: 100%;
+        max-width: 640px;
+        height: 100vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    header { text-align: center; margin-bottom: 4px; }
+    h1 {
+        margin: 0;
+        font-size: 1.5rem;
+        background: linear-gradient(90deg, #ffe066, #ff8ac0, #7be0ff, #ffe066);
+        background-size: 300% 100%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        animation: hue-shift 6s linear infinite;
+    }
+    @keyframes hue-shift { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
+
+    .stat-bar {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+        margin: 6px 0;
+        flex: 0 0 auto;
+    }
+    .stat-tile {
+        background: rgba(255,255,255,0.1);
+        border: 2px solid rgba(255,255,255,0.25);
+        border-radius: 10px;
+        padding: 4px 4px;
+        text-align: center;
+        flex: 1 1 0;
+        min-width: 0;
+    }
+    .stat-tile .stat-value { display: block; font-size: 0.95rem; font-weight: 700; color: #fff; }
+    .stat-tile .stat-label { font-size: 0.5rem; text-transform: uppercase; letter-spacing: 0.04em; color: #d8c4f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .info-bar {
+        text-align: center;
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #ffe9c7;
+        background: rgba(255,255,255,0.08);
+        border-radius: 999px;
+        padding: 5px 10px;
+        margin: 0 0 6px 0;
+        flex: 0 0 auto;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .board-wrap {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 10px 26px rgba(0,0,0,0.4);
+        background: linear-gradient(160deg, #3a1a63, #5c2270);
+        touch-action: manipulation;
+        flex: 0 1 auto;
+        min-height: 0;
+    }
+
+    .cell-grid, .tiles-layer, .fx-layer, .overlay {
+        position: absolute;
+        inset: 0;
+    }
+    .fx-layer, .cell-grid { pointer-events: none; }
+    .tiles-layer { z-index: 2; }
+    .fx-layer { z-index: 4; }
+
+    .cell {
+        position: absolute;
+        box-sizing: border-box;
+        width: 12.5%;
+        height: 12.5%;
+        padding: 2.5%;
+    }
+    .cell-inner {
+        width: 100%;
+        height: 100%;
+        border-radius: 22%;
+        background: rgba(255,255,255,0.06);
+        transition: background 120ms ease, box-shadow 120ms ease;
+    }
+    @keyframes pulseSoft { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+    .tile {
+        position: absolute;
+        box-sizing: border-box;
+        width: 12.5%;
+        height: 12.5%;
+        padding: 2.5%;
+        transition: transform 200ms ease-in-out, opacity 180ms ease;
+        z-index: 2;
+        container-type: inline-size;
+        cursor: pointer;
+    }
+    .tile.selected { z-index: 3; }
+    .tile-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 24%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: inset 0 -6px 0 rgba(0,0,0,0.15), 0 3px 6px rgba(0,0,0,0.3);
+        transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+    .tile.selected .tile-inner {
+        transform: scale(1.14);
+        box-shadow: 0 0 0 2px #fff, 0 0 12px 3px rgba(255,255,255,0.85), inset 0 -6px 0 rgba(0,0,0,0.15);
+    }
+    .tile.merge-target .tile-inner {
+        box-shadow: 0 0 0 2px #ffe066, 0 0 10px 3px rgba(255,224,102,0.9), inset 0 -6px 0 rgba(0,0,0,0.15);
+        animation: pulseSoft 0.8s ease-in-out infinite;
+    }
+    .tile.golden .tile-inner {
+        box-shadow: 0 0 0 2px #ffe066, 0 0 10px 4px rgba(255,224,102,0.85), inset 0 -6px 0 rgba(0,0,0,0.15);
+    }
+    .tile-emoji { font-size: 80cqw; line-height: 1; }
+    .tile-tier {
+        position: absolute;
+        top: 2%;
+        left: 5%;
+        font-size: 18cqw;
+        font-weight: 800;
+        color: rgba(255,255,255,0.8);
+        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+    .tile-spark {
+        position: absolute;
+        top: 1%;
+        right: 3%;
+        font-size: 18cqw;
+    }
+
+    @keyframes spawnPop {
+        0% { transform: scale(0); }
+        70% { transform: scale(1.15); }
+        100% { transform: scale(1); }
+    }
+    @keyframes mergePop {
+        0% { transform: scale(1); }
+        45% { transform: scale(1.3); }
+        100% { transform: scale(1); }
+    }
+    @keyframes poofOut {
+        0% { transform: scale(1); opacity: 1; }
+        100% { transform: scale(0.2); opacity: 0; }
+    }
+    .tile-inner.spawn-anim { animation: spawnPop 170ms ease-out; }
+    .tile-inner.merge-anim { animation: mergePop 220ms ease-out; }
+    .tile-inner.poof-anim { animation: poofOut 220ms ease-in forwards; }
+
+    @keyframes floatUp {
+        0% { transform: translate(-50%, -50%) translateY(0); opacity: 1; }
+        100% { transform: translate(-50%, -50%) translateY(-45%); opacity: 0; }
+    }
+    .float-text {
+        position: absolute;
+        transform: translate(-50%, -50%);
+        font-weight: 800;
+        font-size: 0.68rem;
+        color: #ffe066;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+        animation: floatUp 750ms ease-out forwards;
+        white-space: nowrap;
+    }
+    .float-text.big { font-size: 0.9rem; color: #ff9ad4; }
+
+    .overlay {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: rgba(20, 8, 40, 0.88);
+        z-index: 5;
+        text-align: center;
+        padding: 20px;
+    }
+    .overlay.show { display: flex; }
+    .overlay h2 { margin: 0 0 6px 0; font-size: 1.3rem; }
+    .overlay p { margin: 2px 0 14px 0; color: #e8d9f5; font-size: 0.85rem; }
+    .overlay button {
+        background: linear-gradient(135deg, #ff8ac0, #ffb84d);
+        border: none;
+        color: #2b1055;
+        font-weight: 800;
+        padding: 10px 22px;
+        border-radius: 999px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        box-shadow: 0 4px 0 rgba(0,0,0,0.25);
+    }
+    .overlay button:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.25); }
+
+    .btn-row { display: flex; gap: 10px; justify-content: center; flex: 0 0 auto; margin-top: 6px; }
+    .btn-row button {
+        flex: 1;
+        max-width: 200px;
+        background: rgba(255,255,255,0.14);
+        border: 2px solid rgba(255,255,255,0.3);
+        color: #fff;
+        font-weight: 700;
+        padding: 8px 8px;
+        border-radius: 12px;
+        font-size: 0.82rem;
+        cursor: pointer;
+    }
+    .btn-row button:active { background: rgba(255,255,255,0.26); }
+
+    .toast {
+        position: fixed;
+        top: 16px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-20px);
+        background: rgba(20,8,40,0.95);
+        border: 2px solid rgba(255,255,255,0.3);
+        color: #fff;
+        padding: 10px 18px;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        z-index: 50;
+        opacity: 0;
+        transition: opacity 220ms ease, transform 220ms ease;
+        pointer-events: none;
+        white-space: nowrap;
+        max-width: 92vw;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    .modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(10,4,24,0.92);
+        z-index: 100;
+        flex-direction: column;
+        align-items: center;
+        padding: 16px;
+    }
+    .modal[hidden] { display: none; }
+    .modal:not([hidden]) { display: flex; }
+    .modal h2 { margin: 4px 0 2px 0; }
+    .modal .dex-sub { color: #d8c4f0; font-size: 0.8rem; margin-bottom: 10px; }
+    .dex-grid {
+        width: 100%;
+        max-width: 640px;
+        flex: 1;
+        overflow-y: auto;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 8px;
+        padding-bottom: 10px;
+    }
+    .dex-item {
+        background: rgba(255,255,255,0.07);
+        border: 2px solid rgba(255,255,255,0.18);
+        border-radius: 12px;
+        aspect-ratio: 1/1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 4px;
+    }
+    .dex-item .n { font-size: 0.5rem; color: #cbb8e8; }
+    .dex-item .e { font-size: 1.4rem; }
+    .dex-item .nm { font-size: 0.5rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 95%; }
+    .dex-item.locked { opacity: 0.35; }
+    .dex-item.locked .e { filter: grayscale(1); }
+    .modal button.close-dex {
+        margin-top: 10px;
+        background: linear-gradient(135deg, #ff8ac0, #ffb84d);
+        border: none;
+        color: #2b1055;
+        font-weight: 800;
+        padding: 10px 26px;
+        border-radius: 999px;
+        cursor: pointer;
+    }
+</style>
+</head>
+<body>
+<div class="page">
+    <header>
+        <h1>Creature Concatenizer</h1>
+    </header>
+
+    <div class="stat-bar">
+        <div class="stat-tile"><span class="stat-value" id="scoreVal">0</span><span class="stat-label">Score</span></div>
+        <div class="stat-tile"><span class="stat-value" id="bestVal">0</span><span class="stat-label">Best</span></div>
+        <div class="stat-tile"><span class="stat-value" id="dexVal">0/99</span><span class="stat-label">Discovered</span></div>
+    </div>
+
+    <div class="info-bar" id="infoBar">Tap a creature, then tap any matching creature to merge</div>
+
+    <div class="board-wrap" id="boardWrap">
+        <div class="cell-grid" id="cellGrid"></div>
+        <div class="tiles-layer" id="tilesLayer"></div>
+        <div class="fx-layer" id="fxLayer"></div>
+        <div class="overlay" id="stuckOverlay">
+            <h2>Board's Full!</h2>
+            <p>No empty cells and no matches left. Release one creature back to the wild to make room.</p>
+            <button id="releaseBtn">Release One (Free)</button>
+        </div>
+    </div>
+
+    <div class="btn-row">
+        <button id="newGameBtn">New Game</button>
+        <button id="dexBtn">Creature Dex</button>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal" id="dexModal" hidden>
+    <h2>Creature Dex</h2>
+    <div class="dex-sub" id="dexSub">0 / 99 discovered</div>
+    <div class="dex-grid" id="dexGrid"></div>
+    <button class="close-dex" id="closeDexBtn">Close</button>
+</div>
+
+<script>
+(function(){
+    const N = 8;
+    const TOTAL = N * N;
+
+    const CREATURES = [
+        ['Ant','🐜'],['Ladybug','🐞'],['Bee','🐝'],['Snail','🐌'],
+        ['Cricket','🦗'],['Spider','🕷️'],['Worm','🪱'],['Beetle','🪲'],['Butterfly','🦋'],
+        ['Mouse','🐭'],['Hamster','🐹'],['Frog','🐸'],['Chick','🐤'],['Chicken','🐔'],
+        ['Rabbit','🐰'],['Hedgehog','🦔'],['Turtle','🐢'],['Squirrel','🐿️'],['Bat','🦇'],
+        ['Owl','🦉'],['Cat','🐱'],['Dog','🐶'],['Fox','🦊'],['Raccoon','🦝'],
+        ['Skunk','🦨'],['Duck','🦆'],['Penguin','🐧'],['Parrot','🦜'],['Koala','🐨'],
+        ['Panda','🐼'],['Pig','🐷'],['Sheep','🐑'],['Goat','🐐'],['Cow','🐄'],
+        ['Llama','🦙'],['Monkey','🐵'],['Gorilla','🦍'],['Kangaroo','🦘'],['Otter','🦦'],
+        ['Beaver','🦫'],['Wolf','🐺'],['Deer','🦌'],['Boar','🐗'],['Horse','🐴'],
+        ['Zebra','🦓'],['Bison','🦬'],['Camel','🐫'],['Elephant','🐘'],['Rhino','🦏'],
+        ['Hippo','🦛'],['Giraffe','🦒'],['Lion','🦁'],['Tiger','🐯'],['Leopard','🐆'],
+        ['Bear','🐻'],['Polar Bear','🐻‍❄️'],['Crocodile','🐊'],['Shark','🦈'],['Dolphin','🐬'],
+        ['Whale','🐳'],['Octopus','🐙'],['Squid','🦑'],['Crab','🦀'],['Lobster','🦞'],
+        ['Seal','🦭'],['Eagle','🦅'],['Peacock','🦚'],['Flamingo','🦩'],['Swan','🦢'],
+        ['Sauropod','🦕'],['Stegosaurus','🦕'],['Triceratops','🦖'],['Velociraptor','🦖'],['Brontosaurus','🦕'],
+        ['T-Rex','🦖'],['Mammoth','🐘'],['Saber Cat','🐅'],['Kraken','🐙'],['Yeti','🦧'],
+        ['Griffin','🦅'],['Sphinx','🦁'],['Hydra','🐍'],['Chimera','🐐'],['Centaur','🐴'],
+        ['Werewolf','🐺'],['Mermaid','🧜'],['Unicorn','🦄'],['Phoenix','🐦‍🔥'],['Dragon','🐉'],
+        ['Vampire Lord','🧛'],['Genie','🧞'],['Wizard','🧙'],['Angel','👼'],['Demon King','👹'],
+        ['Titan','🗿'],['Star Beast','🌟'],['Galaxy Serpent','🌌'],['Comet Wyrm','☄️'],['The Concatenizer','🔗']
+    ];
+    const MAX_TIER = CREATURES.length - 1;
+
+    function tileColors(i){
+        const hue = (i * 137.508) % 360;
+        const light = 80 - Math.min(i, 90) / 90 * 38;
+        const c1 = `hsl(${hue.toFixed(1)}, 72%, ${Math.min(light+8,92).toFixed(1)}%)`;
+        const c2 = `hsl(${hue.toFixed(1)}, 66%, ${Math.max(light-12,18).toFixed(1)}%)`;
+        const text = light > 52 ? '#241433' : '#ffffff';
+        return { bg: `linear-gradient(135deg, ${c1}, ${c2})`, text };
+    }
+
+    function valueOf(tier){ return Math.pow(2, tier + 1); }
+
+    function formatNum(n){
+        const suffixes = [
+            [1e33,'Dc'],[1e30,'No'],[1e27,'Oc'],[1e24,'Sp'],[1e21,'Sx'],
+            [1e18,'Qi'],[1e15,'Qa'],[1e12,'T'],[1e9,'B'],[1e6,'M'],[1e3,'K']
+        ];
+        for(const [v,s] of suffixes){
+            if(n >= v) return (n/v).toFixed(n/v < 10 ? 2 : 1) + s;
+        }
+        return Math.round(n).toString();
+    }
+
+    function orthNeighbors(idx){
+        const r = Math.floor(idx / N), c = idx % N;
+        const list = [];
+        if(r > 0) list.push(idx - N);
+        if(c < N-1) list.push(idx + 1);
+        if(r < N-1) list.push(idx + N);
+        if(c > 0) list.push(idx - 1);
+        return list;
+    }
+    // ---- persistent state ----
+    let best = parseInt(localStorage.getItem('cc_best') || '0', 10) || 0;
+    let discovered = new Set();
+    try {
+        const saved = JSON.parse(localStorage.getItem('cc_discovered') || '[]');
+        saved.forEach(i => discovered.add(i));
+    } catch(e) {}
+
+    function saveBest(){ localStorage.setItem('cc_best', String(best)); }
+    function saveDiscovered(){ localStorage.setItem('cc_discovered', JSON.stringify(Array.from(discovered))); }
+
+    // ---- game state ----
+    let grid = new Array(TOTAL).fill(null);
+    let tiles = {};
+    let nextId = 1;
+    let score = 0;
+    let busy = false;
+    let selectedIdx = null;
+    let highlighted = []; // {el, cls}
+
+    const cellGrid = document.getElementById('cellGrid');
+    const tilesLayer = document.getElementById('tilesLayer');
+    const fxLayer = document.getElementById('fxLayer');
+    const boardWrap = document.getElementById('boardWrap');
+    const scoreVal = document.getElementById('scoreVal');
+    const bestVal = document.getElementById('bestVal');
+    const dexVal = document.getElementById('dexVal');
+    const infoBar = document.getElementById('infoBar');
+    const stuckOverlay = document.getElementById('stuckOverlay');
+    const toastEl = document.getElementById('toast');
+
+    function buildCellGrid(){
+        cellGrid.innerHTML = '';
+        for(let i=0;i<TOTAL;i++){
+            const r = Math.floor(i/N), c = i%N;
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.style.left = (c*100/N) + '%';
+            cell.style.top = (r*100/N) + '%';
+            const inner = document.createElement('div');
+            inner.className = 'cell-inner';
+            cell.appendChild(inner);
+            cellGrid.appendChild(cell);
+        }
+    }
+
+    function makeTileEl(tier, golden){
+        const wrap = document.createElement('div');
+        wrap.className = 'tile' + (golden ? ' golden' : '');
+        const inner = document.createElement('div');
+        inner.className = 'tile-inner';
+        const emojiSpan = document.createElement('div');
+        emojiSpan.className = 'tile-emoji';
+        const tierSpan = document.createElement('div');
+        tierSpan.className = 'tile-tier';
+        inner.appendChild(emojiSpan);
+        inner.appendChild(tierSpan);
+        if(golden){
+            const spark = document.createElement('div');
+            spark.className = 'tile-spark';
+            spark.textContent = '✨';
+            inner.appendChild(spark);
+        }
+        wrap.appendChild(inner);
+        wrap._inner = inner;
+        wrap._emoji = emojiSpan;
+        wrap._tier = tierSpan;
+        applyStageVisual(wrap, tier);
+        return wrap;
+    }
+
+    function applyStageVisual(el, tier){
+        const [name, emoji] = CREATURES[tier];
+        const colors = tileColors(tier);
+        el._emoji.textContent = emoji;
+        el._tier.textContent = (tier+1);
+        el._inner.style.background = colors.bg;
+        el._inner.style.color = colors.text;
+        el._name = name;
+    }
+
+    function setTransform(el, row, col){
+        el.style.transform = `translate(${col*100}%, ${row*100}%)`;
+    }
+
+    function spawnTileAt(idx, tier, golden){
+        const row = Math.floor(idx / N), col = idx % N;
+        const id = nextId++;
+        const el = makeTileEl(tier, golden);
+        setTransform(el, row, col);
+        tilesLayer.appendChild(el);
+        tiles[id] = { id, tier, row, col, el, golden: !!golden };
+        grid[idx] = id;
+        registerDiscovery(tier);
+        requestAnimationFrame(() => {
+            el._inner.classList.add('spawn-anim');
+            setTimeout(() => el._inner.classList.remove('spawn-anim'), 200);
+        });
+    }
+
+    function registerDiscovery(tier){
+        if(!discovered.has(tier)){
+            discovered.add(tier);
+            saveDiscovered();
+            updateDexStat();
+            queueToast(`New Creature: ${CREATURES[tier][1]} ${CREATURES[tier][0]}!`);
+        }
+    }
+
+    let toastQueue = [];
+    let toastBusy = false;
+    function queueToast(msg){
+        toastQueue.push(msg);
+        if(!toastBusy) showNextToast();
+    }
+    function showNextToast(){
+        if(toastQueue.length === 0){ toastBusy = false; return; }
+        toastBusy = true;
+        const msg = toastQueue.shift();
+        toastEl.textContent = msg;
+        requestAnimationFrame(() => toastEl.classList.add('show'));
+        setTimeout(() => {
+            toastEl.classList.remove('show');
+            setTimeout(showNextToast, 220);
+        }, 1400);
+    }
+
+    function spawnFloatText(idx, text, big){
+        const row = Math.floor(idx / N), col = idx % N;
+        const el = document.createElement('div');
+        el.className = 'float-text' + (big ? ' big' : '');
+        el.textContent = text;
+        el.style.left = ((col + 0.5) * (100/N)) + '%';
+        el.style.top = ((row + 0.5) * (100/N)) + '%';
+        fxLayer.appendChild(el);
+        setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, 800);
+    }
+
+    // ---- selection & interaction ----
+    function clearHighlights(){
+        highlighted.forEach(h => h.el.classList.remove(h.cls));
+        highlighted = [];
+    }
+
+    function selectTile(idx){
+        clearHighlights();
+        selectedIdx = idx;
+        const tile = tiles[grid[idx]];
+        tile.el.classList.add('selected');
+        highlighted.push({ el: tile.el, cls: 'selected' });
+        if(tile.tier < MAX_TIER){
+            for(let i=0;i<TOTAL;i++){
+                if(i === idx || grid[i] === null) continue;
+                const other = tiles[grid[i]];
+                if(other.tier === tile.tier){
+                    other.el.classList.add('merge-target');
+                    highlighted.push({ el: other.el, cls: 'merge-target' });
+                }
+            }
+        }
+        infoBar.textContent = `${CREATURES[tile.tier][1]} ${CREATURES[tile.tier][0]} · Tier ${tile.tier+1}`;
+    }
+
+    function deselect(){
+        clearHighlights();
+        selectedIdx = null;
+        infoBar.textContent = 'Tap a creature, then tap any matching creature to merge';
+    }
+
+    function performMerge(sourceIdx, targetIdx){
+        const sourceTile = tiles[grid[sourceIdx]];
+        const targetTile = tiles[grid[targetIdx]];
+        const originalTier = targetTile.tier;
+        if(originalTier >= MAX_TIER) return;
+
+        busy = true;
+
+        const chainCells = [sourceIdx];
+        const chainEls = [sourceTile.el];
+        let goldenBonusCount = (sourceTile.golden ? 1 : 0) + (targetTile.golden ? 1 : 0);
+        let tier = originalTier + 1;
+        let totalScore = valueOf(tier);
+        const discoveredList = [tier];
+        const usedIdx = new Set([sourceIdx, targetIdx]);
+
+        while(tier < MAX_TIER){
+            const neighbors = orthNeighbors(targetIdx);
+            let found = -1;
+            for(const n of neighbors){
+                if(usedIdx.has(n)) continue;
+                const nId = grid[n];
+                if(nId !== null && tiles[nId].tier === tier){ found = n; break; }
+            }
+            if(found === -1) break;
+            usedIdx.add(found);
+            chainCells.push(found);
+            chainEls.push(tiles[grid[found]].el);
+            if(tiles[grid[found]].golden) goldenBonusCount++;
+            tier += 1;
+            totalScore += valueOf(tier);
+            discoveredList.push(tier);
+        }
+
+        const finalTier = tier;
+        const goldenBonus = goldenBonusCount * (50 + originalTier * 5);
+        totalScore += goldenBonus;
+
+        chainCells.forEach(idx => {
+            const tId = grid[idx];
+            grid[idx] = null;
+            delete tiles[tId];
+        });
+        targetTile.tier = finalTier;
+        targetTile.golden = false;
+        targetTile.el.classList.remove('golden');
+
+        score += totalScore;
+        if(score > best){ best = score; saveBest(); }
+        updateScoreStat();
+        discoveredList.forEach(t => registerDiscovery(t));
+
+        const STAGGER = 190;
+        chainEls.forEach((el, i) => {
+            setTimeout(() => {
+                setTransform(el, targetTile.row, targetTile.col);
+                el.style.opacity = '0';
+                applyStageVisual(targetTile.el, originalTier + i + 1);
+                targetTile.el._inner.classList.add('merge-anim');
+                spawnFloatText(targetIdx, '+' + formatNum(valueOf(originalTier + i + 1)), i > 0);
+                setTimeout(() => { targetTile.el._inner.classList.remove('merge-anim'); }, 220);
+                setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, 170);
+            }, i * STAGGER);
+        });
+
+        if(goldenBonus > 0){
+            setTimeout(() => spawnFloatText(targetIdx, '+' + goldenBonus + ' ✨', true), chainEls.length * STAGGER + 60);
+        }
+
+        const totalAnimTime = chainEls.length * STAGGER + 260;
+        setTimeout(() => {
+            busy = false;
+            checkBoardStuck();
+        }, totalAnimTime);
+    }
+
+    function onCellTapped(idx){
+        if(busy) return;
+        if(selectedIdx === null){
+            if(grid[idx] !== null) selectTile(idx);
+            return;
+        }
+        if(selectedIdx === idx){ deselect(); return; }
+        const selTile = tiles[grid[selectedIdx]];
+
+        if(grid[idx] === null){
+            deselect();
+            return;
+        }
+
+        const targetTile = tiles[grid[idx]];
+        if(targetTile.tier === selTile.tier && selTile.tier < MAX_TIER){
+            performMerge(selectedIdx, idx);
+            selectedIdx = null;
+            clearHighlights();
+            infoBar.textContent = 'Tap a creature, then tap any matching creature to merge';
+        } else {
+            selectTile(idx);
+        }
+    }
+
+    boardWrap.addEventListener('click', (e) => {
+        if(e.target.closest('.overlay')) return;
+        const rect = boardWrap.getBoundingClientRect();
+        const x = e.clientX - rect.left, y = e.clientY - rect.top;
+        if(x < 0 || y < 0 || x >= rect.width || y >= rect.height) return;
+        const col = Math.min(N-1, Math.floor(x / rect.width * N));
+        const row = Math.min(N-1, Math.floor(y / rect.height * N));
+        onCellTapped(row * N + col);
+    });
+
+    window.addEventListener('keydown', (e) => {
+        if(e.key === 'Escape') deselect();
+    });
+
+    // ---- board stuck / release ----
+    function checkBoardStuck(){
+        const hasEmpty = grid.some(v => v === null);
+        if(hasEmpty){ stuckOverlay.classList.remove('show'); return; }
+        const tierCounts = new Map();
+        for(let i=0;i<TOTAL;i++){
+            const t = tiles[grid[i]];
+            if(!t || t.tier >= MAX_TIER) continue;
+            const count = (tierCounts.get(t.tier) || 0) + 1;
+            if(count >= 2){ stuckOverlay.classList.remove('show'); return; }
+            tierCounts.set(t.tier, count);
+        }
+        stuckOverlay.classList.add('show');
+    }
+
+    document.getElementById('releaseBtn').addEventListener('click', () => {
+        let lowestIdx = -1, lowestTier = Infinity;
+        for(let i=0;i<TOTAL;i++){
+            const t = tiles[grid[i]];
+            if(t && t.tier < lowestTier){ lowestTier = t.tier; lowestIdx = i; }
+        }
+        if(lowestIdx === -1){ stuckOverlay.classList.remove('show'); return; }
+        const tile = tiles[grid[lowestIdx]];
+        tile.el._inner.classList.add('poof-anim');
+        const idx = lowestIdx;
+        grid[idx] = null;
+        delete tiles[tile.id];
+        setTimeout(() => { if(tile.el.parentNode) tile.el.parentNode.removeChild(tile.el); }, 230);
+        stuckOverlay.classList.remove('show');
+    });
+
+    // ---- auto spawn ----
+    const AUTO_SPAWN_MS = 2200;
+
+    function autoSpawn(){
+        const empty = [];
+        for(let i=0;i<TOTAL;i++) if(grid[i] === null) empty.push(i);
+        if(empty.length === 0) return;
+        const idx = empty[Math.floor(Math.random() * empty.length)];
+        const tier = Math.random() < 0.85 ? 0 : 1;
+        const golden = Math.random() < 0.05;
+        spawnTileAt(idx, tier, golden);
+        checkBoardStuck();
+    }
+
+    setInterval(autoSpawn, AUTO_SPAWN_MS);
+
+    // ---- stats / dex ----
+    function updateScoreStat(){
+        scoreVal.textContent = formatNum(score);
+        bestVal.textContent = formatNum(best);
+    }
+    function updateDexStat(){
+        dexVal.textContent = `${discovered.size}/${CREATURES.length}`;
+    }
+
+    // ---- reset ----
+    const STARTER_COUNT = 6;
+    function spawnStarters(){
+        const positions = [];
+        while(positions.length < STARTER_COUNT){
+            const p = Math.floor(Math.random() * TOTAL);
+            if(!positions.includes(p)) positions.push(p);
+        }
+        positions.forEach(p => spawnTileAt(p, Math.random() < 0.75 ? 0 : 1, false));
+    }
+
+    function resetGame(){
+        Object.values(tiles).forEach(t => { if(t.el.parentNode) t.el.parentNode.removeChild(t.el); });
+        tiles = {};
+        grid = new Array(TOTAL).fill(null);
+        score = 0;
+        busy = false;
+        selectedIdx = null;
+        highlighted = [];
+        stuckOverlay.classList.remove('show');
+        infoBar.textContent = 'Tap a creature, then tap any matching creature to merge';
+        updateScoreStat();
+        spawnStarters();
+    }
+
+    document.getElementById('newGameBtn').addEventListener('click', () => {
+        if(score > 0){
+            if(!confirm('Start a new game? Your current run will be lost.')) return;
+        }
+        resetGame();
+    });
+
+    // ---- dex modal ----
+    const dexModal = document.getElementById('dexModal');
+    const dexGrid = document.getElementById('dexGrid');
+    const dexSub = document.getElementById('dexSub');
+    document.getElementById('dexBtn').addEventListener('click', () => {
+        renderDex();
+        dexModal.hidden = false;
+    });
+    document.getElementById('closeDexBtn').addEventListener('click', () => {
+        dexModal.hidden = true;
+    });
+    function renderDex(){
+        dexGrid.innerHTML = '';
+        dexSub.textContent = `${discovered.size} / ${CREATURES.length} discovered`;
+        CREATURES.forEach(([name, emoji], i) => {
+            const item = document.createElement('div');
+            const isFound = discovered.has(i);
+            item.className = 'dex-item' + (isFound ? '' : ' locked');
+            const n = document.createElement('div');
+            n.className = 'n';
+            n.textContent = '#' + (i+1);
+            const e = document.createElement('div');
+            e.className = 'e';
+            e.textContent = isFound ? emoji : '❔';
+            const nm = document.createElement('div');
+            nm.className = 'nm';
+            nm.textContent = isFound ? name : '???';
+            item.appendChild(n);
+            item.appendChild(e);
+            item.appendChild(nm);
+            dexGrid.appendChild(item);
+        });
+    }
+
+    // ---- init ----
+    buildCellGrid();
+    updateScoreStat();
+    updateDexStat();
+    spawnStarters();
+})();
+</script>
+</body>
+</html>

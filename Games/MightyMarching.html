@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+<title>Mighty Marching</title>
+<style>
+    * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        user-select: none;
+        -webkit-user-select: none;
+    }
+    html, body {
+        touch-action: manipulation;
+        overscroll-behavior: none;
+        overflow: hidden;
+        height: 100%;
+        margin: 0;
+    }
+    body {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px;
+        background: radial-gradient(circle at 50% 0%, #cdf1ff 0%, #8ecae6 45%, #4f9bc9 100%);
+        font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+        color: #1c3a4a;
+    }
+
+    header { text-align: center; }
+    h1 {
+        margin: 0 0 2px;
+        font-size: 1.5rem;
+        color: #fff6da;
+        text-shadow: 0 2px 0 #7a4a12, 0 4px 10px rgba(0,0,0,0.35);
+        letter-spacing: 0.02em;
+    }
+    header p {
+        margin: 0;
+        font-size: 0.76rem;
+        color: #0d2f42;
+        text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+    }
+
+    .stat-bar {
+        display: flex;
+        gap: 8px;
+        width: min(94vw, 900px);
+    }
+    .stat-tile {
+        flex: 1 1 0;
+        min-width: 0;
+        background: rgba(10, 40, 55, 0.42);
+        border: 2px solid rgba(255,255,255,0.28);
+        border-radius: 10px;
+        padding: 5px 4px;
+        text-align: center;
+        box-shadow: 0 2px 0 rgba(0,0,0,0.2) inset;
+    }
+    .stat-value { display: block; font-size: 1.1rem; font-weight: 700; color: #ffe066; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+    .stat-label { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.05em; color: #eaf7ff; }
+
+    .morale-wrap {
+        width: min(94vw, 900px);
+        background: rgba(10, 40, 55, 0.42);
+        border: 2px solid rgba(255,255,255,0.28);
+        border-radius: 10px;
+        padding: 4px 8px;
+    }
+    .morale-label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #eaf7ff;
+        margin-bottom: 2px;
+    }
+    .morale-track {
+        height: 8px;
+        border-radius: 5px;
+        background: rgba(0,0,0,0.3);
+        overflow: hidden;
+    }
+    .morale-fill {
+        height: 100%;
+        border-radius: 5px;
+        background: linear-gradient(90deg, #57c84d, #ffe066);
+        width: 100%;
+        transition: width 0.15s linear, background 0.3s linear;
+    }
+
+    .game-wrap {
+        position: relative;
+        width: min(94vw, 116vh, 900px);
+        aspect-ratio: 3 / 2;
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 14px 34px rgba(0,0,0,0.4);
+        border: 5px solid #2c5c3a;
+        touch-action: none;
+    }
+    canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+        background: #7fc77f;
+    }
+
+    .overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(10, 30, 20, 0.82);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 20;
+        padding: 18px;
+        text-align: center;
+    }
+    .overlay.hidden { display: none; }
+    .overlay-card {
+        background: #fffdf4;
+        color: #234d34;
+        border-radius: 16px;
+        padding: 20px 24px;
+        max-width: 360px;
+        box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+    }
+    .overlay-card h2 { margin: 0 0 8px; font-size: 1.3rem; color: #b9790a; }
+    .overlay-card p { margin: 6px 0; font-size: 0.86rem; line-height: 1.4; text-align: left; }
+    .overlay-card .new-best { color: #d68a00; font-weight: 700; text-align: center; }
+    .overlay-card button {
+        margin-top: 14px;
+        background: #ffb703;
+        color: #4a2c00;
+        border: none;
+        padding: 11px 26px;
+        font-size: 1rem;
+        font-weight: 700;
+        border-radius: 10px;
+        cursor: pointer;
+        box-shadow: 0 3px 0 #b9790a;
+        touch-action: manipulation;
+    }
+    .overlay-card button:active { transform: translateY(2px); box-shadow: 0 1px 0 #b9790a; }
+
+    footer {
+        font-size: 0.66rem;
+        color: #0d2f42;
+        text-align: center;
+        opacity: 0.85;
+    }
+</style>
+</head>
+<body>
+
+<header>
+    <h1>🐜 Mighty Marching 🐥</h1>
+    <p>Clear the path so the ants can march home &mdash; and help the critter families along the way!</p>
+</header>
+
+<div class="stat-bar">
+    <div class="stat-tile"><span class="stat-value" id="stat-score">0</span><span class="stat-label">Score</span></div>
+    <div class="stat-tile"><span class="stat-value" id="stat-wave">1</span><span class="stat-label">Wave</span></div>
+    <div class="stat-tile"><span class="stat-value" id="stat-best">0</span><span class="stat-label">Best</span></div>
+</div>
+
+<div class="morale-wrap">
+    <div class="morale-label"><span>Anthill Morale</span><span id="morale-pct">100%</span></div>
+    <div class="morale-track"><div class="morale-fill" id="moraleFill"></div></div>
+</div>
+
+<div class="game-wrap" id="gameWrap">
+    <canvas id="canvas" width="900" height="600"></canvas>
+
+    <div class="overlay" id="startOverlay">
+        <div class="overlay-card">
+            <h2>🧺 Time for a picnic march!</h2>
+            <p>🐜 Ants stream from the anthill to the picnic, single file. Twigs, pebbles, puddles and toys keep landing in their way!</p>
+            <p>👆 Tap an obstacle to toss it aside and unstick the line. Clear a big backup for a bonus!</p>
+            <p>🦆🐔🕊️ Duck, chicken and pigeon families waddle the lawn, sidewalk and street on their own &mdash; mom in front, five babies trailing behind. Tap a stuck mom (❗) to shoo the family onward.</p>
+            <p>⚠️ If the line backs up too long, anthill morale crashes &mdash; keep it flowing!</p>
+            <button id="startBtn">Start Marching</button>
+        </div>
+    </div>
+
+    <div class="overlay hidden" id="overOverlay">
+        <div class="overlay-card">
+            <h2 id="overTitle">😔 Morale Crashed!</h2>
+            <p style="text-align:center;">Score: <strong id="finalScore">0</strong></p>
+            <p style="text-align:center;">Wave reached: <strong id="finalWave">1</strong></p>
+            <p id="newBestMsg" class="new-best" style="display:none;">🎉 New best score!</p>
+            <button id="retryBtn">March Again</button>
+        </div>
+    </div>
+</div>
+
+<footer>Works with mouse or touch &mdash; tap obstacles and stuck critter moms to clear the way.</footer>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const CW = canvas.width, CH = canvas.height;
+
+const LAWN_BOTTOM = 190;
+const SIDEWALK_BOTTOM = 410;
+
+function rand(min, max) { return min + Math.random() * (max - min); }
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function shade(hex, percent) {
+    const n = parseInt(hex.slice(1), 16);
+    let r = (n >> 16) + Math.round(255 * (percent / 100));
+    let g = ((n >> 8) & 0xff) + Math.round(255 * (percent / 100));
+    let b = (n & 0xff) + Math.round(255 * (percent / 100));
+    r = clamp(r, 0, 255); g = clamp(g, 0, 255); b = clamp(b, 0, 255);
+    return `rgb(${r},${g},${b})`;
+}
+
+// ---------- Path (anthill -> picnic), built as a smooth Catmull-Rom spline ----------
+const WAYPOINTS = [
+    { x: 30, y: 300 },
+    { x: 150, y: 105 },
+    { x: 280, y: 305 },
+    { x: 420, y: 525 },
+    { x: 560, y: 300 },
+    { x: 705, y: 120 },
+    { x: 855, y: 300 },
+    { x: 880, y: 300 }
+];
+
+function crPoint(p0, p1, p2, p3, t) {
+    const t2 = t * t, t3 = t2 * t;
+    const x = 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
+    const y = 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+    return { x, y };
+}
+
+function buildPath(waypoints, samplesPerSeg) {
+    const pts = [];
+    const n = waypoints.length;
+    for (let i = 0; i < n - 1; i++) {
+        const p0 = waypoints[Math.max(0, i - 1)];
+        const p1 = waypoints[i];
+        const p2 = waypoints[i + 1];
+        const p3 = waypoints[Math.min(n - 1, i + 2)];
+        for (let s = 0; s < samplesPerSeg; s++) pts.push(crPoint(p0, p1, p2, p3, s / samplesPerSeg));
+    }
+    pts.push(waypoints[n - 1]);
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + dist(pts[i - 1], pts[i]));
+    return { pts, cum, length: cum[cum.length - 1] };
+}
+
+const path = buildPath(WAYPOINTS, 36);
+const ANTHILL = path.pts[0];
+const FOOD = path.pts[path.pts.length - 1];
+
+function pointAtS(s) {
+    s = clamp(s, 0, path.length);
+    let lo = 0, hi = path.cum.length - 1;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (path.cum[mid] < s) lo = mid + 1; else hi = mid; }
+    const i = Math.max(1, lo);
+    const s0 = path.cum[i - 1], s1 = path.cum[i];
+    const t = s1 > s0 ? (s - s0) / (s1 - s0) : 0;
+    const p0 = path.pts[i - 1], p1 = path.pts[i];
+    return {
+        x: p0.x + (p1.x - p0.x) * t,
+        y: p0.y + (p1.y - p0.y) * t,
+        angle: Math.atan2(p1.y - p0.y, p1.x - p0.x)
+    };
+}
+
+function nearestSOnPath(px, py) {
+    let best = Infinity, bestS = 0;
+    for (let i = 0; i < path.pts.length; i++) {
+        const d = Math.hypot(path.pts[i].x - px, path.pts[i].y - py);
+        if (d < best) { best = d; bestS = path.cum[i]; }
+    }
+    return { s: bestS, dist: best };
+}
+
+// ---------- Static scenery ----------
+const flowers = [];
+for (let i = 0; i < 20; i++) {
+    flowers.push({ x: rand(20, CW - 20), y: rand(14, LAWN_BOTTOM - 14), color: ['#ff6fa5', '#ffe066', '#c48bff', '#ff9f4d'][Math.floor(Math.random() * 4)] });
+}
+const cracks = [];
+for (let i = 0; i < 6; i++) {
+    cracks.push({ x: rand(60, CW - 60), y1: rand(LAWN_BOTTOM + 15, SIDEWALK_BOTTOM - 40), len: rand(30, 70), ang: rand(-0.6, 0.6) });
+}
+const joints = [];
+for (let x = 40; x < CW; x += 95) joints.push(x + rand(-6, 6));
+
+// ---------- Game constants ----------
+const ANT_SPEED = 1.7;
+const ANT_MIN_GAP = 15;
+const BLOCK_STOP_OFFSET = 18;
+const PATH_BLOCK_RADIUS = 34;
+const MAX_ANTS = 60;
+const SPECIES = {
+    duck: {
+        beak: 'flat', comb: false, neckPatch: false, footColor: '#ff8c1a',
+        momPalettes: [
+            { body: '#ffd93d', head: '#ffd93d', beak: '#ff8c1a' },
+            { body: '#ffffff', head: '#ffffff', beak: '#ff9f1c' },
+            { body: '#c98a4b', head: '#3f7d4a', beak: '#ffcf4d' }
+        ],
+        babyPalette: { body: '#fff2a8', head: '#fff2a8', beak: '#ff9f1c' }
+    },
+    chicken: {
+        beak: 'pointed', comb: true, neckPatch: false, footColor: '#e8b13a',
+        momPalettes: [
+            { body: '#f1e4cc', head: '#f1e4cc', beak: '#e8b13a' },
+            { body: '#9a5f2b', head: '#9a5f2b', beak: '#e8b13a' },
+            { body: '#3a3a3a', head: '#3a3a3a', beak: '#e8b13a' }
+        ],
+        babyPalette: { body: '#ffe58a', head: '#ffe58a', beak: '#e8b13a' }
+    },
+    pigeon: {
+        beak: 'small', comb: false, neckPatch: true, footColor: '#e0455f',
+        momPalettes: [
+            { body: '#a9adc1', head: '#8f93a8', beak: '#3a3a3a' },
+            { body: '#c9c2b4', head: '#b0a996', beak: '#3a3a3a' },
+            { body: '#6f7385', head: '#585c6d', beak: '#3a3a3a' }
+        ],
+        babyPalette: { body: '#c7c9d6', head: '#c7c9d6', beak: '#3a3a3a' }
+    }
+};
+const SPECIES_KEYS = Object.keys(SPECIES);
+const BABY_COUNT = 5;
+const FOLLOW_DIST = 20;
+const BABY_MAX_STEP = 3.4;
+const OBST_TYPES = ['twig', 'pebble', 'pinecone', 'puddle', 'ball', 'leaf'];
+const OBST_COLORS = { twig: '#8a5a34', pebble: '#8b8b83', pinecone: '#a5622f', puddle: '#7fb8d9', ball: '#e0455f', leaf: '#e08a2f' };
+
+let state = 'START';
+let frame = 0;
+let dt = 1;
+let score = 0;
+let bestScore = Number(localStorage.getItem('mightyMarchingBest') || 0);
+let wave = 1;
+let deliveredThisWave = 0;
+let waveGoal = 12;
+let spawnInterval = 70;
+let spawnTimer = 40;
+let obstacleInterval = 130;
+let obstacleSpawnTimer = 190;
+let maxObstacles = 6;
+let morale = 100;
+let bannerText = '';
+let bannerTimer = 0;
+let obstacleId = 0;
+
+let ants = [];
+let families = [];
+let obstacles = [];
+let particles = [];
+let popups = [];
+
+function pickTarget(entity) { entity.target = { x: rand(50, CW - 50), y: rand(40, CH - 40) }; }
+
+function makeFamily() {
+    const speciesKey = SPECIES_KEYS[Math.floor(Math.random() * SPECIES_KEYS.length)];
+    const species = SPECIES[speciesKey];
+    const x = rand(70, CW - 70), y = rand(50, CH - 50);
+    const mom = {
+        x, y, angle: rand(0, Math.PI * 2), target: { x, y },
+        speed: rand(0.45, 0.8), waddlePhase: Math.random() * Math.PI * 2,
+        state: 'walking', stuckTimer: 0, pauseTimer: 0,
+        palette: species.momPalettes[Math.floor(Math.random() * species.momPalettes.length)]
+    };
+    const babies = [];
+    for (let i = 0; i < BABY_COUNT; i++) {
+        babies.push({
+            x: x - (i + 1) * FOLLOW_DIST, y, angle: mom.angle,
+            waddlePhase: Math.random() * Math.PI * 2
+        });
+    }
+    return { speciesKey, species, mom, babies };
+}
+
+function setupWorld() {
+    ants = [];
+    obstacles = [];
+    particles = [];
+    popups = [];
+    families = [makeFamily(), makeFamily()];
+
+    score = 0;
+    wave = 1;
+    deliveredThisWave = 0;
+    waveGoal = 12;
+    spawnInterval = 70;
+    spawnTimer = 40;
+    obstacleInterval = 130;
+    obstacleSpawnTimer = 190;
+    maxObstacles = 6;
+    morale = 100;
+    bannerText = '';
+    bannerTimer = 0;
+    updateHUD();
+}
+
+function addPopup(x, y, text, color) {
+    popups.push({ x, y, text, color, life: 60, vy: -0.55 });
+}
+
+function spawnParticles(x, y, color, count) {
+    for (let i = 0; i < count; i++) {
+        const a = rand(0, Math.PI * 2);
+        const spd = rand(1, 3.6);
+        particles.push({ x, y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, life: 28, color });
+    }
+}
+
+function updateHUD() {
+    document.getElementById('stat-score').textContent = score;
+    document.getElementById('stat-wave').textContent = wave;
+    document.getElementById('stat-best').textContent = bestScore;
+    const fill = document.getElementById('moraleFill');
+    fill.style.width = clamp(morale, 0, 100) + '%';
+    document.getElementById('morale-pct').textContent = Math.round(clamp(morale, 0, 100)) + '%';
+    if (morale > 55) fill.style.background = 'linear-gradient(90deg, #57c84d, #ffe066)';
+    else if (morale > 25) fill.style.background = 'linear-gradient(90deg, #ffb703, #ff8c1a)';
+    else fill.style.background = 'linear-gradient(90deg, #e0455f, #ff8c1a)';
+}
+
+// ---------- Obstacles ----------
+function spawnObstacle() {
+    if (obstacles.length >= maxObstacles) return;
+    for (let attempts = 0; attempts < 40; attempts++) {
+        const x = rand(45, CW - 45), y = rand(30, CH - 30);
+        if (dist({ x, y }, ANTHILL) < 150) continue;
+        if (dist({ x, y }, FOOD) < 110) continue;
+        let overlap = false;
+        for (const o of obstacles) if (dist(o, { x, y }) < 48) { overlap = true; break; }
+        if (overlap) continue;
+        const near = nearestSOnPath(x, y);
+        obstacles.push({
+            x, y, id: obstacleId++,
+            type: OBST_TYPES[Math.floor(Math.random() * OBST_TYPES.length)],
+            rot: rand(0, Math.PI * 2), scale: rand(0.85, 1.2),
+            pathS: near.s, isPathBlocker: near.dist < PATH_BLOCK_RADIUS
+        });
+        return;
+    }
+}
+
+function findBlockingObstacleAheadForPath(fromS) {
+    let best = null;
+    for (const o of obstacles) {
+        if (!o.isPathBlocker) continue;
+        if (o.pathS > fromS && (!best || o.pathS < best.pathS)) best = o;
+    }
+    return best;
+}
+
+function removeObstacle(o) {
+    const rescued = ants.filter(a => a.rootBlocker === o).length;
+    const bonus = 5 + rescued * 12;
+    score += bonus;
+    addPopup(o.x, o.y - 12, rescued > 0 ? `Rescue! +${bonus}` : `+${bonus}`, rescued > 0 ? '#ffd93d' : '#ffffff');
+    spawnParticles(o.x, o.y, OBST_COLORS[o.type], 14);
+    obstacles = obstacles.filter(x => x !== o);
+    updateHUD();
+}
+
+// ---------- Ants ----------
+function stepAnts() {
+    spawnTimer -= dt;
+    if (spawnTimer <= 0 && ants.length < MAX_ANTS) {
+        ants.push({ s: 0, phase: Math.random() * Math.PI * 2, lateral: rand(-4, 4), blocked: false, rootBlocker: null });
+        spawnTimer = spawnInterval;
+    }
+
+    ants.sort((a, b) => b.s - a.s);
+    let aheadS = Infinity;
+    let aheadBlocked = false;
+    let aheadRoot = null;
+    for (const ant of ants) {
+        let maxS = aheadS === Infinity ? path.length + 60 : aheadS - ANT_MIN_GAP;
+        const direct = findBlockingObstacleAheadForPath(ant.s);
+        let cappedByObstacle = false;
+        if (direct) {
+            const cap = direct.pathS - BLOCK_STOP_OFFSET;
+            if (cap < maxS) { maxS = cap; cappedByObstacle = true; }
+        }
+        const desired = Math.min(ant.s + ANT_SPEED * dt, maxS);
+        const blocked = desired <= ant.s + 0.05 && ant.s < path.length - 1;
+        ant.s = Math.max(ant.s, desired);
+        ant.blocked = blocked;
+        if (blocked) ant.rootBlocker = cappedByObstacle ? direct : (aheadBlocked ? aheadRoot : null);
+        else ant.rootBlocker = null;
+        aheadS = ant.s;
+        aheadBlocked = ant.blocked;
+        aheadRoot = ant.rootBlocker;
+    }
+
+    for (let i = ants.length - 1; i >= 0; i--) {
+        if (ants[i].s >= path.length) {
+            ants.splice(i, 1);
+            score += 5;
+            deliveredThisWave++;
+            spawnParticles(FOOD.x, FOOD.y, '#ffe066', 8);
+            if (deliveredThisWave >= waveGoal) completeWave();
+            updateHUD();
+        }
+    }
+
+    const blockedCount = ants.filter(a => a.blocked).length;
+    if (blockedCount > 0) morale -= 0.024 * blockedCount * dt;
+    else morale = Math.min(100, morale + 0.22 * dt);
+    morale = clamp(morale, 0, 100);
+    if (state === 'PLAYING') updateHUD();
+    if (morale <= 0 && state === 'PLAYING') triggerGameOver();
+}
+
+function completeWave() {
+    wave++;
+    deliveredThisWave = 0;
+    waveGoal = Math.min(waveGoal + 3, 30);
+    spawnInterval = Math.max(spawnInterval - 6, 22);
+    obstacleInterval = Math.max(obstacleInterval - 10, 45);
+    maxObstacles = Math.min(maxObstacles + 1, 12);
+    if (wave % 3 === 0 && families.length < 3) families.push(makeFamily());
+    score += 40 * wave;
+    bannerText = `🎉 Wave ${wave}! The march speeds up!`;
+    bannerTimer = 150;
+    spawnParticles(FOOD.x, FOOD.y, '#ffd93d', 30);
+}
+
+// ---------- Critter families (mom + babies) ----------
+function stepFamilies() {
+    families.forEach(fam => {
+        const d = fam.mom;
+        d.waddlePhase += (0.22 + d.speed * 0.05) * dt;
+        if (d.pauseTimer > 0) { d.pauseTimer -= dt; }
+        else if (d.state === 'stuck') {
+            d.stuckTimer += dt;
+            if (d.stuckTimer > 260) { pickTarget(d); d.state = 'walking'; d.stuckTimer = 0; }
+        } else {
+            const dx = d.target.x - d.x, dy = d.target.y - d.y;
+            const dd = Math.hypot(dx, dy);
+            if (dd < 8) {
+                d.pauseTimer = Math.floor(rand(30, 90)); pickTarget(d);
+            } else {
+                const ang = Math.atan2(dy, dx);
+                d.angle = ang;
+                const lookX = d.x + Math.cos(ang) * 28, lookY = d.y + Math.sin(ang) * 28;
+                const blocker = obstacles.find(o => dist(o, { x: lookX, y: lookY }) < 30);
+                if (blocker) { d.state = 'stuck'; d.stuckTimer = 0; }
+                else {
+                    d.x = clamp(d.x + Math.cos(ang) * d.speed * dt, 30, CW - 30);
+                    d.y = clamp(d.y + Math.sin(ang) * d.speed * dt, 25, CH - 25);
+                }
+            }
+        }
+
+        let leader = d;
+        fam.babies.forEach(b => {
+            b.waddlePhase += 0.3 * dt;
+            const dx = leader.x - b.x, dy = leader.y - b.y;
+            const dd = Math.hypot(dx, dy);
+            if (dd > FOLLOW_DIST) {
+                const ang = Math.atan2(dy, dx);
+                b.angle = ang;
+                const step = Math.min(dd - FOLLOW_DIST, BABY_MAX_STEP * dt);
+                b.x += Math.cos(ang) * step;
+                b.y += Math.sin(ang) * step;
+            }
+            leader = b;
+        });
+    });
+}
+
+function freeMom(d) {
+    d.state = 'walking';
+    d.stuckTimer = 0;
+    pickTarget(d);
+    score += 15;
+    addPopup(d.x, d.y - 24, 'Family freed! +15', '#7ee8ff');
+    spawnParticles(d.x, d.y, '#ffffff', 10);
+    updateHUD();
+}
+
+// ---------- Input ----------
+function handlePointer(e) {
+    e.preventDefault();
+    if (state !== 'PLAYING') return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = CW / rect.width, scaleY = CH / rect.height;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
+
+    for (const fam of families) {
+        const d = fam.mom;
+        if (d.state === 'stuck' && Math.hypot(d.x - x, d.y - y) < 32) { freeMom(d); return; }
+    }
+    let best = null, bestD = Infinity;
+    for (const o of obstacles) {
+        const r = 28 * o.scale;
+        const dd = Math.hypot(o.x - x, o.y - y);
+        if (dd < r && dd < bestD) { best = o; bestD = dd; }
+    }
+    if (best) removeObstacle(best);
+}
+canvas.addEventListener('pointerdown', handlePointer);
+
+let lastTouchEnd = 0;
+document.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 350) e.preventDefault();
+    lastTouchEnd = now;
+}, { passive: false });
+document.addEventListener('dblclick', (e) => e.preventDefault());
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+
+// ---------- Update / draw ----------
+function update() {
+    frame += dt;
+    stepFamilies();
+    if (state === 'PLAYING') {
+        stepAnts();
+        obstacleSpawnTimer -= dt;
+        if (obstacleSpawnTimer <= 0) { spawnObstacle(); obstacleSpawnTimer = obstacleInterval + rand(-12, 12); }
+    }
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        p.vx *= Math.pow(0.94, dt); p.vy *= Math.pow(0.94, dt);
+        p.life -= dt;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+    for (let i = popups.length - 1; i >= 0; i--) {
+        const p = popups[i];
+        p.y += p.vy * dt; p.life -= dt;
+        if (p.life <= 0) popups.splice(i, 1);
+    }
+    if (bannerTimer > 0) bannerTimer -= dt;
+}
+
+function drawBackground() {
+    ctx.fillStyle = '#5fae5a';
+    ctx.fillRect(0, 0, CW, LAWN_BOTTOM);
+    ctx.fillStyle = '#b9bcb4';
+    ctx.fillRect(0, LAWN_BOTTOM, CW, SIDEWALK_BOTTOM - LAWN_BOTTOM);
+    ctx.fillStyle = '#3d4148';
+    ctx.fillRect(0, SIDEWALK_BOTTOM, CW, CH - SIDEWALK_BOTTOM);
+
+    ctx.fillStyle = '#4c9a49';
+    ctx.fillRect(0, LAWN_BOTTOM - 6, CW, 6);
+    ctx.fillStyle = '#8c8f88';
+    ctx.fillRect(0, SIDEWALK_BOTTOM, CW, 5);
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 4;
+    ctx.setLineDash([26, 20]);
+    ctx.lineDashOffset = -frame * 0.4;
+    ctx.beginPath();
+    ctx.moveTo(0, SIDEWALK_BOTTOM + (CH - SIDEWALK_BOTTOM) / 2);
+    ctx.lineTo(CW, SIDEWALK_BOTTOM + (CH - SIDEWALK_BOTTOM) / 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+    ctx.lineWidth = 2;
+    joints.forEach(x => { ctx.beginPath(); ctx.moveTo(x, LAWN_BOTTOM); ctx.lineTo(x, SIDEWALK_BOTTOM); ctx.stroke(); });
+    cracks.forEach(c => {
+        ctx.beginPath();
+        ctx.moveTo(c.x, c.y1);
+        ctx.lineTo(c.x + Math.cos(c.ang) * c.len, c.y1 + Math.sin(c.ang) * c.len);
+        ctx.stroke();
+    });
+
+    flowers.forEach(f => {
+        ctx.fillStyle = f.color;
+        for (let i = 0; i < 5; i++) {
+            const a = (i / 5) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.ellipse(f.x + Math.cos(a) * 3.5, f.y + Math.sin(a) * 3.5, 2.6, 1.8, a, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.fillStyle = '#ffe066';
+        ctx.beginPath(); ctx.arc(f.x, f.y, 2, 0, Math.PI * 2); ctx.fill();
+    });
+}
+
+function drawPath() {
+    ctx.strokeStyle = 'rgba(151, 111, 60, 0.85)';
+    ctx.lineWidth = 12;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    path.pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(198, 156, 96, 0.7)';
+    ctx.lineWidth = 6;
+    ctx.stroke();
+}
+
+function drawAnthill() {
+    ctx.fillStyle = '#7a5230';
+    ctx.beginPath();
+    ctx.ellipse(ANTHILL.x, ANTHILL.y + 6, 34, 22, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#8f6238';
+    ctx.beginPath();
+    ctx.ellipse(ANTHILL.x, ANTHILL.y - 6, 26, 20, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#2b1c10';
+    ctx.beginPath();
+    ctx.ellipse(ANTHILL.x, ANTHILL.y, 9, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function drawFood() {
+    const pct = clamp(deliveredThisWave / waveGoal, 0, 1);
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(FOOD.x, FOOD.y, 32, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#ffd93d';
+    ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(FOOD.x, FOOD.y, 32, -Math.PI / 2, -Math.PI / 2 + pct * Math.PI * 2); ctx.stroke();
+
+    ctx.save();
+    ctx.translate(FOOD.x, FOOD.y);
+    ctx.fillStyle = '#e6e6e6';
+    ctx.beginPath(); ctx.moveTo(-18, -2); ctx.lineTo(18, -2); ctx.lineTo(14, 4); ctx.lineTo(-14, 4); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#e0455f';
+    ctx.fillRect(-14, -1, 28, 3);
+    ctx.fillStyle = '#b5834a';
+    ctx.beginPath(); ctx.roundRect(-17, 4, 34, 15, 4); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 1.5;
+    for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(-17, 4 + (i + 1.5) * 4); ctx.lineTo(17, 4 + (i + 1.5) * 4); ctx.stroke(); }
+    ctx.strokeStyle = '#8a5f30'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(0, 2, 15, Math.PI, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+}
+
+function drawObstacle(o) {
+    ctx.save();
+    ctx.translate(o.x, o.y);
+    ctx.rotate(o.rot);
+    ctx.scale(o.scale, o.scale);
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.beginPath(); ctx.ellipse(0, 10, 20, 6, 0, 0, Math.PI * 2); ctx.fill();
+
+    if (o.type === 'twig') {
+        ctx.fillStyle = '#8a5a34';
+        ctx.beginPath(); ctx.roundRect(-24, -5, 48, 10, 5); ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1.5;
+        for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(-18 + i * 14, -4); ctx.lineTo(-14 + i * 14, 4); ctx.stroke(); }
+    } else if (o.type === 'pebble') {
+        [[0, 0, 16], [-14, 6, 10], [13, 7, 11]].forEach(([px, py, r]) => {
+            const g = ctx.createRadialGradient(px - r * 0.3, py - r * 0.3, 1, px, py, r);
+            g.addColorStop(0, '#b3b3aa'); g.addColorStop(1, '#6c6c62');
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+        });
+    } else if (o.type === 'pinecone') {
+        ctx.fillStyle = '#a5622f';
+        ctx.beginPath(); ctx.ellipse(0, 0, 13, 20, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#6b3d1a'; ctx.lineWidth = 1.6;
+        for (let i = -2; i <= 2; i++) {
+            ctx.beginPath();
+            ctx.moveTo(-11, i * 6);
+            ctx.quadraticCurveTo(0, i * 6 + 5, 11, i * 6);
+            ctx.stroke();
+        }
+    } else if (o.type === 'puddle') {
+        ctx.fillStyle = 'rgba(127,184,217,0.75)';
+        ctx.beginPath(); ctx.ellipse(0, 0, 26, 14, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.beginPath(); ctx.ellipse(-7, -4, 8, 3, -0.3, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(90,150,190,0.6)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(0, 0, 26, 14, 0, 0, Math.PI * 2); ctx.stroke();
+    } else if (o.type === 'ball') {
+        const g = ctx.createRadialGradient(-5, -6, 3, 0, 0, 17);
+        g.addColorStop(0, '#ff8ba0'); g.addColorStop(1, '#e0455f');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(0, 0, 17, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(-17, 0); ctx.quadraticCurveTo(0, -14, 17, 0); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-17, 0); ctx.quadraticCurveTo(0, 14, 17, 0); ctx.stroke();
+    } else {
+        const cols = ['#e08a2f', '#e0455f', '#ffd93d'];
+        for (let i = 0; i < 4; i++) {
+            const a = (i / 4) * Math.PI * 2;
+            ctx.fillStyle = cols[i % cols.length];
+            ctx.beginPath();
+            ctx.ellipse(Math.cos(a) * 7, Math.sin(a) * 7, 12, 7, a, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    ctx.restore();
+
+    if (o.isPathBlocker) {
+        const blocking = ants.some(a => a.rootBlocker === o);
+        if (blocking) drawStuckBubble(o.x, o.y - 32 * o.scale);
+    }
+}
+
+function drawStuckBubble(x, y) {
+    const bob = Math.sin(frame * 0.2) * 3;
+    ctx.save();
+    ctx.translate(x, y + bob);
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#e0455f';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#e0455f';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('!', 0, 1);
+    ctx.restore();
+}
+
+function drawAnt(ant) {
+    const p = pointAtS(ant.s);
+    const nx = -Math.sin(p.angle), ny = Math.cos(p.angle);
+    const x = p.x + nx * ant.lateral, y = p.y + ny * ant.lateral;
+    const bob = ant.blocked ? 0 : Math.sin(frame * 0.5 + ant.phase) * 1.1;
+    ctx.save();
+    ctx.translate(x, y + bob);
+    ctx.rotate(p.angle);
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.beginPath(); ctx.ellipse(0, 5, 9, 3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#3a2415';
+    ctx.beginPath(); ctx.ellipse(-6, 0, 5, 3.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, 0, 3.4, 2.8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#241408';
+    ctx.beginPath(); ctx.arc(5.5, 0, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#241408'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(7, -1.5); ctx.lineTo(11, -4.5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(7, 1.5); ctx.lineTo(11, 4.5); ctx.stroke();
+    ctx.restore();
+}
+
+function drawMom(d, species) {
+    const bob = Math.abs(Math.sin(d.waddlePhase)) * 3;
+    const tilt = Math.sin(d.waddlePhase) * 0.12;
+    const facing = Math.cos(d.angle) >= 0 ? 1 : -1;
+    const pal = d.palette;
+    ctx.save();
+    ctx.translate(d.x, d.y - bob);
+    ctx.rotate(tilt);
+    ctx.scale(facing, 1);
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.beginPath(); ctx.ellipse(0, 18, 16, 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = shade(pal.body, -15);
+    ctx.beginPath(); ctx.ellipse(-9, 2, 9, 7, 0.3, 0, Math.PI * 2); ctx.fill();
+    const g = ctx.createRadialGradient(-3, -6, 3, 0, 0, 17);
+    g.addColorStop(0, shade(pal.body, 20)); g.addColorStop(1, pal.body);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(0, 4, 15, 12, 0, 0, Math.PI * 2); ctx.fill();
+
+    if (species.neckPatch) {
+        ctx.fillStyle = 'rgba(90, 200, 190, 0.55)';
+        ctx.beginPath(); ctx.ellipse(6, -1, 6, 5, 0.4, 0, Math.PI * 2); ctx.fill();
+    }
+
+    ctx.fillStyle = pal.head;
+    ctx.beginPath(); ctx.arc(12, -8, 8, 0, Math.PI * 2); ctx.fill();
+
+    if (species.comb) {
+        ctx.fillStyle = '#e0455f';
+        ctx.beginPath();
+        ctx.moveTo(8, -15); ctx.lineTo(10, -19); ctx.lineTo(12, -15);
+        ctx.lineTo(14, -19); ctx.lineTo(16, -15);
+        ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(17, -3, 2.6, 4, 0, 0, Math.PI * 2); ctx.fill();
+    }
+
+    ctx.fillStyle = pal.beak;
+    if (species.beak === 'flat') {
+        ctx.beginPath(); ctx.moveTo(18, -8); ctx.lineTo(28, -6); ctx.lineTo(18, -4); ctx.closePath(); ctx.fill();
+    } else if (species.beak === 'pointed') {
+        ctx.beginPath(); ctx.moveTo(18, -9); ctx.lineTo(25, -7); ctx.lineTo(18, -5); ctx.closePath(); ctx.fill();
+    } else {
+        ctx.beginPath(); ctx.moveTo(18, -8.5); ctx.lineTo(23, -7); ctx.lineTo(18, -5.5); ctx.closePath(); ctx.fill();
+    }
+
+    ctx.fillStyle = '#22301f';
+    ctx.beginPath(); ctx.arc(14, -10, 1.6, 0, Math.PI * 2); ctx.fill();
+
+    ctx.strokeStyle = species.footColor; ctx.lineWidth = 2.4;
+    const step = Math.sin(d.waddlePhase) * 4;
+    ctx.beginPath(); ctx.moveTo(-2, 14); ctx.lineTo(-2 + step, 20); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(4, 14); ctx.lineTo(4 - step, 20); ctx.stroke();
+    ctx.restore();
+
+    if (d.state === 'stuck') drawStuckBubble(d.x, d.y - 30);
+}
+
+function drawBaby(b, pal, footColor) {
+    const bob = Math.abs(Math.sin(b.waddlePhase)) * 2;
+    const tilt = Math.sin(b.waddlePhase) * 0.15;
+    const facing = Math.cos(b.angle) >= 0 ? 1 : -1;
+    ctx.save();
+    ctx.translate(b.x, b.y - bob);
+    ctx.rotate(tilt);
+    ctx.scale(facing, 1);
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.beginPath(); ctx.ellipse(0, 9, 8, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+    const g = ctx.createRadialGradient(-2, -3, 1.5, 0, 0, 8.5);
+    g.addColorStop(0, shade(pal.body, 20)); g.addColorStop(1, pal.body);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(0, 2, 8, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = pal.head;
+    ctx.beginPath(); ctx.arc(6, -4, 4.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = pal.beak;
+    ctx.beginPath(); ctx.moveTo(9, -4.2); ctx.lineTo(13, -3.2); ctx.lineTo(9, -2.2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#22301f';
+    ctx.beginPath(); ctx.arc(7, -5, 0.9, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = footColor; ctx.lineWidth = 1.6;
+    const step = Math.sin(b.waddlePhase) * 2.4;
+    ctx.beginPath(); ctx.moveTo(-1, 7); ctx.lineTo(-1 + step, 10); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(2, 7); ctx.lineTo(2 - step, 10); ctx.stroke();
+    ctx.restore();
+}
+
+function drawParticles() {
+    particles.forEach(p => {
+        ctx.globalAlpha = Math.max(0, p.life / 28);
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+    });
+}
+
+function drawPopups() {
+    popups.forEach(p => {
+        ctx.globalAlpha = Math.max(0, p.life / 60);
+        ctx.fillStyle = p.color;
+        ctx.font = 'bold 15px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 3;
+        ctx.strokeText(p.text, p.x, p.y);
+        ctx.fillText(p.text, p.x, p.y);
+        ctx.globalAlpha = 1;
+    });
+}
+
+function drawBanner() {
+    if (bannerTimer <= 0) return;
+    const alpha = Math.min(1, bannerTimer / 30, (150 - bannerTimer) / 30 + 1);
+    ctx.globalAlpha = clamp(alpha, 0, 1);
+    ctx.fillStyle = 'rgba(20,20,20,0.55)';
+    ctx.fillRect(CW / 2 - 190, 16, 380, 40);
+    ctx.fillStyle = '#ffe066';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(bannerText, CW / 2, 43);
+    ctx.globalAlpha = 1;
+}
+
+function draw() {
+    drawBackground();
+    drawPath();
+    drawAnthill();
+    drawFood();
+    obstacles.forEach(drawObstacle);
+    families.forEach(fam => {
+        for (let i = fam.babies.length - 1; i >= 0; i--) drawBaby(fam.babies[i], fam.species.babyPalette, fam.species.footColor);
+        drawMom(fam.mom, fam.species);
+    });
+    ants.forEach(drawAnt);
+    drawParticles();
+    drawPopups();
+    drawBanner();
+}
+
+function triggerGameOver() {
+    state = 'OVER';
+    let isNew = false;
+    if (score > bestScore) { bestScore = score; localStorage.setItem('mightyMarchingBest', String(bestScore)); isNew = true; }
+    document.getElementById('finalScore').textContent = score;
+    document.getElementById('finalWave').textContent = wave;
+    document.getElementById('newBestMsg').style.display = isNew ? 'block' : 'none';
+    document.getElementById('overOverlay').classList.remove('hidden');
+    updateHUD();
+}
+
+function startGame() {
+    setupWorld();
+    state = 'PLAYING';
+    document.getElementById('startOverlay').classList.add('hidden');
+    document.getElementById('overOverlay').classList.add('hidden');
+}
+
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('retryBtn').addEventListener('click', startGame);
+
+let lastTime = 0;
+function loop(ts) {
+    dt = lastTime ? clamp((ts - lastTime) / (1000 / 60), 0.1, 3) : 1;
+    lastTime = ts;
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+setupWorld();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
