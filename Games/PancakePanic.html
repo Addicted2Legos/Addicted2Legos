@@ -13,7 +13,7 @@
         -webkit-user-select: none;
         touch-action: manipulation;
     }
-    html, body { min-height: 100vh; }
+    html, body { min-height: 100vh; min-height: 100dvh; }
     body {
         background: radial-gradient(circle at 50% 0%, #3b2412 0%, #1a1006 55%, #0d0703 100%);
         color: #fff7e6;
@@ -23,20 +23,52 @@
         align-items: center;
         justify-content: center;
         min-height: 100vh;
+        min-height: 100dvh;
         overflow: hidden;
     }
     #game-container {
         position: relative;
-        width: 100vw;
-        height: 100vh;
+        width: min(100vw, calc(100dvh * 1000 / 640));
+        height: min(100dvh, calc(100vw * 640 / 1000));
         max-width: 1000px;
         max-height: 640px;
-        aspect-ratio: 1000 / 640;
         background: #241608;
         overflow: hidden;
         box-shadow: 0 25px 60px -12px rgba(0,0,0,0.7);
         border: 2px solid #4a2f13;
         border-radius: 10px;
+    }
+    #rotateOverlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: #0d0703;
+        color: #fff7e6;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 24px;
+        gap: 14px;
+    }
+    #rotateOverlay .icon {
+        font-size: 3rem;
+        display: inline-block;
+        animation: rotateHint 1.6s ease-in-out infinite;
+    }
+    #rotateOverlay p {
+        font-size: 1rem;
+        color: #fde8c8;
+        max-width: 260px;
+    }
+    @keyframes rotateHint {
+        0%, 100% { transform: rotate(0deg); }
+        50% { transform: rotate(90deg); }
+    }
+    @media (orientation: portrait) and (hover: none) and (pointer: coarse) {
+        #game-container { display: none; }
+        #rotateOverlay { display: flex; }
     }
     canvas {
         display: block;
@@ -216,6 +248,10 @@
 </style>
 </head>
 <body>
+<div id="rotateOverlay">
+    <span class="icon">📱</span>
+    <p>Rotate your device to landscape to play Pancake Panic</p>
+</div>
 <div id="game-container">
     <canvas id="game"></canvas>
 
@@ -273,6 +309,13 @@
 <script>
 (function(){
 "use strict";
+
+var lastTouchEnd = 0;
+document.addEventListener('touchend', function(e){
+    var now = Date.now();
+    if (now - lastTouchEnd <= 300) e.preventDefault();
+    lastTouchEnd = now;
+}, { passive: false });
 
 var CW = 1000, CH = 640;
 var canvas = document.getElementById('game');
