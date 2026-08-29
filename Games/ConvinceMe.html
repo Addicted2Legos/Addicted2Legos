@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Convince Me Not To Buy It</title>
+<!-- Clerk: same project used across Games/ (see ClickLasers.html). Replace if you want a separate Clerk app for this one. -->
+<script
+  async
+  crossorigin="anonymous"
+  data-clerk-publishable-key="pk_test_bm9ybWFsLWRhc3NpZS0xOS5jbGVyay5hY2NvdW50cy5kZXYk"
+  src="https://normal-dassie-19.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+  type="text/javascript"
+></script>
+<!-- Supabase: same project used across Games/. Run the SQL in Games/supabase/migrations/ once to create this app's table. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --azure: #1E8FFF;
+    --azure-dark: #0B5FCC;
+    --azure-soft: #E8F3FF;
+    --white: #FFFFFF;
+    --gray-light: #F3F5F7;
+    --gray: #8A97A3;
+    --gray-dark: #33424F;
+    --shadow: 0 10px 30px rgba(20, 40, 70, 0.12);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+    background: linear-gradient(160deg, var(--azure-soft) 0%, var(--gray-light) 60%);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--gray-dark);
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 640px;
+  }
+
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    padding: 0 6px;
+  }
+
+  .top-bar-title {
+    font-weight: 800;
+    font-size: 1.15rem;
+    color: var(--azure-dark);
+  }
+
+  .auth-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .sync-status {
+    font-size: 0.85rem;
+    color: var(--gray);
+    white-space: nowrap;
+  }
+
+  #sign-in-btn {
+    padding: 8px 18px;
+    font-size: 0.95rem;
+    border-radius: 999px;
+    border: 2px solid var(--azure);
+    background: var(--white);
+    color: var(--azure-dark);
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    display: none;
+  }
+
+  #user-button { display: none; }
+
+  .card {
+    background: var(--white);
+    border-radius: 28px;
+    box-shadow: var(--shadow);
+    padding: 44px 40px;
+    text-align: center;
+    animation: fadeIn 0.35s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  h1 {
+    font-size: 2.1rem;
+    line-height: 1.2;
+    margin: 0 0 8px;
+    color: var(--gray-dark);
+  }
+
+  h2 {
+    font-size: 1.6rem;
+    margin: 0 0 18px;
+    color: var(--gray-dark);
+  }
+
+  p.sub {
+    font-size: 1.15rem;
+    color: var(--gray);
+    margin: 0 0 28px;
+    line-height: 1.5;
+  }
+
+  .stats {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+
+  .stat-pill {
+    background: var(--azure-soft);
+    color: var(--azure-dark);
+    font-weight: 700;
+    font-size: 1rem;
+    padding: 10px 18px;
+    border-radius: 999px;
+  }
+
+  .progress-wrap {
+    margin: 8px 0 28px;
+    text-align: left;
+  }
+
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 1rem;
+    color: var(--gray);
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+
+  .progress-track {
+    background: var(--gray-light);
+    border-radius: 999px;
+    height: 22px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    background: linear-gradient(90deg, var(--azure), var(--azure-dark));
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.5s ease;
+  }
+
+  input[type="text"], input[type="number"] {
+    width: 100%;
+    font-size: 1.3rem;
+    padding: 16px 18px;
+    border: 2px solid var(--gray-light);
+    background: var(--gray-light);
+    border-radius: 16px;
+    margin-bottom: 18px;
+    color: var(--gray-dark);
+    font-family: inherit;
+  }
+
+  input:focus {
+    outline: none;
+    border-color: var(--azure);
+    background: var(--white);
+  }
+
+  label.field-label {
+    display: block;
+    text-align: left;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--gray-dark);
+    margin-bottom: 8px;
+  }
+
+  .btn {
+    display: block;
+    width: 100%;
+    font-size: 1.35rem;
+    font-weight: 700;
+    padding: 20px 24px;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+    margin-bottom: 16px;
+    font-family: inherit;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  .btn:active { transform: scale(0.98); }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--azure), var(--azure-dark));
+    color: var(--white);
+    box-shadow: 0 8px 20px rgba(30, 143, 255, 0.35);
+  }
+
+  .btn-primary:hover { box-shadow: 0 10px 26px rgba(30, 143, 255, 0.45); }
+
+  .btn-outline {
+    background: var(--white);
+    color: var(--azure-dark);
+    border: 2px solid var(--azure);
+  }
+
+  .btn-secondary {
+    background: var(--gray-light);
+    color: var(--gray-dark);
+  }
+
+  .link-btn {
+    background: none;
+    border: none;
+    color: var(--gray);
+    font-size: 1rem;
+    text-decoration: underline;
+    cursor: pointer;
+    font-family: inherit;
+    margin-top: 4px;
+    padding: 8px;
+  }
+
+  .animal {
+    font-size: 5.5rem;
+    margin: 8px 0 18px;
+    animation: bounce 2.2s ease-in-out infinite;
+  }
+
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-14px); }
+  }
+
+  .quote {
+    font-size: 1.25rem;
+    font-style: italic;
+    color: var(--gray-dark);
+    line-height: 1.5;
+    margin-bottom: 30px;
+  }
+
+  .coach-list {
+    text-align: left;
+    margin: 0 0 30px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .coach-list li {
+    font-size: 1.1rem;
+    line-height: 1.5;
+    background: var(--gray-light);
+    border-left: 5px solid var(--azure);
+    padding: 14px 18px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+  }
+
+  .top-link {
+    background: none;
+    border: none;
+    color: var(--azure-dark);
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    margin-bottom: 20px;
+  }
+
+  .banner {
+    background: #FFF6E5;
+    border: 2px solid #FFD98A;
+    color: #8A6100;
+    border-radius: 16px;
+    padding: 16px 18px;
+    font-size: 1rem;
+    margin-bottom: 22px;
+    text-align: left;
+  }
+
+  .waiting-item {
+    text-align: left;
+    background: var(--gray-light);
+    border-radius: 14px;
+    padding: 14px 18px;
+    margin-bottom: 12px;
+  }
+
+  .waiting-item .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+  }
+
+  .waiting-item .meta {
+    color: var(--gray);
+    font-size: 0.95rem;
+    margin-top: 4px;
+  }
+
+  .empty-note {
+    color: var(--gray);
+    font-size: 1.05rem;
+    margin-bottom: 20px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="top-bar">
+    <div class="top-bar-title">🐾 Convince Me</div>
+    <div class="auth-controls">
+      <span class="sync-status" id="sync-status"></span>
+      <button id="sign-in-btn">Sign In</button>
+      <div id="user-button"></div>
+    </div>
+  </div>
+
+  <div class="card">
+
+    <!-- HOME -->
+    <div class="screen active" id="screen-home">
+      <div class="stats">
+        <div class="stat-pill" id="stat-saved">💰 $0 saved</div>
+        <div class="stat-pill" id="stat-streak">🔥 0 resisted</div>
+      </div>
+
+      <div id="goal-progress-wrap" class="progress-wrap" style="display:none;">
+        <div class="progress-label">
+          <span id="goal-name-label">Goal</span>
+          <span id="goal-amount-label">$0 / $0</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" id="goal-progress-fill" style="width:0%;"></div></div>
+      </div>
+
+      <div id="ready-banner" class="banner" style="display:none;"></div>
+
+      <h1>Before you buy that...</h1>
+      <p class="sub">Let's think it through together.</p>
+
+      <label class="field-label">What are you trying to buy right now?</label>
+      <input type="text" id="item-name" placeholder="e.g. new headphones">
+
+      <label class="field-label">How much does it cost? (optional)</label>
+      <input type="number" id="item-price" placeholder="e.g. 60" min="0" step="0.01">
+
+      <button class="btn btn-primary" onclick="startFlow()">Let's Talk About It</button>
+      <button class="link-btn" onclick="showScreen('screen-goal-edit')">🎯 Set / edit my savings goal</button>
+      <button class="link-btn" onclick="showWaitingList()">📋 View my waiting list</button>
+    </div>
+
+    <!-- GOAL SETUP -->
+    <div class="screen" id="screen-goal-edit">
+      <h1>What are you really saving for?</h1>
+      <p class="sub">Keep the big picture in view. This shows up every time you're tempted.</p>
+
+      <label class="field-label">Your long-term goal</label>
+      <input type="text" id="goal-name-input" placeholder="e.g. house down payment, vacation, emergency fund">
+
+      <label class="field-label">Target amount (optional)</label>
+      <input type="number" id="goal-amount-input" placeholder="e.g. 5000" min="0" step="0.01">
+
+      <button class="btn btn-primary" onclick="saveGoal()">Save Goal</button>
+      <button class="link-btn" onclick="showScreen('screen-home')">Back</button>
+    </div>
+
+    <!-- ANIMAL BREAK 1 -->
+    <div class="screen" id="screen-animal-1">
+      <div class="animal" id="animal-1-emoji">🐱</div>
+      <div class="quote" id="animal-1-quote">Loading wisdom...</div>
+      <button class="btn btn-primary" onclick="showScreen('screen-downsides')">Okay, keep going</button>
+    </div>
+
+    <!-- DOWNSIDES -->
+    <div class="screen" id="screen-downsides">
+      <h2>Let's be honest about this purchase</h2>
+      <ul class="coach-list" id="downsides-list"></ul>
+      <button class="btn btn-primary" onclick="showScreen('screen-animal-2')">I hear you</button>
+    </div>
+
+    <!-- ANIMAL BREAK 2 -->
+    <div class="screen" id="screen-animal-2">
+      <div class="animal" id="animal-2-emoji">🦥</div>
+      <div class="quote" id="animal-2-quote">Loading wisdom...</div>
+      <button class="btn btn-primary" onclick="showScreen('screen-benefits')">Alright, what's the upside?</button>
+    </div>
+
+    <!-- BENEFITS -->
+    <div class="screen" id="screen-benefits">
+      <h2>Here's what waiting actually gives you</h2>
+      <ul class="coach-list" id="benefits-list"></ul>
+      <button class="btn btn-primary" onclick="proceedFromBenefits()">Okay, I'm ready to decide</button>
+    </div>
+
+    <!-- GOAL PICKER (shown on 2nd and 3rd time through) -->
+    <div class="screen" id="screen-goal-picker">
+      <div class="animal">🌟</div>
+      <h1>You're building a habit.</h1>
+      <p class="sub">You've paused to think twice before — that's worth something. Pick a bigger goal to put this money toward instead:</p>
+      <button class="btn btn-primary" id="goal-option-0" onclick="chooseGoalOption(0)"></button>
+      <button class="btn btn-primary" id="goal-option-1" onclick="chooseGoalOption(1)"></button>
+      <button class="btn btn-primary" id="goal-option-2" onclick="chooseGoalOption(2)"></button>
+      <button class="link-btn" id="goal-picker-skip" onclick="skipGoalPicker()">Skip for now</button>
+    </div>
+
+    <!-- GOAL CONFIRM -->
+    <div class="screen" id="screen-goal-confirm">
+      <div class="animal" id="goal-confirm-emoji">🎯</div>
+      <h1>Great choice!</h1>
+      <p class="sub" id="goal-confirm-message"></p>
+      <button class="btn btn-primary" onclick="showScreen('screen-decision')">Continue</button>
+    </div>
+
+    <!-- DECISION -->
+    <div class="screen" id="screen-decision">
+      <h1>So, what will it be?</h1>
+      <p class="sub" id="decision-item-label">this purchase</p>
+
+      <button class="btn btn-primary" onclick="decideNotBuying()">🎉 I've decided not to buy it</button>
+      <button class="btn btn-outline" onclick="decideWait()">⏳ Put it on a 30-day wait</button>
+      <button class="link-btn" onclick="decideBuyAnyway()">I'm going to buy it anyway</button>
+    </div>
+
+    <!-- RESULT: NOT BUYING -->
+    <div class="screen" id="screen-result-notbuy">
+      <div class="animal" id="celebrate-emoji">🎉🐶</div>
+      <h1>Nice work!</h1>
+      <p class="sub" id="notbuy-message">You just kept your money working for you.</p>
+      <button class="btn btn-primary" onclick="showScreen('screen-home')">Back to Home</button>
+    </div>
+
+    <!-- RESULT: WAIT -->
+    <div class="screen" id="screen-result-wait">
+      <div class="animal">🐢</div>
+      <h1>Smart move.</h1>
+      <p class="sub" id="wait-message">We'll check back with you.</p>
+      <button class="btn btn-primary" onclick="showScreen('screen-home')">Back to Home</button>
+    </div>
+
+    <!-- RESULT: BUY ANYWAY -->
+    <div class="screen" id="screen-result-buy">
+      <div class="animal">🐹</div>
+      <h1>That's your call.</h1>
+      <p class="sub">This app isn't about perfection — it's about pausing to think. Come back next time you're tempted.</p>
+      <button class="btn btn-primary" onclick="showScreen('screen-home')">Back to Home</button>
+    </div>
+
+    <!-- WAITING LIST -->
+    <div class="screen" id="screen-waiting-list">
+      <button class="top-link" onclick="showScreen('screen-home')">&larr; Back</button>
+      <h1>Your Waiting List</h1>
+      <div id="waiting-list-items"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  var STORAGE_KEY = 'convinceMeData';
+
+  var defaultData = {
+    goalName: '',
+    goalAmount: 0,
+    savedTotal: 0,
+    resistedCount: 0,
+    flowCount: 0,
+    waitingItems: []
+  };
+
+  var data = loadLocalData();
+  var currentItem = { name: '', price: 0 };
+  var pendingGoalPicker = false;
+  var currentGoalOptions = [];
+
+  // --- Local storage (offline cache / signed-out fallback) ---
+
+  function loadLocalData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        return Object.assign({}, defaultData, parsed);
+      }
+    } catch (e) {}
+    return Object.assign({}, defaultData);
+  }
+
+  function saveLocalData() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {}
+  }
+
+  // --- Supabase (cloud save, keyed to the signed-in Clerk user) ---
+  // Same project as ClickLasers.html. Run Games/supabase/migrations/*.sql once
+  // in the Supabase SQL editor to create the convince_me_state table + policies.
+  var SUPABASE_URL = 'https://tgdypcnzpojjxuxizjvh.supabase.co';
+  var SUPABASE_ANON_KEY = 'sb_publishable__4owv0oy0QoOnTNYBIOPow_-BDrQ7iS';
+
+  var supabaseClient = (window.supabase && SUPABASE_URL.indexOf('REPLACE-ME') === -1)
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        accessToken: async () => (await window.Clerk?.session?.getToken()) ?? null
+      })
+    : null;
+
+  function rowToData(row) {
+    return {
+      goalName: row.goal_name || '',
+      goalAmount: Number(row.goal_amount) || 0,
+      savedTotal: Number(row.saved_total) || 0,
+      resistedCount: Number(row.resisted_count) || 0,
+      flowCount: Number(row.flow_count) || 0,
+      waitingItems: row.waiting_items || []
+    };
+  }
+
+  function setSyncStatus(text) {
+    document.getElementById('sync-status').textContent = text;
+  }
+
+  async function loadCloudState() {
+    if (!supabaseClient || !window.Clerk?.user) {
+      data = loadLocalData();
+      renderHome();
+      return;
+    }
+    var userId = window.Clerk.user.id;
+    setSyncStatus('Syncing...');
+    var res = await supabaseClient.from('convince_me_state').select('*').eq('clerk_user_id', userId).maybeSingle();
+    if (res.error) {
+      console.error('Failed to load cloud state:', res.error);
+      data = loadLocalData();
+      setSyncStatus('⚠️ Using local data');
+      renderHome();
+      return;
+    }
+    if (res.data) {
+      data = rowToData(res.data);
+      saveLocalData();
+    } else {
+      // First time signed in on this device: migrate whatever's local up to the cloud.
+      data = loadLocalData();
+      await upsertCloudState();
+    }
+    setSyncStatus('☁️ Synced');
+    renderHome();
+  }
+
+  async function upsertCloudState() {
+    if (!supabaseClient || !window.Clerk?.user) return;
+    var userId = window.Clerk.user.id;
+    var res = await supabaseClient.from('convince_me_state').upsert({
+      clerk_user_id: userId,
+      goal_name: data.goalName,
+      goal_amount: data.goalAmount,
+      saved_total: data.savedTotal,
+      resisted_count: data.resistedCount,
+      flow_count: data.flowCount,
+      waiting_items: data.waitingItems,
+      updated_at: new Date().toISOString()
+    });
+    if (res.error) {
+      console.error('Failed to sync to cloud:', res.error);
+      setSyncStatus('⚠️ Sync failed');
+    } else {
+      setSyncStatus('☁️ Synced');
+    }
+  }
+
+  function persist() {
+    saveLocalData();
+    if (window.Clerk && window.Clerk.user) {
+      upsertCloudState();
+    }
+  }
+
+  // --- Screen management ---
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+    document.getElementById(id).classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function fmtMoney(n) {
+    n = Number(n) || 0;
+    return '$' + n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
+  function renderHome() {
+    document.getElementById('stat-saved').textContent = '💰 ' + fmtMoney(data.savedTotal) + ' saved';
+    document.getElementById('stat-streak').textContent = '🔥 ' + data.resistedCount + ' resisted';
+
+    var goalWrap = document.getElementById('goal-progress-wrap');
+    if (data.goalName) {
+      goalWrap.style.display = 'block';
+      document.getElementById('goal-name-label').textContent = '🎯 ' + data.goalName;
+      if (data.goalAmount > 0) {
+        document.getElementById('goal-amount-label').textContent = fmtMoney(data.savedTotal) + ' / ' + fmtMoney(data.goalAmount);
+        var pct = Math.min(100, (data.savedTotal / data.goalAmount) * 100);
+        document.getElementById('goal-progress-fill').style.width = pct + '%';
+      } else {
+        document.getElementById('goal-amount-label').textContent = fmtMoney(data.savedTotal) + ' saved so far';
+        document.getElementById('goal-progress-fill').style.width = '0%';
+      }
+    } else {
+      goalWrap.style.display = 'none';
+    }
+
+    renderReadyBanner();
+  }
+
+  function renderReadyBanner() {
+    var banner = document.getElementById('ready-banner');
+    var now = Date.now();
+    var ready = data.waitingItems.filter(function(w){ return w.readyAt <= now; });
+    if (ready.length > 0) {
+      var w = ready[0];
+      banner.style.display = 'block';
+      banner.innerHTML = '⏰ Your 30-day wait on <strong>' + escapeHtml(w.name) + '</strong> is over. ' +
+        'Do you still want it? ' +
+        '<div style="margin-top:10px;">' +
+        '<button class="btn btn-secondary" style="margin-bottom:8px;" onclick="resolveWaitingItem(\'' + w.id + '\', false)">No, skip it 🎉</button>' +
+        '<button class="btn btn-outline" style="margin-bottom:0;" onclick="resolveWaitingItem(\'' + w.id + '\', true)">Yes, I still want it</button>' +
+        '</div>';
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+
+  function resolveWaitingItem(id, stillWants) {
+    var idx = data.waitingItems.findIndex(function(w){ return w.id === id; });
+    if (idx === -1) return;
+    var item = data.waitingItems[idx];
+    data.waitingItems.splice(idx, 1);
+    if (!stillWants) {
+      data.savedTotal += Number(item.price) || 0;
+      data.resistedCount += 1;
+    }
+    persist();
+    renderHome();
+    if (!stillWants) {
+      document.getElementById('celebrate-emoji').textContent = pickAnimal().emoji + '🎉';
+      document.getElementById('notbuy-message').textContent =
+        'Your wait period on "' + item.name + '" is done, and you let it go. That\'s ' + fmtMoney(item.price) + ' back toward ' +
+        (data.goalName ? data.goalName : 'your goals') + '.';
+      showScreen('screen-result-notbuy');
+    }
+  }
+
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function saveGoal() {
+    var name = document.getElementById('goal-name-input').value.trim();
+    var amount = parseFloat(document.getElementById('goal-amount-input').value) || 0;
+    data.goalName = name;
+    data.goalAmount = amount;
+    persist();
+    renderHome();
+    showScreen('screen-home');
+  }
+
+  var catQuotes = [
+    { emoji: '🐱', text: 'This cat waited four hours for a sunbeam to move two feet. You can wait a day for a purchase.' },
+    { emoji: '🐨', text: 'Koalas sleep twenty hours a day and have never once regretted an impulse buy.' },
+    { emoji: '🦥', text: 'Sloths move 0.15 miles per hour and still have better financial patience than most humans.' },
+    { emoji: '🐶', text: 'This good boy sat and waited for a treat without whining. Be like this good boy.' },
+    { emoji: '🐼', text: 'Pandas eat the same bamboo, one bite at a time, for twelve hours a day. Slow and steady, friend.' },
+    { emoji: '🦊', text: 'A fox does not chase every rabbit it sees. Choose your purchases like a fox chooses dinner.' },
+    { emoji: '🐹', text: 'This hamster is stuffing its cheeks with seeds for later. That is basically a savings account.' },
+    { emoji: '🐢', text: 'Slow and steady wins the race, and also keeps your bank balance a lot less stressful.' },
+    { emoji: '🦉', text: 'The owl sits still all night, watching, waiting, thinking. Try being the owl today.' },
+    { emoji: '🐧', text: 'Penguins huddle together and wait out the entire winter. Your 30-day wait is basically a warm summer breeze.' }
+  ];
+
+  function pickAnimal() {
+    return catQuotes[Math.floor(Math.random() * catQuotes.length)];
+  }
+
+  function shuffleSample(arr, n) {
+    var copy = arr.slice();
+    for (var i = copy.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = copy[i]; copy[i] = copy[j]; copy[j] = tmp;
+    }
+    return copy.slice(0, n);
+  }
+
+  var downsideMessages = [
+    'Impulse buys often end up forgotten in a drawer within thirty days.',
+    'The excitement of a new purchase fades in about twenty minutes. Your bank balance remembers a lot longer.',
+    '"Hedonic adaptation" means new stuff stops feeling exciting almost immediately, no matter how much you wanted it.',
+    'Small purchases add up fast. Twenty dollars here and there, twice a week, is over two thousand dollars a year.',
+    'Spending on small wants now quietly chips away at the bigger goals you actually care about.',
+    'Buyer\'s remorse is real. Most people regret impulse purchases within a week.',
+    'This purchase competes directly with the future version of you who wanted something bigger.',
+    'Clutter has a cost too, not just money. Every unused item is space, attention, and guilt.'
+  ];
+
+  var benefitMessages = [
+    'Waiting even twenty-four hours filters out impulse from genuine want, almost every time.',
+    'Money you don\'t spend today is money that\'s already closer to your real goal tomorrow.',
+    'Delayed gratification is one of the strongest predictors of long-term life satisfaction.',
+    'Purchases you actually plan for bring more lasting joy than the ones you grab on impulse.',
+    'The pride of choosing not to buy something lasts a lot longer than the thrill of buying it.',
+    'Fewer impulse buys means less clutter, less stress, and more freedom day to day.',
+    'A short wait costs you nothing. If you still want it later, it\'ll still be there.',
+    'Every "no" to a small want is a "yes" to something bigger you actually care about.'
+  ];
+
+  var goalSuggestions = [
+    { emoji: '🏝️', name: 'a dream vacation' },
+    { emoji: '🚗', name: 'a new car fund' },
+    { emoji: '🏠', name: 'a home down payment' },
+    { emoji: '🛡️', name: 'a 3-month emergency fund' },
+    { emoji: '🎓', name: 'education or skill-building' },
+    { emoji: '📈', name: 'an investment portfolio' },
+    { emoji: '🧘', name: 'early retirement' },
+    { emoji: '💳', name: 'becoming debt-free' },
+    { emoji: '🎁', name: 'a big future celebration' }
+  ];
+
+  function startFlow() {
+    var name = document.getElementById('item-name').value.trim();
+    var price = parseFloat(document.getElementById('item-price').value) || 0;
+    currentItem = { name: name || 'this item', price: price };
+
+    data.flowCount = (data.flowCount || 0) + 1;
+    pendingGoalPicker = (data.flowCount === 2 || data.flowCount === 3);
+    persist();
+
+    var a1 = pickAnimal();
+    document.getElementById('animal-1-emoji').textContent = a1.emoji;
+    document.getElementById('animal-1-quote').textContent = a1.text;
+
+    var a2 = pickAnimal();
+    document.getElementById('animal-2-emoji').textContent = a2.emoji;
+    document.getElementById('animal-2-quote').textContent = a2.text;
+
+    var downsides = shuffleSample(downsideMessages, 3);
+    var dList = document.getElementById('downsides-list');
+    dList.innerHTML = '';
+    downsides.forEach(function(msg){
+      var li = document.createElement('li');
+      li.textContent = msg;
+      dList.appendChild(li);
+    });
+
+    var benefits = shuffleSample(benefitMessages, 3);
+    var bList = document.getElementById('benefits-list');
+    bList.innerHTML = '';
+    benefits.forEach(function(msg){
+      var li = document.createElement('li');
+      li.textContent = msg;
+      bList.appendChild(li);
+    });
+
+    var label = currentItem.name;
+    if (currentItem.price > 0) label += ' — ' + fmtMoney(currentItem.price);
+    document.getElementById('decision-item-label').textContent = label;
+
+    showScreen('screen-animal-1');
+  }
+
+  function proceedFromBenefits() {
+    if (pendingGoalPicker) {
+      showGoalPicker();
+    } else {
+      showScreen('screen-decision');
+    }
+  }
+
+  function showGoalPicker() {
+    currentGoalOptions = shuffleSample(goalSuggestions, 3);
+    currentGoalOptions.forEach(function(opt, i){
+      document.getElementById('goal-option-' + i).textContent = opt.emoji + ' Save for ' + opt.name;
+    });
+    var skipBtn = document.getElementById('goal-picker-skip');
+    skipBtn.textContent = data.goalName ? ('Keep my current goal: ' + data.goalName) : 'Skip for now';
+    showScreen('screen-goal-picker');
+  }
+
+  function chooseGoalOption(idx) {
+    var opt = currentGoalOptions[idx];
+    data.goalName = opt.name.charAt(0).toUpperCase() + opt.name.slice(1);
+    persist();
+    renderHome();
+
+    document.getElementById('goal-confirm-emoji').textContent = opt.emoji;
+    document.getElementById('goal-confirm-message').textContent =
+      'Every dollar you don\'t spend on "' + currentItem.name + '" is a dollar closer to ' + opt.name + '. That\'s a trade worth making.';
+    showScreen('screen-goal-confirm');
+  }
+
+  function skipGoalPicker() {
+    showScreen('screen-decision');
+  }
+
+  function decideNotBuying() {
+    data.savedTotal += Number(currentItem.price) || 0;
+    data.resistedCount += 1;
+    persist();
+    renderHome();
+
+    var a = pickAnimal();
+    document.getElementById('celebrate-emoji').textContent = a.emoji + '🎉';
+    var msg = 'You just chose not to buy "' + currentItem.name + '".';
+    if (currentItem.price > 0) {
+      msg += ' That\'s ' + fmtMoney(currentItem.price) + ' back in your pocket';
+      msg += data.goalName ? ' toward ' + data.goalName + '.' : '.';
+    }
+    document.getElementById('notbuy-message').textContent = msg;
+    showScreen('screen-result-notbuy');
+  }
+
+  function decideWait() {
+    var readyAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+    var id = 'w_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+    data.waitingItems.push({
+      id: id,
+      name: currentItem.name,
+      price: currentItem.price,
+      readyAt: readyAt
+    });
+    persist();
+    renderHome();
+
+    var readyDate = new Date(readyAt);
+    document.getElementById('wait-message').textContent =
+      '"' + currentItem.name + '" is on your 30-day wait list. Come back on or after ' +
+      readyDate.toLocaleDateString() + ' to decide for real. If you forget about it before then, that tells you something.';
+    showScreen('screen-result-wait');
+  }
+
+  function decideBuyAnyway() {
+    showScreen('screen-result-buy');
+  }
+
+  function showWaitingList() {
+    var container = document.getElementById('waiting-list-items');
+    container.innerHTML = '';
+    if (data.waitingItems.length === 0) {
+      container.innerHTML = '<p class="empty-note">Nothing on your waiting list right now.</p>';
+    } else {
+      var now = Date.now();
+      data.waitingItems
+        .slice()
+        .sort(function(a, b){ return a.readyAt - b.readyAt; })
+        .forEach(function(w){
+          var daysLeft = Math.ceil((w.readyAt - now) / (24 * 60 * 60 * 1000));
+          var div = document.createElement('div');
+          div.className = 'waiting-item';
+          var statusText = daysLeft > 0 ? daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + ' left' : 'Ready now';
+          div.innerHTML =
+            '<div class="row"><span>' + escapeHtml(w.name) + (w.price ? ' — ' + fmtMoney(w.price) : '') + '</span>' +
+            '<span>' + statusText + '</span></div>' +
+            '<div class="meta">Ready: ' + new Date(w.readyAt).toLocaleDateString() + '</div>';
+          container.appendChild(div);
+        });
+    }
+    showScreen('screen-waiting-list');
+  }
+
+  document.getElementById('goal-name-input').addEventListener('focus', function(){
+    document.getElementById('goal-name-input').value = data.goalName || '';
+    document.getElementById('goal-amount-input').value = data.goalAmount || '';
+  });
+
+  // --- Clerk auth wiring ---
+
+  var signInBtn = document.getElementById('sign-in-btn');
+  var userButtonDiv = document.getElementById('user-button');
+
+  function updateAuthUI(signedIn) {
+    if (signedIn) {
+      signInBtn.style.display = 'none';
+      userButtonDiv.style.display = 'block';
+    } else {
+      signInBtn.style.display = 'inline-flex';
+      userButtonDiv.style.display = 'none';
+      setSyncStatus('💾 Local only — sign in to sync');
+    }
+  }
+
+  signInBtn.addEventListener('click', () => window.Clerk && window.Clerk.openSignIn({
+    fallbackRedirectUrl: window.location.href,
+    forceRedirectUrl: window.location.href
+  }));
+
+  window.addEventListener('load', async () => {
+    renderHome();
+
+    if (!window.Clerk) return; // Clerk script not loaded (key not configured yet)
+
+    await window.Clerk.load({
+      signInFallbackRedirectUrl: window.location.href,
+      signInForceRedirectUrl: window.location.href,
+      signUpFallbackRedirectUrl: window.location.href,
+      signUpForceRedirectUrl: window.location.href,
+      afterSignOutUrl: window.location.href
+    });
+
+    window.Clerk.mountUserButton(userButtonDiv, {
+      userProfileMode: 'modal',
+      afterSignOutUrl: window.location.href
+    });
+
+    var signedIn = !!window.Clerk.user;
+    updateAuthUI(signedIn);
+    if (signedIn) await loadCloudState();
+
+    window.Clerk.addListener(async () => {
+      var nowSignedIn = !!window.Clerk.user;
+      updateAuthUI(nowSignedIn);
+      if (nowSignedIn) {
+        await loadCloudState();
+      } else {
+        data = loadLocalData();
+        renderHome();
+      }
+    });
+  });
+</script>
+</body>
+</html>
