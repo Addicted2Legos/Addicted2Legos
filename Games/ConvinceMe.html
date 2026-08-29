@@ -422,9 +422,9 @@
 
     <!-- GOAL PICKER (shown on 2nd and 3rd time through) -->
     <div class="screen" id="screen-goal-picker">
-      <div class="animal">🌟</div>
-      <h1>You're building a habit.</h1>
-      <p class="sub">You've paused to think twice before — that's worth something. Pick a bigger goal to put this money toward instead:</p>
+      <div class="animal" id="goal-picker-emoji">🌟</div>
+      <h1 id="goal-picker-title">You're building a habit.</h1>
+      <p class="sub" id="goal-picker-sub">You've paused to think twice before — that's worth something. Pick a bigger goal to put this money toward instead:</p>
       <button class="btn btn-primary" id="goal-option-0" onclick="chooseGoalOption(0)"></button>
       <button class="btn btn-primary" id="goal-option-1" onclick="chooseGoalOption(1)"></button>
       <button class="btn btn-primary" id="goal-option-2" onclick="chooseGoalOption(2)"></button>
@@ -498,6 +498,7 @@
   var data = loadLocalData();
   var currentItem = { name: '', price: 0 };
   var pendingGoalPicker = false;
+  var goalPickerMode = null; // 'mandatory' (round 2, must pick one) or 'optional' (round 3, can skip)
   var currentGoalOptions = [];
 
   // --- Local storage (offline cache / signed-out fallback) ---
@@ -741,9 +742,6 @@
   ];
 
   var goalSuggestions = [
-    { emoji: '🏝️', name: 'a dream vacation' },
-    { emoji: '🚗', name: 'a new car fund' },
-    { emoji: '🏠', name: 'a home down payment' },
     { emoji: '🛡️', name: 'a 3-month emergency fund' },
     { emoji: '🎓', name: 'education or skill-building' },
     { emoji: '📈', name: 'an investment portfolio' },
@@ -752,13 +750,33 @@
     { emoji: '🎁', name: 'a big future celebration' }
   ];
 
+  // Concrete big-ticket purchases that take real time to save for. Used for the
+  // mandatory 2nd-round goal picker to get the user committing to something specific.
+  var bigPurchaseSuggestions = [
+    { emoji: '🏝️', name: 'a dream vacation' },
+    { emoji: '🚗', name: 'a new car' },
+    { emoji: '🏠', name: 'a home down payment' },
+    { emoji: '💍', name: 'an engagement ring or wedding' },
+    { emoji: '🛠️', name: 'a home renovation' },
+    { emoji: '🛋️', name: 'a full furniture upgrade' },
+    { emoji: '💻', name: 'a high-end laptop or gaming setup' },
+    { emoji: '🎸', name: 'a big-ticket hobby purchase' }
+  ];
+
   function startFlow() {
     var name = document.getElementById('item-name').value.trim();
     var price = parseFloat(document.getElementById('item-price').value) || 0;
     currentItem = { name: name || 'this item', price: price };
 
     data.flowCount = (data.flowCount || 0) + 1;
-    pendingGoalPicker = (data.flowCount === 2 || data.flowCount === 3);
+    if (data.flowCount === 2) {
+      goalPickerMode = 'mandatory';
+    } else if (data.flowCount === 3) {
+      goalPickerMode = 'optional';
+    } else {
+      goalPickerMode = null;
+    }
+    pendingGoalPicker = !!goalPickerMode;
     persist();
 
     var a1 = pickAnimal();
@@ -803,12 +821,29 @@
   }
 
   function showGoalPicker() {
-    currentGoalOptions = shuffleSample(goalSuggestions, 3);
+    var mandatory = goalPickerMode === 'mandatory';
+    var pool = mandatory ? bigPurchaseSuggestions : goalSuggestions;
+    currentGoalOptions = shuffleSample(pool, 3);
     currentGoalOptions.forEach(function(opt, i){
       document.getElementById('goal-option-' + i).textContent = opt.emoji + ' Save for ' + opt.name;
     });
+
+    document.getElementById('goal-picker-emoji').textContent = mandatory ? '🎯' : '🌟';
+    document.getElementById('goal-picker-title').textContent = mandatory
+      ? 'Time to think bigger.'
+      : 'You\'re building a habit.';
+    document.getElementById('goal-picker-sub').textContent = mandatory
+      ? 'You\'ve paused to think twice now — that\'s a real pattern. Before you continue, commit to one big purchase worth saving for instead:'
+      : 'You\'ve paused to think twice before — that\'s worth something. Pick a bigger goal to put this money toward instead:';
+
     var skipBtn = document.getElementById('goal-picker-skip');
-    skipBtn.textContent = data.goalName ? ('Keep my current goal: ' + data.goalName) : 'Skip for now';
+    if (mandatory) {
+      skipBtn.style.display = 'none';
+    } else {
+      skipBtn.style.display = '';
+      skipBtn.textContent = data.goalName ? ('Keep my current goal: ' + data.goalName) : 'Skip for now';
+    }
+
     showScreen('screen-goal-picker');
   }
 
