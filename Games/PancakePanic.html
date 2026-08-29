@@ -237,7 +237,7 @@
             <button id="muteBtn" title="Toggle sound">🔊</button>
         </div>
         <div class="hud-bottom">
-            <button id="stopBtn" class="running">GO</button>
+            <button id="stopBtn">STOP</button>
         </div>
     </div>
 
@@ -325,8 +325,17 @@ function samplePath(points, pitch){
 }
 
 // ---------- audio ----------
-var audioCtx = null, muted = false;
-function ensureAudio(){ if (!audioCtx){ try { audioCtx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){} } }
+var audioCtx = null, muted = false, musicGainNode = null;
+function ensureAudio(){
+    if (!audioCtx){
+        try {
+            audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+            musicGainNode = audioCtx.createGain();
+            musicGainNode.gain.value = muted ? 0 : 1;
+            musicGainNode.connect(audioCtx.destination);
+        } catch(e){}
+    }
+}
 function tone(freq, dur, type, vol){
     if (muted || !audioCtx) return;
     type = type || 'sine'; vol = vol==null ? 0.14 : vol;
@@ -348,6 +357,59 @@ function sfxJam(){ tone(200,0.35,'square',0.12); }
 function sfxFix(){ tone(500,0.08,'triangle',0.12); tone(760,0.1,'triangle',0.12); }
 function sfxShip(){ tone(660,0.1,'sine',0.14); tone(880,0.12,'sine',0.14); tone(1100,0.16,'sine',0.12); }
 function sfxFail(){ tone(300,0.5,'sawtooth',0.18); tone(180,0.6,'sawtooth',0.14); }
+
+// ---------- background "elevator music" ----------
+// A gentle looping lounge-jazz chord loop with an occasional soft melody note,
+// scheduled a little ahead of playback time (the standard Web Audio pattern).
+var MUSIC_CHORDS = [
+    [261.63, 329.63, 392.00, 493.88], // Cmaj7
+    [220.00, 261.63, 329.63, 392.00], // Am7
+    [293.66, 349.23, 440.00, 523.25], // Dm7
+    [196.00, 246.94, 293.66, 349.23]  // G7
+];
+var MUSIC_MELODY_POOL = [523.25, 587.33, 659.25, 698.46, 783.99, 880.00];
+var MUSIC_CHORD_DUR = 3.1;
+var musicNextTime = 0;
+var musicChordIdx = 0;
+function playMusicChord(freqs, startTime, dur){
+    freqs.forEach(function(f, i){
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, startTime);
+        var peak = 0.05 - i*0.006;
+        gain.gain.setValueAtTime(0.0001, startTime);
+        gain.gain.exponentialRampToValueAtTime(Math.max(peak,0.02), startTime+0.7);
+        gain.gain.setValueAtTime(Math.max(peak,0.02), startTime+dur-0.7);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startTime+dur);
+        osc.connect(gain); gain.connect(musicGainNode);
+        osc.start(startTime); osc.stop(startTime+dur+0.05);
+    });
+}
+function playMusicBlip(freq, startTime){
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, startTime);
+    gain.gain.setValueAtTime(0.0001, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.055, startTime+0.1);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime+1.1);
+    osc.connect(gain); gain.connect(musicGainNode);
+    osc.start(startTime); osc.stop(startTime+1.2);
+}
+function scheduleMusic(){
+    if (!audioCtx || !musicGainNode) return;
+    if (musicNextTime < audioCtx.currentTime) musicNextTime = audioCtx.currentTime + 0.05;
+    while (musicNextTime < audioCtx.currentTime + 1.2){
+        playMusicChord(MUSIC_CHORDS[musicChordIdx % MUSIC_CHORDS.length], musicNextTime, MUSIC_CHORD_DUR);
+        if (Math.random() < 0.65){
+            var note = MUSIC_MELODY_POOL[Math.floor(Math.random()*MUSIC_MELODY_POOL.length)];
+            playMusicBlip(note, musicNextTime + MUSIC_CHORD_DUR*(0.3+Math.random()*0.4));
+        }
+        musicNextTime += MUSIC_CHORD_DUR;
+        musicChordIdx++;
+    }
+}
 
 // ---------- popups & particles ----------
 var popups = [], particles = [];
@@ -397,13 +459,17 @@ function SlotBelt(points, pitch){
     this.slots = new Array(this.path.length).fill(null);
     this.stepMs = (pitch / BELT_PX_PER_SEC) * 1000;
     this.acc = 0;
-    this.tweenRate = 3 / (0.45 * this.stepMs);
 }
 SlotBelt.prototype.tick = function(){
     for (var i=this.slots.length-2; i>=0; i--){
         if (this.slots[i] && !this.slots[i+1]){
             this.slots[i+1] = this.slots[i];
             this.slots[i] = null;
+            // Start a fresh, duration-matched glide from wherever it's currently
+            // drawn to the new slot — so it keeps moving for the *whole* step
+            // instead of snapping there early and sitting still until the next tick.
+            var it = this.slots[i+1];
+            it._animFromX = it.x; it._animFromY = it.y; it._animT = 0;
         }
     }
 };
@@ -415,7 +481,10 @@ SlotBelt.prototype.advance = function(dt){
     }
 };
 SlotBelt.prototype.canPush = function(){ return !this.slots[0]; };
-SlotBelt.prototype.push = function(item){ this.slots[0] = item; };
+SlotBelt.prototype.push = function(item){
+    this.slots[0] = item;
+    item._animFromX = item.x; item._animFromY = item.y; item._animT = 0;
+};
 SlotBelt.prototype.peekOut = function(){ return this.slots[this.slots.length-1]; };
 SlotBelt.prototype.takeOut = function(){
     var i = this.slots.length-1;
@@ -461,7 +530,7 @@ function buildBelts(){
         {x:FILLER_OUT.x, y:FILLER_OUT.y}, {x:230, y:560}, {x:230, y:210}, {x:290, y:190}
     ], 40);
     belt2 = new SlotBelt([
-        {x:452, y:172}, {x:560, y:172}, {x:610, y:280}, {x:610, y:360}
+        {x:452, y:172}, {x:560, y:172}, {x:610, y:280}, {x:610, y:345}, {x:786, y:345}
     ], 38);
     beltFormerToInsert = new SlotBelt([{x:600,y:400},{x:658,y:400}], 48);
     beltSealerToHelix = new SlotBelt([{x:958,y:412},{x:968,y:452}], 30);
@@ -483,6 +552,12 @@ var activeBox = null;
 var insertBuffer = null; // box waiting for insert click
 var sealBuffer = null;   // box being sealed
 var helixItems = [];     // {box, t}
+var loaderReaches = [];  // {x0,y0,x1,y1,t,dur,workerIdx,box,bad} - a worker's hand carrying a bag to the box
+var LOADER_WORKERS = [
+    {x: LOADER_RECT.x + 16, y: 385, color:'#22c55e'},
+    {x: LOADER_RECT.x + LOADER_RECT.w - 12, y: 385, color:'#a855f7'}
+];
+var nextLoaderWorker = 0;
 
 // ---------- machine states ----------
 function newMachine(repairNeeded, jamChancePerSec){
@@ -495,10 +570,10 @@ filler.timer = 1500;
 boxFormer.timer = 3200;
 sealer.busy = false; sealer.sealT = 0;
 
-var fillerInterval = 1700;
-var boxFormerInterval = 3400;
-var sealDuration = 1300;
-var qcDwellTime = 4200;
+var fillerInterval = 2200;
+var boxFormerInterval = 3800;
+var sealDuration = 1800;
+var qcDwellTime = 5200;
 var badBagChance = 0.14;
 
 var qcSlots = QC_SLOT_POS.map(function(p){ return { pos:p, item:null, dwell:0, decided:null, decidedAge:0 }; });
@@ -538,12 +613,12 @@ function resetGame(){
     G.running = true; G.lineRunning = true; G.over = false;
     G.score = 0; G.shipped = 0; G.streak = 0; G.bestStreak = 0; G.stress = 0; G.elapsed = 0;
     buildBelts();
-    bagQueue = []; activeBox = null; insertBuffer = null; sealBuffer = null; helixItems = [];
+    bagQueue = []; activeBox = null; insertBuffer = null; sealBuffer = null; helixItems = []; loaderReaches = [];
     filler.jammed=false; filler.repairClicks=0; filler.timer=1200;
     boxFormer.jammed=false; boxFormer.repairClicks=0; boxFormer.timer=2600;
     sealer.jammed=false; sealer.repairClicks=0; sealer.busy=false; sealer.sealT=0;
     qcSlots.forEach(function(s){ s.item=null; s.dwell=0; s.decided=null; });
-    fillerInterval = 1700; boxFormerInterval = 3400; badBagChance = 0.14;
+    fillerInterval = 2200; boxFormerInterval = 3800; badBagChance = 0.12;
     popups = []; particles = [];
     updateStopBtn();
 }
@@ -695,7 +770,23 @@ function updateLoader(dt){
     }
 }
 function bagQueuePos(i){
-    return { x: LOADER_RECT.x - 40 - i*34, y: 360 };
+    return { x: LOADER_RECT.x - 40 - i*34, y: 345 };
+}
+
+function updateLoaderReaches(dt){
+    for (var i=loaderReaches.length-1; i>=0; i--){
+        var r = loaderReaches[i];
+        r.t += dt;
+        if (r.t >= r.dur){
+            loaderReaches.splice(i,1);
+            if (r.box.bagCount < 8){
+                r.box.bagCount++;
+                if (r.bad) r.box.hadBadBag = true;
+                spawnParticles(r.x1, r.y1, '#fbbf24', 5, 70);
+                if (r.box.bagCount >= 8) spawnPopup(r.x1, r.y1-30, 'Box full!', '#4ade80');
+            }
+        }
+    }
 }
 
 function updateSealer(dt){
@@ -791,21 +882,27 @@ function updateBelts(dt){
     beltSealerToHelix.advance(dt); topBelt.advance(dt);
 }
 
+function slideBeltItem(it, target, stepMs, dt){
+    it._animT = (it._animT || 0) + dt;
+    var frac = clamp(it._animT / stepMs, 0, 1);
+    it.x = lerp(it._animFromX!=null ? it._animFromX : target.x, target.x, frac);
+    it.y = lerp(it._animFromY!=null ? it._animFromY : target.y, target.y, frac);
+}
 function tweenBeltItems(dt){
-    belt1.forEachItem(function(it,p){ tweenTo(it,p.x,p.y,dt,belt1.tweenRate); });
-    belt2.forEachItem(function(it,p){ tweenTo(it,p.x,p.y,dt,belt2.tweenRate); });
-    beltFormerToInsert.forEachItem(function(it,p){ tweenTo(it,p.x,p.y,dt,beltFormerToInsert.tweenRate); });
-    beltSealerToHelix.forEachItem(function(it,p){ tweenTo(it,p.x,p.y,dt,beltSealerToHelix.tweenRate); });
-    topBelt.forEachItem(function(it,p){ tweenTo(it,p.x,p.y,dt,topBelt.tweenRate); });
+    belt1.forEachItem(function(it,p){ slideBeltItem(it,p,belt1.stepMs,dt); });
+    belt2.forEachItem(function(it,p){ slideBeltItem(it,p,belt2.stepMs,dt); });
+    beltFormerToInsert.forEachItem(function(it,p){ slideBeltItem(it,p,beltFormerToInsert.stepMs,dt); });
+    beltSealerToHelix.forEachItem(function(it,p){ slideBeltItem(it,p,beltSealerToHelix.stepMs,dt); });
+    topBelt.forEachItem(function(it,p){ slideBeltItem(it,p,topBelt.stepMs,dt); });
 }
 
 function difficultyRamp(dt){
     G.elapsed += dt;
     var m = G.elapsed / 1000;
-    fillerInterval = Math.max(750, 1700 - m*4.2);
-    boxFormerInterval = Math.max(1900, 3400 - m*5.5);
-    badBagChance = Math.min(0.30, 0.14 + m*0.0009);
-    filler.jamChancePerSec = Math.min(0.02, 0.006 + m*0.00004);
+    fillerInterval = Math.max(1150, 2200 - m*3.0);
+    boxFormerInterval = Math.max(2400, 3800 - m*4.0);
+    badBagChance = Math.min(0.26, 0.12 + m*0.0006);
+    filler.jamChancePerSec = Math.min(0.014, 0.005 + m*0.00002);
 }
 
 function anyQueueHot(){
@@ -829,6 +926,7 @@ function update(dt){
     updateBoxFormer(dt);
     updateInsert(dt);
     updateLoader(dt);
+    updateLoaderReaches(dt);
     updateSealer(dt);
     updateHelix(dt);
     updateExit(dt);
@@ -863,13 +961,15 @@ function update(dt){
 }
 
 function updateStopBtn(){
+    // Label the button by what tapping it will DO, not the current status —
+    // a real emergency-stop button always reads STOP; pressing it is what pauses the line.
     var btn = document.getElementById('stopBtn');
     if (G.lineRunning){
-        btn.textContent = 'GO';
-        btn.classList.add('running');
-    } else {
         btn.textContent = 'STOP';
         btn.classList.remove('running');
+    } else {
+        btn.textContent = 'GO';
+        btn.classList.add('running');
     }
     if (G.lineRunning && anyQueueHot()) btn.classList.add('pulse'); else btn.classList.remove('pulse');
 }
@@ -881,28 +981,55 @@ function drawPathStroke(path){
     for (var i=1;i<path.length;i++) ctx.lineTo(path[i].x, path[i].y);
     ctx.stroke();
 }
-function drawBelt(belt){
-    var path = belt.path;
+function drawRoller(x, y, r){
     ctx.save();
-    ctx.lineJoin='round'; ctx.lineCap='round';
-    ctx.strokeStyle = '#3f2a14';
-    ctx.lineWidth = 24;
-    drawPathStroke(path);
-    ctx.strokeStyle = '#241708';
-    ctx.lineWidth = 24;
-    ctx.globalAlpha = 0.35;
-    drawPathStroke(path);
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = 'rgba(250,204,21,0.55)';
-    ctx.lineWidth = 5;
-    ctx.setLineDash([13,15]);
-    ctx.lineDashOffset = -G.beltAnim;
-    drawPathStroke(path);
-    ctx.setLineDash([]);
+    var g = ctx.createRadialGradient(x-r*0.3, y-r*0.35, r*0.15, x, y, r);
+    g.addColorStop(0, '#e2e8f0'); g.addColorStop(0.55, '#94a3b8'); g.addColorStop(1, '#3f4753');
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = '#20242c'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, r*0.32, 0, Math.PI*2);
+    ctx.fillStyle = '#232830'; ctx.fill();
     ctx.restore();
 }
+function drawBeltRollers(points){
+    for (var i=1; i<points.length-1; i++) drawRoller(points[i].x, points[i].y, 9);
+    drawRoller(points[0].x, points[0].y, 14);
+    drawRoller(points[points.length-1].x, points[points.length-1].y, 14);
+}
+function drawBeltSurface(path, animOffset){
+    ctx.save();
+    ctx.lineJoin='round'; ctx.lineCap='round';
+    // steel side frame
+    ctx.strokeStyle = '#26221c';
+    ctx.lineWidth = 30;
+    drawPathStroke(path);
+    // recessed bed, visible through the gaps between slats
+    ctx.strokeStyle = '#15120e';
+    ctx.lineWidth = 22;
+    drawPathStroke(path);
+    // modular plastic slats, scrolling to sell motion
+    ctx.save();
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = '#cdbf9a';
+    ctx.lineWidth = 19;
+    ctx.setLineDash([21, 5]);
+    ctx.lineDashOffset = -animOffset;
+    drawPathStroke(path);
+    ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+    ctx.lineWidth = 19;
+    ctx.setLineDash([2, 24]);
+    ctx.lineDashOffset = -animOffset + 20;
+    drawPathStroke(path);
+    ctx.restore();
+    ctx.restore();
+}
+function drawBelt(belt){
+    drawBeltSurface(belt.path, G.beltAnim);
+    drawBeltRollers(belt.points || belt.path);
+}
 function drawBeltStatic(p0, p1){
-    drawBelt({ path: [p0, p1] });
+    drawBelt({ path: [p0, p1], points: [p0, p1] });
 }
 
 function drawBag(x,y,scale,badTint){
@@ -965,7 +1092,7 @@ function drawBox(x,y,box){
     ctx.restore();
 }
 
-function drawWorker(x,y,color,active,armSwing){
+function drawWorker(x,y,color,active,armSwing,reachTo){
     ctx.save();
     ctx.translate(x,y);
     var bob = active ? Math.sin(armSwing*0.02)*3 : 0;
@@ -983,7 +1110,11 @@ function drawWorker(x,y,color,active,armSwing){
     ctx.beginPath(); ctx.arc(0,-27,9.5,Math.PI,0); ctx.fillStyle = '#facc15'; ctx.fill();
     // arm
     ctx.strokeStyle = color; ctx.lineWidth = 6; ctx.lineCap='round';
-    ctx.beginPath(); ctx.moveTo(10,-6); ctx.lineTo(20, -6+bob*3); ctx.stroke();
+    if (reachTo){
+        ctx.beginPath(); ctx.moveTo(6,-10); ctx.lineTo(reachTo.x - x, reachTo.y - y); ctx.stroke();
+    } else {
+        ctx.beginPath(); ctx.moveTo(10,-6); ctx.lineTo(20, -6+bob*3); ctx.stroke();
+    }
     ctx.restore();
 }
 
@@ -1071,15 +1202,15 @@ function drawQCTable(){
     ctx.save();
     ctx.translate(QC_CENTER.x, QC_CENTER.y+30);
     ctx.rotate(G.tableAngle);
-    ctx.beginPath(); ctx.ellipse(0,0,QC_R,QC_R*0.55,0,0,Math.PI*2);
-    var g = ctx.createRadialGradient(0,0,10,0,0,QC_R);
+    ctx.beginPath(); ctx.arc(0,0,QC_R,0,Math.PI*2);
+    var g = ctx.createRadialGradient(-QC_R*0.3,-QC_R*0.3,10,0,0,QC_R);
     g.addColorStop(0,'#94a3b8'); g.addColorStop(1,'#475569');
     ctx.fillStyle = g; ctx.fill();
     ctx.strokeStyle = '#1e293b'; ctx.lineWidth=3; ctx.stroke();
     for (var i=0;i<8;i++){
         var a = i/8*Math.PI*2;
         ctx.beginPath();
-        ctx.arc(Math.cos(a)*QC_R*0.85, Math.sin(a)*QC_R*0.85*0.55, 3, 0, Math.PI*2);
+        ctx.arc(Math.cos(a)*QC_R*0.85, Math.sin(a)*QC_R*0.85, 3, 0, Math.PI*2);
         ctx.fillStyle = '#1e293b'; ctx.fill();
     }
     ctx.restore();
@@ -1116,9 +1247,14 @@ function drawInsertStation(){
     ctx.restore();
     drawWorker(r.x+r.w/2, r.y+18, '#f59e0b', !!insertBuffer, performance.now());
     if (insertBuffer && !insertBuffer.hasInsert){
+        var pulse = 0.5+0.5*Math.sin(performance.now()*0.008);
         ctx.save();
-        ctx.font='900 12px sans-serif'; ctx.fillStyle='#fef08a'; ctx.textAlign='center';
-        ctx.fillText('TAP', insertBuffer.x, insertBuffer.y-40);
+        ctx.textAlign='center';
+        ctx.font = (900) + ' ' + Math.round(14+pulse*3) + 'px sans-serif';
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillText('▼ TAP BOX', insertBuffer.x+1, insertBuffer.y-39);
+        ctx.fillStyle = '#fef08a';
+        ctx.fillText('▼ TAP BOX', insertBuffer.x, insertBuffer.y-40);
         ctx.restore();
     }
 }
@@ -1126,11 +1262,46 @@ function drawInsertStation(){
 function drawLoaderStation(){
     ctx.save();
     ctx.font='800 11px sans-serif'; ctx.fillStyle='#fde68a'; ctx.textAlign='center';
-    ctx.fillText('LOAD 8 BAGS', LOADER_RECT.x+LOADER_RECT.w/2, LOADER_RECT.y-30);
+    ctx.fillText('LOAD 8 BAGS', LOADER_RECT.x+LOADER_RECT.w/2, 302);
     ctx.restore();
-    drawWorker(LOADER_RECT.x+18, LOADER_RECT.y+18, '#22c55e', true, performance.now());
-    drawWorker(LOADER_RECT.x+LOADER_RECT.w-10, LOADER_RECT.y+18, '#a855f7', true, performance.now()+300);
+
+    // bags wait on the belt, which runs behind the workers
     bagQueue.forEach(function(b){ drawBag(b.x,b.y,0.85,b.hadUncaughtLeak); });
+
+    // workers stand in front of the belt; when grabbing, an arm reaches back for a bag
+    LOADER_WORKERS.forEach(function(w, idx){
+        var reach = null;
+        for (var i=0;i<loaderReaches.length;i++){ if (loaderReaches[i].workerIdx===idx){ reach = loaderReaches[i]; break; } }
+        var reachPos = null;
+        if (reach){
+            var t = clamp(reach.t/reach.dur, 0, 1);
+            reachPos = { x: lerp(reach.x0, reach.x1, t), y: lerp(reach.y0, reach.y1, t) };
+        }
+        drawWorker(w.x, w.y, w.color, true, performance.now()+idx*300, reachPos);
+    });
+
+    if (activeBox && activeBox.bagCount >= 8){
+        ctx.save();
+        ctx.font='900 12px sans-serif'; ctx.fillStyle='#4ade80'; ctx.textAlign='center';
+        ctx.fillText('FULL — sending to sealer…', activeBox.x, activeBox.y-40);
+        ctx.restore();
+    } else if (bagQueue.length > 0 && activeBox){
+        ctx.save();
+        ctx.font='900 12px sans-serif'; ctx.fillStyle='#fef08a'; ctx.textAlign='center';
+        ctx.fillText('▼ TAP BAGS', LOADER_RECT.x+LOADER_RECT.w/2, 316);
+        ctx.restore();
+    } else if (bagQueue.length > 0 && !activeBox){
+        ctx.save();
+        ctx.font='900 12px sans-serif'; ctx.fillStyle='#fca5a5'; ctx.textAlign='center';
+        ctx.fillText('needs a box — check Insert →', LOADER_RECT.x+LOADER_RECT.w/2, 316);
+        ctx.restore();
+    }
+}
+function drawLoaderReachBags(){
+    loaderReaches.forEach(function(r){
+        var t = clamp(r.t/r.dur, 0, 1);
+        drawBag(lerp(r.x0,r.x1,t), lerp(r.y0,r.y1,t), 0.72, r.bad);
+    });
 }
 
 function drawSealer(){
@@ -1179,12 +1350,21 @@ function drawCeilingExit(){
 }
 
 function drawStopHint(){
+    if (!G.lineRunning){
+        ctx.save();
+        ctx.font='900 16px sans-serif';
+        ctx.fillStyle = '#4ade80';
+        ctx.textAlign='center';
+        ctx.fillText('⏸ BELTS PAUSED', CW/2, 525);
+        ctx.restore();
+        return;
+    }
     if (!anyQueueHot()) return;
     ctx.save();
-    ctx.font='900 13px sans-serif';
-    ctx.fillStyle = 'rgba(248,113,113,0.9)';
+    ctx.font='900 14px sans-serif';
+    ctx.fillStyle = 'rgba(248,113,113,0.95)';
     ctx.textAlign='center';
-    ctx.fillText('LINE BACKING UP!', CW/2, 30);
+    ctx.fillText('LINE BACKING UP — hit the red button!', CW/2, 525);
     ctx.restore();
 }
 
@@ -1231,8 +1411,13 @@ function draw(){
     topBelt.forEachItem(function(it){ drawBox(it.x,it.y,it); });
     if (insertBuffer) drawBox(insertBuffer.x, insertBuffer.y, insertBuffer);
     if (activeBox) drawBox(activeBox.x, activeBox.y, activeBox);
+    drawLoaderReachBags();
     if (sealBuffer) drawBox(sealBuffer.x, sealBuffer.y, sealBuffer);
 
+    if (!G.lineRunning){
+        ctx.fillStyle = 'rgba(30,58,138,0.16)';
+        ctx.fillRect(0,0,CW,CH);
+    }
     drawStopHint();
 
     // particles
@@ -1295,15 +1480,17 @@ function handlePointer(clientX, clientY){
 
     for (var j=0;j<bagQueue.length;j++){
         var bag = bagQueue[j];
-        if (activeBox && activeBox.bagCount < 8 && dist(mx,my,bag.x,bag.y) < 24){
+        if (activeBox && dist(mx,my,bag.x,bag.y) < 24){
+            var reserved = 0;
+            for (var k=0;k<loaderReaches.length;k++){ if (loaderReaches[k].box === activeBox) reserved++; }
+            if (activeBox.bagCount + reserved >= 8) return;
             bagQueue.splice(j,1);
-            activeBox.bagCount++;
-            if (bag.hadUncaughtLeak) activeBox.hadBadBag = true;
+            var workerIdx = nextLoaderWorker; nextLoaderWorker = 1 - nextLoaderWorker;
+            loaderReaches.push({
+                x0: bag.x, y0: bag.y, x1: LOADER_POS.x, y1: LOADER_POS.y,
+                t: 0, dur: 420, workerIdx: workerIdx, box: activeBox, bad: bag.hadUncaughtLeak
+            });
             sfxClick();
-            spawnParticles(bag.x,bag.y,'#fbbf24',6,80);
-            if (activeBox.bagCount >= 8){
-                spawnPopup(activeBox.x, activeBox.y-30, 'Box full!', '#4ade80');
-            }
             return;
         }
     }
@@ -1313,7 +1500,12 @@ canvas.addEventListener('pointerdown', function(e){
     handlePointer(e.clientX, e.clientY);
 });
 
-document.getElementById('stopBtn').addEventListener('click', function(){
+var lastStopToggle = 0;
+document.getElementById('stopBtn').addEventListener('pointerdown', function(e){
+    e.preventDefault();
+    var now = performance.now();
+    if (now - lastStopToggle < 300) return; // ignore accidental double-taps
+    lastStopToggle = now;
     if (!G.running || G.over) return;
     G.lineRunning = !G.lineRunning;
     sfxClick();
@@ -1323,6 +1515,10 @@ document.getElementById('stopBtn').addEventListener('click', function(){
 document.getElementById('muteBtn').addEventListener('click', function(){
     muted = !muted;
     document.getElementById('muteBtn').textContent = muted ? '🔇' : '🔊';
+    if (musicGainNode && audioCtx){
+        musicGainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+        musicGainNode.gain.setTargetAtTime(muted ? 0 : 1, audioCtx.currentTime, 0.08);
+    }
 });
 
 document.getElementById('startBtn').addEventListener('click', function(){
@@ -1343,6 +1539,7 @@ function frame(ts){
     lastTime = ts;
     if (G.running && !G.over) update(dt);
     draw();
+    scheduleMusic();
     requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
