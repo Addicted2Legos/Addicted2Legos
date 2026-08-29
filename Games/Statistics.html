@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Site Statistics</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --surface-1: rgba(15, 23, 42, 0.55);
+    --surface-2: rgba(15, 23, 42, 0.32);
+    --border: rgba(255, 255, 255, 0.12);
+    --text-primary: #f8fafc;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --series: #3987e5;
+    --series-wash: rgba(57, 135, 229, 0.16);
+    --gridline: rgba(255, 255, 255, 0.12);
+  }
+  html, body { margin: 0; min-height: 100vh; }
+  body {
+    background: #0b1120;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--text-primary);
+    padding: 24px;
+    box-sizing: border-box;
+  }
+  main {
+    width: min(1080px, 100%);
+    margin: 0 auto;
+  }
+  h1 {
+    margin: 0 0 4px;
+    font-size: clamp(1.3rem, 3vw, 1.7rem);
+  }
+  .subtitle {
+    margin: 0 0 24px;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+  }
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .tile {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px 18px;
+  }
+  .tile .label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .tile .value {
+    font-size: 1.8rem;
+    font-weight: 600;
+  }
+  .panels {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .panel {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 18px 20px;
+    backdrop-filter: blur(4px);
+  }
+  .panel.wide { grid-column: 1 / -1; }
+  .panel h2 {
+    margin: 0 0 2px;
+    font-size: 1rem;
+  }
+  .panel .panel-sub {
+    margin: 0 0 14px;
+    font-size: 0.76rem;
+    color: var(--text-muted);
+  }
+  .bar-row {
+    display: grid;
+    grid-template-columns: 140px 1fr 56px;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 0.82rem;
+  }
+  .bar-row .name {
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bar-track {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 4px;
+    height: 16px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    background: var(--series);
+    border-radius: 4px;
+    min-width: 3px;
+  }
+  .bar-row .count {
+    text-align: right;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+  .empty {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    padding: 8px 0;
+  }
+  svg.trend { width: 100%; height: 160px; overflow: visible; }
+  .trend-tooltip {
+    position: absolute;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.76rem;
+    pointer-events: none;
+    display: none;
+    white-space: nowrap;
+  }
+  .trend-wrap { position: relative; }
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+  }
+  table.data-table th, table.data-table td {
+    text-align: left;
+    padding: 5px 8px;
+    border-bottom: 1px solid var(--gridline);
+    color: var(--text-secondary);
+  }
+  table.data-table th {
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.68rem;
+    letter-spacing: 0.05em;
+  }
+  details summary {
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    margin-top: 6px;
+  }
+  a.back-link {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    text-decoration: none;
+  }
+  a.back-link:hover { color: var(--text-primary); }
+</style>
+</head>
+<body>
+<main>
+  <a class="back-link" href="index.html">&larr; Back to Games</a>
+  <h1>Site Statistics</h1>
+  <p class="subtitle" id="tracking-since">Loading&hellip;</p>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="panels">
+    <div class="panel">
+      <h2>Most played games</h2>
+      <p class="panel-sub">By total page loads, all-time</p>
+      <div id="games-bars"></div>
+      <details id="games-more-wrap" style="display:none;">
+        <summary>Show all games</summary>
+        <table class="data-table" id="games-table"></table>
+      </details>
+    </div>
+
+    <div class="panel">
+      <h2>Plays by country</h2>
+      <p class="panel-sub">Coarse geo-IP lookup, all-time</p>
+      <div id="country-bars"></div>
+    </div>
+
+    <div class="panel wide">
+      <h2>Plays by state / region</h2>
+      <p class="panel-sub">Top regions across all countries, all-time</p>
+      <div id="region-bars"></div>
+    </div>
+
+    <div class="panel wide">
+      <h2>Plays per day</h2>
+      <p class="panel-sub">Site-wide, last 30 days</p>
+      <div class="trend-wrap">
+        <svg class="trend" id="trend-svg" viewBox="0 0 600 160" preserveAspectRatio="none"></svg>
+        <div class="trend-tooltip" id="trend-tooltip"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Device type</h2>
+      <p class="panel-sub">All-time</p>
+      <div id="device-bars"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Browser</h2>
+      <p class="panel-sub">All-time</p>
+      <div id="browser-bars"></div>
+    </div>
+
+    <div class="panel wide">
+      <h2>Top referrers</h2>
+      <p class="panel-sub">External sites that sent traffic in (internal navigation between games counts as Direct)</p>
+      <div id="referrer-bars"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Errors</h2>
+      <p class="panel-sub">Games with client-side errors, last 30 days</p>
+      <div id="error-table-wrap"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+  const SUPABASE_URL = 'https://tgdypcnzpojjxuxizjvh.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable__4owv0oy0QoOnTNYBIOPow_-BDrQ7iS';
+  const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  function fmt(n) {
+    if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    return String(n);
+  }
+
+  function fmtDuration(seconds) {
+    if (seconds === null || seconds === undefined) return '--';
+    if (seconds < 60) return `${seconds}s`;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}m ${s}s`;
+  }
+
+  function fmtPct(n) {
+    if (n === null || n === undefined || Number.isNaN(n)) return '--';
+    return `${n}%`;
+  }
+
+  // Row values (game_name, country, region, device_type, browser,
+  // referrer_host) come from game_plays, which anyone can insert into
+  // directly via the public anon key -- treat every value as untrusted and
+  // build nodes with textContent/property assignment, never innerHTML.
+  function renderBars(container, rows, labelKey, countKey, max, limit) {
+    container.innerHTML = '';
+    if (!rows || rows.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'No data yet.';
+      container.appendChild(empty);
+      return;
+    }
+    const top = limit ? rows.slice(0, limit) : rows;
+    top.forEach(row => {
+      const pct = Math.max((row[countKey] / max) * 100, 2);
+      const div = document.createElement('div');
+      div.className = 'bar-row';
+
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.title = String(row[labelKey]);
+      name.textContent = String(row[labelKey]);
+
+      const track = document.createElement('span');
+      track.className = 'bar-track';
+      const fill = document.createElement('span');
+      fill.className = 'bar-fill';
+      fill.style.width = pct + '%';
+      track.appendChild(fill);
+
+      const count = document.createElement('span');
+      count.className = 'count';
+      count.textContent = fmt(row[countKey]);
+
+      div.appendChild(name);
+      div.appendChild(track);
+      div.appendChild(count);
+      container.appendChild(div);
+    });
+  }
+
+  function addTableRow(table, cells) {
+    const tr = document.createElement('tr');
+    cells.forEach(text => {
+      const td = document.createElement('td');
+      td.textContent = text;
+      tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  }
+
+  function addTableHeaderRow(table, headers) {
+    const tr = document.createElement('tr');
+    headers.forEach(text => {
+      const th = document.createElement('th');
+      th.textContent = text;
+      tr.appendChild(th);
+    });
+    table.appendChild(tr);
+  }
+
+  function renderTile(container, label, value) {
+    const div = document.createElement('div');
+    div.className = 'tile';
+    div.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+    container.appendChild(div);
+  }
+
+  function renderTrend(rows) {
+    const svg = document.getElementById('trend-svg');
+    const tooltip = document.getElementById('trend-tooltip');
+    svg.innerHTML = '';
+    if (!rows || rows.length === 0) {
+      svg.outerHTML = '<div class="empty">No data yet.</div>';
+      return;
+    }
+    const w = 600, h = 160, padL = 8, padR = 8, padT = 12, padB = 20;
+    const max = Math.max(...rows.map(r => r.play_count), 1);
+    const stepX = (w - padL - padR) / Math.max(rows.length - 1, 1);
+    const yFor = v => padT + (h - padT - padB) * (1 - v / max);
+    const points = rows.map((r, i) => [padL + i * stepX, yFor(r.play_count)]);
+
+    const ns = 'http://www.w3.org/2000/svg';
+    // gridlines
+    [0, 0.5, 1].forEach(f => {
+      const y = padT + (h - padT - padB) * (1 - f);
+      const line = document.createElementNS(ns, 'line');
+      line.setAttribute('x1', padL); line.setAttribute('x2', w - padR);
+      line.setAttribute('y1', y); line.setAttribute('y2', y);
+      line.setAttribute('stroke', 'var(--gridline)');
+      line.setAttribute('stroke-width', '1');
+      svg.appendChild(line);
+    });
+
+    // area wash
+    const areaPath = 'M' + points.map(p => p.join(',')).join('L') +
+      `L${points[points.length - 1][0]},${h - padB}L${points[0][0]},${h - padB}Z`;
+    const area = document.createElementNS(ns, 'path');
+    area.setAttribute('d', areaPath);
+    area.setAttribute('fill', 'var(--series-wash)');
+    area.setAttribute('stroke', 'none');
+    svg.appendChild(area);
+
+    // line
+    const linePath = 'M' + points.map(p => p.join(',')).join('L');
+    const line = document.createElementNS(ns, 'path');
+    line.setAttribute('d', linePath);
+    line.setAttribute('fill', 'none');
+    line.setAttribute('stroke', 'var(--series)');
+    line.setAttribute('stroke-width', '2');
+    line.setAttribute('stroke-linejoin', 'round');
+    line.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(line);
+
+    // end marker + label
+    const last = points[points.length - 1];
+    const dot = document.createElementNS(ns, 'circle');
+    dot.setAttribute('cx', last[0]); dot.setAttribute('cy', last[1]);
+    dot.setAttribute('r', 4);
+    dot.setAttribute('fill', 'var(--series)');
+    dot.setAttribute('stroke', '#0b1120');
+    dot.setAttribute('stroke-width', '2');
+    svg.appendChild(dot);
+
+    const label = document.createElementNS(ns, 'text');
+    label.setAttribute('x', last[0]);
+    label.setAttribute('y', last[1] - 10);
+    label.setAttribute('text-anchor', 'end');
+    label.setAttribute('fill', 'var(--text-primary)');
+    label.setAttribute('font-size', '11');
+    label.textContent = rows[rows.length - 1].play_count;
+    svg.appendChild(label);
+
+    // hover targets
+    points.forEach((p, i) => {
+      const hit = document.createElementNS(ns, 'circle');
+      hit.setAttribute('cx', p[0]); hit.setAttribute('cy', p[1]);
+      hit.setAttribute('r', 10);
+      hit.setAttribute('fill', 'transparent');
+      hit.style.cursor = 'pointer';
+      hit.addEventListener('mouseenter', () => {
+        const rect = svg.getBoundingClientRect();
+        const scaleX = rect.width / w;
+        const scaleY = rect.height / h;
+        tooltip.style.display = 'block';
+        tooltip.style.left = (p[0] * scaleX) + 'px';
+        tooltip.style.top = (p[1] * scaleY - 36) + 'px';
+        tooltip.textContent = `${rows[i].day}: ${rows[i].play_count} play${rows[i].play_count === 1 ? '' : 's'}`;
+      });
+      hit.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+      svg.appendChild(hit);
+    });
+  }
+
+  async function load() {
+    const [summary, games, countries, regions, days, devices, browsers, referrers, engagement, retention, errors] = await Promise.all([
+      client.from('game_stats_summary').select('*').single(),
+      client.from('game_play_counts').select('*'),
+      client.from('plays_by_country').select('*'),
+      client.from('plays_by_region').select('*'),
+      client.from('plays_by_day').select('*').order('day', { ascending: true }).limit(30),
+      client.from('plays_by_device').select('*'),
+      client.from('plays_by_browser').select('*'),
+      client.from('plays_by_referrer').select('*'),
+      client.from('engagement_summary').select('*').single(),
+      client.from('retention_summary').select('*').single(),
+      client.from('errors_by_game').select('*')
+    ]);
+
+    const tiles = document.getElementById('tiles');
+    if (summary.data) {
+      renderTile(tiles, 'Total plays', fmt(summary.data.total_plays || 0));
+      renderTile(tiles, 'Unique sessions', fmt(summary.data.unique_sessions || 0));
+      renderTile(tiles, 'Games with plays', fmt(summary.data.games_played || 0));
+      renderTile(tiles, 'Countries reached', fmt(summary.data.countries_reached || 0));
+      const since = summary.data.tracking_since
+        ? new Date(summary.data.tracking_since).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+        : null;
+      document.getElementById('tracking-since').textContent = since
+        ? `Tracking since ${since}`
+        : 'No plays logged yet -- check back after the site gets some traffic.';
+    } else {
+      document.getElementById('tracking-since').textContent = 'Stats unavailable right now.';
+    }
+
+    if (engagement.data) {
+      const e = engagement.data;
+      const known = (e.bounces || 0) + (e.engaged || 0);
+      const bounceRate = known > 0 ? Math.round((e.bounces / known) * 100) : null;
+      renderTile(tiles, 'Avg. play duration', fmtDuration(e.avg_duration_seconds));
+      renderTile(tiles, 'Bounce rate (<5s)', fmtPct(bounceRate));
+    }
+    if (retention.data) {
+      const r = retention.data;
+      const returnRate = r.total_sessions > 0 ? Math.round((r.returning_sessions / r.total_sessions) * 100) : null;
+      const multiGameRate = r.total_sessions > 0 ? Math.round((r.multi_game_sessions / r.total_sessions) * 100) : null;
+      renderTile(tiles, 'Sessions playing 2+ games', fmtPct(multiGameRate));
+      renderTile(tiles, 'Sessions returning another day', fmtPct(returnRate));
+    }
+
+    const gameRows = games.data || [];
+    const gameMax = Math.max(...gameRows.map(r => r.play_count), 1);
+    renderBars(document.getElementById('games-bars'), gameRows, 'game_name', 'play_count', gameMax, 10);
+    if (gameRows.length > 10) {
+      document.getElementById('games-more-wrap').style.display = 'block';
+      const table = document.getElementById('games-table');
+      table.innerHTML = '';
+      addTableHeaderRow(table, ['Game', 'Plays', 'Unique sessions', 'Avg. duration', 'Completion']);
+      gameRows.forEach(r => addTableRow(table, [
+        r.game_name, r.play_count, r.unique_sessions, fmtDuration(r.avg_duration_seconds), fmtPct(r.completion_rate_pct)
+      ]));
+    }
+
+    const countryRows = countries.data || [];
+    const countryMax = Math.max(...countryRows.map(r => r.play_count), 1);
+    renderBars(document.getElementById('country-bars'), countryRows, 'country', 'play_count', countryMax, 10);
+
+    const regionRows = (regions.data || []).map(r => ({
+      label: r.region === 'Unknown' ? 'Unknown' : `${r.region}, ${r.country}`,
+      play_count: r.play_count
+    }));
+    const regionMax = Math.max(...regionRows.map(r => r.play_count), 1);
+    renderBars(document.getElementById('region-bars'), regionRows, 'label', 'play_count', regionMax, 12);
+
+    const deviceRows = devices.data || [];
+    const deviceMax = Math.max(...deviceRows.map(r => r.play_count), 1);
+    renderBars(document.getElementById('device-bars'), deviceRows, 'device_type', 'play_count', deviceMax);
+
+    const browserRows = browsers.data || [];
+    const browserMax = Math.max(...browserRows.map(r => r.play_count), 1);
+    renderBars(document.getElementById('browser-bars'), browserRows, 'browser', 'play_count', browserMax);
+
+    const referrerRows = referrers.data || [];
+    const referrerMax = Math.max(...referrerRows.map(r => r.play_count), 1);
+    renderBars(document.getElementById('referrer-bars'), referrerRows, 'referrer_host', 'play_count', referrerMax, 10);
+
+    const errorRows = errors.data || [];
+    const errorWrap = document.getElementById('error-table-wrap');
+    errorWrap.innerHTML = '';
+    if (errorRows.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'No errors logged.';
+      errorWrap.appendChild(empty);
+    } else {
+      const table = document.createElement('table');
+      table.className = 'data-table';
+      addTableHeaderRow(table, ['Game', 'Count']);
+      errorRows.forEach(r => addTableRow(table, [r.game_name, r.error_count]));
+      errorWrap.appendChild(table);
+    }
+
+    renderTrend(days.data || []);
+  }
+
+  load();
+</script>
+</body>
+</html>
