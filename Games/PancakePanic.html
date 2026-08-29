@@ -277,20 +277,6 @@
         </div>
     </div>
 
-    <div class="modal" id="startModal">
-        <div class="modal-box">
-            <h1>🥞 Pancake Panic</h1>
-            <p>Keep the pancake-mix line running! Tap the machines and workers to keep everything moving.</p>
-            <ul>
-                <li>🛠️ <b>Jammed machines</b> flash red — tap them repeatedly to fix.</li>
-                <li>🔍 <b>QC table</b> — tap each bag to inspect before it moves on. A leaky bag is rejected on the spot; a good one gets sent through.</li>
-                <li>📦 <b>Insert &amp; Loaders</b> — tap the box to add the divider, then tap bags to load 8 per box.</li>
-                <li>🔴 <b>Big red button</b> stops the belts (but not the clicking) so you can catch up.</li>
-            </ul>
-            <button class="bigBtn" id="startBtn">Start Shift</button>
-        </div>
-    </div>
-
     <div class="modal hidden" id="overModal">
         <div class="modal-box">
             <h1>Line Shut Down!</h1>
@@ -650,6 +636,12 @@ var LOADER_WORKERS = [
 ];
 var nextLoaderWorker = 0;
 
+// rejected bags get tossed from QC over to a reject pile by the loader station
+var REJECT_STACK_POS = {x: LOADER_RECT.x - 15, y: 505};
+var rejectFlights = []; // {x0,y0,x1,y1,t,dur} - a bad bag arcing from QC to the reject pile
+var rejectPile = 0;
+var stackReach = null;  // {workerIdx,t,dur} - brief arm-dip when a bag lands on the pile
+
 // ---------- machine states ----------
 function newMachine(repairNeeded, jamChancePerSec){
     return { jammed:false, repairClicks:0, repairNeeded:repairNeeded, jamChancePerSec:jamChancePerSec, jamAcc:0, jamElapsed:0, timer:0 };
@@ -705,6 +697,7 @@ function resetGame(){
     G.score = 0; G.shipped = 0; G.streak = 0; G.bestStreak = 0; G.stress = 0; G.elapsed = 0;
     buildBelts();
     bagQueue = []; activeBox = null; insertBuffer = null; sealBuffer = null; helixItems = []; loaderReaches = [];
+    rejectFlights = []; rejectPile = 0; stackReach = null;
     filler.jammed=false; filler.repairClicks=0; filler.timer=1200;
     boxFormer.jammed=false; boxFormer.repairClicks=0; boxFormer.timer=2600;
     sealer.jammed=false; sealer.repairClicks=0; sealer.busy=false; sealer.sealT=0;
@@ -796,6 +789,7 @@ function resolveQCClick(s, mx, my){
         spawnPopup(s.pos.x, s.pos.y-28, 'LEAK! Rejected', '#f87171');
         spawnParticles(s.pos.x, s.pos.y, '#f87171', 12, 140);
         addScore(5);
+        rejectFlights.push({ x0:s.pos.x, y0:s.pos.y, x1:REJECT_STACK_POS.x, y1:REJECT_STACK_POS.y, t:0, dur:850 });
         s.item = null; s.decided = null;
     } else {
         sfxGood();
@@ -877,6 +871,24 @@ function updateLoaderReaches(dt){
                 if (r.box.bagCount >= 8) spawnPopup(r.x1, r.y1-30, 'Box full!', '#4ade80');
             }
         }
+    }
+}
+
+function updateRejectFlights(dt){
+    for (var i=rejectFlights.length-1; i>=0; i--){
+        var f = rejectFlights[i];
+        f.t += dt;
+        if (f.t >= f.dur){
+            rejectFlights.splice(i,1);
+            rejectPile++;
+            spawnParticles(REJECT_STACK_POS.x, REJECT_STACK_POS.y-10, '#f87171', 8, 90);
+            var idx = nextLoaderWorker; nextLoaderWorker = 1 - nextLoaderWorker;
+            stackReach = { workerIdx: idx, t:0, dur:260 };
+        }
+    }
+    if (stackReach){
+        stackReach.t += dt;
+        if (stackReach.t >= stackReach.dur) stackReach = null;
     }
 }
 
@@ -1018,6 +1030,7 @@ function update(dt){
     updateInsert(dt);
     updateLoader(dt);
     updateLoaderReaches(dt);
+    updateRejectFlights(dt);
     updateSealer(dt);
     updateHelix(dt);
     updateExit(dt);
@@ -1369,6 +1382,8 @@ function drawLoaderStation(){
         if (reach){
             var t = clamp(reach.t/reach.dur, 0, 1);
             reachPos = { x: lerp(reach.x0, reach.x1, t), y: lerp(reach.y0, reach.y1, t) };
+        } else if (stackReach && stackReach.workerIdx === idx){
+            reachPos = { x: REJECT_STACK_POS.x, y: REJECT_STACK_POS.y };
         }
         drawWorker(w.x, w.y, w.color, true, performance.now()+idx*300, reachPos);
     });
@@ -1395,6 +1410,40 @@ function drawLoaderReachBags(){
         var t = clamp(r.t/r.dur, 0, 1);
         drawBag(lerp(r.x0,r.x1,t), lerp(r.y0,r.y1,t), 0.72, r.bad);
     });
+}
+
+function drawRejectFlights(){
+    rejectFlights.forEach(function(f){
+        var t = clamp(f.t/f.dur, 0, 1);
+        var x = lerp(f.x0, f.x1, t);
+        var y = lerp(f.y0, f.y1, t) - Math.sin(t*Math.PI)*90;
+        drawBag(x, y, 0.8, true);
+    });
+}
+
+function drawRejectStack(){
+    var p = REJECT_STACK_POS;
+    ctx.save();
+    ctx.font='800 10px sans-serif'; ctx.fillStyle='#fca5a5'; ctx.textAlign='center';
+    ctx.fillText('REJECTS', p.x, p.y-52);
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    rr(p.x-32, p.y-4, 64, 16, 4); ctx.fill();
+    ctx.strokeStyle = '#7f1d1d'; ctx.lineWidth = 2;
+    rr(p.x-32, p.y-4, 64, 16, 4); ctx.stroke();
+    ctx.restore();
+    var shown = Math.min(rejectPile, 6);
+    for (var i=0;i<shown;i++){
+        drawBag(p.x + ((i%2) ? 9 : -9), p.y - 16 - i*11, 0.62, true);
+    }
+    if (rejectPile > 0){
+        ctx.save();
+        ctx.font='900 11px sans-serif'; ctx.textAlign='center';
+        ctx.fillStyle = '#00000088';
+        ctx.fillText('x'+rejectPile, p.x+1, p.y+27);
+        ctx.fillStyle = '#fca5a5';
+        ctx.fillText('x'+rejectPile, p.x, p.y+26);
+        ctx.restore();
+    }
 }
 
 function drawSealer(){
@@ -1489,6 +1538,7 @@ function draw(){
     drawMachine(boxFormer, BOXFORMER_RECT, 'BOX FORMER', ['#34d399','#047857']);
     drawInsertStation();
     drawLoaderStation();
+    drawRejectStack();
     drawMachine(sealer, SEALER_RECT, 'SEALER', ['#38bdf8','#0369a1']);
     drawSealer();
     drawHelix();
@@ -1505,6 +1555,7 @@ function draw(){
     if (insertBuffer) drawBox(insertBuffer.x, insertBuffer.y, insertBuffer);
     if (activeBox) drawBox(activeBox.x, activeBox.y, activeBox);
     drawLoaderReachBags();
+    drawRejectFlights();
     if (sealBuffer) drawBox(sealBuffer.x, sealBuffer.y, sealBuffer);
 
     if (!G.lineRunning){
@@ -1614,18 +1665,15 @@ document.getElementById('muteBtn').addEventListener('click', function(){
     }
 });
 
-document.getElementById('startBtn').addEventListener('click', function(){
-    ensureAudio();
-    document.getElementById('startModal').classList.add('hidden');
-    resetGame();
-});
+document.addEventListener('pointerdown', function(){ ensureAudio(); }, { once: true });
+
 document.getElementById('restartBtn').addEventListener('click', function(){
     document.getElementById('overModal').classList.add('hidden');
     resetGame();
 });
 
 // ---------- loop ----------
-buildBelts();
+resetGame();
 function frame(ts){
     if (lastTime === null) lastTime = ts;
     var dt = ts - lastTime;
