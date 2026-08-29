@@ -636,9 +636,15 @@ var LOADER_WORKERS = [
 ];
 var nextLoaderWorker = 0;
 
-// rejected bags get tossed from QC over to a reject pile by the loader station
+// rejected bags drop onto a small pile right at QC first; boxing workers periodically
+// swing by, grab one, and carry it over to the bigger pile by the loader station
+var QC_REJECT_PILE_POS = {x: QC_CENTER.x, y: 335};
+var qcRejectPile = 0;
+var qcCollectTimer = 0;
+var QC_COLLECT_INTERVAL = 2600;
+
 var REJECT_STACK_POS = {x: LOADER_RECT.x - 15, y: 505};
-var rejectFlights = []; // {x0,y0,x1,y1,t,dur} - a bad bag arcing from QC to the reject pile
+var rejectFlights = []; // {x0,y0,x1,y1,t,dur} - a bad bag arcing from the QC pile to the loader pile
 var rejectPile = 0;
 var stackReach = null;  // {workerIdx,t,dur} - brief arm-dip when a bag lands on the pile
 
@@ -698,6 +704,7 @@ function resetGame(){
     buildBelts();
     bagQueue = []; activeBox = null; insertBuffer = null; sealBuffer = null; helixItems = []; loaderReaches = [];
     rejectFlights = []; rejectPile = 0; stackReach = null;
+    qcRejectPile = 0; qcCollectTimer = 0;
     filler.jammed=false; filler.repairClicks=0; filler.timer=1200;
     boxFormer.jammed=false; boxFormer.repairClicks=0; boxFormer.timer=2600;
     sealer.jammed=false; sealer.repairClicks=0; sealer.busy=false; sealer.sealT=0;
@@ -789,7 +796,8 @@ function resolveQCClick(s, mx, my){
         spawnPopup(s.pos.x, s.pos.y-28, 'LEAK! Rejected', '#f87171');
         spawnParticles(s.pos.x, s.pos.y, '#f87171', 12, 140);
         addScore(5);
-        rejectFlights.push({ x0:s.pos.x, y0:s.pos.y, x1:REJECT_STACK_POS.x, y1:REJECT_STACK_POS.y, t:0, dur:850 });
+        qcRejectPile++;
+        spawnParticles(QC_REJECT_PILE_POS.x, QC_REJECT_PILE_POS.y, '#f87171', 6, 70);
         s.item = null; s.decided = null;
     } else {
         sfxGood();
@@ -889,6 +897,19 @@ function updateRejectFlights(dt){
     if (stackReach){
         stackReach.t += dt;
         if (stackReach.t >= stackReach.dur) stackReach = null;
+    }
+}
+
+function updateQCRejectCollection(dt){
+    if (qcRejectPile > 0){
+        qcCollectTimer += dt;
+        if (qcCollectTimer >= QC_COLLECT_INTERVAL){
+            qcCollectTimer = 0;
+            qcRejectPile--;
+            rejectFlights.push({ x0:QC_REJECT_PILE_POS.x, y0:QC_REJECT_PILE_POS.y, x1:REJECT_STACK_POS.x, y1:REJECT_STACK_POS.y, t:0, dur:850 });
+        }
+    } else {
+        qcCollectTimer = 0;
     }
 }
 
@@ -1031,6 +1052,7 @@ function update(dt){
     updateLoader(dt);
     updateLoaderReaches(dt);
     updateRejectFlights(dt);
+    updateQCRejectCollection(dt);
     updateSealer(dt);
     updateHelix(dt);
     updateExit(dt);
@@ -1421,29 +1443,38 @@ function drawRejectFlights(){
     });
 }
 
-function drawRejectStack(){
-    var p = REJECT_STACK_POS;
+function drawBagPile(p, count, maxShown, bagScale, binW, binH){
     ctx.save();
     ctx.font='800 10px sans-serif'; ctx.fillStyle='#fca5a5'; ctx.textAlign='center';
-    ctx.fillText('REJECTS', p.x, p.y-52);
+    ctx.fillText('REJECTS', p.x, p.y-binH-38);
     ctx.fillStyle = 'rgba(0,0,0,0.28)';
-    rr(p.x-32, p.y-4, 64, 16, 4); ctx.fill();
+    rr(p.x-binW/2, p.y-4, binW, binH, 4); ctx.fill();
     ctx.strokeStyle = '#7f1d1d'; ctx.lineWidth = 2;
-    rr(p.x-32, p.y-4, 64, 16, 4); ctx.stroke();
+    rr(p.x-binW/2, p.y-4, binW, binH, 4); ctx.stroke();
     ctx.restore();
-    var shown = Math.min(rejectPile, 6);
+    var shown = Math.min(count, maxShown);
+    var spacing = 11 * bagScale / 0.62;
+    var jitter = 9 * bagScale / 0.62;
     for (var i=0;i<shown;i++){
-        drawBag(p.x + ((i%2) ? 9 : -9), p.y - 16 - i*11, 0.62, true);
+        drawBag(p.x + ((i%2) ? jitter : -jitter), p.y - 16 - i*spacing, bagScale, true);
     }
-    if (rejectPile > 0){
+    if (count > 0){
         ctx.save();
         ctx.font='900 11px sans-serif'; ctx.textAlign='center';
         ctx.fillStyle = '#00000088';
-        ctx.fillText('x'+rejectPile, p.x+1, p.y+27);
+        ctx.fillText('x'+count, p.x+1, p.y+27);
         ctx.fillStyle = '#fca5a5';
-        ctx.fillText('x'+rejectPile, p.x, p.y+26);
+        ctx.fillText('x'+count, p.x, p.y+26);
         ctx.restore();
     }
+}
+
+function drawRejectStack(){
+    drawBagPile(REJECT_STACK_POS, rejectPile, 6, 0.62, 64, 16);
+}
+
+function drawQCRejectPile(){
+    drawBagPile(QC_REJECT_PILE_POS, qcRejectPile, 4, 0.5, 52, 13);
 }
 
 function drawSealer(){
@@ -1535,6 +1566,7 @@ function draw(){
 
     drawFillerMachine();
     drawQCTable();
+    drawQCRejectPile();
     drawMachine(boxFormer, BOXFORMER_RECT, 'BOX FORMER', ['#34d399','#047857']);
     drawInsertStation();
     drawLoaderStation();
