@@ -358,56 +358,104 @@ function sfxFix(){ tone(500,0.08,'triangle',0.12); tone(760,0.1,'triangle',0.12)
 function sfxShip(){ tone(660,0.1,'sine',0.14); tone(880,0.12,'sine',0.14); tone(1100,0.16,'sine',0.12); }
 function sfxFail(){ tone(300,0.5,'sawtooth',0.18); tone(180,0.6,'sawtooth',0.14); }
 
-// ---------- background "elevator music" ----------
-// A gentle looping lounge-jazz chord loop with an occasional soft melody note,
+// ---------- background music: bouncy upbeat loop ----------
+// A peppy I-V-vi-IV progression with a bouncing bass, a plucky chord stab,
+// a light kick/hat pulse, and a cheerful 8th-note melody riff on top —
 // scheduled a little ahead of playback time (the standard Web Audio pattern).
-var MUSIC_CHORDS = [
-    [261.63, 329.63, 392.00, 493.88], // Cmaj7
-    [220.00, 261.63, 329.63, 392.00], // Am7
-    [293.66, 349.23, 440.00, 523.25], // Dm7
-    [196.00, 246.94, 293.66, 349.23]  // G7
+var MUSIC_BEAT_DUR = 0.42; // ~140bpm quarter notes
+var MUSIC_STEP_DUR = MUSIC_BEAT_DUR / 2; // 8th notes, 8 per bar
+var MUSIC_PROGRESSION = [
+    { bass: 130.81, chord: [261.63, 329.63, 392.00], scale: [523.25, 587.33, 659.25, 783.99, 880.00] }, // C
+    { bass: 98.00,  chord: [196.00, 246.94, 293.66], scale: [392.00, 440.00, 493.88, 587.33, 659.25] }, // G
+    { bass: 110.00, chord: [220.00, 261.63, 329.63], scale: [440.00, 493.88, 523.25, 659.25, 698.46] }, // Am
+    { bass: 87.31,  chord: [174.61, 220.00, 261.63], scale: [349.23, 392.00, 440.00, 523.25, 587.33] }  // F
 ];
-var MUSIC_MELODY_POOL = [523.25, 587.33, 659.25, 698.46, 783.99, 880.00];
-var MUSIC_CHORD_DUR = 3.1;
+var MUSIC_RIFF = [0, 2, 1, 3, 0, 2, 4, 3]; // scale-degree pattern, repeats every bar
 var musicNextTime = 0;
-var musicChordIdx = 0;
-function playMusicChord(freqs, startTime, dur){
-    freqs.forEach(function(f, i){
-        var osc = audioCtx.createOscillator();
-        var gain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(f, startTime);
-        var peak = 0.05 - i*0.006;
-        gain.gain.setValueAtTime(0.0001, startTime);
-        gain.gain.exponentialRampToValueAtTime(Math.max(peak,0.02), startTime+0.7);
-        gain.gain.setValueAtTime(Math.max(peak,0.02), startTime+dur-0.7);
-        gain.gain.exponentialRampToValueAtTime(0.0001, startTime+dur);
-        osc.connect(gain); gain.connect(musicGainNode);
-        osc.start(startTime); osc.stop(startTime+dur+0.05);
-    });
+var musicBarIdx = 0;
+var musicStepIdx = 0;
+function playKick(startTime, hard){
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(hard ? 150 : 120, startTime);
+    osc.frequency.exponentialRampToValueAtTime(40, startTime+0.12);
+    gain.gain.setValueAtTime(hard ? 0.18 : 0.12, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime+0.16);
+    osc.connect(gain); gain.connect(musicGainNode);
+    osc.start(startTime); osc.stop(startTime+0.2);
 }
-function playMusicBlip(freq, startTime){
+function playHat(startTime){
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(7000, startTime);
+    gain.gain.setValueAtTime(0.018, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime+0.045);
+    osc.connect(gain); gain.connect(musicGainNode);
+    osc.start(startTime); osc.stop(startTime+0.05);
+}
+function playBassNote(freq, startTime, dur){
     var osc = audioCtx.createOscillator();
     var gain = audioCtx.createGain();
     osc.type = 'triangle';
     osc.frequency.setValueAtTime(freq, startTime);
     gain.gain.setValueAtTime(0.0001, startTime);
-    gain.gain.exponentialRampToValueAtTime(0.055, startTime+0.1);
-    gain.gain.exponentialRampToValueAtTime(0.0001, startTime+1.1);
+    gain.gain.exponentialRampToValueAtTime(0.10, startTime+0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime+dur);
     osc.connect(gain); gain.connect(musicGainNode);
-    osc.start(startTime); osc.stop(startTime+1.2);
+    osc.start(startTime); osc.stop(startTime+dur+0.02);
+}
+function playChordStab(freqs, startTime, dur){
+    freqs.forEach(function(f, i){
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(f, startTime);
+        var peak = 0.05 - i*0.009;
+        gain.gain.setValueAtTime(0.0001, startTime);
+        gain.gain.exponentialRampToValueAtTime(Math.max(peak,0.02), startTime+0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startTime+dur);
+        osc.connect(gain); gain.connect(musicGainNode);
+        osc.start(startTime); osc.stop(startTime+dur+0.02);
+    });
+}
+function playMelodyBlip(freq, startTime){
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(freq, startTime);
+    gain.gain.setValueAtTime(0.0001, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.045, startTime+0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime+0.2);
+    osc.connect(gain); gain.connect(musicGainNode);
+    osc.start(startTime); osc.stop(startTime+0.22);
 }
 function scheduleMusic(){
     if (!audioCtx || !musicGainNode) return;
     if (musicNextTime < audioCtx.currentTime) musicNextTime = audioCtx.currentTime + 0.05;
     while (musicNextTime < audioCtx.currentTime + 1.2){
-        playMusicChord(MUSIC_CHORDS[musicChordIdx % MUSIC_CHORDS.length], musicNextTime, MUSIC_CHORD_DUR);
-        if (Math.random() < 0.65){
-            var note = MUSIC_MELODY_POOL[Math.floor(Math.random()*MUSIC_MELODY_POOL.length)];
-            playMusicBlip(note, musicNextTime + MUSIC_CHORD_DUR*(0.3+Math.random()*0.4));
+        var bar = MUSIC_PROGRESSION[musicBarIdx % MUSIC_PROGRESSION.length];
+        var step = musicStepIdx % 8;
+        var t = musicNextTime;
+
+        if (step === 0){
+            playChordStab(bar.chord, t, MUSIC_BEAT_DUR*1.8);
+            playBassNote(bar.bass, t, MUSIC_BEAT_DUR*0.9);
+            playKick(t, true);
+        } else if (step === 4){
+            playBassNote(bar.bass, t, MUSIC_BEAT_DUR*0.7);
+            playKick(t, false);
+        } else if (step === 6){
+            playKick(t, false);
         }
-        musicNextTime += MUSIC_CHORD_DUR;
-        musicChordIdx++;
+        if (step % 2 === 1) playHat(t);
+
+        playMelodyBlip(bar.scale[MUSIC_RIFF[step] % bar.scale.length], t);
+
+        musicNextTime += MUSIC_STEP_DUR;
+        musicStepIdx++;
+        if (musicStepIdx % 8 === 0) musicBarIdx++;
     }
 }
 
@@ -1095,7 +1143,6 @@ function drawBox(x,y,box){
 function drawWorker(x,y,color,active,armSwing,reachTo){
     ctx.save();
     ctx.translate(x,y);
-    var bob = active ? Math.sin(armSwing*0.02)*3 : 0;
     // legs
     ctx.fillStyle = '#334155';
     rr(-9,10,7,16,3); ctx.fill();
@@ -1113,7 +1160,10 @@ function drawWorker(x,y,color,active,armSwing,reachTo){
     if (reachTo){
         ctx.beginPath(); ctx.moveTo(6,-10); ctx.lineTo(reachTo.x - x, reachTo.y - y); ctx.stroke();
     } else {
-        ctx.beginPath(); ctx.moveTo(10,-6); ctx.lineTo(20, -6+bob*3); ctx.stroke();
+        var reach = active ? (Math.sin(armSwing*0.0006)*0.5+0.5) : 0;
+        var armEndX = 10 + reach*14;
+        var armEndY = -6 + reach*4;
+        ctx.beginPath(); ctx.moveTo(10,-6); ctx.lineTo(armEndX, armEndY); ctx.stroke();
     }
     ctx.restore();
 }
@@ -1376,9 +1426,9 @@ function draw(){
     }
 
     // background floor
-    ctx.fillStyle = '#2b1a0c';
+    ctx.fillStyle = '#d8dbde';
     ctx.fillRect(0,0,CW,CH);
-    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    ctx.fillStyle = 'rgba(0,0,0,0.05)';
     for (var gx=0; gx<CW; gx+=40) ctx.fillRect(gx,0,1,CH);
     for (var gy=0; gy<CH; gy+=40) ctx.fillRect(0,gy,CW,1);
 
