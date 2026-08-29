@@ -574,6 +574,12 @@ SlotBelt.prototype.forEachItem = function(cb){
         if (this.slots[i]) cb(this.slots[i], this.path[i]);
     }
 };
+SlotBelt.prototype.removeItem = function(item){
+    var i = this.slots.indexOf(item);
+    if (i < 0) return false;
+    this.slots[i] = null;
+    return true;
+};
 
 function tweenTo(item, tx, ty, dt, rate){
     rate = rate || 0.012;
@@ -595,9 +601,9 @@ var SEALER_POS = {x:948, y:400};
 var HELIX_CX = 968, HELIX_BASE_Y = 460, HELIX_TOP_Y = 90, HELIX_R = 30, HELIX_LOOPS = 2.4;
 var QC_CENTER = {x:352, y:172};
 var QC_R = 92;
-var QC_SLOT_POS = [
-    {x:270, y:150}, {x:318, y:126}, {x:388, y:126}, {x:436, y:150}
-];
+var QC_DISC_CENTER = {x: QC_CENTER.x, y: QC_CENTER.y + 30};
+var QC_ENTRY = {x:290, y:190}; // where belt1 feeds bags onto the disc
+var QC_ITEM_ORBIT_R = dist(QC_ENTRY.x, QC_ENTRY.y, QC_DISC_CENTER.x, QC_DISC_CENTER.y);
 var QC_WORKERS = [{x:248,y:222},{x:458,y:222}];
 
 // belts
@@ -662,10 +668,11 @@ sealer.busy = false; sealer.sealT = 0;
 var fillerInterval = 2200;
 var boxFormerInterval = 3800;
 var sealDuration = 1800;
-var qcDwellTime = 5200;
+var QC_LEAK_REVEAL_MS = 2600; // how long a leaky bag circles before it visibly starts leaking
+var QC_HOT_THRESHOLD = 6;     // qcItems length that counts as "backing up" for the STOP hint
 var badBagChance = 0.14;
 
-var qcSlots = QC_SLOT_POS.map(function(p){ return { pos:p, item:null, dwell:0, decided:null, decidedAge:0 }; });
+var qcItems = []; // bags currently circling the QC disc, uninspected or waiting for belt2 room
 
 // ---------- click zones dynamic ----------
 function rectHit(r, x, y){ return x>=r.x && x<=r.x+r.w && y>=r.y && y<=r.y+r.h; }
@@ -708,7 +715,7 @@ function resetGame(){
     filler.jammed=false; filler.repairClicks=0; filler.timer=1200;
     boxFormer.jammed=false; boxFormer.repairClicks=0; boxFormer.timer=2600;
     sealer.jammed=false; sealer.repairClicks=0; sealer.busy=false; sealer.sealT=0;
-    qcSlots.forEach(function(s){ s.item=null; s.dwell=0; s.decided=null; });
+    qcItems = [];
     fillerInterval = 2200; boxFormerInterval = 3800; badBagChance = 0.12;
     popups = []; particles = [];
     updateStopBtn();
@@ -755,60 +762,52 @@ function updateQC(dt){
     if (G.lineRunning){
         var incoming = belt1.peekOut();
         if (incoming){
-            var freeSlot = null;
-            for (var i=0;i<qcSlots.length;i++){ if (!qcSlots[i].item){ freeSlot = qcSlots[i]; break; } }
-            if (freeSlot){
-                belt1.takeOut();
-                freeSlot.item = incoming;
-                freeSlot.dwell = qcDwellTime;
-                freeSlot.decided = null;
-                incoming.x = 290; incoming.y = 190;
-            }
+            belt1.takeOut();
+            var gateAngle = Math.atan2(QC_ENTRY.y - QC_DISC_CENTER.y, QC_ENTRY.x - QC_DISC_CENTER.x);
+            incoming._qcBaseAngle = gateAngle - G.tableAngle;
+            incoming._qcElapsed = 0;
+            incoming._qcDecided = null;
+            qcItems.push(incoming);
         }
     }
-    qcSlots.forEach(function(s){
-        if (!s.item) return;
-        tweenTo(s.item, s.pos.x, s.pos.y, dt, 0.005);
-        if (s.decided === 'pass'){
+    for (var i=qcItems.length-1; i>=0; i--){
+        var b = qcItems[i];
+        if (b._qcDecided === 'pass'){
             if (belt2.canPush()){
-                belt2.push(s.item);
-                s.item = null; s.decided = null;
+                belt2.push(b);
+                qcItems.splice(i,1);
             }
-            return;
+            continue;
         }
-        if (s.decided === 'reject') return; // handled by timed removal elsewhere
-        if (G.lineRunning){
-            s.dwell -= dt;
-            if (s.dwell <= 0){
-                if (s.item.isBad){ s.item.hadUncaughtLeak = true; }
-                s.decided = 'pass';
-            }
-        }
-    });
+        var ang = b._qcBaseAngle + G.tableAngle;
+        b.x = QC_DISC_CENTER.x + Math.cos(ang) * QC_ITEM_ORBIT_R;
+        b.y = QC_DISC_CENTER.y + Math.sin(ang) * QC_ITEM_ORBIT_R;
+        if (G.lineRunning) b._qcElapsed += dt;
+    }
 }
 
-function resolveQCClick(s, mx, my){
-    if (!s.item || s.decided) return false;
-    if (!dist(mx,my,s.item.x,s.item.y) < 34) {}
+function resolveQCClick(bag){
+    if (!bag || bag._qcDecided) return false;
     sfxClick();
-    if (s.item.isBad){
+    if (bag.isBad){
         sfxReject();
-        spawnPopup(s.pos.x, s.pos.y-28, 'LEAK! Rejected', '#f87171');
-        spawnParticles(s.pos.x, s.pos.y, '#f87171', 12, 140);
+        spawnPopup(bag.x, bag.y-28, 'LEAK! Rejected', '#f87171');
+        spawnParticles(bag.x, bag.y, '#f87171', 12, 140);
         addScore(5);
         rejectToggle = !rejectToggle;
         if (rejectToggle){
             qcRejectPile++;
             spawnParticles(QC_REJECT_PILE_POS.x, QC_REJECT_PILE_POS.y, '#f87171', 6, 70);
         } else {
-            rejectFlights.push({ x0:s.pos.x, y0:s.pos.y, x1:REJECT_STACK_POS.x, y1:REJECT_STACK_POS.y, t:0, dur:850 });
+            rejectFlights.push({ x0:bag.x, y0:bag.y, x1:REJECT_STACK_POS.x, y1:REJECT_STACK_POS.y, t:0, dur:850 });
         }
-        s.item = null; s.decided = null;
+        var idx = qcItems.indexOf(bag);
+        if (idx >= 0) qcItems.splice(idx,1);
     } else {
         sfxGood();
-        spawnPopup(s.pos.x, s.pos.y-28, 'OK +2', '#4ade80');
+        spawnPopup(bag.x, bag.y-28, 'OK +2', '#4ade80');
         addScore(2);
-        s.decided = 'pass';
+        bag._qcDecided = 'pass';
     }
     return true;
 }
@@ -1023,8 +1022,7 @@ function difficultyRamp(dt){
 
 function anyQueueHot(){
     if (bagQueue.length >= BAG_QUEUE_CAP) return true;
-    var qcFull = qcSlots.every(function(s){ return s.item; });
-    if (qcFull) return true;
+    if (qcItems.length >= QC_HOT_THRESHOLD) return true;
     if (!belt1.canPush() && filler.jammed) return true;
     return false;
 }
@@ -1343,18 +1341,16 @@ function drawQCTable(){
     ctx.restore();
 }
 
-function drawQCSlots(){
-    qcSlots.forEach(function(s){
-        if (!s.item) return;
-        // ring showing dwell time remaining
-        if (!s.decided){
-            var pct = clamp(s.dwell/qcDwellTime,0,1);
+function drawQCItems(){
+    qcItems.forEach(function(b){
+        if (!b._qcDecided){
+            // faint ring marks it as still uninspected and tappable
             ctx.beginPath();
-            ctx.arc(s.item.x, s.item.y, 22, -Math.PI/2, -Math.PI/2 + pct*Math.PI*2);
-            ctx.strokeStyle = pct>0.35 ? 'rgba(74,222,128,0.8)' : 'rgba(248,113,113,0.9)';
-            ctx.lineWidth = 3; ctx.stroke();
+            ctx.arc(b.x, b.y, 20, 0, Math.PI*2);
+            ctx.strokeStyle = 'rgba(226,232,240,0.35)';
+            ctx.lineWidth = 2; ctx.stroke();
         }
-        drawBag(s.item.x, s.item.y, 1, s.item.isBad && s.decided===null && s.dwell < qcDwellTime*0.5);
+        drawBag(b.x, b.y, 1, b.isBad && !b._qcDecided && b._qcElapsed > QC_LEAK_REVEAL_MS);
     });
 }
 
@@ -1570,7 +1566,7 @@ function draw(){
     // items on belts
     belt1.forEachItem(function(it){ drawBag(it.x,it.y,1,false); });
     belt2.forEachItem(function(it){ drawBag(it.x,it.y,0.9,it.hadUncaughtLeak); });
-    drawQCSlots();
+    drawQCItems();
 
     beltFormerToInsert.forEachItem(function(it){ drawBox(it.x,it.y,it); });
     beltSealerToHelix.forEachItem(function(it){ drawBox(it.x,it.y,it); });
@@ -1620,6 +1616,34 @@ function toCanvasCoords(clientX, clientY){
     };
 }
 
+// lets a tap grab a bag straight off the belt while it's still riding the final straight
+// run into the loader, instead of making the player wait for it to reach the very end
+function grabBagFromBelt2(mx, my){
+    if (!activeBox) return false;
+    var pts = belt2.points;
+    var p0 = pts[pts.length-2], p1 = pts[pts.length-1];
+    var minX = Math.min(p0.x, p1.x) - 10, maxX = Math.max(p0.x, p1.x) + 10;
+    var midY = (p0.y + p1.y) / 2;
+    var found = null;
+    belt2.forEachItem(function(it){
+        if (found) return;
+        if (it.x >= minX && it.x <= maxX && Math.abs(it.y - midY) < 20 && dist(mx,my,it.x,it.y) < 24) found = it;
+    });
+    if (!found) return false;
+    var reserved = 0;
+    for (var k=0;k<loaderReaches.length;k++){ if (loaderReaches[k].box === activeBox) reserved++; }
+    if (activeBox.bagCount + reserved < 8){
+        belt2.removeItem(found);
+        var workerIdx = nextLoaderWorker; nextLoaderWorker = 1 - nextLoaderWorker;
+        loaderReaches.push({
+            x0: found.x, y0: found.y, x1: LOADER_POS.x, y1: LOADER_POS.y,
+            t: 0, dur: 420, workerIdx: workerIdx, box: activeBox, bad: found.hadUncaughtLeak
+        });
+        sfxClick();
+    }
+    return true;
+}
+
 function handlePointer(clientX, clientY){
     if (!G.running || G.over) return;
     var p = toCanvasCoords(clientX, clientY);
@@ -1629,10 +1653,10 @@ function handlePointer(clientX, clientY){
     if (boxFormer.jammed && rectHit(BOXFORMER_RECT, mx, my)){ repairClick(boxFormer, BOXFORMER_RECT.x+BOXFORMER_RECT.w/2, BOXFORMER_RECT.y+BOXFORMER_RECT.h/2); return; }
     if (sealer.jammed && rectHit(SEALER_RECT, mx, my)){ repairClick(sealer, SEALER_RECT.x+SEALER_RECT.w/2, SEALER_RECT.y+SEALER_RECT.h/2); return; }
 
-    for (var i=0;i<qcSlots.length;i++){
-        var s = qcSlots[i];
-        if (s.item && !s.decided && dist(mx,my,s.item.x,s.item.y) < 26){
-            resolveQCClick(s, mx, my);
+    for (var i=0;i<qcItems.length;i++){
+        var b = qcItems[i];
+        if (!b._qcDecided && dist(mx,my,b.x,b.y) < 26){
+            resolveQCClick(b);
             return;
         }
     }
@@ -1644,6 +1668,8 @@ function handlePointer(clientX, clientY){
         addScore(1);
         return;
     }
+
+    if (grabBagFromBelt2(mx, my)) return;
 
     for (var j=0;j<bagQueue.length;j++){
         var bag = bagQueue[j];
