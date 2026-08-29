@@ -636,15 +636,15 @@ var LOADER_WORKERS = [
 ];
 var nextLoaderWorker = 0;
 
-// rejected bags drop onto a small pile right at QC first; boxing workers periodically
-// swing by, grab one, and carry it over to the bigger pile by the loader station
+// each rejected bag permanently goes to exactly one of two piles, decided the moment it's
+// rejected — QC's own local pile, or the one by the loader station (boxing workers grab it
+// straight off the QC table). A bag never moves between the two piles afterward.
 var QC_REJECT_PILE_POS = {x: QC_CENTER.x, y: 335};
 var qcRejectPile = 0;
-var qcCollectTimer = 0;
-var QC_COLLECT_INTERVAL = 2600;
+var rejectToggle = false; // alternates which pile a newly rejected bag is sent to
 
 var REJECT_STACK_POS = {x: LOADER_RECT.x - 15, y: 505};
-var rejectFlights = []; // {x0,y0,x1,y1,t,dur} - a bad bag arcing from the QC pile to the loader pile
+var rejectFlights = []; // {x0,y0,x1,y1,t,dur} - a bad bag arcing from QC straight to the loader pile
 var rejectPile = 0;
 var stackReach = null;  // {workerIdx,t,dur} - brief arm-dip when a bag lands on the pile
 
@@ -704,7 +704,7 @@ function resetGame(){
     buildBelts();
     bagQueue = []; activeBox = null; insertBuffer = null; sealBuffer = null; helixItems = []; loaderReaches = [];
     rejectFlights = []; rejectPile = 0; stackReach = null;
-    qcRejectPile = 0; qcCollectTimer = 0;
+    qcRejectPile = 0; rejectToggle = false;
     filler.jammed=false; filler.repairClicks=0; filler.timer=1200;
     boxFormer.jammed=false; boxFormer.repairClicks=0; boxFormer.timer=2600;
     sealer.jammed=false; sealer.repairClicks=0; sealer.busy=false; sealer.sealT=0;
@@ -796,8 +796,13 @@ function resolveQCClick(s, mx, my){
         spawnPopup(s.pos.x, s.pos.y-28, 'LEAK! Rejected', '#f87171');
         spawnParticles(s.pos.x, s.pos.y, '#f87171', 12, 140);
         addScore(5);
-        qcRejectPile++;
-        spawnParticles(QC_REJECT_PILE_POS.x, QC_REJECT_PILE_POS.y, '#f87171', 6, 70);
+        rejectToggle = !rejectToggle;
+        if (rejectToggle){
+            qcRejectPile++;
+            spawnParticles(QC_REJECT_PILE_POS.x, QC_REJECT_PILE_POS.y, '#f87171', 6, 70);
+        } else {
+            rejectFlights.push({ x0:s.pos.x, y0:s.pos.y, x1:REJECT_STACK_POS.x, y1:REJECT_STACK_POS.y, t:0, dur:850 });
+        }
         s.item = null; s.decided = null;
     } else {
         sfxGood();
@@ -897,19 +902,6 @@ function updateRejectFlights(dt){
     if (stackReach){
         stackReach.t += dt;
         if (stackReach.t >= stackReach.dur) stackReach = null;
-    }
-}
-
-function updateQCRejectCollection(dt){
-    if (qcRejectPile > 0){
-        qcCollectTimer += dt;
-        if (qcCollectTimer >= QC_COLLECT_INTERVAL){
-            qcCollectTimer = 0;
-            qcRejectPile--;
-            rejectFlights.push({ x0:QC_REJECT_PILE_POS.x, y0:QC_REJECT_PILE_POS.y, x1:REJECT_STACK_POS.x, y1:REJECT_STACK_POS.y, t:0, dur:850 });
-        }
-    } else {
-        qcCollectTimer = 0;
     }
 }
 
@@ -1052,7 +1044,6 @@ function update(dt){
     updateLoader(dt);
     updateLoaderReaches(dt);
     updateRejectFlights(dt);
-    updateQCRejectCollection(dt);
     updateSealer(dt);
     updateHelix(dt);
     updateExit(dt);
