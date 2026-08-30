@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Maze Escape</title>
+<style>
+  * {
+    box-sizing: border-box;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #0b1220;
+    color: #e2e8f0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    touch-action: manipulation;
+  }
+  #app {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ---------- HUD ---------- */
+  #hud {
+    width: 100%;
+    max-width: 480px;
+    padding: env(safe-area-inset-top, 10px) 14px 4px;
+    text-align: center;
+    z-index: 5;
+  }
+  h1 {
+    margin: 4px 0 6px;
+    font-size: clamp(18px, 5vw, 24px);
+    color: #4ade80;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+  }
+  .stats-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #94a3b8;
+    font-weight: 600;
+  }
+  .stats-row .val { color: #38bdf8; }
+  #warning {
+    margin-top: 4px;
+    min-height: 20px;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: #fbbf24;
+    text-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  #warning.show { opacity: 1; }
+  #warning.run {
+    color: #ef4444;
+    text-shadow: 0 0 12px rgba(239, 68, 68, 0.8);
+  }
+
+  /* ---------- Canvas ---------- */
+  #game-wrapper {
+    position: relative;
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+  }
+  canvas#maze {
+    display: block;
+    touch-action: none;
+    border-radius: 10px;
+    box-shadow: 0 0 30px rgba(0,0,0,0.6);
+  }
+
+  /* ---------- D-Pad ---------- */
+  #dpad {
+    display: grid;
+    grid-template-columns: 56px 56px 56px;
+    grid-template-rows: 56px 56px 56px;
+    gap: 4px;
+    padding: 6px 0 max(10px, env(safe-area-inset-bottom, 10px));
+    z-index: 5;
+  }
+  #dpad button {
+    grid-column: var(--c);
+    grid-row: var(--r);
+    background: rgba(148, 163, 184, 0.14);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    color: #e2e8f0;
+    border-radius: 12px;
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
+  }
+  #dpad button:active { background: rgba(74, 222, 128, 0.35); }
+  #btn-up { --c: 2; --r: 1; }
+  #btn-left { --c: 1; --r: 2; }
+  #btn-right { --c: 3; --r: 2; }
+  #btn-down { --c: 2; --r: 3; }
+
+  /* ---------- Overlays ---------- */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(11, 18, 32, 0.94);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    z-index: 20;
+    padding: 24px;
+  }
+  .overlay[hidden] { display: none; }
+  .overlay h2 {
+    font-size: clamp(22px, 6vw, 32px);
+    margin: 0 0 8px;
+  }
+  .overlay p { color: #94a3b8; margin: 4px 0 18px; font-size: 14px; }
+
+  #select-title { color: #4ade80; text-shadow: 0 0 10px rgba(74,222,128,0.5); }
+
+  .char-row {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 22px;
+  }
+  .char-btn {
+    background: rgba(148, 163, 184, 0.1);
+    border: 2px solid rgba(148, 163, 184, 0.25);
+    border-radius: 18px;
+    padding: 12px 18px 10px;
+    cursor: pointer;
+    color: #e2e8f0;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .char-btn:active, .char-btn.chosen { border-color: #4ade80; background: rgba(74,222,128,0.15); }
+  .char-btn canvas { display: block; margin: 0 auto 6px; }
+
+  .big-btn {
+    background: #16a34a;
+    color: white;
+    border: none;
+    padding: 14px 30px;
+    font-size: 17px;
+    font-weight: 800;
+    border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(22, 163, 74, 0.4);
+  }
+  .big-btn:active { transform: scale(0.96); }
+  .ghost-btn {
+    margin-top: 12px;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 13px;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  #win-screen h2 { color: #4ade80; text-shadow: 0 0 14px rgba(74,222,128,0.6); }
+  #lose-screen h2 { color: #ef4444; text-shadow: 0 0 14px rgba(239,68,68,0.6); }
+  .result-stat { color: #38bdf8; font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="hud">
+    <h1>Maze Escape</h1>
+    <div class="stats-row">
+      <span>Time: <span id="timer" class="val">0.0s</span></span>
+      <span>Best: <span id="best" class="val">--</span></span>
+      <span>Zombies: <span id="zcount" class="val">0</span></span>
+    </div>
+    <div id="warning"></div>
+  </div>
+
+  <div id="game-wrapper">
+    <canvas id="maze"></canvas>
+  </div>
+
+  <div id="dpad">
+    <button id="btn-up">&#8593;</button>
+    <button id="btn-left">&#8592;</button>
+    <button id="btn-right">&#8594;</button>
+    <button id="btn-down">&#8595;</button>
+  </div>
+
+  <!-- Character select -->
+  <div class="overlay" id="select-screen">
+    <h2 id="select-title">Choose Your Runner</h2>
+    <p>The zombies will start walking two seconds after you set off.<br>You're a little faster than they are &mdash; reach the far side to escape!</p>
+    <div class="char-row">
+      <div class="char-btn" id="pick-guy">
+        <canvas width="64" height="64"></canvas>
+        Guy
+      </div>
+      <div class="char-btn" id="pick-gal">
+        <canvas width="64" height="64"></canvas>
+        Gal
+      </div>
+    </div>
+    <button class="big-btn" id="start-btn">Enter Maze</button>
+  </div>
+
+  <!-- Win -->
+  <div class="overlay" id="win-screen" hidden>
+    <h2>You Escaped!</h2>
+    <p>Time: <span class="result-stat" id="win-time"></span><br>Zombies chasing you: <span class="result-stat" id="win-zombies"></span></p>
+    <button class="big-btn" id="win-again-btn">Next Maze</button>
+    <button class="ghost-btn" id="win-switch-btn">Change Runner</button>
+  </div>
+
+  <!-- Lose -->
+  <div class="overlay" id="lose-screen" hidden>
+    <h2>Caught!</h2>
+    <p>A zombie got you after <span class="result-stat" id="lose-time"></span>.</p>
+    <button class="big-btn" id="lose-again-btn">Try Again</button>
+    <button class="ghost-btn" id="lose-switch-btn">Change Runner</button>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ============== Maze generation ==============
+  var N = 12;
+  var START = { r: 5, c: 0 };
+  var EXIT = { r: 5, c: N - 1 };
+
+  function idx(r, c) { return r * N + c; }
+
+  function generateMaze() {
+    var cells = [];
+    for (var r = 0; r < N; r++) {
+      for (var c = 0; c < N; c++) {
+        cells.push({ r: r, c: c, top: true, right: true, bottom: true, left: true, visited: false });
+      }
+    }
+    var dirs = [
+      { dr: -1, dc: 0, wall: 'top', opp: 'bottom' },
+      { dr: 1, dc: 0, wall: 'bottom', opp: 'top' },
+      { dr: 0, dc: -1, wall: 'left', opp: 'right' },
+      { dr: 0, dc: 1, wall: 'right', opp: 'left' }
+    ];
+    var stack = [];
+    var current = cells[idx(START.r, START.c)];
+    current.visited = true;
+    stack.push(current);
+    while (stack.length) {
+      current = stack[stack.length - 1];
+      var neighbors = [];
+      for (var i = 0; i < dirs.length; i++) {
+        var d = dirs[i];
+        var nr = current.r + d.dr, nc = current.c + d.dc;
+        if (nr >= 0 && nr < N && nc >= 0 && nc < N) {
+          var n = cells[idx(nr, nc)];
+          if (!n.visited) neighbors.push({ cell: n, dir: d });
+        }
+      }
+      if (neighbors.length) {
+        var pick = neighbors[Math.floor(Math.random() * neighbors.length)];
+        current[pick.dir.wall] = false;
+        pick.cell[pick.dir.opp] = false;
+        pick.cell.visited = true;
+        stack.push(pick.cell);
+      } else {
+        stack.pop();
+      }
+    }
+    return cells;
+  }
+
+  function neighborsOf(cells, cell) {
+    var list = [];
+    if (!cell.top && cell.r > 0) list.push(cells[idx(cell.r - 1, cell.c)]);
+    if (!cell.bottom && cell.r < N - 1) list.push(cells[idx(cell.r + 1, cell.c)]);
+    if (!cell.left && cell.c > 0) list.push(cells[idx(cell.r, cell.c - 1)]);
+    if (!cell.right && cell.c < N - 1) list.push(cells[idx(cell.r, cell.c + 1)]);
+    return list;
+  }
+
+  // Returns the cell adjacent to `from` that lies on the shortest path to `to`.
+  function bfsNextStep(cells, from, to) {
+    if (from === to) return null;
+    var visited = new Set([from]);
+    var prev = new Map();
+    var queue = [from];
+    var head = 0;
+    while (head < queue.length) {
+      var cur = queue[head++];
+      if (cur === to) break;
+      var ns = neighborsOf(cells, cur);
+      for (var i = 0; i < ns.length; i++) {
+        var n = ns[i];
+        if (!visited.has(n)) {
+          visited.add(n);
+          prev.set(n, cur);
+          queue.push(n);
+        }
+      }
+    }
+    if (!visited.has(to)) return null;
+    var step = to;
+    while (prev.get(step) !== from) {
+      step = prev.get(step);
+      if (step === undefined) return null;
+    }
+    return step;
+  }
+
+  // ============== Rendering helpers ==============
+  function drawRunnerIcon(ctx, x, y, r, gender, mood) {
+    ctx.save();
+    ctx.translate(x, y);
+    var bodyColor = gender === 'gal' ? '#ec4899' : '#3b82f6';
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = Math.max(1, r * 0.08);
+    ctx.strokeStyle = '#ffffff';
+    ctx.stroke();
+
+    if (gender === 'gal') {
+      // bow
+      ctx.fillStyle = '#f472b6';
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 1.05);
+      ctx.lineTo(-r * 0.4, -r * 1.4);
+      ctx.lineTo(0, -r * 1.15);
+      ctx.lineTo(r * 0.4, -r * 1.4);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      // cap
+      ctx.fillStyle = '#1e3a8a';
+      ctx.beginPath();
+      ctx.arc(0, -r * 0.15, r * 0.92, Math.PI, 0);
+      ctx.fill();
+    }
+
+    var eyeOffset = r * 0.35;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(-eyeOffset, -r * 0.05, r * 0.22, 0, Math.PI * 2);
+    ctx.arc(eyeOffset, -r * 0.05, r * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.arc(-eyeOffset, -r * 0.05, r * 0.11, 0, Math.PI * 2);
+    ctx.arc(eyeOffset, -r * 0.05, r * 0.11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawZombieIcon(ctx, x, y, r, walkPhase) {
+    ctx.save();
+    ctx.translate(x, y);
+
+    var swing = Math.sin(walkPhase) * r * 0.6;
+    ctx.strokeStyle = '#14532d';
+    ctx.lineWidth = Math.max(1, r * 0.24);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.32, r * 0.8);
+    ctx.lineTo(-r * 0.32 + swing * 0.5, r * 1.35);
+    ctx.moveTo(r * 0.32, r * 0.8);
+    ctx.lineTo(r * 0.32 - swing * 0.5, r * 1.35);
+    ctx.stroke();
+
+    var bob = -Math.abs(Math.sin(walkPhase)) * r * 0.14;
+    ctx.translate(0, bob);
+
+    ctx.fillStyle = '#22c55e';
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = Math.max(1, r * 0.08);
+    ctx.strokeStyle = '#14532d';
+    ctx.stroke();
+
+    var eyeOffset = r * 0.35;
+    ctx.strokeStyle = '#7f1d1d';
+    ctx.lineWidth = Math.max(1, r * 0.16);
+    ctx.beginPath();
+    ctx.moveTo(-eyeOffset - r * 0.18, -r * 0.2);
+    ctx.lineTo(-eyeOffset + r * 0.18, r * 0.1);
+    ctx.moveTo(-eyeOffset + r * 0.18, -r * 0.2);
+    ctx.lineTo(-eyeOffset - r * 0.18, r * 0.1);
+    ctx.moveTo(eyeOffset - r * 0.18, -r * 0.2);
+    ctx.lineTo(eyeOffset + r * 0.18, r * 0.1);
+    ctx.moveTo(eyeOffset + r * 0.18, -r * 0.2);
+    ctx.lineTo(eyeOffset - r * 0.18, r * 0.1);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#7f1d1d';
+    ctx.lineWidth = Math.max(1, r * 0.1);
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.3, r * 0.45);
+    ctx.lineTo(-r * 0.1, r * 0.32);
+    ctx.lineTo(r * 0.1, r * 0.5);
+    ctx.lineTo(r * 0.3, r * 0.32);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ============== Game state ==============
+  var canvas = document.getElementById('maze');
+  var ctx = canvas.getContext('2d');
+  var size = 0, cellSize = 0, wallW = 2;
+
+  var PLAYER_MOVE_MS = 260;
+  var ZOMBIE_MOVE_MS = 340;
+  var ZOMBIE_DELAY_MS = 2000;
+
+  var gender = 'guy';
+  var wins = 0;
+  var maxZombies = 20;
+  var ZOMBIE_WAKE_STAGGER_MS = 90;
+  var ZOMBIE_WALK_FREQ = 0.013;
+
+  var cells, player, zombies, running, startedAt, zombieTimerId, elapsed;
+  var keysHeld = [];
+  var touchDir = null;
+
+  function loadBest() {
+    try { return localStorage.getItem('mazeEscapeBest'); } catch (e) { return null; }
+  }
+  function saveBest(t) {
+    try {
+      var cur = parseFloat(localStorage.getItem('mazeEscapeBest'));
+      if (isNaN(cur) || t < cur) localStorage.setItem('mazeEscapeBest', String(t));
+    } catch (e) {}
+  }
+  function loadWins() {
+    try { return parseInt(localStorage.getItem('mazeEscapeWins') || '0', 10); } catch (e) { return 0; }
+  }
+  function saveWins(w) {
+    try { localStorage.setItem('mazeEscapeWins', String(w)); } catch (e) {}
+  }
+
+  function refreshBestDisplay() {
+    var b = loadBest();
+    document.getElementById('best').textContent = b ? (parseFloat(b).toFixed(1) + 's') : '--';
+  }
+
+  function resize() {
+    var wrapper = document.getElementById('game-wrapper');
+    size = Math.floor(Math.min(wrapper.clientWidth, wrapper.clientHeight) * 0.96);
+    canvas.width = size;
+    canvas.height = size;
+    cellSize = size / N;
+    wallW = Math.max(2, size * 0.006);
+    drawFrame();
+  }
+  window.addEventListener('resize', resize);
+
+  function cellCenter(cell) {
+    return { x: cell.c * cellSize + cellSize / 2, y: cell.r * cellSize + cellSize / 2 };
+  }
+
+  function makeMover(cell) {
+    return {
+      cell: cell,
+      from: cell,
+      to: cell,
+      moving: false,
+      t: 0,
+      duration: PLAYER_MOVE_MS,
+      walkClock: 0
+    };
+  }
+
+  function moverPos(m) {
+    var a = cellCenter(m.from), b = cellCenter(m.to);
+    var t = m.moving ? m.t : 1;
+    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+  }
+
+  function tryStartMove(m, dr, dc) {
+    if (m.moving) return false;
+    var c = m.cell;
+    var blocked =
+      (dr === -1 && c.top) || (dr === 1 && c.bottom) ||
+      (dc === -1 && c.left) || (dc === 1 && c.right);
+    if (blocked) return false;
+    var nr = c.r + dr, nc = c.c + dc;
+    if (nr < 0 || nr >= N || nc < 0 || nc >= N) return false;
+    m.from = c;
+    m.to = cells[idx(nr, nc)];
+    m.moving = true;
+    m.t = 0;
+    return true;
+  }
+
+  function stepMover(m, dtMs) {
+    if (!m.moving) return;
+    m.walkClock += dtMs;
+    m.t += dtMs / m.duration;
+    if (m.t >= 1) {
+      m.t = 1;
+      m.cell = m.to;
+      m.moving = false;
+    }
+  }
+
+  function resetGame(newMaze) {
+    if (newMaze) cells = generateMaze();
+    player = makeMover(cells[idx(START.r, START.c)]);
+    var zCount = Math.min(1 + wins, maxZombies);
+    zombies = [];
+    for (var i = 0; i < zCount; i++) {
+      var zm = makeMover(cells[idx(START.r, START.c)]);
+      zm.duration = ZOMBIE_MOVE_MS;
+      zm.awake = false;
+      zm.wakeAt = ZOMBIE_DELAY_MS + i * ZOMBIE_WAKE_STAGGER_MS;
+      zombies.push(zm);
+    }
+    document.getElementById('zcount').textContent = String(zCount);
+    running = true;
+    elapsed = 0;
+    startedAt = performance.now();
+    clearTimeout(zombieTimerId);
+    var warn = document.getElementById('warning');
+    warn.className = 'show';
+    warn.textContent = 'Zombies stir in 2s…';
+    zombieTimerId = setTimeout(function () {
+      warn.className = 'show run';
+      warn.textContent = 'RUN!';
+      setTimeout(function () { warn.className = ''; }, 1200);
+    }, ZOMBIE_DELAY_MS);
+    refreshBestDisplay();
+  }
+
+  function currentDir() {
+    if (touchDir) return touchDir;
+    if (keysHeld.length) return keysHeld[keysHeld.length - 1];
+    return null;
+  }
+
+  var DIRS = {
+    up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1]
+  };
+
+  var lastTs = null;
+  function loop(ts) {
+    if (lastTs === null) lastTs = ts;
+    var dt = ts - lastTs;
+    lastTs = ts;
+    if (running) update(dt);
+    drawFrame();
+    requestAnimationFrame(loop);
+  }
+
+  function update(dt) {
+    elapsed = (performance.now() - startedAt) / 1000;
+    document.getElementById('timer').textContent = elapsed.toFixed(1) + 's';
+
+    var d = currentDir();
+    if (d && DIRS[d]) tryStartMove(player, DIRS[d][0], DIRS[d][1]);
+    stepMover(player, dt);
+
+    for (var i = 0; i < zombies.length; i++) {
+      var z = zombies[i];
+      if (!z.awake) {
+        if (elapsed * 1000 >= z.wakeAt) z.awake = true;
+        else continue;
+      }
+      if (!z.moving) {
+        var next = bfsNextStep(cells, z.cell, player.cell);
+        if (next) {
+          var dr = next.r - z.cell.r, dc = next.c - z.cell.c;
+          tryStartMove(z, dr, dc);
+        }
+      }
+      stepMover(z, dt);
+    }
+
+    // Collision check (pixel distance so mid-animation catches count)
+    var pp = moverPos(player);
+    var threshold = cellSize * 0.55;
+    for (var j = 0; j < zombies.length; j++) {
+      if (!zombies[j].awake) continue;
+      var zp = moverPos(zombies[j]);
+      var dx = pp.x - zp.x, dy = pp.y - zp.y;
+      if (Math.sqrt(dx * dx + dy * dy) < threshold) {
+        return endGame(false);
+      }
+    }
+
+    if (player.cell === cells[idx(EXIT.r, EXIT.c)] && !player.moving) {
+      return endGame(true);
+    }
+  }
+
+  function endGame(won) {
+    running = false;
+    clearTimeout(zombieTimerId);
+    var warn = document.getElementById('warning');
+    if (won) {
+      warn.className = '';
+      wins += 1;
+      saveWins(wins);
+      saveBest(elapsed);
+      document.getElementById('win-time').textContent = elapsed.toFixed(1) + 's';
+      document.getElementById('win-zombies').textContent = String(zombies.length);
+      show('win-screen');
+      if (window.GameAnalytics) window.GameAnalytics.markCompleted();
+    } else {
+      warn.className = 'show run';
+      warn.textContent = 'CAUGHT!';
+      setTimeout(function () {
+        warn.className = '';
+        document.getElementById('lose-time').textContent = elapsed.toFixed(1) + 's';
+        show('lose-screen');
+      }, 2000);
+    }
+  }
+
+  function show(id) {
+    ['select-screen', 'win-screen', 'lose-screen'].forEach(function (s) {
+      document.getElementById(s).hidden = (s !== id);
+    });
+  }
+  function hideAllOverlays() {
+    ['select-screen', 'win-screen', 'lose-screen'].forEach(function (s) {
+      document.getElementById(s).hidden = true;
+    });
+  }
+
+  // ============== Drawing ==============
+  function drawFrame() {
+    if (!cells) return;
+    ctx.clearRect(0, 0, size, size);
+    ctx.fillStyle = '#111827';
+    ctx.fillRect(0, 0, size, size);
+
+    // start/exit tint
+    ctx.fillStyle = 'rgba(74, 222, 128, 0.18)';
+    ctx.fillRect(START.c * cellSize, START.r * cellSize, cellSize, cellSize);
+    var glow = 0.22 + 0.12 * Math.sin(performance.now() / 220);
+    ctx.fillStyle = 'rgba(251, 191, 36, ' + glow + ')';
+    ctx.fillRect(EXIT.c * cellSize, EXIT.r * cellSize, cellSize, cellSize);
+
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = wallW;
+    ctx.lineCap = 'square';
+    ctx.beginPath();
+    for (var r = 0; r < N; r++) {
+      for (var c = 0; c < N; c++) {
+        var cell = cells[idx(r, c)];
+        var x = c * cellSize, y = r * cellSize;
+        if (cell.top) { ctx.moveTo(x, y); ctx.lineTo(x + cellSize, y); }
+        if (cell.left) { ctx.moveTo(x, y); ctx.lineTo(x, y + cellSize); }
+        if (cell.right) { ctx.moveTo(x + cellSize, y); ctx.lineTo(x + cellSize, y + cellSize); }
+        if (cell.bottom) { ctx.moveTo(x, y + cellSize); ctx.lineTo(x + cellSize, y + cellSize); }
+      }
+    }
+    ctx.stroke();
+
+    var playerIconR = cellSize * 0.34;
+    var zombieIconR = cellSize * 0.2;
+    for (var i = 0; i < zombies.length; i++) {
+      if (!zombies[i].awake) continue;
+      var zp = moverPos(zombies[i]);
+      drawZombieIcon(ctx, zp.x, zp.y, zombieIconR, zombies[i].walkClock * ZOMBIE_WALK_FREQ);
+    }
+    var pp = moverPos(player);
+    drawRunnerIcon(ctx, pp.x, pp.y, playerIconR, gender);
+  }
+
+  // ============== Input ==============
+  var KEY_MAP = {
+    ArrowUp: 'up', w: 'up', W: 'up',
+    ArrowDown: 'down', s: 'down', S: 'down',
+    ArrowLeft: 'left', a: 'left', A: 'left',
+    ArrowRight: 'right', d: 'right', D: 'right'
+  };
+  window.addEventListener('keydown', function (e) {
+    var dir = KEY_MAP[e.key];
+    if (!dir) return;
+    e.preventDefault();
+    if (keysHeld.indexOf(dir) === -1) keysHeld.push(dir);
+  });
+  window.addEventListener('keyup', function (e) {
+    var dir = KEY_MAP[e.key];
+    if (!dir) return;
+    var i = keysHeld.indexOf(dir);
+    if (i !== -1) keysHeld.splice(i, 1);
+  });
+
+  function bindDpad(id, dir) {
+    var btn = document.getElementById(id);
+    var set = function (e) { e.preventDefault(); touchDir = dir; };
+    var clear = function (e) { if (touchDir === dir) touchDir = null; };
+    btn.addEventListener('touchstart', set, { passive: false });
+    btn.addEventListener('touchend', clear);
+    btn.addEventListener('touchcancel', clear);
+    btn.addEventListener('mousedown', set);
+    btn.addEventListener('mouseup', clear);
+    btn.addEventListener('mouseleave', clear);
+  }
+  bindDpad('btn-up', 'up');
+  bindDpad('btn-down', 'down');
+  bindDpad('btn-left', 'left');
+  bindDpad('btn-right', 'right');
+
+  // ============== UI wiring ==============
+  function drawPreview(canvasEl, g) {
+    var pctx = canvasEl.getContext('2d');
+    pctx.clearRect(0, 0, 64, 64);
+    drawRunnerIcon(pctx, 32, 36, 22, g);
+  }
+  var guyBtn = document.getElementById('pick-guy');
+  var galBtn = document.getElementById('pick-gal');
+  drawPreview(guyBtn.querySelector('canvas'), 'guy');
+  drawPreview(galBtn.querySelector('canvas'), 'gal');
+
+  function selectGender(g) {
+    gender = g;
+    guyBtn.classList.toggle('chosen', g === 'guy');
+    galBtn.classList.toggle('chosen', g === 'gal');
+  }
+  guyBtn.addEventListener('click', function () { selectGender('guy'); });
+  galBtn.addEventListener('click', function () { selectGender('gal'); });
+  selectGender('guy');
+
+  document.getElementById('start-btn').addEventListener('click', function () {
+    hideAllOverlays();
+    resetGame(true);
+  });
+  document.getElementById('win-again-btn').addEventListener('click', function () {
+    hideAllOverlays();
+    resetGame(true);
+  });
+  document.getElementById('lose-again-btn').addEventListener('click', function () {
+    wins = 0;
+    saveWins(0);
+    hideAllOverlays();
+    resetGame(true);
+  });
+  document.getElementById('win-switch-btn').addEventListener('click', function () { show('select-screen'); });
+  document.getElementById('lose-switch-btn').addEventListener('click', function () {
+    wins = 0;
+    saveWins(0);
+    show('select-screen');
+  });
+
+  // ============== Init ==============
+  wins = loadWins();
+  cells = generateMaze();
+  player = makeMover(cells[idx(START.r, START.c)]);
+  zombies = [];
+  running = false;
+  refreshBestDisplay();
+  resize();
+  show('select-screen');
+  requestAnimationFrame(loop);
+})();
+</script>
+
+    <script>window.GAME_NAME = "Maze Escape";</script>
+    <script src="analytics.js" defer></script>
+</body>
+</html>
