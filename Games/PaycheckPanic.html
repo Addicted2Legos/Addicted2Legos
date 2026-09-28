@@ -50,10 +50,6 @@
             border-radius: 3px;
         }
 
-        .azure-border {
-            border: 1px solid #0284C7;
-        }
-        
         .azure-glow {
             box-shadow: 0 0 15px rgba(2, 132, 199, 0.4);
         }
@@ -79,53 +75,16 @@
             backdrop-filter: blur(8px);
         }
 
-        @keyframes pulseGlow {
-            0%, 100% { box-shadow: 0 0 15px rgba(56, 189, 248, 0.6); }
-            50% { box-shadow: 0 0 25px rgba(56, 189, 248, 0.9); }
+        /* Screen Shake Animation Class */
+        .screen-shake {
+            animation: shake 0.25s cubic-bezier(.36,.07,.19,.97) both;
         }
 
-        .shield-active {
-            animation: pulseGlow 1s infinite;
-        }
-
-        .emerald-glow {
-            box-shadow: 0 0 15px rgba(16, 185, 129, 0.45);
-        }
-
-        input[type=range].custom-slider {
-            -webkit-appearance: none;
-            appearance: none;
-            background: #1E293B;
-            height: 8px;
-            border-radius: 9999px;
-            outline: none;
-            border: 1px solid #334155;
-            cursor: pointer;
-        }
-        input[type=range].custom-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: #0284C7;
-            cursor: pointer;
-            border: 2px solid #F8FAFC;
-            box-shadow: 0 0 10px rgba(2, 132, 199, 0.6);
-            transition: transform 0.15s ease, background-color 0.15s ease;
-        }
-        input[type=range].custom-slider::-webkit-slider-thumb:hover {
-            transform: scale(1.15);
-            background: #38BDF8;
-        }
-        input[type=range].custom-slider::-moz-range-thumb {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: #0284C7;
-            cursor: pointer;
-            border: 2px solid #F8FAFC;
-            box-shadow: 0 0 10px rgba(2, 132, 199, 0.6);
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+            40%, 60% { transform: translate3d(6px, 0, 0); }
         }
     </style>
 </head>
@@ -134,76 +93,104 @@
     <header class="w-full max-w-6xl mx-auto bg-navyLight border border-navyBorder rounded-xl p-3 mb-3 shadow-lg">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
             
-            <!-- Logo & Level Goals Chip -->
+            <!-- Logo & Month Status -->
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-lg bg-azure text-cream flex items-center justify-center text-xl font-black shadow azure-glow">
                     <i class="fa-solid fa-wallet"></i>
                 </div>
                 <div>
-                    <h1 class="text-lg font-bold text-cream leading-none tracking-wide flex items-center gap-2">
-                        PAYCHECK PANIC
-                    </h1>
-                    <button id="btnLevelGoalsChip" class="text-xs text-azure hover:text-cyan-300 font-medium mt-1 flex items-center gap-1.5 transition" title="Click to view Level Objectives">
-                        <i class="fa-solid fa-bullseye text-[11px]"></i>
-                        <span id="hudLevelBadge">Level 1: 0/3 Goals</span>
-                        <i class="fa-solid fa-circle-info text-[10px] opacity-70"></i>
-                    </button>
+                    <h1 class="text-lg font-bold text-cream leading-none tracking-wide">PAYCHECK PANIC</h1>
+                    <p class="text-xs text-azure font-medium mt-1" id="hudMonthDisplay">Month 1 • Day 1 / 30</p>
                 </div>
             </div>
 
-            <!-- STREAMLINED ACTION HUD: ONLY CHECKING, EMERGENCY FUND, AND DAYS REMAINING -->
+            <!-- Primary Account Cards -->
             <div class="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm">
-                <!-- 1. Checking Balance Account -->
-                <div class="bg-navy p-2 px-3.5 rounded-lg border border-navyBorder flex flex-col min-w-[125px]">
-                    <div class="flex items-center justify-between gap-1 mb-0.5">
-                        <span class="text-cream/60 text-[10px] uppercase font-bold tracking-wider">Checking</span>
-                        <span id="hudAutoInvestPill" class="hidden text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1 py-0.2 rounded font-mono font-bold">+$0/s</span>
-                    </div>
-                    <span class="text-emerald-400 font-mono font-black text-base sm:text-lg" id="hudCash">$500.00</span>
+                <!-- Checking Cash Account -->
+                <div class="bg-navy p-2 px-3 rounded-lg border border-navyBorder flex flex-col min-w-[110px]">
+                    <span class="text-cream/60 text-[10px] uppercase tracking-wider">Checking Cash</span>
+                    <span class="text-azure font-mono font-bold text-base" id="hudCash">$500.00</span>
                 </div>
 
-                <!-- 2. Emergency Fund -->
-                <div class="bg-navy p-2 px-3.5 rounded-lg border border-navyBorder flex flex-col min-w-[125px]">
-                    <div class="flex items-center justify-between gap-1 mb-0.5">
-                        <span class="text-cream/60 text-[10px] uppercase font-bold tracking-wider">Emergency Fund</span>
-                        <span class="text-[10px] text-azure font-mono font-semibold" id="hudEmergencyGoalLabel">$0 / $500</span>
-                    </div>
-                    <span class="text-azure font-mono font-black text-base sm:text-lg" id="hudSavings">$0.00</span>
+                <!-- High-Yield Savings Account (Good Interest) -->
+                <div class="bg-navy p-2 px-3 rounded-lg border border-navyBorder flex flex-col min-w-[110px]">
+                    <span class="text-cream/60 text-[10px] uppercase tracking-wider">HYSA Savings</span>
+                    <span class="text-cream font-mono font-bold text-base" id="hudSavings">$0.00</span>
                 </div>
 
-                <!-- 3. Days Remaining in Month -->
-                <div class="bg-navy p-2 px-3.5 rounded-lg border border-navyBorder flex flex-col min-w-[115px]">
-                    <div class="flex items-center justify-between gap-1 mb-0.5">
-                        <span class="text-cream/60 text-[10px] uppercase font-bold tracking-wider">Days Left</span>
-                        <span class="text-[10px] text-cream/40 font-mono" id="hudMonthTag">Month 1</span>
-                    </div>
-                    <span class="text-cream font-mono font-black text-base sm:text-lg" id="hudDaysRemaining">29 Days</span>
+                <!-- Total Debt / Credit Cards -->
+                <div class="bg-navy p-2 px-3 rounded-lg border border-navyBorder flex flex-col min-w-[100px]">
+                    <span class="text-cream/60 text-[10px] uppercase tracking-wider">Total Loans</span>
+                    <span class="text-cream font-mono font-semibold text-base" id="hudLoans">$0.00</span>
+                </div>
+
+                <!-- Current Career Role -->
+                <div class="bg-navy p-2 px-3 rounded-lg border border-navyBorder flex flex-col min-w-[120px]">
+                    <span class="text-cream/60 text-[10px] uppercase tracking-wider">Current Job</span>
+                    <span class="text-cream font-medium truncate max-w-[110px]" id="hudJobTitle">Fast Food Attendant</span>
                 </div>
             </div>
 
-            <!-- Quick Utilities (Loans & Careers Modals) -->
-            <div class="flex items-center gap-1.5">
-                <button id="btnLoansModal" class="px-2.5 py-1.5 text-xs bg-navy border border-navyBorder hover:border-azure text-cream/80 hover:text-cream rounded-lg transition" title="Loans & HYSA">
-                    <i class="fa-solid fa-building-columns mr-1 text-azure"></i> Bank
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-2">
+                <button id="btnShieldAbility" class="px-3 py-1.5 text-xs bg-cyan-900/60 border border-cyan-400 text-cyan-300 rounded-lg hover:bg-cyan-500 hover:text-navy transition font-bold flex items-center gap-1.5 shadow">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span id="shieldBtnLabel">Shield (Space)</span>
                 </button>
-                <button id="btnCareersModal" class="px-2.5 py-1.5 text-xs bg-navy border border-navyBorder hover:border-azure text-cream/80 hover:text-cream rounded-lg transition" title="Careers & Education">
-                    <i class="fa-solid fa-user-graduate mr-1 text-azure"></i> Careers
+                <button id="btnLoansModal" class="px-3 py-1.5 text-xs bg-navy border border-azure text-azure rounded-lg hover:bg-azure hover:text-cream transition font-semibold">
+                    <i class="fa-solid fa-building-columns mr-1"></i> Loans
+                </button>
+                <button id="btnCareersModal" class="px-3 py-1.5 text-xs bg-azure text-cream font-bold rounded-lg hover:bg-azureHover transition">
+                    <i class="fa-solid fa-user-graduate mr-1"></i> Careers
                 </button>
             </div>
         </div>
 
         <!-- Month Calendar Progress Bar -->
-        <div class="w-full bg-navy h-2 rounded-full overflow-hidden border border-navyBorder relative">
+        <div class="w-full bg-navy h-2.5 rounded-full mb-3 overflow-hidden border border-navyBorder relative">
             <div id="monthProgressBar" class="bg-azure h-full transition-all duration-300 w-0"></div>
-            <div class="absolute left-1/2 top-0 bottom-0 w-0.5 bg-cream/40" title="Bi-weekly Payday 1"></div>
-            <div class="absolute right-0 top-0 bottom-0 w-0.5 bg-cream/40" title="Bi-weekly Payday 2"></div>
+            <div class="absolute left-[83.3%] top-0 bottom-0 w-1 bg-red-500/80 animate-pulse" title="Panic Phase Trigger (Day 25)"></div>
+        </div>
+
+        <!-- PERSISTENT ON-SCREEN CATEGORIZED FINANCIAL BREAKDOWN PANEL -->
+        <div class="bg-navy/90 border border-navyBorder rounded-lg p-2 text-xs grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+            <div class="bg-navyLight/60 p-1.5 rounded border border-navyBorder">
+                <span class="text-[10px] text-cream/50 block uppercase">Total Earned</span>
+                <span class="text-azure font-mono font-bold" id="hudTotalEarned">$0.00</span>
+            </div>
+            <div class="bg-navyLight/60 p-1.5 rounded border border-navyBorder">
+                <span class="text-[10px] text-cream/50 block uppercase">Total Saved</span>
+                <span class="text-cream font-mono font-bold" id="hudTotalSaved">$0.00</span>
+            </div>
+            <div class="bg-navyLight/60 p-1.5 rounded border border-navyBorder">
+                <span class="text-[10px] text-cream/50 block uppercase">Total Spent</span>
+                <span class="text-cream font-mono font-bold" id="hudTotalSpent">$0.00</span>
+            </div>
+            <div class="bg-navyLight/60 p-1.5 rounded border border-navyBorder">
+                <span class="text-[10px] text-cream/50 block uppercase">Total Late Fees</span>
+                <span class="text-cream font-mono font-bold" id="hudTotalFees">$0.00</span>
+            </div>
+            <div class="bg-navyLight/60 p-1.5 rounded border border-navyBorder col-span-2 sm:col-span-1">
+                <span class="text-[10px] text-cream/50 block uppercase">Interest (Earned / Paid)</span>
+                <span class="font-mono font-bold">
+                    <span class="text-azure" id="hudInterestEarned">+$0</span> / 
+                    <span class="text-cream/80" id="hudInterestPaid">-$0</span>
+                </span>
+            </div>
         </div>
     </header>
 
     <!-- MAIN GAMEPLAY CANVAS AREA -->
     <main class="w-full max-w-6xl mx-auto flex-1 flex flex-col items-center justify-center relative">
-        <div class="canvas-container w-full rounded-xl overflow-hidden border border-navyBorder shadow-2xl bg-navy">
+        <div id="canvasContainer" class="canvas-container w-full rounded-xl overflow-hidden border border-navyBorder shadow-2xl bg-navy">
             <canvas id="gameCanvas"></canvas>
+
+            <!-- END OF MONTH "PANIC PHASE" ALARM BANNER -->
+            <div id="panicBanner" class="hidden absolute top-3 left-1/2 -translate-x-1/2 bg-red-600/90 border-2 border-red-400 text-white px-6 py-2 rounded-full shadow-2xl flex items-center gap-3 animate-bounce z-20">
+                <i class="fa-solid fa-triangle-exclamation text-xl text-yellow-300 animate-spin"></i>
+                <span class="font-black tracking-wider text-xs sm:text-sm">PANIC PHASE! INFLATION & SURPRISE BILL RUSH!</span>
+                <i class="fa-solid fa-triangle-exclamation text-xl text-yellow-300 animate-spin"></i>
+            </div>
 
             <!-- Educational Tip Callout Banner -->
             <div id="eduTipBanner" class="absolute top-3 left-3 right-3 bg-navyLight/95 border border-azure/40 text-cream p-3 rounded-xl shadow-lg flex items-start gap-3 text-xs transition-all duration-300 z-10">
@@ -213,7 +200,7 @@
                 <div class="flex-1">
                     <span class="font-bold text-azure block mb-0.5" id="eduTipTitle">Visual Micro-Badges & Shield Filter</span>
                     <p class="text-cream/90 leading-relaxed" id="eduTipBody">
-                        Catch Green Income & Blue Gems! Avoid Crimson Expenses, Amber Wants, and Red Spikes. Press **SPACEBAR** to activate your 5s Debt Filter Shield!
+                        Identify items instantly by color! Avoid unexpected expense traps during End-of-Month Panic!
                     </p>
                 </div>
                 <button id="btnCloseTipBanner" class="text-cream/40 hover:text-cream px-1">
@@ -233,23 +220,12 @@
             <!-- Start / Next Shift Canvas Splash Screen -->
             <div id="startOverlay" class="absolute inset-0 bg-navy/95 flex flex-col items-center justify-center p-6 text-center z-30">
                 <div class="w-16 h-16 rounded-2xl bg-azure text-cream flex items-center justify-center text-3xl font-black mb-4 shadow-lg azure-glow">
-                    <i class="fa-solid fa-shield-halved"></i>
+                    <i class="fa-solid fa-graduation-cap"></i>
                 </div>
-                <h2 class="text-2xl sm:text-3xl font-bold text-cream mb-1" id="startOverlayTitle">Level 1: The Starter Month</h2>
-                <p class="text-xs text-azure font-mono font-bold uppercase tracking-wider mb-2" id="startOverlaySubtitle">Starter Budgeting & Emergency Shield</p>
-                <p class="text-xs sm:text-sm text-cream/80 max-w-lg mb-4 leading-relaxed" id="shiftDescriptionText">
-                    Catch 🟢 Income ($500) and 💎 Investment Growth while dodging 🔴 Expenses, 🟡 Wants, and ⚠️ Spike Traps.
+                <h2 class="text-2xl sm:text-3xl font-bold text-cream mb-2" id="startOverlayTitle">Month 1: Learning Good vs. Bad Interest</h2>
+                <p class="text-sm text-cream/80 max-w-lg mb-6 leading-relaxed" id="shiftDescriptionText">
+                    Watch out for Days 25-30 Panic Phase! Bills drop faster and surprise emergencies appear. Catch Paychecks and activate your Shield!
                 </p>
-
-                <!-- Level Campaign Goals Box -->
-                <div class="bg-navyLight border border-azure/40 p-3 rounded-xl max-w-lg w-full mb-4 text-left">
-                    <span class="text-[10px] text-azure uppercase font-bold tracking-wider block mb-2">
-                        <i class="fa-solid fa-bullseye mr-1"></i> Current Level 3-Part Mission:
-                    </span>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs" id="startOverlayGoalsGrid">
-                        <!-- Populated dynamically -->
-                    </div>
-                </div>
                 
                 <div class="flex flex-wrap gap-3 justify-center mb-6">
                     <div class="bg-navyLight border border-navyBorder px-4 py-2 rounded-lg text-left text-xs">
@@ -261,8 +237,8 @@
                         <span class="text-azure font-bold text-sm">Bi-Weekly (Days 15 & 30)</span>
                     </div>
                     <div class="bg-navyLight border border-navyBorder px-4 py-2 rounded-lg text-left text-xs">
-                        <span class="text-cream/60 block">Shield Power</span>
-                        <span class="text-azure font-bold text-sm">Press SPACEBAR (5s Repel)</span>
+                        <span class="text-cream/60 block">Background Environment</span>
+                        <span class="text-cyan-400 font-bold text-sm" id="bgEnvironmentLabel">Bus Stop / Entry Desk</span>
                     </div>
                 </div>
 
@@ -272,7 +248,7 @@
             </div>
         </div>
 
-        <!-- Controls Bar for Mobile/Tablet -->
+        <!-- Controls Bar -->
         <div class="w-full flex items-center justify-between gap-2 mt-2 px-1">
             <div class="flex items-center gap-2">
                 <button id="btnPause" class="px-3 py-1.5 bg-navyLight border border-navyBorder text-cream text-xs rounded-lg hover:bg-navyBorder">
@@ -284,13 +260,13 @@
             </div>
             
             <div class="text-xs text-cream/60 hidden sm:block">
-                <kbd class="px-1.5 py-0.5 bg-navyLight border border-navyBorder rounded text-azure font-bold">A</kbd>/<kbd class="px-1.5 py-0.5 bg-navyLight border border-navyBorder rounded text-azure font-bold">D</kbd> or <kbd class="px-1.5 py-0.5 bg-navyLight border border-navyBorder rounded text-azure font-bold">←</kbd>/<kbd class="px-1.5 py-0.5 bg-navyLight border border-navyBorder rounded text-azure font-bold">→</kbd> to move | <kbd class="px-1.5 py-0.5 bg-navyLight border border-navyBorder rounded text-azure font-bold">SPACE</kbd> for Defense Shield
+                Use <kbd class="px-1.5 py-0.5 bg-navyLight border border-navyBorder rounded text-azure font-bold">A</kbd>/<kbd class="px-1.5 py-0.5 bg-navyLight border border-navyBorder rounded text-azure font-bold">D</kbd> or <kbd class="px-1.5 py-0.5 bg-navyLight border border-navyBorder rounded text-azure font-bold">←</kbd>/<kbd class="px-1.5 py-0.5 bg-navyLight border border-navyBorder rounded text-azure font-bold">→</kbd> to move. Press <kbd class="px-1.5 py-0.5 bg-navyLight border border-navyBorder rounded text-cyan-400 font-bold">Space</kbd> for Shield Filter!
             </div>
 
-            <!-- Shield Button & Touch Controls -->
+            <!-- Touch Controls -->
             <div class="flex items-center gap-1 sm:hidden">
-                <button id="btnTouchShield" class="px-3 py-2 bg-azure text-cream font-bold text-xs rounded-lg active:bg-azureHover flex items-center gap-1">
-                    <i class="fa-solid fa-shield"></i> SHIELD
+                <button id="btnTouchShield" class="px-2.5 h-10 bg-cyan-900/80 border border-cyan-400 text-cyan-300 text-xs font-bold rounded-lg flex items-center justify-center gap-1">
+                    <i class="fa-solid fa-shield-halved"></i> Shield
                 </button>
                 <button id="btnTouchLeft" class="w-10 h-10 bg-navyLight border border-navyBorder rounded-lg active:bg-azure active:text-cream flex items-center justify-center">
                     <i class="fa-solid fa-chevron-left"></i>
@@ -302,201 +278,76 @@
         </div>
     </main>
 
-    <!-- MODAL 1: "MONTHLY FINANCIAL REVIEW" DASHBOARD (DAY 30 FREEZE) -->
-    <div id="modalBudget" class="hidden fixed inset-0 modal-overlay z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-        <div class="bg-navy border border-navyBorder w-full max-w-3xl rounded-2xl p-4 sm:p-6 shadow-2xl relative my-auto max-h-[92vh] flex flex-col justify-between overflow-hidden">
+    <!-- MODAL 1: MONTH-END BUDGET ANALYZER -->
+    <div id="modalBudget" class="hidden fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-navy border border-navyBorder w-full max-w-2xl rounded-2xl p-5 sm:p-6 shadow-2xl relative my-auto">
             
-            <!-- Header -->
             <div class="flex items-center justify-between pb-3 border-b border-navyBorder mb-3">
+                <div>
+                    <h3 class="text-xl font-bold text-azure flex items-center gap-2">
+                        <i class="fa-solid fa-file-invoice-dollar"></i> Month-End Ledger & Savings Review
+                    </h3>
+                    <p class="text-xs text-cream/70">Analyze income, cut unnecessary wants, and set up auto-pay to eliminate late fees!</p>
+                </div>
+                <span class="text-xs bg-navyLight border border-azure/30 text-azure px-2.5 py-1 rounded-full font-mono" id="budgetMonthTag">Month 1</span>
+            </div>
+
+            <!-- AUTO-PAY TOGGLE BANNER -->
+            <div class="bg-navyLight border border-azure/40 p-3 rounded-xl mb-4 flex items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-azure text-cream flex items-center justify-center text-xl shadow azure-glow">
-                        <i class="fa-solid fa-chart-pie"></i>
+                    <div class="w-9 h-9 rounded-lg bg-azure/20 text-azure flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
                     </div>
                     <div>
-                        <h3 class="text-lg sm:text-xl font-black text-cream flex items-center gap-2">
-                            MONTHLY FINANCIAL REVIEW
-                        </h3>
-                        <p class="text-xs text-cream/70">Analyze cashflow, eliminate late fee friction, optimize wants with sliders, and review Level Goals.</p>
+                        <span class="text-xs font-bold text-cream block">Punctuality Focus: Auto-Pay System ($20/mo)</span>
+                        <p class="text-[11px] text-cream/70">Puts effort into paying on time to completely prevent $35+ late payment fees!</p>
                     </div>
                 </div>
-                <span class="text-xs bg-navyLight border border-azure/40 text-azure font-mono font-bold px-3 py-1 rounded-full shadow" id="budgetMonthTag">Month 1 Complete</span>
-            </div>
-
-            <!-- Scrollable Review Body -->
-            <div class="overflow-y-auto pr-1 space-y-4 max-h-[62vh]">
-                
-                <!-- 1. KEY FINANCIAL BREAKDOWN METRICS -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    <!-- 💰 Total Earned vs. Spent -->
-                    <div class="bg-navyLight border border-navyBorder p-3 rounded-xl flex flex-col justify-between">
-                        <div>
-                            <div class="flex items-center justify-between mb-1">
-                                <span class="text-[11px] font-bold uppercase tracking-wider text-cream/70 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-scale-balanced text-emerald-400"></i> Earned vs. Spent
-                                </span>
-                            </div>
-                            <div class="space-y-1 text-xs text-cream/80 my-2">
-                                <div class="flex justify-between">
-                                    <span class="text-cream/50">Gross Wages (2x Pay):</span>
-                                    <span class="text-emerald-400 font-mono font-bold" id="summaryGrossIncome">$1,600.00</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-cream/50">Total Expenses & Bills:</span>
-                                    <span class="text-rose-400 font-mono font-bold" id="summaryTotalExpenses">-$1,100.00</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="pt-2 border-t border-navyBorder flex items-center justify-between">
-                            <span class="text-[11px] text-cream/60">Net Monthly Cashflow:</span>
-                            <span class="text-emerald-400 font-mono font-extrabold text-sm" id="summaryNetCash">+$500.00</span>
-                        </div>
-                    </div>
-
-                    <!-- 💸 Money Lost to Late Fees & Bad APR -->
-                    <div class="bg-navyLight border border-rose-500/30 p-3 rounded-xl flex flex-col justify-between">
-                        <div>
-                            <div class="flex items-center justify-between mb-1">
-                                <span class="text-[11px] font-bold uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-triangle-exclamation text-rose-400"></i> Friction & Bad APR
-                                </span>
-                                <span class="text-[10px] text-rose-400 font-mono font-bold" id="summaryLateFeesLost">-$0.00</span>
-                            </div>
-                            <div class="space-y-1 text-xs text-cream/80 my-1">
-                                <div class="flex justify-between">
-                                    <span class="text-cream/50">Late Payment Penalty:</span>
-                                    <span class="text-rose-300 font-mono" id="reviewLateFeeDetail">$0.00</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-cream/50">Credit Card 8% APR:</span>
-                                    <span class="text-rose-300 font-mono" id="reviewDebtAprDetail">$0.00</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="pt-2 border-t border-navyBorder">
-                            <button id="btnToggleAutoPay" class="w-full py-1.5 text-[11px] font-bold rounded-lg transition bg-navy border border-azure text-azure hover:bg-azure hover:text-cream flex items-center justify-center gap-1.5">
-                                <i class="fa-solid fa-clock-rotate-left"></i>
-                                <span id="autoPayBtnText">ENABLE AUTO-PAY ($20/mo)</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- 📈 High-Yield Interest Earned -->
-                    <div class="bg-navyLight border border-azure/40 p-3 rounded-xl flex flex-col justify-between">
-                        <div>
-                            <div class="flex items-center justify-between mb-1">
-                                <span class="text-[11px] font-bold uppercase tracking-wider text-azure flex items-center gap-1.5">
-                                    <i class="fa-solid fa-chart-line text-cyan-400"></i> High-Yield Growth
-                                </span>
-                                <span class="text-[10px] text-cyan-300 font-mono font-bold" id="reviewTotalInterestYield">+$0.00</span>
-                            </div>
-                            <div class="space-y-1 text-xs text-cream/80 my-1">
-                                <div class="flex justify-between">
-                                    <span class="text-cream/50">HYSA 6% Compound:</span>
-                                    <span class="text-azure font-mono font-bold" id="reviewHysaCompoundDetail">+$0.00</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-cream/50">Auto-Invest Snowball:</span>
-                                    <span class="text-emerald-400 font-mono font-bold" id="reviewPassiveSnowballDetail">+$0.00</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="pt-2 border-t border-navyBorder flex items-center justify-between">
-                            <span class="text-[11px] text-cream/60">Passive Engine Rate:</span>
-                            <span class="text-emerald-400 font-mono font-bold text-xs" id="reviewPassiveRateDetail">+$0.00 / sec</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 2. ✂️ INTERACTIVE CUT-OR-KEEP SLIDERS -->
-                <div class="bg-navyLight border border-navyBorder rounded-xl p-3.5">
-                    <div class="flex flex-wrap items-center justify-between gap-2 mb-2 pb-2 border-b border-navyBorder">
-                        <div>
-                            <h4 class="text-xs font-bold text-cream uppercase tracking-wider flex items-center gap-2">
-                                <i class="fa-solid fa-scissors text-azure"></i> Interactive Budget Optimizer: Cut-or-Keep Sliders
-                            </h4>
-                            <p class="text-[11px] text-cream/70">Slide to cut non-essential wants and subscriptions. Free up cash to fund your Emergency Savings!</p>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs text-cream/60">Monthly Cut Savings:</span>
-                            <span class="text-emerald-400 font-mono font-black text-sm" id="totalSavedFromCuts">$0.00 / mo</span>
-                        </div>
-                    </div>
-
-                    <!-- Dynamic List of Sliders and Fixed Needs -->
-                    <div class="space-y-2.5 max-h-48 overflow-y-auto pr-1" id="expenseListContainer">
-                        <!-- Populated by JavaScript with range sliders for discretionary expenses -->
-                    </div>
-                </div>
-
-                <!-- 3. 🎯 STRUCTURED CAMPAIGN OBJECTIVES & MILESTONES -->
-                <div class="bg-navyLight border border-azure/40 rounded-xl p-3.5">
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center gap-2">
-                            <i class="fa-solid fa-trophy text-amber-400"></i>
-                            <h4 class="text-xs font-bold text-cream uppercase tracking-wider" id="reviewCampaignTitle">
-                                Level 1 Objectives: The Starter Month
-                            </h4>
-                        </div>
-                        <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-azure/20 text-azure border border-azure/30" id="reviewCampaignProgressTag">
-                            0 / 3 Cleared
-                        </span>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2" id="reviewCampaignGoalsList">
-                        <!-- Populated dynamically with live checkmarks and status -->
-                    </div>
-
-                    <!-- Level Cleared Banner -->
-                    <div id="reviewLevelClearedBanner" class="hidden mt-3 p-2.5 bg-emerald-500/10 border border-emerald-500/40 rounded-xl flex items-center justify-between gap-2">
-                        <div class="flex items-center gap-2 text-xs text-emerald-300 font-semibold">
-                            <i class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
-                            <span>All Level Objectives Cleared! You unlocked the next milestone!</span>
-                        </div>
-                        <button id="btnAdvanceLevel" class="px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-navy font-black text-xs rounded-lg transition shadow">
-                            Advance to Next Level →
-                        </button>
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- Footer Action Controls -->
-            <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-navyBorder mt-3">
-                <div class="flex items-center gap-2">
-                    <button id="btnReviewOpenLoans" class="px-3 py-1.5 bg-navy border border-navyBorder hover:border-azure text-cream text-xs font-semibold rounded-lg transition">
-                        <i class="fa-solid fa-piggy-bank text-azure mr-1"></i> Emergency Fund & Debt
-                    </button>
-                    <button id="btnReviewOpenCareers" class="px-3 py-1.5 bg-navy border border-navyBorder hover:border-azure text-cream text-xs font-semibold rounded-lg transition">
-                        <i class="fa-solid fa-user-graduate text-azure mr-1"></i> Careers & Education
-                    </button>
-                </div>
-                <button id="btnPayBillsAndContinue" class="px-6 py-2.5 bg-azure text-cream font-extrabold text-sm rounded-xl hover:bg-azureHover transition shadow-lg flex items-center gap-2">
-                    <span>Pay Bills & Start Next Month</span>
-                    <i class="fa-solid fa-arrow-right"></i>
+                <button id="btnToggleAutoPay" class="px-4 py-1.5 text-xs font-bold rounded-lg transition bg-navy border border-azure text-azure hover:bg-azure hover:text-cream">
+                    ENABLE AUTO-PAY
                 </button>
             </div>
-        </div>
-    </div>
 
-    <!-- MODAL: CAMPAIGN GOALS PREVIEW (CLICKABLE FROM TOP HUD CHIP) -->
-    <div id="modalGoals" class="hidden fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4">
-        <div class="bg-navy border border-navyBorder w-full max-w-md rounded-2xl p-5 shadow-2xl relative">
-            <div class="flex items-center justify-between pb-3 border-b border-navyBorder mb-3">
-                <div class="flex items-center gap-2">
-                    <i class="fa-solid fa-bullseye text-azure text-lg"></i>
-                    <h3 class="text-base font-bold text-cream" id="goalsModalTitle">Campaign Objectives</h3>
+            <!-- Ledger Breakdown Header -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 text-xs">
+                <div class="bg-navyLight border border-navyBorder p-2.5 rounded-xl">
+                    <span class="text-[10px] text-cream/60 block">Bi-Weekly Pay (2x)</span>
+                    <span class="text-azure font-mono font-bold text-sm" id="summaryGrossIncome">$1,600.00</span>
                 </div>
-                <button class="btnCloseModal text-cream/50 hover:text-cream text-base">
-                    <i class="fa-solid fa-xmark"></i>
+                <div class="bg-navyLight border border-navyBorder p-2.5 rounded-xl">
+                    <span class="text-[10px] text-cream/60 block">Commute Gas Cost</span>
+                    <span class="text-cream font-mono font-medium text-sm" id="summaryCommuteCost">$40.00</span>
+                </div>
+                <div class="bg-navyLight border border-navyBorder p-2.5 rounded-xl">
+                    <span class="text-[10px] text-cream/60 block">Late Fees & Debt APR Lost</span>
+                    <span class="text-cream font-mono font-bold text-sm" id="summaryLateFeesLost">$0.00</span>
+                </div>
+                <div class="bg-navyLight border border-navyBorder p-2.5 rounded-xl">
+                    <span class="text-[10px] text-cream/60 block">Net Remaining Cash</span>
+                    <span class="text-azure font-mono font-bold text-sm" id="summaryNetCash">$880.00</span>
+                </div>
+            </div>
+
+            <h4 class="text-xs uppercase font-bold text-cream/60 tracking-wider mb-2 flex justify-between items-center">
+                <span>Budget Helper: Cut Wants & Avoid Debt Traps</span>
+                <span class="text-azure text-[11px] font-normal">Click 'CUT IT' to save money</span>
+            </h4>
+
+            <!-- Expenses List -->
+            <div class="space-y-2 mb-4 max-h-48 overflow-y-auto pr-1" id="expenseListContainer">
+                <!-- Dynamically Populated -->
+            </div>
+
+            <!-- Summary Modal Actions -->
+            <div class="flex items-center justify-between pt-3 border-t border-navyBorder">
+                <div>
+                    <span class="text-xs text-cream/60 block">Total Monthly Savings Created</span>
+                    <span class="text-azure font-mono font-extrabold text-base" id="totalSavedFromCuts">$0.00 / mo</span>
+                </div>
+                <button id="btnPayBillsAndContinue" class="px-6 py-2.5 bg-azure text-cream font-bold rounded-xl hover:bg-azureHover transition shadow">
+                    Pay Bills & Start Next Month
                 </button>
             </div>
-            <p class="text-xs text-cream/70 mb-3" id="goalsModalSubtitle">Complete all 3 missions to clear the level and advance your financial career.</p>
-            <div class="space-y-2 mb-4" id="goalsModalList">
-                <!-- Dynamically filled -->
-            </div>
-            <button class="btnCloseModal w-full py-2 bg-azure text-cream text-xs font-bold rounded-xl hover:bg-azureHover transition">
-                Got It
-            </button>
         </div>
     </div>
 
@@ -509,7 +360,7 @@
                     <h3 class="text-xl font-bold text-azure flex items-center gap-2">
                         <i class="fa-solid fa-user-graduate"></i> Career & Skill Advancement
                     </h3>
-                    <p class="text-xs text-cream/70">Invest saved cash into higher education to unlock well-paying job roles!</p>
+                    <p class="text-xs text-cream/70">Invest saved cash into higher education to unlock well-paying job roles & luxury backgrounds!</p>
                 </div>
                 <button class="btnCloseModal text-cream/50 hover:text-cream text-lg">
                     <i class="fa-solid fa-xmark"></i>
@@ -521,7 +372,7 @@
             </div>
 
             <div class="bg-navyLight border border-navyBorder rounded-xl p-3 text-xs text-cream/80 flex justify-between items-center">
-                <span><i class="fa-solid fa-car text-azure mr-1"></i> Higher roles feature increased pay but longer commutes!</span>
+                <span><i class="fa-solid fa-car text-azure mr-1"></i> Upgrading unlocks new lifestyle background visuals & salary!</span>
                 <span class="text-azure font-semibold" id="careerCurrentBalanceDisplay">Cash: $500.00</span>
             </div>
         </div>
@@ -588,39 +439,11 @@
                     </div>
                 </div>
             </div>
-
-            <div class="bg-navyLight/60 border border-azure/30 rounded-xl p-3 text-xs text-cream/80">
-                <span class="font-bold text-azure block mb-0.5"><i class="fa-solid fa-graduation-cap mr-1"></i> Core Principle: Making Money Work For You:</span>
-                Good interest compound growth builds wealth automatically. Bad debt interest drains your hard-earned paycheck every month!
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL 4: LEVEL MILESTONE / CAMPAIGN VICTORY CELEBRATION -->
-    <div id="modalLevelVictory" class="hidden fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4">
-        <div class="bg-navy border-2 border-azure w-full max-w-md rounded-2xl p-6 shadow-2xl relative text-center azure-glow">
-            <div class="w-16 h-16 rounded-2xl bg-amber-400/20 text-amber-400 mx-auto flex items-center justify-center text-3xl font-black mb-3 border border-amber-400/40">
-                <i class="fa-solid fa-trophy" id="victoryTrophyIcon"></i>
-            </div>
-            <h3 class="text-2xl font-black text-cream mb-1" id="victoryTitle">LEVEL 1 CLEARED!</h3>
-            <p class="text-xs text-azure font-mono font-bold uppercase tracking-wider mb-3" id="victorySubtitle">Starter Budgeting Master</p>
-            <p class="text-xs text-cream/80 mb-5 leading-relaxed" id="victoryBody">
-                You built a $500 emergency buffer, activated Auto-Pay to dodge late fees, and avoided debt traps!
-            </p>
-            
-            <div class="bg-navyLight border border-navyBorder rounded-xl p-3 text-xs text-left mb-5 space-y-1.5" id="victoryNextGoalPreview">
-                <span class="text-[10px] text-cream/50 uppercase font-bold tracking-wider block">Upcoming Mission Preview:</span>
-                <div class="text-cream font-medium" id="victoryNextGoalsText">Level 2: Save $1,200 for Trade School & keep gas under 15%!</div>
-            </div>
-
-            <button id="btnContinueFromVictory" class="w-full py-3 bg-azure hover:bg-azureHover text-cream font-black text-sm rounded-xl transition shadow-lg">
-                Continue Campaign →
-            </button>
         </div>
     </div>
 
     <script>
-        // --- WEB AUDIO API SOUND SYSTEM ---
+        // --- JUICE: WEB AUDIO API SOUND ENGINE ---
         class SoundEngine {
             constructor() {
                 this.ctx = null;
@@ -630,10 +453,29 @@
             init() {
                 if (!this.ctx) {
                     const AudioContext = window.AudioContext || window.webkitAudioContext;
-                    if (AudioContext) {
-                        this.ctx = new AudioContext();
-                    }
+                    if (AudioContext) this.ctx = new AudioContext();
                 }
+            }
+
+            // JUICE: Cash Register Chiming Sound on Paycheck
+            playCashRegister() {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                // High double bell chime
+                const createChime = (freq, start, duration) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + start);
+                    gain.gain.setValueAtTime(0.2, now + start);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + start + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now + start);
+                    osc.stop(now + start + duration);
+                };
+                createChime(987.77, 0, 0.15); // B5
+                createChime(1318.51, 0.08, 0.35); // E6
             }
 
             playCoin() {
@@ -642,28 +484,29 @@
                 const gain = this.ctx.createGain();
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(600, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.12);
-                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+                osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
                 osc.connect(gain);
                 gain.connect(this.ctx.destination);
                 osc.start();
-                osc.stop(this.ctx.currentTime + 0.12);
+                osc.stop(this.ctx.currentTime + 0.1);
             }
 
+            // JUICE: Heavy Buzzer / Trap Sound on Penalty
             playTrap() {
                 if (this.muted || !this.ctx) return;
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
                 osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(220, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(90, this.ctx.currentTime + 0.25);
-                gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+                osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(60, this.ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
                 osc.connect(gain);
                 gain.connect(this.ctx.destination);
                 osc.start();
-                osc.stop(this.ctx.currentTime + 0.25);
+                osc.stop(this.ctx.currentTime + 0.3);
             }
 
             playShield() {
@@ -672,46 +515,30 @@
                 const gain = this.ctx.createGain();
                 osc.type = 'triangle';
                 osc.frequency.setValueAtTime(300, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.3);
-                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+                osc.frequency.exponentialRampToValueAtTime(900, this.ctx.currentTime + 0.35);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.35);
                 osc.connect(gain);
                 gain.connect(this.ctx.destination);
                 osc.start();
-                osc.stop(this.ctx.currentTime + 0.3);
-            }
-
-            playPaycheck() {
-                if (this.muted || !this.ctx) return;
-                const now = this.ctx.currentTime;
-                const notes = [523.25, 659.25, 783.99, 1046.50];
-                notes.forEach((freq, idx) => {
-                    const osc = this.ctx.createOscillator();
-                    const gain = this.ctx.createGain();
-                    osc.frequency.setValueAtTime(freq, now + idx * 0.08);
-                    gain.gain.setValueAtTime(0.12, now + idx * 0.08);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.08 + 0.15);
-                    osc.connect(gain);
-                    gain.connect(this.ctx.destination);
-                    osc.start(now + idx * 0.08);
-                    osc.stop(now + idx * 0.08 + 0.15);
-                });
+                osc.stop(this.ctx.currentTime + 0.35);
             }
         }
 
         const sound = new SoundEngine();
 
-        // --- CAREERS CONFIGURATION ---
+        // --- CAREERS CONFIGURATION WITH LIFESTYLE BACKGROUNDS ---
         const CAREERS = [
             {
                 id: 'fast_food',
                 title: 'Fast Food Attendant',
                 level: 1,
-                speedLabel: 'Level 1 (Very Slow)',
-                itemSpeedMin: 0.8,
-                itemSpeedMax: 1.2,
-                spawnInterval: 120,
-                biweeklyPay: 800,  // $1,600/mo
+                speedLabel: 'Level 1 (Entry Level)',
+                bgName: 'Entry: Bus Stop & Alley',
+                itemSpeedMin: 0.9,
+                itemSpeedMax: 1.3,
+                spawnInterval: 110,
+                biweeklyPay: 800,
                 commuteMiles: 5,
                 gasCostMonthly: 40,
                 eduRequired: 'None',
@@ -722,11 +549,12 @@
                 id: 'retail_clerk',
                 title: 'Retail Store Clerk',
                 level: 2,
-                speedLabel: 'Level 2 (Slow & Steady)',
-                itemSpeedMin: 1.2,
-                itemSpeedMax: 1.7,
-                spawnInterval: 90,
-                biweeklyPay: 1100, // $2,200/mo
+                speedLabel: 'Level 2 (Steady Pace)',
+                bgName: 'Mid-Career: Apartment & Sedan',
+                itemSpeedMin: 1.3,
+                itemSpeedMax: 1.8,
+                spawnInterval: 85,
+                biweeklyPay: 1100,
                 commuteMiles: 10,
                 gasCostMonthly: 75,
                 eduRequired: 'High School Diploma',
@@ -737,11 +565,12 @@
                 id: 'jr_dev',
                 title: 'Junior Web Developer',
                 level: 3,
-                speedLabel: 'Level 3 (Moderate)',
-                itemSpeedMin: 1.8,
-                itemSpeedMax: 2.5,
-                spawnInterval: 70,
-                biweeklyPay: 2200, // $4,400/mo
+                speedLabel: 'Level 3 (Moderate Rush)',
+                bgName: 'Mid-Career: Apartment & Sedan',
+                itemSpeedMin: 1.9,
+                itemSpeedMax: 2.6,
+                spawnInterval: 65,
+                biweeklyPay: 2200,
                 commuteMiles: 15,
                 gasCostMonthly: 120,
                 eduRequired: 'Coding Bootcamp Cert',
@@ -753,10 +582,11 @@
                 title: 'Financial Analyst',
                 level: 4,
                 speedLabel: 'Level 4 (Fast Pace)',
-                itemSpeedMin: 2.6,
-                itemSpeedMax: 3.4,
-                spawnInterval: 50,
-                biweeklyPay: 3600, // $7,200/mo
+                bgName: 'Executive: City Penthouse & HYSA Board',
+                itemSpeedMin: 2.7,
+                itemSpeedMax: 3.5,
+                spawnInterval: 48,
+                biweeklyPay: 3600,
                 commuteMiles: 22,
                 gasCostMonthly: 180,
                 eduRequired: 'Finance Degree',
@@ -768,10 +598,11 @@
                 title: 'Corporate Executive',
                 level: 5,
                 speedLabel: 'Level 5 (Expert Rush)',
-                itemSpeedMin: 3.5,
-                itemSpeedMax: 4.8,
-                spawnInterval: 35,
-                biweeklyPay: 6000, // $12,000/mo
+                bgName: 'Executive: High-Rise Penthouse View',
+                itemSpeedMin: 3.6,
+                itemSpeedMax: 5.0,
+                spawnInterval: 32,
+                biweeklyPay: 6000,
                 commuteMiles: 30,
                 gasCostMonthly: 250,
                 eduRequired: 'MBA / Executive Master',
@@ -784,85 +615,10 @@
             { id: 'rent', name: 'Housing & Rent', amount: 750, discretionary: false, icon: 'fa-house' },
             { id: 'groceries', name: 'Essential Groceries', amount: 250, discretionary: false, icon: 'fa-cart-shopping' },
             { id: 'utilities', name: 'Electricity & Water', amount: 120, discretionary: false, icon: 'fa-bolt' },
-            { id: 'subscription_boxes', name: 'Subscription Boxes & Crates', amount: 45, discretionary: true, icon: 'fa-box-open' },
             { id: 'dining_out', name: 'Dining Out & Fast Food', amount: 180, discretionary: true, icon: 'fa-utensils' },
             { id: 'streaming', name: 'Streaming & Gaming Subs', amount: 45, discretionary: true, icon: 'fa-tv' },
             { id: 'gym', name: 'Luxury Gym Membership', amount: 65, discretionary: true, icon: 'fa-dumbbell' }
         ];
-
-        // --- STRUCTURED CAMPAIGN MODE OBJECTIVES ---
-        const CAMPAIGN_LEVELS = {
-            1: {
-                title: "Level 1: The Starter Month",
-                subtitle: "Starter Budgeting & Emergency Shield",
-                description: "Establish your financial safety net! Build an emergency fund, activate Auto-Pay to dodge late fees, and stay clear of credit debt traps.",
-                goals: [
-                    { id: 'emergencyFund', title: "Build a $500 Emergency Savings Fund", target: "$500 Savings", check: (gs) => gs.savings >= 500, getProgress: (gs) => `$${Math.min(500, Math.floor(gs.savings))}/$500` },
-                    { id: 'zeroLateFees', title: "Finish month with $0 Late Fees (Enable Auto-Pay!)", target: "$0 Late Fees", check: (gs) => gs.campaign.lateFeesThisMonth === 0 && gs.autoPayEnabled, getProgress: (gs) => gs.autoPayEnabled ? "Auto-Pay Active" : "Auto-Pay Off" },
-                    { id: 'zeroDebtTraps', title: "Avoid all Credit Card Debt traps", target: "$0 Debt & 0 Traps", check: (gs) => gs.loans === 0 && gs.campaign.badInterestHitsThisMonth === 0, getProgress: (gs) => gs.loans > 0 ? `$${gs.loans} Debt` : (gs.campaign.badInterestHitsThisMonth > 0 ? `${gs.campaign.badInterestHitsThisMonth} Traps Hit` : "Clean!") }
-                ],
-                victoryTitle: "STARTER BUDGETING MASTER!",
-                victoryDesc: "You built a $500 emergency buffer, activated Auto-Pay to dodge late penalties, and avoided debt traps!",
-                nextPreview: "Level 2: Commute & Career Upgrade — Save $1,200 for Trade School & keep gas under 15%!"
-            },
-            2: {
-                title: "Level 2: Commute & Career Upgrade",
-                subtitle: "Trade School & Transportation Optimization",
-                description: "Level up your skills while keeping transportation costs strictly under 15% of income. Save up and upgrade your career!",
-                goals: [
-                    { id: 'saveTradeSchool', title: "Save $1,200 for a trade school cert / night class", target: "$1,200 Cash Saved", check: (gs) => gs.cash >= 1200 || gs.unlockedJobMax >= 1, getProgress: (gs) => `$${Math.min(1200, Math.floor(gs.cash))}/$1,200` },
-                    { id: 'gasUnder15Percent', title: "Keep monthly gas & commute costs under 15% of income", target: "Commute < 15%", check: (gs) => {
-                        const job = CAREERS[gs.currentJobIndex];
-                        const gross = job.biweeklyPay * 2;
-                        return (job.gasCostMonthly / gross) <= 0.15;
-                    }, getProgress: (gs) => {
-                        const job = CAREERS[gs.currentJobIndex];
-                        const pct = ((job.gasCostMonthly / (job.biweeklyPay * 2)) * 100).toFixed(1);
-                        return `${pct}% of Income`;
-                    }},
-                    { id: 'careerPromoted', title: "Upgrade Career (Retail Clerk or Junior Developer)", target: "Promotion", check: (gs) => gs.currentJobIndex >= 1, getProgress: (gs) => CAREERS[gs.currentJobIndex].title }
-                ],
-                victoryTitle: "CAREER ACCELERATOR MASTER!",
-                victoryDesc: "You balanced commute expenses, funded your vocational education, and earned higher wages!",
-                nextPreview: "Level 3: Compound Interest Compounder — Earn $100 in High-Yield Interest & build passive income streams!"
-            },
-            3: {
-                title: "Level 3: Compound Interest Compounder",
-                subtitle: "Passive Dividends & Financial Independence",
-                description: "Turn your finances into an automated wealth generator! Accumulate high-yield compound interest, wipe out bad debt, and build your Auto-Invest passive stream.",
-                goals: [
-                    { id: 'earn100Interest', title: "Earn $100 in High-Yield Interest", target: "$100 Interest Earned", check: (gs) => gs.interestEarned >= 100, getProgress: (gs) => `$${Math.min(100, Math.floor(gs.interestEarned))}/$100` },
-                    { id: 'zeroDebtAndPassiveStream', title: "Pay off all credit debt & invest in passive dividend streams", target: "$0 Debt & +$5/s", check: (gs) => gs.loans === 0 && gs.autoInvest.rate >= 5, getProgress: (gs) => gs.loans > 0 ? `$${gs.loans} Debt Left` : `Rate: +$${gs.autoInvest.rate}/s` },
-                    { id: 'netWorth3000', title: "Achieve $3,000+ Total Net Worth", target: "$3,000 Net Worth", check: (gs) => (gs.cash + gs.savings - gs.loans) >= 3000, getProgress: (gs) => `$${Math.floor(gs.cash + gs.savings - gs.loans)}/$3,000` }
-                ],
-                victoryTitle: "FINANCIAL INDEPENDENCE MASTER!",
-                victoryDesc: "You conquered debt, harnessed compound growth, and created an automated wealth snowball!",
-                nextPreview: "Endless Wealth Mode: Keep compounding and maximizing passive cashflow!"
-            }
-        };
-
-        // --- UPGRADABLE AUTO-INVEST ENGINE TIERS ---
-        const AUTO_INVEST_TIERS = [
-            { catches: 1, rate: 1, label: 'Tier 1 (+ $1/s)' },
-            { catches: 3, rate: 5, label: 'Tier 2 (+ $5/s)' },
-            { catches: 6, rate: 15, label: 'Tier 3 (+ $15/s)' },
-            { catches: 10, rate: 25, label: 'Tier 4 (+ $25/s)' }
-        ];
-
-        const LEVEL_TIPS = {
-            1: {
-                title: "Level 1 Rule: Good Interest vs. Bad Interest!",
-                body: "Catch **Good Interest (HYSA / Compound Growth)** & income items! Avoid **Bad Interest (Credit Cards / Late Fees)** traps that drain your money."
-            },
-            2: {
-                title: "Level 2 Rule: Avoid Late Payment Fees!",
-                body: "Missed payments incur $35+ late fees! Enable the **Auto-Pay System** in the budget modal to keep payments on time automatically."
-            },
-            3: {
-                title: "Level 3 Rule: Make Money Work For You!",
-                body: "Deposit extra cash into your High-Yield Savings Account (HYSA) to let compound interest generate passive income every month!"
-            }
-        };
 
         // GLOBAL GAME STATE
         const gameState = {
@@ -873,7 +629,7 @@
             savings: 0,
             loans: 0,
             
-            // STATS LEDGER TRACKERS
+            // LEDGER STATS
             totalEarned: 500,
             totalSaved: 0,
             totalSpent: 0,
@@ -881,40 +637,21 @@
             interestEarned: 0,
             interestPaid: 0,
             
-            // SHIELD & DEFENSIVE FILTER ABILITY
+            // PANIC MECHANIC & SHIELD
+            isPanicPhase: false,
             shieldActive: false,
             shieldTimer: 0,
             shieldCooldown: 0,
             
-            // SYSTEM SETTINGS
+            // JUICE ENGINE TIMERS
+            damageFlashTimer: 0,
+            shakeDuration: 0,
+            particles: [],
+
             autoPayEnabled: false,
             currentJobIndex: 0,
             unlockedJobMax: 0,
             cutExpenses: new Set(),
-            cutSliders: {
-                subscription_boxes: 0,
-                dining_out: 0,
-                streaming: 0,
-                gym: 0
-            },
-            
-            // AUTO-INVEST ENGINE (PASSIVE INCOME SNOWBALL)
-            autoInvest: {
-                level: 0,
-                rate: 0, // $/sec
-                totalEarned: 0,
-                catches: 0
-            },
-            passiveTickTimer: 0,
-
-            // STRUCTURED CAMPAIGN MODE
-            campaign: {
-                level: 1,
-                badInterestHitsThisMonth: 0,
-                lateFeesThisMonth: 0,
-                completedLevels: new Set()
-            },
-
             gameMode: 'FALLING',
             isShiftActive: false,
             isPaused: false,
@@ -945,7 +682,7 @@
         }
         window.addEventListener('resize', resizeCanvas);
 
-        const keys = { Left: false, Right: false, Up: false, Down: false };
+        const keys = { Left: false, Right: false, Up: false, Down: false, Space: false };
         window.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.Left = true;
             if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.Right = true;
@@ -962,17 +699,6 @@
             if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.Up = false;
             if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.Down = false;
         });
-
-        function activateShield() {
-            if (!gameState.isShiftActive || gameState.isPaused) return;
-            if (gameState.shieldCooldown <= 0 && !gameState.shieldActive) {
-                gameState.shieldActive = true;
-                gameState.shieldTimer = 300; // 5 seconds at 60fps
-                gameState.shieldCooldown = 600; // 10s cooldown
-                sound.playShield();
-                showFloatingText('SHIELD FILTER ACTIVE!', gameState.player.x + gameState.player.width / 2, gameState.player.y - 20, '#38BDF8');
-            }
-        }
 
         let isDragging = false;
         canvas.addEventListener('mousedown', (e) => {
@@ -1004,59 +730,119 @@
             }
         }
 
-        // REDESIGNED MICRO-BADGE ITEMS WITH VISUAL COLOR-CODING
+        // VISUAL MICRO-BADGES ITEM SCHEMA
         const ITEM_TYPES = [
-            // 🟢 INCOME / GREEN BADGE
-            { type: 'income', label: 'Paycheck', value: 500, isPositive: true, category: 'Income', faIcon: 'fa-money-bill-wave', badgeBg: '#10B981', badgeBorder: '#34D399', badgeType: 'INCOME' },
-            { type: 'income', label: 'Dividend', value: 120, isPositive: true, category: 'Income', faIcon: 'fa-coins', badgeBg: '#059669', badgeBorder: '#10B981', badgeType: 'INCOME' },
+            // 🟢 INCOME
+            { type: 'income', badgeStyle: 'income', label: 'Paycheck', value: 500, isPositive: true, category: 'Income', icon: '💵' },
+            { type: 'income', badgeStyle: 'income', label: 'Overtime', value: 80, isPositive: true, category: 'Income', icon: '⚡' },
             
-            // 🔴 REQUIRED EXPENSES / CRIMSON BADGE
-            { type: 'expense', label: 'Rent', value: -750, isPositive: false, category: 'Required Expense', faIcon: 'fa-house', badgeBg: '#DC2626', badgeBorder: '#F87171', badgeType: 'EXPENSE' },
-            { type: 'expense', label: 'Electric', value: -120, isPositive: false, category: 'Required Expense', faIcon: 'fa-bolt', badgeBg: '#B91C1C', badgeBorder: '#EF4444', badgeType: 'EXPENSE' },
-            { type: 'expense', label: 'Gas', value: -45, isPositive: false, category: 'Required Expense', faIcon: 'fa-gas-pump', badgeBg: '#991B1B', badgeBorder: '#F87171', badgeType: 'EXPENSE' },
-
-            // 🟡 DISCRETIONARY WANTS / AMBER BADGE
-            { type: 'want', label: 'Takeout', value: -45, isPositive: false, category: 'Discretionary Want', faIcon: 'fa-utensils', badgeBg: '#D97706', badgeBorder: '#FBBF24', badgeType: 'WANT' },
-            { type: 'want', label: 'Console', value: -300, isPositive: false, category: 'Discretionary Want', faIcon: 'fa-gamepad', badgeBg: '#B45309', badgeBorder: '#F59E0B', badgeType: 'WANT' },
-
             // 💎 GOOD INTEREST / BLUE GEM
-            { type: 'good_interest', label: 'HYSA Yield', value: 100, isPositive: true, category: 'Good Interest', faIcon: 'fa-gem', badgeBg: '#0284C7', badgeBorder: '#38BDF8', badgeType: 'GOOD_INTEREST' },
-            { type: 'good_interest', label: 'Growth', value: 150, isPositive: true, category: 'Good Interest', faIcon: 'fa-chart-line', badgeBg: '#0369A1', badgeBorder: '#7DD3FC', badgeType: 'GOOD_INTEREST' },
+            { type: 'good_interest', badgeStyle: 'good_interest', label: 'HYSA Yield', value: 75, isPositive: true, category: 'Good Interest', icon: '💎' },
+            { type: 'good_interest', badgeStyle: 'good_interest', label: 'Compound', value: 100, isPositive: true, category: 'Good Interest', icon: '📈' },
 
-            // ⚠️ BAD INTEREST / SPIKE (SHARP RED WARNING)
-            { type: 'bad_interest', label: 'APR Trap', value: -80, isPositive: false, category: 'Bad Interest', faIcon: 'fa-triangle-exclamation', badgeBg: '#7F1D1D', badgeBorder: '#EF4444', badgeType: 'BAD_INTEREST' },
-            { type: 'bad_interest', label: 'Late Fee', value: -40, isPositive: false, category: 'Bad Interest', faIcon: 'fa-skull-crossbones', badgeBg: '#450A0A', badgeBorder: '#DC2626', badgeType: 'BAD_INTEREST' }
+            // 🔴 REQUIRED EXPENSES
+            { type: 'expense', badgeStyle: 'expense', label: 'Rent / Housing', value: -250, isPositive: false, category: 'Required Expense', icon: '🏠' },
+            { type: 'expense', badgeStyle: 'expense', label: 'Electric / Gas', value: -120, isPositive: false, category: 'Required Expense', icon: '⚡' },
+
+            // 🟡 DISCRETIONARY WANTS
+            { type: 'want', badgeStyle: 'want', label: 'Takeout Food', value: -45, isPositive: false, category: 'Discretionary Want', icon: '🍔' },
+            { type: 'want', badgeStyle: 'want', label: 'Game Console', value: -35, isPositive: false, category: 'Discretionary Want', icon: '🎮' },
+
+            // ⚠️ BAD INTEREST & SURPRISE PANIC EXPENSES
+            { type: 'bad_interest', badgeStyle: 'bad_interest', label: 'Credit Card APR', value: -65, isPositive: false, category: 'Bad Interest', icon: '⚠️' },
+            { type: 'late_fee', badgeStyle: 'bad_interest', label: 'Late Fee Trap', value: -40, isPositive: false, category: 'Late Fee Trap', icon: '⚠️' }
         ];
 
+        const PANIC_UNEXPECTED_EXPENSES = [
+            { type: 'expense', badgeStyle: 'bad_interest', label: 'Flat Tire!', value: -180, isPositive: false, category: 'Unexpected Emergency', icon: '🚗' },
+            { type: 'expense', badgeStyle: 'bad_interest', label: 'ER Medical Bill', value: -350, isPositive: false, category: 'Unexpected Emergency', icon: '🏥' },
+            { type: 'expense', badgeStyle: 'bad_interest', label: 'Plumbing Emergency', value: -220, isPositive: false, category: 'Unexpected Emergency', icon: '🪠' }
+        ];
+
+        function activateShield() {
+            if (gameState.shieldCooldown <= 0 && !gameState.shieldActive) {
+                gameState.shieldActive = true;
+                gameState.shieldTimer = 300; // 5s
+                gameState.shieldCooldown = 900; // 15s Cooldown
+                sound.playShield();
+                showFloatingText('SHIELD FILTER ACTIVE!', canvas.width / 2, canvas.height / 2 - 30, '#38BDF8');
+                updateShieldButtonUI();
+            }
+        }
+
+        function updateShieldButtonUI() {
+            const btn = document.getElementById('btnShieldAbility');
+            const lbl = document.getElementById('shieldBtnLabel');
+            if (gameState.shieldActive) {
+                lbl.textContent = `Active (${Math.ceil(gameState.shieldTimer / 60)}s)`;
+                btn.className = 'px-3 py-1.5 text-xs bg-cyan-500 text-navy rounded-lg font-extrabold shadow azure-glow animate-pulse';
+            } else if (gameState.shieldCooldown > 0) {
+                lbl.textContent = `Cooldown (${Math.ceil(gameState.shieldCooldown / 60)}s)`;
+                btn.className = 'px-3 py-1.5 text-xs bg-navy border border-navyBorder text-cream/40 rounded-lg font-semibold cursor-not-allowed';
+            } else {
+                lbl.textContent = 'Shield (Space)';
+                btn.className = 'px-3 py-1.5 text-xs bg-cyan-900/60 border border-cyan-400 text-cyan-300 rounded-lg hover:bg-cyan-500 hover:text-navy transition font-bold flex items-center gap-1.5 shadow';
+            }
+        }
+
+        function triggerJuiceSparks(x, y, color) {
+            for (let i = 0; i < 18; i++) {
+                gameState.particles.push({
+                    x, y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    size: Math.random() * 4 + 2,
+                    color,
+                    life: 30
+                });
+            }
+        }
+
+        function triggerScreenShakeAndFlash() {
+            gameState.shakeDuration = 15; // 15 frames of canvas shake
+            gameState.damageFlashTimer = 18; // 18 frames of red vignette flash
+            const container = document.getElementById('canvasContainer');
+            container.classList.remove('screen-shake');
+            void container.offsetWidth; // Force reflow
+            container.classList.add('screen-shake');
+            setTimeout(() => container.classList.remove('screen-shake'), 300);
+        }
+
         function spawnItem() {
-            const template = ITEM_TYPES[Math.floor(Math.random() * ITEM_TYPES.length)];
+            let template;
+            // PANIC PHASE: Heavy spawn of unexpected emergency bills
+            if (gameState.isPanicPhase && Math.random() < 0.45) {
+                template = PANIC_UNEXPECTED_EXPENSES[Math.floor(Math.random() * PANIC_UNEXPECTED_EXPENSES.length)];
+            } else {
+                template = ITEM_TYPES[Math.floor(Math.random() * ITEM_TYPES.length)];
+            }
+
             const currentJob = CAREERS[gameState.currentJobIndex];
-            const baseSpeed = currentJob.itemSpeedMin + Math.random() * (currentJob.itemSpeedMax - currentJob.itemSpeedMin);
+            let speedMult = gameState.isPanicPhase ? 1.5 : 1.0;
+            const baseSpeed = (currentJob.itemSpeedMin + Math.random() * (currentJob.itemSpeedMax - currentJob.itemSpeedMin)) * speedMult;
             
-            const badgeWidth = 110;
-            const badgeHeight = 36;
+            const cardWidth = 110;
+            const cardHeight = 36;
 
             if (gameState.gameMode === 'FALLING') {
                 gameState.items.push({
                     ...template,
-                    x: Math.random() * (canvas.width - badgeWidth - 20) + 10,
-                    y: -badgeHeight - 10,
-                    w: badgeWidth,
-                    h: badgeHeight,
+                    x: Math.random() * (canvas.width - cardWidth - 20) + 10,
+                    y: -cardHeight - 10,
+                    w: cardWidth,
+                    h: cardHeight,
                     speedY: baseSpeed,
-                    speedX: 0,
-                    repelled: false
+                    speedX: 0
                 });
             } else {
                 gameState.items.push({
                     ...template,
                     x: canvas.width + 20,
                     y: 60 + Math.random() * (canvas.height - 140),
-                    w: badgeWidth,
-                    h: badgeHeight,
+                    w: cardWidth,
+                    h: cardHeight,
                     speedY: 0,
-                    speedX: -baseSpeed * 1.1,
-                    repelled: false
+                    speedX: -baseSpeed * 1.1
                 });
             }
         }
@@ -1066,48 +852,39 @@
 
             const currentJob = CAREERS[gameState.currentJobIndex];
 
-            // Shield Timers
+            // Shield Ability
             if (gameState.shieldActive) {
                 gameState.shieldTimer--;
-                if (gameState.shieldTimer <= 0) {
-                    gameState.shieldActive = false;
-                }
+                if (gameState.shieldTimer <= 0) gameState.shieldActive = false;
+                updateShieldButtonUI();
             }
             if (gameState.shieldCooldown > 0) {
                 gameState.shieldCooldown--;
+                updateShieldButtonUI();
             }
 
-            // AUTO-INVEST ENGINE: PASSIVE INCOME SNOWBALL TICKER (every 60 frames = 1 sec)
-            if (gameState.autoInvest.rate > 0) {
-                gameState.passiveTickTimer++;
-                if (gameState.passiveTickTimer >= 60) {
-                    gameState.passiveTickTimer = 0;
-                    const payout = gameState.autoInvest.rate;
-                    gameState.cash += payout;
-                    gameState.autoInvest.totalEarned += payout;
-                    gameState.interestEarned += payout;
-                    gameState.totalEarned += payout;
-                    
-                    showFloatingText(`+$${payout}`, gameState.player.x + gameState.player.width / 2, gameState.player.y - 25, '#10B981');
-                    updateHUD();
-                }
-            }
-
-            // Calendar Days
+            // Calendar Days & PANIC PHASE (Days 25 - 30)
             gameState.dayTimer++;
-            if (gameState.dayTimer >= 60) {
+            if (gameState.dayTimer >= (gameState.isPanicPhase ? 40 : 60)) {
                 gameState.dayTimer = 0;
                 gameState.day++;
+
+                // CHECK FOR DAYS 25-30 PANIC PHASE TRIGGER
+                if (gameState.day >= 25 && !gameState.isPanicPhase) {
+                    gameState.isPanicPhase = true;
+                    document.getElementById('panicBanner').classList.remove('hidden');
+                    sound.playTrap();
+                }
 
                 // BI-WEEKLY PAYCHECK TRIGGER (Day 15 & Day 30)
                 if (gameState.day === 15 || gameState.day === 30) {
                     gameState.cash += currentJob.biweeklyPay;
                     gameState.totalEarned += currentJob.biweeklyPay;
-                    sound.playPaycheck();
+                    sound.playCashRegister();
+                    triggerJuiceSparks(canvas.width / 2, canvas.height / 2, '#38BDF8');
                     showFloatingText(`+$${currentJob.biweeklyPay} PAYCHECK!`, canvas.width / 2, canvas.height / 2, '#0284C7');
                 }
 
-                // Finish Month
                 if (gameState.day > 30) {
                     endShiftMonth();
                     return;
@@ -1129,24 +906,24 @@
                 gameState.player.y = Math.max(40, Math.min(canvas.height - gameState.player.height - 20, gameState.player.y));
             }
 
-            // Spawning
+            // Spawning Rate (Faster during Panic Phase)
             gameState.spawnTimer++;
-            if (gameState.spawnTimer >= currentJob.spawnInterval) {
+            const effectiveInterval = gameState.isPanicPhase ? Math.floor(currentJob.spawnInterval * 0.6) : currentJob.spawnInterval;
+            if (gameState.spawnTimer >= effectiveInterval) {
                 spawnItem();
                 gameState.spawnTimer = 0;
             }
 
-            // Item Update & Defensive Filter Repel
+            // Collision Check & Dynamic Repel Physics
             for (let i = gameState.items.length - 1; i >= 0; i--) {
                 const item = gameState.items[i];
 
-                // REPEL / FILTER SHIELD MECHANIC FOR BAD INTEREST / TRAPS
-                if (gameState.shieldActive && (item.badgeType === 'BAD_INTEREST' || item.badgeType === 'WANT')) {
-                    const distToPlayer = Math.hypot((item.x + item.w/2) - (gameState.player.x + gameState.player.width/2), (item.y + item.h/2) - (gameState.player.y + gameState.player.height/2));
-                    if (distToPlayer < 180) {
-                        item.repelled = true;
-                        item.speedY = -Math.abs(item.speedY) - 3; // Push upwards away
-                        item.speedX = (item.x < gameState.player.x) ? -4 : 4;
+                if (gameState.shieldActive && (!item.isPositive || item.badgeStyle === 'bad_interest')) {
+                    const distY = (gameState.player.y) - (item.y + item.h);
+                    const distX = (gameState.player.x + gameState.player.width / 2) - (item.x + item.w / 2);
+                    if (Math.abs(distX) < 140 && distY < 120 && distY > -30) {
+                        item.speedY = -Math.abs(item.speedY) * 1.5;
+                        item.speedX = (distX < 0 ? 3 : -3);
                     }
                 }
 
@@ -1160,49 +937,39 @@
                     item.y + item.h > gameState.player.y
                 );
 
-                if (hit && !item.repelled) {
+                if (hit) {
                     gameState.cash += item.value;
                     if (gameState.cash < 0) gameState.cash = 0;
 
-                    // TRACK CATEGORIZED LEDGER STATS & AUTO-INVEST SNOWBALL
                     if (item.type === 'good_interest') {
                         gameState.interestEarned += item.value;
                         gameState.totalEarned += item.value;
-
-                        // UPGRADE AUTO-INVEST ENGINE
-                        gameState.autoInvest.catches++;
-                        let upgradedTier = null;
-                        for (let t = AUTO_INVEST_TIERS.length - 1; t >= 0; t--) {
-                            if (gameState.autoInvest.catches >= AUTO_INVEST_TIERS[t].catches) {
-                                if (gameState.autoInvest.rate < AUTO_INVEST_TIERS[t].rate) {
-                                    upgradedTier = AUTO_INVEST_TIERS[t];
-                                    gameState.autoInvest.rate = upgradedTier.rate;
-                                    gameState.autoInvest.level = t + 1;
-                                }
-                                break;
-                            }
-                        }
-
-                        if (upgradedTier) {
-                            showFloatingText(`🚀 AUTO-INVEST ${upgradedTier.label}!`, gameState.player.x + gameState.player.width / 2, gameState.player.y - 45, '#38BDF8');
-                            sound.playPaycheck();
-                        }
                     } else if (item.type === 'income') {
                         gameState.totalEarned += item.value;
                     } else if (item.type === 'bad_interest') {
                         gameState.interestPaid += Math.abs(item.value);
                         gameState.totalSpent += Math.abs(item.value);
-                        gameState.campaign.badInterestHitsThisMonth++;
+                    } else if (item.type === 'late_fee') {
+                        gameState.totalFees += Math.abs(item.value);
+                        gameState.totalSpent += Math.abs(item.value);
                     } else {
                         gameState.totalSpent += Math.abs(item.value);
                     }
 
+                    // JUICE FEEDBACK TRIGGERS
                     if (item.value >= 0) {
-                        sound.playCoin();
-                        showFloatingText(`+$${item.value}`, item.x + item.w / 2, item.y, '#34D399');
+                        if (item.label === 'Paycheck') {
+                            sound.playCashRegister();
+                            triggerJuiceSparks(item.x + item.w / 2, item.y, '#F59E0B');
+                        } else {
+                            sound.playCoin();
+                            triggerJuiceSparks(item.x + item.w / 2, item.y, '#38BDF8');
+                        }
+                        showFloatingText(`+$${item.value}`, item.x + item.w / 2, item.y, '#22C55E');
                     } else {
                         sound.playTrap();
-                        showFloatingText(`-$${Math.abs(item.value)}`, item.x + item.w / 2, item.y, '#F87171');
+                        triggerScreenShakeAndFlash();
+                        showFloatingText(`-$${Math.abs(item.value)}`, item.x + item.w / 2, item.y, '#EF4444');
                     }
 
                     gameState.items.splice(i, 1);
@@ -1210,9 +977,18 @@
                     continue;
                 }
 
-                if (item.y > canvas.height + 60 || item.y < -120 || item.x < -item.w - 20 || item.x > canvas.width + 40) {
+                if (item.y > canvas.height + 60 || item.y < -100 || item.x < -item.w - 40 || item.x > canvas.width + 40) {
                     gameState.items.splice(i, 1);
                 }
+            }
+
+            // Update Particle Sparks
+            for (let p = gameState.particles.length - 1; p >= 0; p--) {
+                const particle = gameState.particles[p];
+                particle.x += particle.vx;
+                particle.y += particle.vy;
+                particle.life--;
+                if (particle.life <= 0) gameState.particles.splice(p, 1);
             }
         }
 
@@ -1221,39 +997,96 @@
             floatingTexts.push({ text, x, y, color, opacity: 1.0, life: 45 });
         }
 
-        function renderCanvas() {
-            ctx.fillStyle = '#0F172A';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // --- VISUAL LIFE MILESTONES: DYNAMIC EVOLVING BACKGROUND SCENES ---
+        function renderBackgroundEnvironment() {
+            const level = CAREERS[gameState.currentJobIndex].level;
 
-            // Background Grid Lines
-            ctx.strokeStyle = 'rgba(51, 65, 85, 0.25)';
-            ctx.lineWidth = 1;
-            const gridSize = 40;
-            for (let x = 0; x < canvas.width; x += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
-                ctx.stroke();
-            }
-            for (let y = 0; y < canvas.height; y += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
-                ctx.stroke();
-            }
+            if (level === 1) {
+                // ENTRY LEVEL: Bus Stop / Alley Streetlights
+                ctx.fillStyle = '#0F172A';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw Player Basket/Catcher + Active Shield Aura
-            ctx.save();
-            if (gameState.shieldActive) {
-                ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
+                // Bus Stop Sign Line
+                ctx.strokeStyle = '#334155';
                 ctx.lineWidth = 4;
                 ctx.beginPath();
-                ctx.arc(gameState.player.x + gameState.player.width/2, gameState.player.y + gameState.player.height/2, 65, 0, Math.PI * 2);
+                ctx.moveTo(60, canvas.height);
+                ctx.lineTo(60, canvas.height - 130);
                 ctx.stroke();
-                ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
+
+                ctx.fillStyle = '#0284C7';
+                ctx.fillRect(40, canvas.height - 160, 40, 30);
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 10px Inter';
+                ctx.fillText('BUS', 60, canvas.height - 142);
+
+                // Cracked Pavement Line
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+                ctx.beginPath();
+                ctx.moveTo(0, canvas.height - 20);
+                ctx.lineTo(canvas.width, canvas.height - 20);
+                ctx.stroke();
+
+            } else if (level === 2 || level === 3) {
+                // MID CAREER: Suburban Apartment & Starter Car Silhouette
+                ctx.fillStyle = '#1E293B';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Apartment Skyline Windows
+                ctx.fillStyle = 'rgba(2, 132, 199, 0.15)';
+                for (let x = 40; x < canvas.width; x += 100) {
+                    ctx.fillRect(x, canvas.height - 220, 50, 180);
+                }
+
+                // Sedan Silhouette Line at bottom
+                ctx.fillStyle = '#0F172A';
+                ctx.fillRect(canvas.width - 160, canvas.height - 50, 120, 30);
+                ctx.beginPath();
+                ctx.arc(canvas.width - 130, canvas.height - 18, 12, 0, Math.PI * 2);
+                ctx.arc(canvas.width - 70, canvas.height - 18, 12, 0, Math.PI * 2);
+                ctx.fillStyle = '#334155';
                 ctx.fill();
+
+            } else {
+                // EXECUTIVE / INVESTOR: High-Rise Penthouse City View & Glowing HYSA Yield Board
+                ctx.fillStyle = '#090D16';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // City Lights
+                for (let i = 0; i < 30; i++) {
+                    const lx = (i * 45) % canvas.width;
+                    const ly = 80 + (i * 35) % (canvas.height - 160);
+                    ctx.fillStyle = i % 2 === 0 ? 'rgba(56, 189, 248, 0.3)' : 'rgba(245, 158, 11, 0.3)';
+                    ctx.fillRect(lx, ly, 12, 18);
+                }
+
+                // Glowing High-Yield Asset Board in Background
+                ctx.fillStyle = 'rgba(2, 132, 199, 0.1)';
+                ctx.strokeStyle = '#0284C7';
+                ctx.lineWidth = 1;
+                ctx.fillRect(canvas.width - 200, 20, 180, 80);
+                ctx.strokeRect(canvas.width - 200, 20, 180, 80);
+
+                ctx.fillStyle = '#38BDF8';
+                ctx.font = 'bold 11px Courier New';
+                ctx.textAlign = 'left';
+                ctx.fillText('HYSA YIELD: +6.0% APR', canvas.width - 190, 42);
+                ctx.fillText(`SAVINGS: $${gameState.savings}`, canvas.width - 190, 62);
+                ctx.fillText('NET WORTH: EXPONENTIAL', canvas.width - 190, 82);
+            }
+        }
+
+        function renderCanvas() {
+            renderBackgroundEnvironment();
+
+            // JUICE: Red Damage Flash Overlay
+            if (gameState.damageFlashTimer > 0) {
+                ctx.fillStyle = `rgba(239, 68, 68, ${gameState.damageFlashTimer / 36})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                gameState.damageFlashTimer--;
             }
 
+            // Player Basket
             ctx.fillStyle = gameState.shieldActive ? '#38BDF8' : '#0284C7';
             ctx.beginPath();
             if (ctx.roundRect) {
@@ -1267,60 +1100,122 @@
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            ctx.fillStyle = '#F8FAFC';
+            // Draw Dynamic Shield Aura
+            if (gameState.shieldActive) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
+                ctx.lineWidth = 3;
+                ctx.shadowColor = '#38BDF8';
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.arc(
+                    gameState.player.x + gameState.player.width / 2,
+                    gameState.player.y + gameState.player.height / 2,
+                    gameState.player.width * 0.75,
+                    0, Math.PI * 2
+                );
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            ctx.fillStyle = gameState.shieldActive ? '#0F172A' : '#F8FAFC';
             ctx.font = 'bold 11px Inter';
             ctx.textAlign = 'center';
             ctx.fillText(
-                gameState.shieldActive ? 'SHIELDED' : (gameState.gameMode === 'FALLING' ? 'CATCHER' : 'COLLECTOR'),
+                gameState.shieldActive ? 'SHIELD FILTER' : (gameState.gameMode === 'FALLING' ? 'CATCHER' : 'COLLECTOR'),
                 gameState.player.x + gameState.player.width / 2,
                 gameState.player.y + 15
             );
-            ctx.restore();
 
-            // Draw Micro-Badge Items
+            // RENDER VISUAL MICRO-BADGES
             gameState.items.forEach((item) => {
                 ctx.save();
-                
-                // Micro-Badge Container Styling
-                ctx.fillStyle = item.badgeBg;
-                ctx.strokeStyle = item.badgeBorder;
-                ctx.lineWidth = item.badgeType === 'BAD_INTEREST' ? 3 : 2;
+                let bgGradient, borderColor, valueColor, iconBgColor;
+
+                if (item.badgeStyle === 'income') {
+                    borderColor = '#22C55E';
+                    valueColor = '#4ADE80';
+                    iconBgColor = '#10B981';
+                    bgGradient = ctx.createLinearGradient(item.x, item.y, item.x, item.y + item.h);
+                    bgGradient.addColorStop(0, '#064E3B');
+                    bgGradient.addColorStop(1, '#022C22');
+                } else if (item.badgeStyle === 'good_interest') {
+                    const pulse = Math.sin(Date.now() / 150) * 5 + 10;
+                    ctx.shadowColor = '#007FFF';
+                    ctx.shadowBlur = pulse;
+                    borderColor = '#38BDF8';
+                    valueColor = '#7DD3FC';
+                    iconBgColor = '#0284C7';
+                    bgGradient = ctx.createLinearGradient(item.x, item.y, item.x, item.y + item.h);
+                    bgGradient.addColorStop(0, '#0C4A6E');
+                    bgGradient.addColorStop(1, '#075985');
+                } else if (item.badgeStyle === 'expense') {
+                    borderColor = '#EF4444';
+                    valueColor = '#FCA5A5';
+                    iconBgColor = '#DC2626';
+                    bgGradient = ctx.createLinearGradient(item.x, item.y, item.x, item.y + item.h);
+                    bgGradient.addColorStop(0, '#7F1D1D');
+                    bgGradient.addColorStop(1, '#450A0A');
+                } else if (item.badgeStyle === 'want') {
+                    borderColor = '#F59E0B';
+                    valueColor = '#FDE68A';
+                    iconBgColor = '#D97706';
+                    bgGradient = ctx.createLinearGradient(item.x, item.y, item.x, item.y + item.h);
+                    bgGradient.addColorStop(0, '#78350F');
+                    bgGradient.addColorStop(1, '#451A03');
+                } else {
+                    borderColor = '#DC2626';
+                    valueColor = '#F87171';
+                    iconBgColor = '#B91C1C';
+                    bgGradient = ctx.createLinearGradient(item.x, item.y, item.x, item.y + item.h);
+                    bgGradient.addColorStop(0, '#450A0A');
+                    bgGradient.addColorStop(1, '#0F172A');
+                }
+
+                ctx.fillStyle = bgGradient;
+                ctx.strokeStyle = borderColor;
+                ctx.lineWidth = item.badgeStyle === 'bad_interest' ? 2.5 : 1.5;
 
                 ctx.beginPath();
                 if (ctx.roundRect) {
-                    ctx.roundRect(item.x, item.y, item.w, item.h, 18); // Capsule Badge Shape
+                    ctx.roundRect(item.x, item.y, item.w, item.h, 18);
                 } else {
                     ctx.rect(item.x, item.y, item.w, item.h);
                 }
                 ctx.fill();
                 ctx.stroke();
 
-                // Pulsing Glow for Good Interest Blue Gem
-                if (item.badgeType === 'GOOD_INTEREST') {
-                    ctx.shadowColor = '#38BDF8';
-                    ctx.shadowBlur = 10;
-                    ctx.strokeStyle = '#7DD3FC';
-                    ctx.stroke();
-                }
+                // Icon Left Circle
+                const circleRadius = 13;
+                const circleX = item.x + circleRadius + 5;
+                const circleY = item.y + item.h / 2;
 
-                // Sharp Warning Spike Outline for Bad Interest
-                if (item.badgeType === 'BAD_INTEREST') {
-                    ctx.strokeStyle = '#EF4444';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(item.x - 2, item.y - 2, item.w + 4, item.h + 4);
-                }
+                ctx.fillStyle = iconBgColor;
+                ctx.beginPath();
+                ctx.arc(circleX, circleY, circleRadius, 0, Math.PI * 2);
+                ctx.fill();
 
-                // Badge Value Text & Micro Info
-                ctx.shadowBlur = 0;
-                ctx.fillStyle = '#F8FAFC';
-                ctx.font = 'extrabold 11px Inter';
+                ctx.font = '13px Inter';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                
-                const valStr = item.value >= 0 ? `+$${item.value}` : `-$${Math.abs(item.value)}`;
-                ctx.fillText(`${valStr} • ${item.label}`, item.x + item.w / 2, item.y + item.h / 2);
+                ctx.fillText(item.icon, circleX, circleY + 1);
+
+                // Right Value Text
+                ctx.font = 'extrabold 12px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = valueColor;
+                const valText = item.isPositive ? `+$${item.value}` : `-$${Math.abs(item.value)}`;
+                ctx.fillText(valText, item.x + circleRadius * 2 + 32, item.y + item.h / 2 + 1);
 
                 ctx.restore();
+            });
+
+            // JUICE: Render Particles / Sparkles
+            gameState.particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
             });
 
             // Floating Text Animations
@@ -1328,7 +1223,7 @@
                 const ft = floatingTexts[i];
                 ctx.fillStyle = ft.color;
                 ctx.globalAlpha = ft.opacity;
-                ctx.font = 'extrabold 15px Inter';
+                ctx.font = 'extrabold 16px Inter';
                 ctx.textAlign = 'center';
                 ctx.fillText(ft.text, ft.x, ft.y);
                 ft.y -= 1;
@@ -1348,56 +1243,22 @@
         function updateHUD() {
             document.getElementById('hudCash').textContent = `$${gameState.cash.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
             document.getElementById('hudSavings').textContent = `$${gameState.savings.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+            document.getElementById('hudLoans').textContent = `$${gameState.loans.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
             
-            const daysLeft = Math.max(0, 30 - gameState.day);
-            document.getElementById('hudDaysRemaining').textContent = `${daysLeft} Day${daysLeft === 1 ? '' : 's'}`;
-            document.getElementById('hudMonthTag').textContent = `Month ${gameState.month}`;
-
-            const percent = Math.min(100, (gameState.day / 30) * 100);
-            document.getElementById('monthProgressBar').style.width = `${percent}%`;
-
-            // Auto-Invest Pill indicator
-            const autoInvestPill = document.getElementById('hudAutoInvestPill');
-            if (gameState.autoInvest.rate > 0) {
-                autoInvestPill.textContent = `+$${gameState.autoInvest.rate}/s`;
-                autoInvestPill.classList.remove('hidden');
-                autoInvestPill.classList.add('emerald-glow');
-            } else {
-                autoInvestPill.classList.add('hidden');
-                autoInvestPill.classList.remove('emerald-glow');
-            }
-
-            // Emergency Fund Goal Label
-            const camp = CAMPAIGN_LEVELS[gameState.campaign.level];
-            const emergencyLabel = document.getElementById('hudEmergencyGoalLabel');
-            if (gameState.campaign.level === 1) {
-                emergencyLabel.textContent = `$${Math.min(500, Math.floor(gameState.savings))}/$500`;
-            } else {
-                emergencyLabel.textContent = `$${Math.floor(gameState.savings)} Saved`;
-            }
-
-            // Campaign Level Chip Badge
-            if (camp) {
-                let cleared = 0;
-                camp.goals.forEach(g => {
-                    if (g.check(gameState)) cleared++;
-                });
-                document.getElementById('hudLevelBadge').textContent = `Level ${gameState.campaign.level}: ${cleared}/${camp.goals.length} Goals`;
-            }
-
-            // Educational Tips Sync
             const currentJob = CAREERS[gameState.currentJobIndex];
-            const currentLevel = currentJob.level;
-            const tipInfo = LEVEL_TIPS[currentLevel];
-            const banner = document.getElementById('eduTipBanner');
+            document.getElementById('hudJobTitle').textContent = currentJob.title;
+            document.getElementById('hudMonthDisplay').textContent = `Month ${gameState.month} • Day ${gameState.day} / 30`;
             
-            if (tipInfo && gameState.isShiftActive) {
-                document.getElementById('eduTipTitle').textContent = tipInfo.title;
-                document.getElementById('eduTipBody').textContent = tipInfo.body;
-                banner.classList.remove('hidden');
-            } else {
-                banner.classList.add('hidden');
-            }
+            document.getElementById('hudTotalEarned').textContent = `$${gameState.totalEarned.toLocaleString()}`;
+            document.getElementById('hudTotalSaved').textContent = `$${gameState.totalSaved.toLocaleString()}`;
+            document.getElementById('hudTotalSpent').textContent = `$${gameState.totalSpent.toLocaleString()}`;
+            document.getElementById('hudTotalFees').textContent = `$${gameState.totalFees.toLocaleString()}`;
+            document.getElementById('hudInterestEarned').textContent = `+$${gameState.interestEarned.toLocaleString()}`;
+            document.getElementById('hudInterestPaid').textContent = `-$${gameState.interestPaid.toLocaleString()}`;
+
+            const percent = (gameState.day / 30) * 100;
+            document.getElementById('monthProgressBar').style.width = `${percent}%`;
+            document.getElementById('bgEnvironmentLabel').textContent = currentJob.bgName;
         }
 
         function startShift() {
@@ -1405,11 +1266,11 @@
             gameState.day = 1;
             gameState.dayTimer = 0;
             gameState.items = [];
+            gameState.isPanicPhase = false;
             gameState.isShiftActive = true;
             gameState.isPaused = false;
-            gameState.campaign.badInterestHitsThisMonth = 0;
-            gameState.campaign.lateFeesThisMonth = 0;
 
+            document.getElementById('panicBanner').classList.add('hidden');
             document.getElementById('startOverlay').classList.add('hidden');
             document.getElementById('pauseOverlay').classList.add('hidden');
             updateHUD();
@@ -1417,17 +1278,15 @@
 
         function endShiftMonth() {
             gameState.isShiftActive = false;
-            document.getElementById('eduTipBanner').classList.add('hidden');
+            gameState.isPanicPhase = false;
+            document.getElementById('panicBanner').classList.add('hidden');
             
-            // Compound Good Interest on Savings Balance (6% Monthly Yield)
-            let yieldBonus = 0;
             if (gameState.savings > 0) {
-                yieldBonus = Math.round(gameState.savings * 0.06);
+                const yieldBonus = Math.round(gameState.savings * 0.06);
                 gameState.savings += yieldBonus;
                 gameState.interestEarned += yieldBonus;
                 gameState.totalEarned += yieldBonus;
             }
-            gameState.lastMonthYield = yieldBonus;
 
             openBudgetModal();
         }
@@ -1437,260 +1296,97 @@
             const monthlyGross = job.biweeklyPay * 2;
             const commuteCost = job.gasCostMonthly;
 
-            document.getElementById('budgetMonthTag').textContent = `Month ${gameState.month} Review`;
-            document.getElementById('summaryGrossIncome').textContent = `$${monthlyGross.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+            document.getElementById('budgetMonthTag').textContent = `Month ${gameState.month}`;
+            document.getElementById('summaryGrossIncome').textContent = `$${monthlyGross.toLocaleString()}`;
+            document.getElementById('summaryCommuteCost').textContent = `$${commuteCost.toLocaleString()}`;
 
-            // Auto-Pay Button State
             const btnAutoPay = document.getElementById('btnToggleAutoPay');
-            const autoPayText = document.getElementById('autoPayBtnText');
             if (gameState.autoPayEnabled) {
-                autoPayText.textContent = 'AUTO-PAY ACTIVE ($20/mo) - Late Fees Blocked!';
-                btnAutoPay.className = 'w-full py-1.5 text-[11px] font-bold rounded-lg transition bg-azure text-cream shadow emerald-glow flex items-center justify-center gap-1.5';
+                btnAutoPay.textContent = 'AUTO-PAY ACTIVE ($20/mo)';
+                btnAutoPay.className = 'px-4 py-1.5 text-xs font-bold rounded-lg transition bg-azure text-cream shadow';
             } else {
-                autoPayText.textContent = 'ENABLE AUTO-PAY ($20/mo) - Prevent $35 Fees!';
-                btnAutoPay.className = 'w-full py-1.5 text-[11px] font-bold rounded-lg transition bg-navy border border-azure text-azure hover:bg-azure hover:text-cream flex items-center justify-center gap-1.5';
+                btnAutoPay.textContent = 'ENABLE AUTO-PAY';
+                btnAutoPay.className = 'px-4 py-1.5 text-xs font-bold rounded-lg transition bg-navy border border-azure text-azure hover:bg-azure hover:text-cream';
             }
 
-            // Calculate Expenses with Interactive Sliders
             const listContainer = document.getElementById('expenseListContainer');
             listContainer.innerHTML = '';
 
-            let totalBills = commuteCost; // Commute cost always applies
-            let totalSavedFromCuts = 0;
-
+            let totalBills = commuteCost;
             if (gameState.autoPayEnabled) totalBills += 20;
 
-            // Render Commute Cost Line Item
-            const commuteRow = document.createElement('div');
-            commuteRow.className = 'flex items-center justify-between p-2 rounded-lg bg-navy/60 border border-navyBorder text-xs';
-            commuteRow.innerHTML = `
-                <div class="flex items-center gap-2">
-                    <div class="w-7 h-7 rounded-lg bg-azure/20 text-azure flex items-center justify-center text-xs">
-                        <i class="fa-solid fa-gas-pump"></i>
-                    </div>
-                    <div>
-                        <span class="font-semibold text-cream text-xs block">Workplace Commute Gas (${job.commuteMiles} mi)</span>
-                        <span class="text-[10px] text-cream/50">Transportation Need</span>
-                    </div>
-                </div>
-                <span class="font-mono font-bold text-cream text-xs">-$${commuteCost.toFixed(2)}</span>
-            `;
-            listContainer.appendChild(commuteRow);
-
             BASE_EXPENSES.forEach(exp => {
-                if (exp.discretionary) {
-                    const cutPct = gameState.cutSliders[exp.id] || 0;
-                    const amountSaved = Math.round(exp.amount * (cutPct / 100));
-                    const actualCharge = exp.amount - amountSaved;
-                    totalBills += actualCharge;
-                    totalSavedFromCuts += amountSaved;
+                const isCut = gameState.cutExpenses.has(exp.id);
+                if (!isCut) totalBills += exp.amount;
 
-                    const row = document.createElement('div');
-                    row.className = `p-2.5 rounded-xl border transition-all ${cutPct === 100 ? 'bg-navy/40 border-emerald-500/30' : 'bg-navy/90 border-navyBorder'}`;
-                    
-                    row.innerHTML = `
-                        <div class="flex items-center justify-between mb-1.5">
-                            <div class="flex items-center gap-2">
-                                <div class="w-7 h-7 rounded-lg ${cutPct === 100 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-azure/20 text-azure'} flex items-center justify-center text-xs">
-                                    <i class="fa-solid ${exp.icon}"></i>
-                                </div>
-                                <div>
-                                    <span class="text-xs font-bold text-cream block">${exp.name}</span>
-                                    <span class="text-[10px] ${cutPct === 100 ? 'text-emerald-400 font-semibold' : 'text-cream/50'}">
-                                        ${cutPct === 100 ? '✓ Fully Cut & Saved!' : cutPct > 0 ? `Cut by ${cutPct}%` : 'Discretionary Want'}
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <span class="font-mono text-xs font-bold ${actualCharge === 0 ? 'line-through text-cream/40' : 'text-cream'}">$${actualCharge.toFixed(2)}/mo</span>
-                                ${amountSaved > 0 ? `<span class="text-[10px] text-emerald-400 block font-mono font-bold">Saved +$${amountSaved}/mo</span>` : ''}
-                            </div>
+                const itemRow = document.createElement('div');
+                itemRow.className = `flex items-center justify-between p-2.5 rounded-xl border ${isCut ? 'bg-navy/40 border-navyBorder opacity-50' : 'bg-navyLight border-navyBorder'}`;
+                
+                itemRow.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg ${isCut ? 'bg-navyBorder text-cream/40' : 'bg-azure/20 text-azure'} flex items-center justify-center text-sm">
+                            <i class="fa-solid ${exp.icon}"></i>
                         </div>
-                        <div class="flex items-center gap-3 mt-1">
-                            <span class="text-[10px] text-cream/50 font-mono">Keep ($${exp.amount})</span>
-                            <input type="range" min="0" max="100" step="10" value="${cutPct}" 
-                                class="custom-slider flex-1"
-                                oninput="handleSliderCut('${exp.id}', this.value)">
-                            <span class="text-[10px] text-emerald-400 font-mono font-bold">Cut 100%</span>
-                            <button onclick="quickSetCut('${exp.id}', ${cutPct === 100 ? 0 : 100})" 
-                                class="px-2 py-0.5 text-[10px] font-bold rounded ${cutPct === 100 ? 'bg-navy border border-navyBorder text-cream hover:border-azure' : 'bg-azure text-cream hover:bg-azureHover'} transition">
-                                ${cutPct === 100 ? 'Reset' : 'Cut All'}
+                        <div>
+                            <span class="text-xs font-semibold text-cream block">${exp.name}</span>
+                            <span class="text-[10px] ${exp.discretionary ? 'text-azure' : 'text-cream/50'}">
+                                ${exp.discretionary ? 'Discretionary Want (Optional)' : 'Fixed Essential Need'}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="font-mono text-sm ${isCut ? 'line-through text-cream/40' : 'text-cream font-bold'}">$${exp.amount}</span>
+                        ${exp.discretionary ? `
+                            <button onclick="toggleCutExpense('${exp.id}')" class="px-3 py-1 text-[11px] font-bold rounded-lg transition ${isCut ? 'bg-azure text-cream' : 'bg-navy border border-navyBorder text-cream hover:border-azure'}">
+                                ${isCut ? 'UNCUT' : 'CUT IT'}
                             </button>
-                        </div>
-                    `;
-                    listContainer.appendChild(row);
-                } else {
-                    totalBills += exp.amount;
-                    const row = document.createElement('div');
-                    row.className = 'flex items-center justify-between p-2 rounded-lg bg-navy/60 border border-navyBorder text-xs';
-                    row.innerHTML = `
-                        <div class="flex items-center gap-2">
-                            <div class="w-7 h-7 rounded-lg bg-navyBorder text-cream/60 flex items-center justify-center text-xs">
-                                <i class="fa-solid ${exp.icon}"></i>
-                            </div>
-                            <div>
-                                <span class="font-semibold text-cream text-xs block">${exp.name}</span>
-                                <span class="text-[10px] text-cream/40 uppercase font-semibold">Fixed Essential Need</span>
-                            </div>
-                        </div>
-                        <span class="font-mono font-bold text-cream text-xs">-$${exp.amount.toFixed(2)}</span>
-                    `;
-                    listContainer.appendChild(row);
-                }
+                        ` : `
+                            <span class="text-[10px] uppercase text-cream/40 font-bold px-2 py-1 bg-navy rounded">Fixed Need</span>
+                        `}
+                    </div>
+                `;
+                listContainer.appendChild(itemRow);
             });
 
-            // Loan Interest Charge
             let loanInterestCharge = 0;
             if (gameState.loans > 0) {
                 loanInterestCharge = gameState.loans * 0.08;
                 totalBills += loanInterestCharge;
             }
 
-            // Late Fees Calculation
             let lateFeePenalty = 0;
             if (!gameState.autoPayEnabled && (monthlyGross - totalBills < 200)) {
                 lateFeePenalty = 35;
                 totalBills += lateFeePenalty;
             }
-            gameState.campaign.lateFeesThisMonth = lateFeePenalty;
 
-            // Update Breakdown Cards
-            document.getElementById('totalSavedFromCuts').textContent = `$${totalSavedFromCuts.toLocaleString('en-US', { minimumFractionDigits: 2 })} / mo`;
-            document.getElementById('summaryTotalExpenses').textContent = `-$${totalBills.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-            const netCashLeft = monthlyGross - totalBills;
-            const netCashEl = document.getElementById('summaryNetCash');
-            netCashEl.textContent = `${netCashLeft >= 0 ? '+' : ''}$${netCashLeft.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-            netCashEl.className = `font-mono font-extrabold text-sm ${netCashLeft >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+            document.getElementById('summaryLateFeesLost').textContent = `$${(lateFeePenalty + loanInterestCharge).toFixed(2)}`;
 
-            // Friction Card details
-            document.getElementById('reviewLateFeeDetail').textContent = `$${lateFeePenalty.toFixed(2)}`;
-            document.getElementById('reviewDebtAprDetail').textContent = `-$${loanInterestCharge.toFixed(2)}`;
-            document.getElementById('summaryLateFeesLost').textContent = `-$${(lateFeePenalty + loanInterestCharge).toFixed(2)}`;
+            let totalSaved = 0;
+            gameState.cutExpenses.forEach(id => {
+                const exp = BASE_EXPENSES.find(e => e.id === id);
+                if (exp) totalSaved += exp.amount;
+            });
 
-            // High Yield Growth details
-            const yieldBonus = gameState.lastMonthYield || 0;
-            document.getElementById('reviewHysaCompoundDetail').textContent = `+$${yieldBonus.toFixed(2)}`;
-            document.getElementById('reviewPassiveSnowballDetail').textContent = `+$${gameState.autoInvest.totalEarned.toFixed(2)}`;
-            document.getElementById('reviewPassiveRateDetail').textContent = `+$${gameState.autoInvest.rate.toFixed(2)} / sec`;
-            document.getElementById('reviewTotalInterestYield').textContent = `+$${(yieldBonus + gameState.autoInvest.totalEarned).toFixed(2)}`;
-
-            // Evaluate Campaign Objectives for current level
-            const camp = CAMPAIGN_LEVELS[gameState.campaign.level];
-            const campaignContainer = document.getElementById('reviewCampaignGoalsList');
-            campaignContainer.innerHTML = '';
-            let clearedCount = 0;
-
-            if (camp) {
-                document.getElementById('reviewCampaignTitle').textContent = `${camp.title}`;
-                camp.goals.forEach(goal => {
-                    const isCleared = goal.check(gameState);
-                    if (isCleared) clearedCount++;
-
-                    const goalCard = document.createElement('div');
-                    goalCard.className = `p-2.5 rounded-xl border flex flex-col justify-between ${isCleared ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300' : 'bg-navy/80 border-navyBorder text-cream/80'}`;
-                    goalCard.innerHTML = `
-                        <div>
-                            <div class="flex items-center gap-1.5 mb-1">
-                                <i class="fa-solid ${isCleared ? 'fa-circle-check text-emerald-400' : 'fa-circle-dot text-azure'} text-sm"></i>
-                                <span class="text-[11px] font-bold text-cream">${goal.title}</span>
-                            </div>
-                        </div>
-                        <div class="flex items-center justify-between mt-2 pt-1 border-t border-navyBorder/50 text-[10px]">
-                            <span class="text-cream/50">Status:</span>
-                            <span class="font-mono font-bold ${isCleared ? 'text-emerald-400' : 'text-azure'}">${goal.getProgress(gameState)}</span>
-                        </div>
-                    `;
-                    campaignContainer.appendChild(goalCard);
-                });
-
-                document.getElementById('reviewCampaignProgressTag').textContent = `${clearedCount} / ${camp.goals.length} Cleared`;
-
-                const levelClearedBanner = document.getElementById('reviewLevelClearedBanner');
-                if (clearedCount === camp.goals.length) {
-                    levelClearedBanner.classList.remove('hidden');
-                    document.getElementById('btnAdvanceLevel').onclick = advanceCampaignLevel;
-                } else {
-                    levelClearedBanner.classList.add('hidden');
-                }
-            }
-
+            document.getElementById('totalSavedFromCuts').textContent = `$${totalSaved.toLocaleString()} / mo saved`;
+            document.getElementById('summaryNetCash').textContent = `$${(monthlyGross - totalBills).toLocaleString()}`;
+            
             document.getElementById('modalBudget').classList.remove('hidden');
         }
 
-        window.handleSliderCut = function(expenseId, value) {
-            gameState.cutSliders[expenseId] = parseInt(value, 10);
+        document.getElementById('btnToggleAutoPay').addEventListener('click', () => {
+            gameState.autoPayEnabled = !gameState.autoPayEnabled;
             openBudgetModal();
-        };
+        });
 
-        window.quickSetCut = function(expenseId, pct) {
-            gameState.cutSliders[expenseId] = pct;
-            openBudgetModal();
-        };
-
-        function advanceCampaignLevel() {
-            const camp = CAMPAIGN_LEVELS[gameState.campaign.level];
-            if (!camp) return;
-
-            gameState.campaign.completedLevels.add(gameState.campaign.level);
-            
-            // Populate Victory Modal
-            document.getElementById('victoryTitle').textContent = camp.victoryTitle;
-            document.getElementById('victorySubtitle').textContent = camp.subtitle;
-            document.getElementById('victoryBody').textContent = camp.victoryDesc;
-            document.getElementById('victoryNextGoalsText').textContent = camp.nextPreview;
-
-            const btnContinue = document.getElementById('btnContinueFromVictory');
-            if (gameState.campaign.level >= 3) {
-                btnContinue.textContent = "Start Endless Wealth Mode 🚀";
+        window.toggleCutExpense = function(id) {
+            if (gameState.cutExpenses.has(id)) {
+                gameState.cutExpenses.delete(id);
             } else {
-                btnContinue.textContent = `Advance to Level ${gameState.campaign.level + 1} →`;
+                gameState.cutExpenses.add(id);
             }
-
-            document.getElementById('modalBudget').classList.add('hidden');
-            document.getElementById('modalLevelVictory').classList.remove('hidden');
-            sound.playPaycheck();
-        }
-
-        function continueFromVictory() {
-            document.getElementById('modalLevelVictory').classList.add('hidden');
-            if (gameState.campaign.level < 3) {
-                gameState.campaign.level++;
-            }
-            updateHUD();
-            updateStartOverlay();
             openBudgetModal();
-        }
-
-        function openGoalsPreviewModal() {
-            const camp = CAMPAIGN_LEVELS[gameState.campaign.level];
-            if (!camp) return;
-
-            document.getElementById('goalsModalTitle').textContent = camp.title;
-            document.getElementById('goalsModalSubtitle').textContent = camp.description;
-            const container = document.getElementById('goalsModalList');
-            container.innerHTML = '';
-
-            camp.goals.forEach(goal => {
-                const cleared = goal.check(gameState);
-                const card = document.createElement('div');
-                card.className = `p-3 rounded-xl border flex items-center justify-between gap-3 ${cleared ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-200' : 'bg-navyLight border-navyBorder text-cream/90'}`;
-                card.innerHTML = `
-                    <div class="flex items-center gap-2.5">
-                        <i class="fa-solid ${cleared ? 'fa-circle-check text-emerald-400 text-lg' : 'fa-circle-dot text-azure text-base'}"></i>
-                        <div>
-                            <span class="text-xs font-bold block">${goal.title}</span>
-                            <span class="text-[10px] text-cream/60">Target: ${goal.target}</span>
-                        </div>
-                    </div>
-                    <span class="text-[11px] font-mono font-bold px-2 py-0.5 rounded ${cleared ? 'bg-emerald-500/20 text-emerald-300' : 'bg-navy border border-navyBorder text-cream/70'}">
-                        ${goal.getProgress(gameState)}
-                    </span>
-                `;
-                container.appendChild(card);
-            });
-
-            document.getElementById('modalGoals').classList.remove('hidden');
-        }
+        };
 
         function payBillsAndAdvance() {
             const job = CAREERS[gameState.currentJobIndex];
@@ -1700,13 +1396,7 @@
             if (gameState.autoPayEnabled) totalBills += 20;
 
             BASE_EXPENSES.forEach(exp => {
-                if (exp.discretionary) {
-                    const cutPct = gameState.cutSliders[exp.id] || 0;
-                    const saved = Math.round(exp.amount * (cutPct / 100));
-                    totalBills += (exp.amount - saved);
-                } else {
-                    totalBills += exp.amount;
-                }
+                if (!gameState.cutExpenses.has(exp.id)) totalBills += exp.amount;
             });
 
             if (gameState.loans > 0) {
@@ -1724,50 +1414,23 @@
             gameState.cash += netCashLeft;
             gameState.totalSpent += totalBills;
 
-            if (netCashLeft > 0) {
-                gameState.totalSaved += netCashLeft;
-            }
+            if (netCashLeft > 0) gameState.totalSaved += netCashLeft;
 
             gameState.month++;
             gameState.gameMode = (gameState.month % 2 === 1) ? 'FALLING' : 'CONVEYOR';
 
             document.getElementById('modalBudget').classList.add('hidden');
             
-            updateStartOverlay();
+            document.getElementById('startOverlayTitle').textContent = `Month ${gameState.month}: ${job.title} Shift`;
+            document.getElementById('shiftSpeedLabel').textContent = job.speedLabel;
+            document.getElementById('shiftDescriptionText').textContent = gameState.gameMode === 'FALLING'
+                ? 'Catch Good Interest & Income cards falling from above. Watch out for Days 25-30 Panic Phase!'
+                : 'Conveyor belt mode! Collect incoming Good Interest cards moving right to left!';
+            
             document.getElementById('startOverlay').classList.remove('hidden');
             updateHUD();
         }
 
-        function updateStartOverlay() {
-            const camp = CAMPAIGN_LEVELS[gameState.campaign.level];
-            const job = CAREERS[gameState.currentJobIndex];
-            if (!camp) return;
-
-            document.getElementById('startOverlayTitle').textContent = `Month ${gameState.month}: ${job.title} Shift`;
-            document.getElementById('startOverlaySubtitle').textContent = camp.title;
-            document.getElementById('shiftDescriptionText').textContent = camp.description;
-            document.getElementById('shiftSpeedLabel').textContent = job.speedLabel;
-
-            const grid = document.getElementById('startOverlayGoalsGrid');
-            if (grid) {
-                grid.innerHTML = '';
-                camp.goals.forEach((goal, idx) => {
-                    const isCleared = goal.check(gameState);
-                    const card = document.createElement('div');
-                    card.className = `p-2 rounded-lg border ${isCleared ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-navy/80 border-navyBorder text-cream/80'}`;
-                    card.innerHTML = `
-                        <div class="font-bold text-[10px] text-cream mb-0.5 flex items-center justify-between">
-                            <span>Goal ${idx + 1}</span>
-                            ${isCleared ? '<i class="fa-solid fa-circle-check text-emerald-400"></i>' : ''}
-                        </div>
-                        <div class="text-[11px] leading-snug">${goal.title}</div>
-                    `;
-                    grid.appendChild(card);
-                });
-            }
-        }
-
-        // CAREERS & SAVINGS / LOANS MODAL HANDLERS
         function openCareersModal() {
             const container = document.getElementById('careersContainer');
             container.innerHTML = '';
@@ -1793,8 +1456,7 @@
                         <div class="text-xs space-y-1.5 mb-3 text-cream/70">
                             <div class="flex justify-between"><span class="text-cream/50">Level & Speed:</span> <span class="text-azure font-medium">${career.speedLabel}</span></div>
                             <div class="flex justify-between"><span class="text-cream/50">Bi-Weekly Pay:</span> <span class="text-azure font-mono font-bold">$${career.biweeklyPay.toLocaleString()}</span></div>
-                            <div class="flex justify-between"><span class="text-cream/50">Commute Gas Cost:</span> <span class="text-cream font-mono">$${career.gasCostMonthly}/mo (${career.commuteMiles} mi)</span></div>
-                            <div class="flex justify-between"><span class="text-cream/50">Education Required:</span> <span class="text-cream">${career.eduRequired}</span></div>
+                            <div class="flex justify-between"><span class="text-cream/50">Lifestyle Scene:</span> <span class="text-cream font-medium">${career.bgName}</span></div>
                         </div>
                     </div>
 
@@ -1828,7 +1490,7 @@
                 gameState.cash -= targetJob.upgradeCost;
                 gameState.unlockedJobMax = Math.max(gameState.unlockedJobMax, idx);
                 gameState.currentJobIndex = idx;
-                sound.playPaycheck();
+                sound.playCashRegister();
                 updateHUD();
                 openCareersModal();
             }
@@ -1840,7 +1502,6 @@
             document.getElementById('modalLoans').classList.remove('hidden');
         }
 
-        // DEPOSIT / WITHDRAW SAVINGS (GOOD INTEREST)
         document.getElementById('btnDepositSavings').addEventListener('click', () => {
             if (gameState.cash >= 250) {
                 gameState.cash -= 250;
@@ -1861,7 +1522,6 @@
             }
         });
 
-        // BORROW / PAY LOAN (BAD INTEREST)
         document.getElementById('btnTakeLoan').addEventListener('click', () => {
             gameState.loans += 500;
             gameState.cash += 500;
@@ -1884,6 +1544,8 @@
         // Event Listeners
         document.getElementById('btnStartShift').addEventListener('click', startShift);
         document.getElementById('btnPayBillsAndContinue').addEventListener('click', payBillsAndAdvance);
+        document.getElementById('btnShieldAbility').addEventListener('click', activateShield);
+        document.getElementById('btnTouchShield').addEventListener('touchstart', (e) => { e.preventDefault(); activateShield(); });
 
         document.getElementById('btnPause').addEventListener('click', () => {
             if (!gameState.isShiftActive) return;
@@ -1902,21 +1564,15 @@
 
         document.getElementById('btnCareersModal').addEventListener('click', openCareersModal);
         document.getElementById('btnLoansModal').addEventListener('click', openLoansModal);
-        document.getElementById('btnLevelGoalsChip').addEventListener('click', openGoalsPreviewModal);
-        document.getElementById('btnReviewOpenLoans').addEventListener('click', openLoansModal);
-        document.getElementById('btnReviewOpenCareers').addEventListener('click', openCareersModal);
-        document.getElementById('btnContinueFromVictory').addEventListener('click', continueFromVictory);
 
         document.querySelectorAll('.btnCloseModal').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.getElementById('modalCareers').classList.add('hidden');
                 document.getElementById('modalLoans').classList.add('hidden');
-                document.getElementById('modalGoals').classList.add('hidden');
             });
         });
 
         // Touch Control Buttons
-        document.getElementById('btnTouchShield').addEventListener('click', activateShield);
         document.getElementById('btnTouchLeft').addEventListener('touchstart', (e) => { e.preventDefault(); keys.Left = true; });
         document.getElementById('btnTouchLeft').addEventListener('touchend', (e) => { e.preventDefault(); keys.Left = false; });
         document.getElementById('btnTouchRight').addEventListener('touchstart', (e) => { e.preventDefault(); keys.Left = false; keys.Right = true; });
@@ -1931,7 +1587,6 @@
         window.onload = function() {
             resizeCanvas();
             updateHUD();
-            updateStartOverlay();
             requestAnimationFrame(gameLoop);
         };
     </script>
