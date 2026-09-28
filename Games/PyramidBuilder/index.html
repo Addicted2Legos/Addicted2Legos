@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="Pyramid Builder - Construct magnificent ancient Egyptian pyramids block by block with precision timing.">
+  <title>Pyramid Builder | Ancient Egyptian Architecture Game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-wrapper">
+    <!-- Game Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Top HUD Overlay -->
+    <header id="hud" class="hud-container">
+      <div class="hud-left">
+        <div class="stat-card">
+          <span class="stat-label">SCORE</span>
+          <span id="score-display" class="stat-value">0</span>
+        </div>
+        <div class="stat-card high-score-card">
+          <span class="stat-label">HIGH SCORE</span>
+          <span id="high-score-display" class="stat-value">0</span>
+        </div>
+        <div id="combo-badge" class="combo-badge hidden">
+          <span class="combo-fire">🔥</span>
+          <span id="combo-text">x2 COMBO</span>
+        </div>
+      </div>
+
+      <div class="hud-center">
+        <div class="level-badge">
+          <span id="level-title" class="level-title">Step Pyramid of Djoser</span>
+          <div class="progress-bar-container" title="Pyramid Progress">
+            <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+          </div>
+          <span id="block-progress-text" class="block-progress-text">Block 1 / 15</span>
+        </div>
+      </div>
+
+      <div class="hud-right">
+        <div id="lives-container" class="lives-container" title="Lives Remaining">
+          <span class="ankh-life active" data-life="1">☥</span>
+          <span class="ankh-life active" data-life="2">☥</span>
+          <span class="ankh-life active" data-life="3">☥</span>
+        </div>
+        <div class="hud-buttons">
+          <button id="btn-sound" class="icon-btn" title="Toggle Sound (M)" aria-label="Toggle Sound">🔊</button>
+          <button id="btn-pause" class="icon-btn" title="Pause Game (P)" aria-label="Pause Game">⏸️</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Bottom Action Area (Mobile Drop Button & Controls hint) -->
+    <footer id="hud-bottom" class="hud-bottom">
+      <div class="controls-hint">
+        <span class="hint-desktop">Press <kbd>SPACE</kbd> or <kbd>CLICK</kbd> anywhere to drop block</span>
+        <span class="hint-mobile">Tap screen or DROP button to place block</span>
+      </div>
+      <button id="btn-mobile-drop" class="mobile-drop-btn">
+        <span>DROP BLOCK</span>
+      </button>
+    </footer>
+
+    <!-- START SCREEN MODAL -->
+    <div id="modal-start" class="modal-overlay active">
+      <div class="modal-card royal-frame">
+        <div class="pyramid-hieroglyph-header">
+          <span class="hieroglyph-icon">𓉐</span>
+          <span class="hieroglyph-icon">𓃭</span>
+          <span class="hieroglyph-icon">𓋹</span>
+        </div>
+        <h1 class="game-title">PYRAMID BUILDER</h1>
+        <p class="game-subtitle">Rise from Royal Mason to Pharaoh's Master Architect</p>
+
+        <div class="how-to-play-card">
+          <h3>HOW TO PLAY</h3>
+          <ul>
+            <li>𓍝 <strong>Watch the stone block</strong> fly across the sky over the pyramid.</li>
+            <li>⏱️ <strong>Time your drop</strong> with <kbd>Space</kbd>, <kbd>Click</kbd>, or <kbd>Tap</kbd> to align it on the guide.</li>
+            <li>✨ <strong>Perfect center drops</strong> trigger combo multipliers and golden score bursts!</li>
+            <li>⚠️ <strong>Missed blocks</strong> will tumble and chip your royal Ankh lives.</li>
+          </ul>
+        </div>
+
+        <div class="mode-select-grid">
+          <button class="mode-btn primary" data-mode="campaign">
+            <span class="mode-icon">🏛️</span>
+            <span class="mode-name">PHARAOH'S CAMPAIGN</span>
+            <span class="mode-desc">Build 3 monumental ancient wonders of increasing scale</span>
+          </button>
+          <button class="mode-btn" data-mode="endless">
+            <span class="mode-icon">⚡</span>
+            <span class="mode-name">ENDLESS OBELISK</span>
+            <span class="mode-desc">High speed non-stop stacking to reach the heavens</span>
+          </button>
+          <button class="mode-btn" data-mode="zen">
+            <span class="mode-icon">𓆸</span>
+            <span class="mode-name">ZEN OF THE NILE</span>
+            <span class="mode-desc">Relaxed building with no strikes or pressure</span>
+          </button>
+        </div>
+
+        <div class="modal-footer">
+          <button id="btn-start-game" class="gold-action-btn pulse-glow">START ARCHITECTURE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAUSE MODAL -->
+    <div id="modal-pause" class="modal-overlay hidden">
+      <div class="modal-card royal-frame compact">
+        <h2>GAME PAUSED</h2>
+        <p>Take a breath by the oasis, Architect.</p>
+        <div class="modal-actions-col">
+          <button id="btn-resume" class="gold-action-btn">RESUME (<kbd>ESC</kbd>)</button>
+          <button id="btn-restart" class="secondary-btn">RESTART LEVEL</button>
+          <button id="btn-menu" class="secondary-btn">MAIN MENU</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEVEL VICTORY MODAL -->
+    <div id="modal-victory" class="modal-overlay hidden">
+      <div class="modal-card royal-frame victory-card">
+        <div class="pyramidion-glow">▲</div>
+        <h2 id="victory-title" class="victory-header">MONUMENT COMPLETED!</h2>
+        <p id="victory-subtitle" class="victory-sub">The Golden Capstone has been blessed by Ra!</p>
+
+        <div class="stats-summary-grid">
+          <div class="summary-box">
+            <span class="summary-label">ACCURACY</span>
+            <span id="stat-accuracy" class="summary-val gold">98.5%</span>
+          </div>
+          <div class="summary-box">
+            <span class="summary-label">PERFECT DROPS</span>
+            <span id="stat-perfects" class="summary-val">12</span>
+          </div>
+          <div class="summary-box">
+            <span class="summary-label">MAX COMBO</span>
+            <span id="stat-max-combo" class="summary-val">x6</span>
+          </div>
+          <div class="summary-box">
+            <span class="summary-label">TOTAL SCORE</span>
+            <span id="stat-total-score" class="summary-val gold">4,850</span>
+          </div>
+        </div>
+
+        <div class="architect-rank-card">
+          <span class="rank-label">ROYAL ARCHITECT RANK:</span>
+          <span id="stat-rank" class="rank-title">GRAND VIZIER OF THE PYRAMIDS</span>
+        </div>
+
+        <div class="modal-actions-row">
+          <button id="btn-next-level" class="gold-action-btn pulse-glow">NEXT WONDER ➔</button>
+          <button id="btn-victory-replay" class="secondary-btn">REPLAY</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- GAME OVER MODAL -->
+    <div id="modal-gameover" class="modal-overlay hidden">
+      <div class="modal-card royal-frame gameover-card">
+        <div class="gameover-icon">𓃭</div>
+        <h2>THE PYRAMID HAS CRUMBLED</h2>
+        <p>The desert sands claimed your structure before completion.</p>
+
+        <div class="stats-summary-grid">
+          <div class="summary-box">
+            <span class="summary-label">FINAL SCORE</span>
+            <span id="gameover-score" class="summary-val gold">1,240</span>
+          </div>
+          <div class="summary-box">
+            <span class="summary-label">HIGH SCORE</span>
+            <span id="gameover-high-score" class="summary-val">3,800</span>
+          </div>
+          <div class="summary-box">
+            <span class="summary-label">BLOCKS PLACED</span>
+            <span id="gameover-blocks" class="summary-val">9 / 15</span>
+          </div>
+          <div class="summary-box">
+            <span class="summary-label">ACCURACY</span>
+            <span id="gameover-accuracy" class="summary-val">74.2%</span>
+          </div>
+        </div>
+
+        <div class="modal-actions-row">
+          <button id="btn-try-again" class="gold-action-btn pulse-glow">TRY AGAIN</button>
+          <button id="btn-gameover-menu" class="secondary-btn">MAIN MENU</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

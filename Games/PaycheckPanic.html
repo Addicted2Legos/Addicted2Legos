@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Paycheck Panic - Master Your Cash Flow</title>
+    <!-- Tailwind CSS for clean layout UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: '#0F172A',
+                        azure: '#0284C7',
+                        azureHover: '#0369A1',
+                        azureGlow: '#007FFF',
+                        cream: '#F8FAFC',
+                        navyLight: '#1E293B',
+                        navyBorder: '#334155'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['Courier New', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #0F172A;
+            color: #F8FAFC;
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0F172A;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #0284C7;
+            border-radius: 3px;
+        }
+
+        .azure-border {
+            border: 1px solid #0284C7;
+        }
+        
+        .azure-glow {
+            box-shadow: 0 0 15px rgba(2, 132, 199, 0.4);
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: calc(100vh - 280px);
+            min-height: 380px;
+            max-height: 620px;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background-color: #0F172A;
+            border-radius: 0.75rem;
+        }
+
+        .modal-overlay {
+            background-color: rgba(15, 23, 42, 0.90);
+            backdrop-filter: blur(8px);
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 15px rgba(56, 189, 248, 0.6); }
+            50% { box-shadow: 0 0 25px rgba(56, 189, 248, 0.9); }
+        }
+
+        .shield-active {
+            animation: pulseGlow 1s infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-2 sm:p-4 bg-navy text-cream">
+
+    <header class="w-full max-w-6xl mx-auto bg-navyLight border border-navyBorder rounded-xl p-3 mb-3 shadow-lg">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+            
+            <!-- Logo & Month Status -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-azure text-cream flex items-center justify-center text-xl font-black shadow azure-glow">
+                    <i class="fa-solid fa-wallet"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-cream leading-none tracking-wide">PAYCHECK PANIC</h1>
+                    <p class="text-xs text-azure font-medium mt-1" id="hudMonthDisplay">Month 1 • Day 1 / 30</p>
+                </div>
+            </div>
+
+            <!-- Primary Account Cards -->
+            <div class="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm">
+                <!-- Checking Cash Account -->
+                <div class="bg-navy p-2 px-3 rounded-lg border border-navyBorder flex flex-col min-w-[110px]">
+                    <span class="text-cream/60 text-[10px] uppercase tracking-wider">Checking Cash</span>
+                    <span class="text-azure font-mono font-bold text-base" id="hudCash">$500.00</span>
+                </div>
+
+                <!-- High-Yield Savings Account (Good Interest) -->
+                <div class="bg-navy p-2 px-3 rounded-lg border border-navyBorder flex flex-col min-w-[110px]">
+                    <span class="text-cream/60 text-[10px] uppercase tracking-wider">HYSA Savings</span>
+                    <span class="text-cream font-mono font-bold text-base" id="hudSavings">$0.00</span>
+                </div>
+
+                <!-- Total Debt / Credit Cards -->
+                <div class="bg-navy p-2 px-3 rounded-lg border border-navyBorder flex flex-col min-w-[100px]">
+                    <span class="text-cream/60 text-[10px] uppercase tracking-wider">Total Loans</span>
+                    <span class="text-cream font-mono font-semibold text-base" id="hudLoans">$0.00</span>
+                </div>
+
+                <!-- Current Career Role -->
+                <div class="bg-navy p-2 px-3 rounded-lg border border-navyBorder flex flex-col min-w-[120px]">
+                    <span class="text-cream/60 text-[10px] uppercase tracking-wider">Current Job</span>
+                    <span class="text-cream font-medium truncate max-w-[110px]" id="hudJobTitle">Fast Food Attendant</span>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-2">
+                <button id="btnLoansModal" class="px-3 py-1.5 text-xs bg-navy border border-azure text-azure rounded-lg hover:bg-azure hover:text-cream transition font-semibold">
+                    <i class="fa-solid fa-building-columns mr-1"></i> Loans
+                </button>
+                <button id="btnCareersModal" class="px-3 py-1.5 text-xs bg-azure text-cream font-bold rounded-lg hover:bg-azureHover transition">
+                    <i class="fa-solid fa-user-graduate mr-1"></i> Careers
+                </button>
+            </div>
+        </div>
+
+        <!-- Month Calendar Progress Bar -->
+        <div class="w-full bg-navy h-2 rounded-full mb-3 overflow-hidden border border-navyBorder relative">
+            <div id="monthProgressBar" class="bg-azure h-full transition-all duration-300 w-0"></div>
+            <div class="absolute left-1/2 top-0 bottom-0 w-0.5 bg-cream/40" title="Bi-weekly Paycheck #1"></div>
+            <div class="absolute right-0 top-0 bottom-0 w-0.5 bg-cream/40" title="Bi-weekly Paycheck #2"></div>
+        </div>
+
+        <!-- PERSISTENT ON-SCREEN CATEGORIZED FINANCIAL BREAKDOWN PANEL -->
+        <div class="bg-navy/90 border border-navyBorder rounded-lg p-2 text-xs grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+            <div class="bg-navyLight/60 p-1.5 rounded border border-navyBorder">
+                <span class="text-[10px] text-cream/50 block uppercase">Total Earned</span>
+                <span class="text-azure font-mono font-bold" id="hudTotalEarned">$0.00</span>
+            </div>
+            <div class="bg-navyLight/60 p-1.5 rounded border border-navyBorder">
+                <span class="text-[10px] text-cream/50 block uppercase">Total Saved</span>
+                <span class="text-cream font-mono font-bold" id="hudTotalSaved">$0.00</span>
+            </div>
+            <div class="bg-navyLight/60 p-1.5 rounded border border-navyBorder">
+                <span class="text-[10px] text-cream/50 block uppercase">Total Spent</span>
+                <span class="text-cream font-mono font-bold" id="hudTotalSpent">$0.00</span>
+            </div>
+            <div class="bg-navyLight/60 p-1.5 rounded border border-navyBorder">
+                <span class="text-[10px] text-cream/50 block uppercase">Total Late Fees</span>
+                <span class="text-cream font-mono font-bold" id="hudTotalFees">$0.00</span>
+            </div>
+            <div class="bg-navyLight/60 p-1.5 rounded border border-navyBorder col-span-2 sm:col-span-1">
+                <span class="text-[10px] text-cream/50 block uppercase">Interest (Earned / Paid)</span>
+                <span class="font-mono font-bold">
+                    <span class="text-azure" id="hudInterestEarned">+$0</span> / 
+                    <span class="text-cream/80" id="hudInterestPaid">-$0</span>
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN GAMEPLAY CANVAS AREA -->
+    <main class="w-full max-w-6xl mx-auto flex-1 flex flex-col items-center justify-center relative">
+        <div class="canvas-container w-full rounded-xl overflow-hidden border border-navyBorder shadow-2xl bg-navy">
+            <canvas id="gameCanvas"></canvas>
+
+            <!-- Educational Tip Callout Banner -->
+            <div id="eduTipBanner" class="absolute top-3 left-3 right-3 bg-navyLight/95 border border-azure/40 text-cream p-3 rounded-xl shadow-lg flex items-start gap-3 text-xs transition-all duration-300 z-10">
+                <div class="w-7 h-7 rounded-lg bg-azure text-cream flex-shrink-0 flex items-center justify-center font-bold text-sm">
+                    <i class="fa-solid fa-lightbulb"></i>
+                </div>
+                <div class="flex-1">
+                    <span class="font-bold text-azure block mb-0.5" id="eduTipTitle">Visual Micro-Badges & Shield Filter</span>
+                    <p class="text-cream/90 leading-relaxed" id="eduTipBody">
+                        Catch Green Income & Blue Gems! Avoid Crimson Expenses, Amber Wants, and Red Spikes. Press **SPACEBAR** to activate your 5s Debt Filter Shield!
+                    </p>
+                </div>
+                <button id="btnCloseTipBanner" class="text-cream/40 hover:text-cream px-1">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- On-Canvas Pause Overlay -->
+            <div id="pauseOverlay" class="hidden absolute inset-0 bg-navy/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center z-20">
+                <h2 class="text-3xl font-extrabold text-azure mb-2">SHIFT PAUSED</h2>
+                <p class="text-cream/80 max-w-md text-sm mb-6">Check your live ledger stats or review career and investment upgrades.</p>
+                <button id="btnResume" class="px-6 py-2.5 bg-azure text-cream font-bold rounded-xl hover:bg-azureHover transition">
+                    Resume Shift
+                </button>
+            </div>
+
+            <!-- Start / Next Shift Canvas Splash Screen -->
+            <div id="startOverlay" class="absolute inset-0 bg-navy/95 flex flex-col items-center justify-center p-6 text-center z-30">
+                <div class="w-16 h-16 rounded-2xl bg-azure text-cream flex items-center justify-center text-3xl font-black mb-4 shadow-lg azure-glow">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <h2 class="text-2xl sm:text-3xl font-bold text-cream mb-2" id="startOverlayTitle">Month 1: Visual Micro-Badges & Defense</h2>
+                <p class="text-sm text-cream/80 max-w-lg mb-6 leading-relaxed" id="shiftDescriptionText">
+                    Items are now micro-badges with instant color coding! Catch 🟢 Income ($500) and 💎 Investment Growth while dodging 🔴 Expenses, 🟡 Wants, and ⚠️ Spike Traps.
+                </p>
+                
+                <div class="flex flex-wrap gap-3 justify-center mb-6">
+                    <div class="bg-navyLight border border-navyBorder px-4 py-2 rounded-lg text-left text-xs">
+                        <span class="text-cream/60 block">Shift Pace</span>
+                        <span class="text-azure font-bold text-sm" id="shiftSpeedLabel">Level 1 - Very Slow</span>
+                    </div>
+                    <div class="bg-navyLight border border-navyBorder px-4 py-2 rounded-lg text-left text-xs">
+                        <span class="text-cream/60 block">Paycheck Schedule</span>
+                        <span class="text-azure font-bold text-sm">Bi-Weekly (Days 15 & 30)</span>
+                    </div>
+                    <div class="bg-navyLight border border-navyBorder px-4 py-2 rounded-lg text-left text-xs">
+                        <span class="text-cream/60 block">Shield Power</span>
+                        <span class="text-azure font-bold text-sm">Press SPACEBAR (5s Repel)</span>
+                    </div>
+                </div>
+
+                <button id="btnStartShift" class="px-8 py-3 bg-azure text-cream text-base font-extrabold rounded-xl hover:bg-azureHover transition shadow-lg transform hover:-translate-y-0.5">
+                    Start Shift
+                </button>
+            </div>
+        </div>
+
+        <!-- Controls Bar for Mobile/Tablet -->
+        <div class="w-full flex items-center justify-between gap-2 mt-2 px-1">
+            <div class="flex items-center gap-2">
+                <button id="btnPause" class="px-3 py-1.5 bg-navyLight border border-navyBorder text-cream text-xs rounded-lg hover:bg-navyBorder">
+                    <i class="fa-solid fa-pause mr-1"></i> Pause
+                </button>
+                <button id="btnToggleSound" class="px-3 py-1.5 bg-navyLight border border-navyBorder text-cream text-xs rounded-lg hover:bg-navyBorder">
+                    <i class="fa-solid fa-volume-high text-azure mr-1" id="soundIcon"></i> Sound
+                </button>
+            </div>
+            
+            <div class="text-xs text-cream/60 hidden sm:block">
+                <kbd class="px-1.5 py-0.5 bg-navyLight border border-navyBorder rounded text-azure font-bold">A</kbd>/<kbd class="px-1.5 py-0.5 bg-navyLight border border-navyBorder rounded text-azure font-bold">D</kbd> or <kbd class="px-1.5 py-0.5 bg-navyLight border border-navyBorder rounded text-azure font-bold">←</kbd>/<kbd class="px-1.5 py-0.5 bg-navyLight border border-navyBorder rounded text-azure font-bold">→</kbd> to move | <kbd class="px-1.5 py-0.5 bg-navyLight border border-navyBorder rounded text-azure font-bold">SPACE</kbd> for Defense Shield
+            </div>
+
+            <!-- Shield Button & Touch Controls -->
+            <div class="flex items-center gap-1 sm:hidden">
+                <button id="btnTouchShield" class="px-3 py-2 bg-azure text-cream font-bold text-xs rounded-lg active:bg-azureHover flex items-center gap-1">
+                    <i class="fa-solid fa-shield"></i> SHIELD
+                </button>
+                <button id="btnTouchLeft" class="w-10 h-10 bg-navyLight border border-navyBorder rounded-lg active:bg-azure active:text-cream flex items-center justify-center">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <button id="btnTouchRight" class="w-10 h-10 bg-navyLight border border-navyBorder rounded-lg active:bg-azure active:text-cream flex items-center justify-center">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL 1: MONTH-END BUDGET & "AUTO-PAY / LATE FEE" ANALYZER -->
+    <div id="modalBudget" class="hidden fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-navy border border-navyBorder w-full max-w-2xl rounded-2xl p-5 sm:p-6 shadow-2xl relative my-auto">
+            
+            <div class="flex items-center justify-between pb-3 border-b border-navyBorder mb-3">
+                <div>
+                    <h3 class="text-xl font-bold text-azure flex items-center gap-2">
+                        <i class="fa-solid fa-file-invoice-dollar"></i> Month-End Ledger & Savings Review
+                    </h3>
+                    <p class="text-xs text-cream/70">Analyze income, cut unnecessary wants, and set up auto-pay to eliminate late fees!</p>
+                </div>
+                <span class="text-xs bg-navyLight border border-azure/30 text-azure px-2.5 py-1 rounded-full font-mono" id="budgetMonthTag">Month 1</span>
+            </div>
+
+            <!-- AUTO-PAY & PUNCTUALITY EFFORT SYSTEM TOGGLE BANNER -->
+            <div class="bg-navyLight border border-azure/40 p-3 rounded-xl mb-4 flex items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-lg bg-azure/20 text-azure flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs font-bold text-cream block">Punctuality Focus: Auto-Pay System ($20/mo)</span>
+                        <p class="text-[11px] text-cream/70">Puts effort into paying on time to completely prevent $35+ late payment fees!</p>
+                    </div>
+                </div>
+                <button id="btnToggleAutoPay" class="px-4 py-1.5 text-xs font-bold rounded-lg transition bg-navy border border-azure text-azure hover:bg-azure hover:text-cream">
+                    ENABLE AUTO-PAY
+                </button>
+            </div>
+
+            <!-- Income, Commute & Late Fee Loss Header -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 text-xs">
+                <div class="bg-navyLight border border-navyBorder p-2.5 rounded-xl">
+                    <span class="text-[10px] text-cream/60 block">Bi-Weekly Pay (2x)</span>
+                    <span class="text-azure font-mono font-bold text-sm" id="summaryGrossIncome">$1,600.00</span>
+                </div>
+                <div class="bg-navyLight border border-navyBorder p-2.5 rounded-xl">
+                    <span class="text-[10px] text-cream/60 block">Commute Gas Cost</span>
+                    <span class="text-cream font-mono font-medium text-sm" id="summaryCommuteCost">$40.00</span>
+                </div>
+                <div class="bg-navyLight border border-navyBorder p-2.5 rounded-xl">
+                    <span class="text-[10px] text-cream/60 block">Late Fees & Debt APR Lost</span>
+                    <span class="text-cream font-mono font-bold text-sm" id="summaryLateFeesLost">$0.00</span>
+                </div>
+                <div class="bg-navyLight border border-navyBorder p-2.5 rounded-xl">
+                    <span class="text-[10px] text-cream/60 block">Net Remaining Cash</span>
+                    <span class="text-azure font-mono font-bold text-sm" id="summaryNetCash">$880.00</span>
+                </div>
+            </div>
+
+            <h4 class="text-xs uppercase font-bold text-cream/60 tracking-wider mb-2 flex justify-between items-center">
+                <span>Budget Helper: Cut Wants & Avoid Debt Traps</span>
+                <span class="text-azure text-[11px] font-normal">Click 'CUT IT' to save money</span>
+            </h4>
+
+            <!-- Expenses List with Cut/Keep Toggles -->
+            <div class="space-y-2 mb-4 max-h-48 overflow-y-auto pr-1" id="expenseListContainer">
+                <!-- Dynamically Populated -->
+            </div>
+
+            <!-- Educational Tip Box -->
+            <div class="bg-navyLight/80 border border-azure/40 rounded-xl p-3 mb-4 flex items-start gap-3 text-xs">
+                <i class="fa-solid fa-graduation-cap text-azure text-base mt-0.5"></i>
+                <div>
+                    <span class="font-bold text-azure block mb-0.5" id="budgetLessonTitle">Financial Literacy Lesson: Good vs. Bad Interest</span>
+                    <p class="text-cream/90 leading-relaxed" id="educationalTipText">
+                        **Bad Interest** (credit cards, late fees) drains your paycheck every month. **Good Interest** (HYSA, investments) makes your money work for you through compounding!
+                    </p>
+                </div>
+            </div>
+
+            <!-- Summary Modal Actions -->
+            <div class="flex items-center justify-between pt-3 border-t border-navyBorder">
+                <div>
+                    <span class="text-xs text-cream/60 block">Total Monthly Savings Created</span>
+                    <span class="text-azure font-mono font-extrabold text-base" id="totalSavedFromCuts">$0.00 / mo</span>
+                </div>
+                <button id="btnPayBillsAndContinue" class="px-6 py-2.5 bg-azure text-cream font-bold rounded-xl hover:bg-azureHover transition shadow">
+                    Pay Bills & Start Next Month
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: CAREER & EDUCATION UPGRADES -->
+    <div id="modalCareers" class="hidden fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-navy border border-navyBorder w-full max-w-3xl rounded-2xl p-5 sm:p-6 shadow-2xl relative my-auto">
+            
+            <div class="flex items-center justify-between pb-3 border-b border-navyBorder mb-4">
+                <div>
+                    <h3 class="text-xl font-bold text-azure flex items-center gap-2">
+                        <i class="fa-solid fa-user-graduate"></i> Career & Skill Advancement
+                    </h3>
+                    <p class="text-xs text-cream/70">Invest saved cash into higher education to unlock well-paying job roles!</p>
+                </div>
+                <button class="btnCloseModal text-cream/50 hover:text-cream text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4" id="careersContainer">
+                <!-- Dynamically populated careers -->
+            </div>
+
+            <div class="bg-navyLight border border-navyBorder rounded-xl p-3 text-xs text-cream/80 flex justify-between items-center">
+                <span><i class="fa-solid fa-car text-azure mr-1"></i> Higher roles feature increased pay but longer commutes!</span>
+                <span class="text-azure font-semibold" id="careerCurrentBalanceDisplay">Cash: $500.00</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: BANK LOANS & SAVINGS INVESTMENTS -->
+    <div id="modalLoans" class="hidden fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-navy border border-navyBorder w-full max-w-xl rounded-2xl p-5 sm:p-6 shadow-2xl relative my-auto">
+            
+            <div class="flex items-center justify-between pb-3 border-b border-navyBorder mb-4">
+                <div>
+                    <h3 class="text-xl font-bold text-azure flex items-center gap-2">
+                        <i class="fa-solid fa-landmark"></i> Good vs. Bad Interest Management
+                    </h3>
+                    <p class="text-xs text-cream/70">Put money into High-Yield Savings to earn Good Interest, or pay down Bad Debt!</p>
+                </div>
+                <button class="btnCloseModal text-cream/50 hover:text-cream text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                <!-- High-Yield Savings Account (Good Interest) -->
+                <div class="bg-navyLight border border-azure/50 p-4 rounded-xl flex flex-col justify-between">
+                    <div>
+                        <h4 class="font-bold text-cream text-sm mb-1 flex items-center gap-1.5">
+                            <i class="fa-solid fa-chart-line text-azure"></i> High-Yield Savings (HYSA)
+                        </h4>
+                        <p class="text-xs text-cream/70 mb-3">Deposit cash to earn **6% Good Compound Interest** every month!</p>
+                        <div class="text-xs space-y-1 mb-4">
+                            <div class="flex justify-between"><span class="text-cream/60">HYSA Balance:</span> <span class="text-azure font-mono font-bold" id="loanModalSavings">$0.00</span></div>
+                            <div class="flex justify-between"><span class="text-cream/60">Monthly Yield:</span> <span class="text-azure font-mono">+6% / Month</span></div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="btnDepositSavings" class="flex-1 py-2 bg-azure text-cream text-xs font-bold rounded-lg hover:bg-azureHover transition">
+                            Deposit $250
+                        </button>
+                        <button id="btnWithdrawSavings" class="px-3 py-2 bg-navy border border-navyBorder text-cream/80 text-xs font-bold rounded-lg hover:border-azure transition">
+                            Withdraw
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Debt & Credit Cards (Bad Interest) -->
+                <div class="bg-navyLight border border-navyBorder p-4 rounded-xl flex flex-col justify-between">
+                    <div>
+                        <h4 class="font-bold text-cream text-sm mb-1 flex items-center gap-1.5">
+                            <i class="fa-solid fa-credit-card text-cream/60"></i> Debt & Credit Cards
+                        </h4>
+                        <p class="text-xs text-cream/70 mb-3">Borrow micro-loans, but eliminate debt to stop paying **8% Bad Interest**!</p>
+                        <div class="text-xs space-y-1 mb-4">
+                            <div class="flex justify-between"><span class="text-cream/60">Current Debt:</span> <span class="text-cream font-mono font-bold" id="loanModalCurrentDebt">$0.00</span></div>
+                            <div class="flex justify-between"><span class="text-cream/60">Interest Charge:</span> <span class="text-cream/80 font-mono">-8% / Month</span></div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="btnTakeLoan" class="flex-1 py-2 bg-navy border border-azure text-azure text-xs font-bold rounded-lg hover:bg-azure hover:text-cream transition">
+                            Borrow $500
+                        </button>
+                        <button id="btnPayoffLoan" class="flex-1 py-2 bg-azure text-cream text-xs font-bold rounded-lg hover:bg-azureHover transition">
+                            Pay $500 Debt
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-navyLight/60 border border-azure/30 rounded-xl p-3 text-xs text-cream/80">
+                <span class="font-bold text-azure block mb-0.5"><i class="fa-solid fa-graduation-cap mr-1"></i> Core Principle: Making Money Work For You:</span>
+                Good interest compound growth builds wealth automatically. Bad debt interest drains your hard-earned paycheck every month!
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- WEB AUDIO API SOUND SYSTEM ---
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) {
+                        this.ctx = new AudioContext();
+                    }
+                }
+            }
+
+            playCoin() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.12);
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.12);
+            }
+
+            playTrap() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(90, this.ctx.currentTime + 0.25);
+                gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.25);
+            }
+
+            playShield() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.3);
+            }
+
+            playPaycheck() {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+                    gain.gain.setValueAtTime(0.12, now + idx * 0.08);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.08 + 0.15);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now + idx * 0.08);
+                    osc.stop(now + idx * 0.08 + 0.15);
+                });
+            }
+        }
+
+        const sound = new SoundEngine();
+
+        // --- CAREERS CONFIGURATION ---
+        const CAREERS = [
+            {
+                id: 'fast_food',
+                title: 'Fast Food Attendant',
+                level: 1,
+                speedLabel: 'Level 1 (Very Slow)',
+                itemSpeedMin: 0.8,
+                itemSpeedMax: 1.2,
+                spawnInterval: 120,
+                biweeklyPay: 800,  // $1,600/mo
+                commuteMiles: 5,
+                gasCostMonthly: 40,
+                eduRequired: 'None',
+                upgradeCost: 0,
+                icon: 'fa-burger'
+            },
+            {
+                id: 'retail_clerk',
+                title: 'Retail Store Clerk',
+                level: 2,
+                speedLabel: 'Level 2 (Slow & Steady)',
+                itemSpeedMin: 1.2,
+                itemSpeedMax: 1.7,
+                spawnInterval: 90,
+                biweeklyPay: 1100, // $2,200/mo
+                commuteMiles: 10,
+                gasCostMonthly: 75,
+                eduRequired: 'High School Diploma',
+                upgradeCost: 300,
+                icon: 'fa-store'
+            },
+            {
+                id: 'jr_dev',
+                title: 'Junior Web Developer',
+                level: 3,
+                speedLabel: 'Level 3 (Moderate)',
+                itemSpeedMin: 1.8,
+                itemSpeedMax: 2.5,
+                spawnInterval: 70,
+                biweeklyPay: 2200, // $4,400/mo
+                commuteMiles: 15,
+                gasCostMonthly: 120,
+                eduRequired: 'Coding Bootcamp Cert',
+                upgradeCost: 1500,
+                icon: 'fa-code'
+            },
+            {
+                id: 'fin_analyst',
+                title: 'Financial Analyst',
+                level: 4,
+                speedLabel: 'Level 4 (Fast Pace)',
+                itemSpeedMin: 2.6,
+                itemSpeedMax: 3.4,
+                spawnInterval: 50,
+                biweeklyPay: 3600, // $7,200/mo
+                commuteMiles: 22,
+                gasCostMonthly: 180,
+                eduRequired: 'Finance Degree',
+                upgradeCost: 3500,
+                icon: 'fa-chart-pie'
+            },
+            {
+                id: 'executive',
+                title: 'Corporate Executive',
+                level: 5,
+                speedLabel: 'Level 5 (Expert Rush)',
+                itemSpeedMin: 3.5,
+                itemSpeedMax: 4.8,
+                spawnInterval: 35,
+                biweeklyPay: 6000, // $12,000/mo
+                commuteMiles: 30,
+                gasCostMonthly: 250,
+                eduRequired: 'MBA / Executive Master',
+                upgradeCost: 8000,
+                icon: 'fa-briefcase'
+            }
+        ];
+
+        const BASE_EXPENSES = [
+            { id: 'rent', name: 'Housing & Rent', amount: 750, discretionary: false, icon: 'fa-house' },
+            { id: 'groceries', name: 'Essential Groceries', amount: 250, discretionary: false, icon: 'fa-cart-shopping' },
+            { id: 'utilities', name: 'Electricity & Water', amount: 120, discretionary: false, icon: 'fa-bolt' },
+            { id: 'dining_out', name: 'Dining Out & Fast Food', amount: 180, discretionary: true, icon: 'fa-utensils' },
+            { id: 'streaming', name: 'Streaming & Gaming Subs', amount: 45, discretionary: true, icon: 'fa-tv' },
+            { id: 'gym', name: 'Luxury Gym Membership', amount: 65, discretionary: true, icon: 'fa-dumbbell' }
+        ];
+
+        const LEVEL_TIPS = {
+            1: {
+                title: "Level 1 Rule: Good Interest vs. Bad Interest!",
+                body: "Catch **Good Interest (HYSA / Compound Growth)** & income items! Avoid **Bad Interest (Credit Cards / Late Fees)** traps that drain your money."
+            },
+            2: {
+                title: "Level 2 Rule: Avoid Late Payment Fees!",
+                body: "Missed payments incur $35+ late fees! Enable the **Auto-Pay System** in the budget modal to keep payments on time automatically."
+            },
+            3: {
+                title: "Level 3 Rule: Make Money Work For You!",
+                body: "Deposit extra cash into your High-Yield Savings Account (HYSA) to let compound interest generate passive income every month!"
+            }
+        };
+
+        // GLOBAL GAME STATE
+        const gameState = {
+            month: 1,
+            day: 1,
+            dayTimer: 0,
+            cash: 500,
+            savings: 0,
+            loans: 0,
+            
+            // STATS LEDGER TRACKERS
+            totalEarned: 500,
+            totalSaved: 0,
+            totalSpent: 0,
+            totalFees: 0,
+            interestEarned: 0,
+            interestPaid: 0,
+            
+            // SHIELD & DEFENSIVE FILTER ABILITY
+            shieldActive: false,
+            shieldTimer: 0,
+            shieldCooldown: 0,
+            
+            // SYSTEM SETTINGS
+            autoPayEnabled: false,
+            currentJobIndex: 0,
+            unlockedJobMax: 0,
+            cutExpenses: new Set(),
+            gameMode: 'FALLING',
+            isShiftActive: false,
+            isPaused: false,
+            
+            player: {
+                x: 0,
+                y: 0,
+                width: 120,
+                height: 22,
+                speed: 9
+            },
+
+            items: [],
+            spawnTimer: 0
+        };
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            gameState.player.y = canvas.height - 40;
+            if (gameState.player.x + gameState.player.width > canvas.width) {
+                gameState.player.x = canvas.width / 2 - gameState.player.width / 2;
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        const keys = { Left: false, Right: false, Up: false, Down: false };
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.Left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.Right = true;
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.Up = true;
+            if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.Down = true;
+            if (e.key === ' ' || e.code === 'Space') {
+                e.preventDefault();
+                activateShield();
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.Left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.Right = false;
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.Up = false;
+            if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.Down = false;
+        });
+
+        function activateShield() {
+            if (!gameState.isShiftActive || gameState.isPaused) return;
+            if (gameState.shieldCooldown <= 0 && !gameState.shieldActive) {
+                gameState.shieldActive = true;
+                gameState.shieldTimer = 300; // 5 seconds at 60fps
+                gameState.shieldCooldown = 600; // 10s cooldown
+                sound.playShield();
+                showFloatingText('SHIELD FILTER ACTIVE!', gameState.player.x + gameState.player.width / 2, gameState.player.y - 20, '#38BDF8');
+            }
+        }
+
+        let isDragging = false;
+        canvas.addEventListener('mousedown', (e) => {
+            sound.init();
+            isDragging = true;
+            movePlayerToInput(e.clientX, e.clientY);
+        });
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging) movePlayerToInput(e.clientX, e.clientY);
+        });
+        window.addEventListener('mouseup', () => isDragging = false);
+
+        canvas.addEventListener('touchstart', (e) => {
+            sound.init();
+            if (e.touches.length > 0) movePlayerToInput(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: true });
+        canvas.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 0) movePlayerToInput(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: true });
+
+        function movePlayerToInput(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = clientX - rect.left;
+            const mouseY = clientY - rect.top;
+
+            gameState.player.x = Math.max(0, Math.min(canvas.width - gameState.player.width, mouseX - gameState.player.width / 2));
+            if (gameState.gameMode === 'CONVEYOR') {
+                gameState.player.y = Math.max(40, Math.min(canvas.height - gameState.player.height - 20, mouseY - gameState.player.height / 2));
+            }
+        }
+
+        // REDESIGNED MICRO-BADGE ITEMS WITH VISUAL COLOR-CODING
+        const ITEM_TYPES = [
+            // 🟢 INCOME / GREEN BADGE
+            { type: 'income', label: 'Paycheck', value: 500, isPositive: true, category: 'Income', faIcon: 'fa-money-bill-wave', badgeBg: '#10B981', badgeBorder: '#34D399', badgeType: 'INCOME' },
+            { type: 'income', label: 'Dividend', value: 120, isPositive: true, category: 'Income', faIcon: 'fa-coins', badgeBg: '#059669', badgeBorder: '#10B981', badgeType: 'INCOME' },
+            
+            // 🔴 REQUIRED EXPENSES / CRIMSON BADGE
+            { type: 'expense', label: 'Rent', value: -750, isPositive: false, category: 'Required Expense', faIcon: 'fa-house', badgeBg: '#DC2626', badgeBorder: '#F87171', badgeType: 'EXPENSE' },
+            { type: 'expense', label: 'Electric', value: -120, isPositive: false, category: 'Required Expense', faIcon: 'fa-bolt', badgeBg: '#B91C1C', badgeBorder: '#EF4444', badgeType: 'EXPENSE' },
+            { type: 'expense', label: 'Gas', value: -45, isPositive: false, category: 'Required Expense', faIcon: 'fa-gas-pump', badgeBg: '#991B1B', badgeBorder: '#F87171', badgeType: 'EXPENSE' },
+
+            // 🟡 DISCRETIONARY WANTS / AMBER BADGE
+            { type: 'want', label: 'Takeout', value: -45, isPositive: false, category: 'Discretionary Want', faIcon: 'fa-utensils', badgeBg: '#D97706', badgeBorder: '#FBBF24', badgeType: 'WANT' },
+            { type: 'want', label: 'Console', value: -300, isPositive: false, category: 'Discretionary Want', faIcon: 'fa-gamepad', badgeBg: '#B45309', badgeBorder: '#F59E0B', badgeType: 'WANT' },
+
+            // 💎 GOOD INTEREST / BLUE GEM
+            { type: 'good_interest', label: 'HYSA Yield', value: 100, isPositive: true, category: 'Good Interest', faIcon: 'fa-gem', badgeBg: '#0284C7', badgeBorder: '#38BDF8', badgeType: 'GOOD_INTEREST' },
+            { type: 'good_interest', label: 'Growth', value: 150, isPositive: true, category: 'Good Interest', faIcon: 'fa-chart-line', badgeBg: '#0369A1', badgeBorder: '#7DD3FC', badgeType: 'GOOD_INTEREST' },
+
+            // ⚠️ BAD INTEREST / SPIKE (SHARP RED WARNING)
+            { type: 'bad_interest', label: 'APR Trap', value: -80, isPositive: false, category: 'Bad Interest', faIcon: 'fa-triangle-exclamation', badgeBg: '#7F1D1D', badgeBorder: '#EF4444', badgeType: 'BAD_INTEREST' },
+            { type: 'bad_interest', label: 'Late Fee', value: -40, isPositive: false, category: 'Bad Interest', faIcon: 'fa-skull-crossbones', badgeBg: '#450A0A', badgeBorder: '#DC2626', badgeType: 'BAD_INTEREST' }
+        ];
+
+        function spawnItem() {
+            const template = ITEM_TYPES[Math.floor(Math.random() * ITEM_TYPES.length)];
+            const currentJob = CAREERS[gameState.currentJobIndex];
+            const baseSpeed = currentJob.itemSpeedMin + Math.random() * (currentJob.itemSpeedMax - currentJob.itemSpeedMin);
+            
+            const badgeWidth = 110;
+            const badgeHeight = 36;
+
+            if (gameState.gameMode === 'FALLING') {
+                gameState.items.push({
+                    ...template,
+                    x: Math.random() * (canvas.width - badgeWidth - 20) + 10,
+                    y: -badgeHeight - 10,
+                    w: badgeWidth,
+                    h: badgeHeight,
+                    speedY: baseSpeed,
+                    speedX: 0,
+                    repelled: false
+                });
+            } else {
+                gameState.items.push({
+                    ...template,
+                    x: canvas.width + 20,
+                    y: 60 + Math.random() * (canvas.height - 140),
+                    w: badgeWidth,
+                    h: badgeHeight,
+                    speedY: 0,
+                    speedX: -baseSpeed * 1.1,
+                    repelled: false
+                });
+            }
+        }
+
+        function updateGameplay() {
+            if (!gameState.isShiftActive || gameState.isPaused) return;
+
+            const currentJob = CAREERS[gameState.currentJobIndex];
+
+            // Shield Timers
+            if (gameState.shieldActive) {
+                gameState.shieldTimer--;
+                if (gameState.shieldTimer <= 0) {
+                    gameState.shieldActive = false;
+                }
+            }
+            if (gameState.shieldCooldown > 0) {
+                gameState.shieldCooldown--;
+            }
+
+            // Calendar Days
+            gameState.dayTimer++;
+            if (gameState.dayTimer >= 60) {
+                gameState.dayTimer = 0;
+                gameState.day++;
+
+                // BI-WEEKLY PAYCHECK TRIGGER (Day 15 & Day 30)
+                if (gameState.day === 15 || gameState.day === 30) {
+                    gameState.cash += currentJob.biweeklyPay;
+                    gameState.totalEarned += currentJob.biweeklyPay;
+                    sound.playPaycheck();
+                    showFloatingText(`+$${currentJob.biweeklyPay} PAYCHECK!`, canvas.width / 2, canvas.height / 2, '#0284C7');
+                }
+
+                // Finish Month
+                if (gameState.day > 30) {
+                    endShiftMonth();
+                    return;
+                }
+                updateHUD();
+            }
+
+            // Keyboard Movement
+            if (gameState.gameMode === 'FALLING') {
+                if (keys.Left) gameState.player.x -= gameState.player.speed;
+                if (keys.Right) gameState.player.x += gameState.player.speed;
+                gameState.player.x = Math.max(0, Math.min(canvas.width - gameState.player.width, gameState.player.x));
+            } else {
+                if (keys.Up) gameState.player.y -= gameState.player.speed;
+                if (keys.Down) gameState.player.y += gameState.player.speed;
+                if (keys.Left) gameState.player.x -= gameState.player.speed;
+                if (keys.Right) gameState.player.x += gameState.player.speed;
+                gameState.player.x = Math.max(0, Math.min(canvas.width - gameState.player.width, gameState.player.x));
+                gameState.player.y = Math.max(40, Math.min(canvas.height - gameState.player.height - 20, gameState.player.y));
+            }
+
+            // Spawning
+            gameState.spawnTimer++;
+            if (gameState.spawnTimer >= currentJob.spawnInterval) {
+                spawnItem();
+                gameState.spawnTimer = 0;
+            }
+
+            // Item Update & Defensive Filter Repel
+            for (let i = gameState.items.length - 1; i >= 0; i--) {
+                const item = gameState.items[i];
+
+                // REPEL / FILTER SHIELD MECHANIC FOR BAD INTEREST / TRAPS
+                if (gameState.shieldActive && (item.badgeType === 'BAD_INTEREST' || item.badgeType === 'WANT')) {
+                    const distToPlayer = Math.hypot((item.x + item.w/2) - (gameState.player.x + gameState.player.width/2), (item.y + item.h/2) - (gameState.player.y + gameState.player.height/2));
+                    if (distToPlayer < 180) {
+                        item.repelled = true;
+                        item.speedY = -Math.abs(item.speedY) - 3; // Push upwards away
+                        item.speedX = (item.x < gameState.player.x) ? -4 : 4;
+                    }
+                }
+
+                item.x += item.speedX;
+                item.y += item.speedY;
+
+                const hit = (
+                    item.x < gameState.player.x + gameState.player.width &&
+                    item.x + item.w > gameState.player.x &&
+                    item.y < gameState.player.y + gameState.player.height &&
+                    item.y + item.h > gameState.player.y
+                );
+
+                if (hit && !item.repelled) {
+                    gameState.cash += item.value;
+                    if (gameState.cash < 0) gameState.cash = 0;
+
+                    // TRACK CATEGORIZED LEDGER STATS
+                    if (item.type === 'good_interest') {
+                        gameState.interestEarned += item.value;
+                        gameState.totalEarned += item.value;
+                    } else if (item.type === 'income') {
+                        gameState.totalEarned += item.value;
+                    } else if (item.type === 'bad_interest') {
+                        gameState.interestPaid += Math.abs(item.value);
+                        gameState.totalSpent += Math.abs(item.value);
+                    } else {
+                        gameState.totalSpent += Math.abs(item.value);
+                    }
+
+                    if (item.value >= 0) {
+                        sound.playCoin();
+                        showFloatingText(`+$${item.value}`, item.x + item.w / 2, item.y, '#34D399');
+                    } else {
+                        sound.playTrap();
+                        showFloatingText(`-$${Math.abs(item.value)}`, item.x + item.w / 2, item.y, '#F87171');
+                    }
+
+                    gameState.items.splice(i, 1);
+                    updateHUD();
+                    continue;
+                }
+
+                if (item.y > canvas.height + 60 || item.y < -120 || item.x < -item.w - 20 || item.x > canvas.width + 40) {
+                    gameState.items.splice(i, 1);
+                }
+            }
+        }
+
+        const floatingTexts = [];
+        function showFloatingText(text, x, y, color) {
+            floatingTexts.push({ text, x, y, color, opacity: 1.0, life: 45 });
+        }
+
+        function renderCanvas() {
+            ctx.fillStyle = '#0F172A';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Background Grid Lines
+            ctx.strokeStyle = 'rgba(51, 65, 85, 0.25)';
+            ctx.lineWidth = 1;
+            const gridSize = 40;
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // Draw Player Basket/Catcher + Active Shield Aura
+            ctx.save();
+            if (gameState.shieldActive) {
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(gameState.player.x + gameState.player.width/2, gameState.player.y + gameState.player.height/2, 65, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
+                ctx.fill();
+            }
+
+            ctx.fillStyle = gameState.shieldActive ? '#38BDF8' : '#0284C7';
+            ctx.beginPath();
+            if (ctx.roundRect) {
+                ctx.roundRect(gameState.player.x, gameState.player.y, gameState.player.width, gameState.player.height, 8);
+            } else {
+                ctx.rect(gameState.player.x, gameState.player.y, gameState.player.width, gameState.player.height);
+            }
+            ctx.fill();
+
+            ctx.strokeStyle = '#F8FAFC';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = '#F8FAFC';
+            ctx.font = 'bold 11px Inter';
+            ctx.textAlign = 'center';
+            ctx.fillText(
+                gameState.shieldActive ? 'SHIELDED' : (gameState.gameMode === 'FALLING' ? 'CATCHER' : 'COLLECTOR'),
+                gameState.player.x + gameState.player.width / 2,
+                gameState.player.y + 15
+            );
+            ctx.restore();
+
+            // Draw Micro-Badge Items
+            gameState.items.forEach((item) => {
+                ctx.save();
+                
+                // Micro-Badge Container Styling
+                ctx.fillStyle = item.badgeBg;
+                ctx.strokeStyle = item.badgeBorder;
+                ctx.lineWidth = item.badgeType === 'BAD_INTEREST' ? 3 : 2;
+
+                ctx.beginPath();
+                if (ctx.roundRect) {
+                    ctx.roundRect(item.x, item.y, item.w, item.h, 18); // Capsule Badge Shape
+                } else {
+                    ctx.rect(item.x, item.y, item.w, item.h);
+                }
+                ctx.fill();
+                ctx.stroke();
+
+                // Pulsing Glow for Good Interest Blue Gem
+                if (item.badgeType === 'GOOD_INTEREST') {
+                    ctx.shadowColor = '#38BDF8';
+                    ctx.shadowBlur = 10;
+                    ctx.strokeStyle = '#7DD3FC';
+                    ctx.stroke();
+                }
+
+                // Sharp Warning Spike Outline for Bad Interest
+                if (item.badgeType === 'BAD_INTEREST') {
+                    ctx.strokeStyle = '#EF4444';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(item.x - 2, item.y - 2, item.w + 4, item.h + 4);
+                }
+
+                // Badge Value Text & Micro Info
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#F8FAFC';
+                ctx.font = 'extrabold 11px Inter';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                const valStr = item.value >= 0 ? `+$${item.value}` : `-$${Math.abs(item.value)}`;
+                ctx.fillText(`${valStr} • ${item.label}`, item.x + item.w / 2, item.y + item.h / 2);
+
+                ctx.restore();
+            });
+
+            // Floating Text Animations
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ctx.fillStyle = ft.color;
+                ctx.globalAlpha = ft.opacity;
+                ctx.font = 'extrabold 15px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ft.y -= 1;
+                ft.life--;
+                ft.opacity = ft.life / 45;
+                if (ft.life <= 0) floatingTexts.splice(i, 1);
+            }
+            ctx.globalAlpha = 1.0;
+        }
+
+        function gameLoop() {
+            updateGameplay();
+            renderCanvas();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function updateHUD() {
+            document.getElementById('hudCash').textContent = `$${gameState.cash.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+            document.getElementById('hudSavings').textContent = `$${gameState.savings.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+            document.getElementById('hudLoans').textContent = `$${gameState.loans.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+            
+            const currentJob = CAREERS[gameState.currentJobIndex];
+            document.getElementById('hudJobTitle').textContent = currentJob.title;
+            document.getElementById('hudMonthDisplay').textContent = `Month ${gameState.month} • Day ${gameState.day} / 30`;
+            
+            // UPDATE PERSISTENT LEDGER STATS PANEL
+            document.getElementById('hudTotalEarned').textContent = `$${gameState.totalEarned.toLocaleString()}`;
+            document.getElementById('hudTotalSaved').textContent = `$${gameState.totalSaved.toLocaleString()}`;
+            document.getElementById('hudTotalSpent').textContent = `$${gameState.totalSpent.toLocaleString()}`;
+            document.getElementById('hudTotalFees').textContent = `$${gameState.totalFees.toLocaleString()}`;
+            document.getElementById('hudInterestEarned').textContent = `+$${gameState.interestEarned.toLocaleString()}`;
+            document.getElementById('hudInterestPaid').textContent = `-$${gameState.interestPaid.toLocaleString()}`;
+
+            const percent = (gameState.day / 30) * 100;
+            document.getElementById('monthProgressBar').style.width = `${percent}%`;
+
+            // Educational Tips Sync
+            const currentLevel = currentJob.level;
+            const tipInfo = LEVEL_TIPS[currentLevel];
+            const banner = document.getElementById('eduTipBanner');
+            
+            if (tipInfo && gameState.isShiftActive) {
+                document.getElementById('eduTipTitle').textContent = tipInfo.title;
+                document.getElementById('eduTipBody').textContent = tipInfo.body;
+                banner.classList.remove('hidden');
+            } else {
+                banner.classList.add('hidden');
+            }
+        }
+
+        function startShift() {
+            sound.init();
+            gameState.day = 1;
+            gameState.dayTimer = 0;
+            gameState.items = [];
+            gameState.isShiftActive = true;
+            gameState.isPaused = false;
+
+            document.getElementById('startOverlay').classList.add('hidden');
+            document.getElementById('pauseOverlay').classList.add('hidden');
+            updateHUD();
+        }
+
+        function endShiftMonth() {
+            gameState.isShiftActive = false;
+            document.getElementById('eduTipBanner').classList.add('hidden');
+            
+            // Compound Good Interest on Savings Balance (6% Monthly Yield)
+            if (gameState.savings > 0) {
+                const yieldBonus = Math.round(gameState.savings * 0.06);
+                gameState.savings += yieldBonus;
+                gameState.interestEarned += yieldBonus;
+                gameState.totalEarned += yieldBonus;
+            }
+
+            openBudgetModal();
+        }
+
+        function openBudgetModal() {
+            const job = CAREERS[gameState.currentJobIndex];
+            const monthlyGross = job.biweeklyPay * 2;
+            const commuteCost = job.gasCostMonthly;
+
+            document.getElementById('budgetMonthTag').textContent = `Month ${gameState.month}`;
+            document.getElementById('summaryGrossIncome').textContent = `$${monthlyGross.toLocaleString()}`;
+            document.getElementById('summaryCommuteCost').textContent = `$${commuteCost.toLocaleString()}`;
+
+            // Auto-Pay Button State
+            const btnAutoPay = document.getElementById('btnToggleAutoPay');
+            if (gameState.autoPayEnabled) {
+                btnAutoPay.textContent = 'AUTO-PAY ACTIVE ($20/mo)';
+                btnAutoPay.className = 'px-4 py-1.5 text-xs font-bold rounded-lg transition bg-azure text-cream shadow';
+            } else {
+                btnAutoPay.textContent = 'ENABLE AUTO-PAY';
+                btnAutoPay.className = 'px-4 py-1.5 text-xs font-bold rounded-lg transition bg-navy border border-azure text-azure hover:bg-azure hover:text-cream';
+            }
+
+            const listContainer = document.getElementById('expenseListContainer');
+            listContainer.innerHTML = '';
+
+            let totalBills = commuteCost;
+            if (gameState.autoPayEnabled) totalBills += 20;
+
+            BASE_EXPENSES.forEach(exp => {
+                const isCut = gameState.cutExpenses.has(exp.id);
+                if (!isCut) {
+                    totalBills += exp.amount;
+                }
+
+                const itemRow = document.createElement('div');
+                itemRow.className = `flex items-center justify-between p-2.5 rounded-xl border ${isCut ? 'bg-navy/40 border-navyBorder opacity-50' : 'bg-navyLight border-navyBorder'}`;
+                
+                itemRow.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg ${isCut ? 'bg-navyBorder text-cream/40' : 'bg-azure/20 text-azure'} flex items-center justify-center text-sm">
+                            <i class="fa-solid ${exp.icon}"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs font-semibold text-cream block">${exp.name}</span>
+                            <span class="text-[10px] ${exp.discretionary ? 'text-azure' : 'text-cream/50'}">
+                                ${exp.discretionary ? 'Discretionary Want (Optional)' : 'Fixed Essential Need'}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="font-mono text-sm ${isCut ? 'line-through text-cream/40' : 'text-cream font-bold'}">$${exp.amount}</span>
+                        ${exp.discretionary ? `
+                            <button onclick="toggleCutExpense('${exp.id}')" class="px-3 py-1 text-[11px] font-bold rounded-lg transition ${isCut ? 'bg-azure text-cream' : 'bg-navy border border-navyBorder text-cream hover:border-azure'}">
+                                ${isCut ? 'UNCUT' : 'CUT IT'}
+                            </button>
+                        ` : `
+                            <span class="text-[10px] uppercase text-cream/40 font-bold px-2 py-1 bg-navy rounded">Fixed Need</span>
+                        `}
+                    </div>
+                `;
+                listContainer.appendChild(itemRow);
+            });
+
+            // Loan Interest Charge Line Item
+            let loanInterestCharge = 0;
+            if (gameState.loans > 0) {
+                loanInterestCharge = gameState.loans * 0.08;
+                totalBills += loanInterestCharge;
+                const loanRow = document.createElement('div');
+                loanRow.className = 'flex items-center justify-between p-2.5 rounded-xl border bg-navyLight border-navyBorder';
+                loanRow.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-navyBorder text-cream/70 flex items-center justify-center text-sm">
+                            <i class="fa-solid fa-percent"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs font-semibold text-cream block">Debt Interest Charge (8%)</span>
+                            <span class="text-[10px] text-cream/50">Monthly Bad Interest Loss</span>
+                        </div>
+                    </div>
+                    <span class="font-mono text-sm text-cream font-bold">-$${loanInterestCharge.toFixed(2)}</span>
+                `;
+                listContainer.appendChild(loanRow);
+            }
+
+            // Late Fees Calculation (If Auto-Pay is Disabled and cash is low)
+            let lateFeePenalty = 0;
+            if (!gameState.autoPayEnabled && (monthlyGross - totalBills < 200)) {
+                lateFeePenalty = 35;
+                totalBills += lateFeePenalty;
+            }
+
+            document.getElementById('summaryLateFeesLost').textContent = `$${(lateFeePenalty + loanInterestCharge).toFixed(2)}`;
+
+            let totalSaved = 0;
+            gameState.cutExpenses.forEach(id => {
+                const exp = BASE_EXPENSES.find(e => e.id === id);
+                if (exp) totalSaved += exp.amount;
+            });
+
+            document.getElementById('totalSavedFromCuts').textContent = `$${totalSaved.toLocaleString()} / mo saved`;
+            document.getElementById('summaryNetCash').textContent = `$${(monthlyGross - totalBills).toLocaleString()}`;
+            
+            document.getElementById('modalBudget').classList.remove('hidden');
+        }
+
+        document.getElementById('btnToggleAutoPay').addEventListener('click', () => {
+            gameState.autoPayEnabled = !gameState.autoPayEnabled;
+            openBudgetModal();
+        });
+
+        window.toggleCutExpense = function(id) {
+            if (gameState.cutExpenses.has(id)) {
+                gameState.cutExpenses.delete(id);
+            } else {
+                gameState.cutExpenses.add(id);
+            }
+            openBudgetModal();
+        };
+
+        function payBillsAndAdvance() {
+            const job = CAREERS[gameState.currentJobIndex];
+            const monthlyGross = job.biweeklyPay * 2;
+            let totalBills = job.gasCostMonthly;
+
+            if (gameState.autoPayEnabled) totalBills += 20;
+
+            BASE_EXPENSES.forEach(exp => {
+                if (!gameState.cutExpenses.has(exp.id)) {
+                    totalBills += exp.amount;
+                }
+            });
+
+            if (gameState.loans > 0) {
+                const interest = gameState.loans * 0.08;
+                totalBills += interest;
+                gameState.interestPaid += interest;
+            }
+
+            if (!gameState.autoPayEnabled && (monthlyGross - totalBills < 200)) {
+                totalBills += 35;
+                gameState.totalFees += 35;
+            }
+
+            const netCashLeft = monthlyGross - totalBills;
+            gameState.cash += netCashLeft;
+            gameState.totalSpent += totalBills;
+
+            // Increment Total Saved Stat
+            if (netCashLeft > 0) {
+                gameState.totalSaved += netCashLeft;
+            }
+
+            gameState.month++;
+            gameState.gameMode = (gameState.month % 2 === 1) ? 'FALLING' : 'CONVEYOR';
+
+            document.getElementById('modalBudget').classList.add('hidden');
+            
+            document.getElementById('startOverlayTitle').textContent = `Month ${gameState.month}: ${job.title} Shift`;
+            document.getElementById('shiftSpeedLabel').textContent = job.speedLabel;
+            document.getElementById('shiftModeBadge').textContent = gameState.gameMode === 'FALLING' ? 'Falling Catch' : 'Side Conveyor';
+            document.getElementById('shiftDescriptionText').textContent = gameState.gameMode === 'FALLING'
+                ? 'Catch Good Interest & Income badges falling from above while using Shield Defense against Bad Interest!'
+                : 'Conveyor belt mode! Collect incoming Good Interest badges moving right to left!';
+            
+            document.getElementById('startOverlay').classList.remove('hidden');
+            updateHUD();
+        }
+
+        // CAREERS & SAVINGS / LOANS MODAL HANDLERS
+        function openCareersModal() {
+            const container = document.getElementById('careersContainer');
+            container.innerHTML = '';
+
+            CAREERS.forEach((career, idx) => {
+                const isCurrent = idx === gameState.currentJobIndex;
+                const isUnlocked = idx <= gameState.unlockedJobMax;
+                const canAfford = gameState.cash >= career.upgradeCost;
+
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-xl border flex flex-col justify-between ${isCurrent ? 'bg-navyLight border-azure azure-glow' : 'bg-navyLight border-navyBorder'}`;
+                
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid ${career.icon} text-azure text-base"></i>
+                                <h4 class="font-bold text-sm text-cream">${career.title}</h4>
+                            </div>
+                            ${isCurrent ? '<span class="text-[10px] bg-azure text-cream font-bold px-2 py-0.5 rounded">ACTIVE ROLE</span>' : ''}
+                        </div>
+
+                        <div class="text-xs space-y-1.5 mb-3 text-cream/70">
+                            <div class="flex justify-between"><span class="text-cream/50">Level & Speed:</span> <span class="text-azure font-medium">${career.speedLabel}</span></div>
+                            <div class="flex justify-between"><span class="text-cream/50">Bi-Weekly Pay:</span> <span class="text-azure font-mono font-bold">$${career.biweeklyPay.toLocaleString()}</span></div>
+                            <div class="flex justify-between"><span class="text-cream/50">Commute Gas Cost:</span> <span class="text-cream font-mono">$${career.gasCostMonthly}/mo (${career.commuteMiles} mi)</span></div>
+                            <div class="flex justify-between"><span class="text-cream/50">Education Required:</span> <span class="text-cream">${career.eduRequired}</span></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        ${isCurrent ? `
+                            <button disabled class="w-full py-2 bg-navy border border-navyBorder text-cream/40 text-xs font-bold rounded-lg cursor-default">Current Active Job</button>
+                        ` : isUnlocked ? `
+                            <button onclick="switchJob(${idx})" class="w-full py-2 bg-azure text-cream text-xs font-bold rounded-lg hover:bg-azureHover transition">Switch to Role</button>
+                        ` : `
+                            <button onclick="upgradeEducation(${idx})" ${!canAfford ? 'disabled' : ''} class="w-full py-2 ${canAfford ? 'bg-azure text-cream hover:bg-azureHover' : 'bg-navy border border-navyBorder text-cream/40 cursor-not-allowed'} text-xs font-bold rounded-lg transition">                                 Unlock via Education ($${career.upgradeCost.toLocaleString()})
+                            </button>
+                        `}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            document.getElementById('careerCurrentBalanceDisplay').textContent = `Cash: $${gameState.cash.toLocaleString()}`;
+            document.getElementById('modalCareers').classList.remove('hidden');
+        }
+
+        window.switchJob = function(idx) {
+            gameState.currentJobIndex = idx;
+            updateHUD();
+            openCareersModal();
+        };
+
+        window.upgradeEducation = function(idx) {
+            const targetJob = CAREERS[idx];
+            if (gameState.cash >= targetJob.upgradeCost) {
+                gameState.cash -= targetJob.upgradeCost;
+                gameState.unlockedJobMax = Math.max(gameState.unlockedJobMax, idx);
+                gameState.currentJobIndex = idx;
+                sound.playPaycheck();
+                updateHUD();
+                openCareersModal();
+            }
+        };
+
+        function openLoansModal() {
+            document.getElementById('loanModalSavings').textContent = `$${gameState.savings.toLocaleString()}`;
+            document.getElementById('loanModalCurrentDebt').textContent = `$${gameState.loans.toLocaleString()}`;
+            document.getElementById('modalLoans').classList.remove('hidden');
+        }
+
+        // DEPOSIT / WITHDRAW SAVINGS (GOOD INTEREST)
+        document.getElementById('btnDepositSavings').addEventListener('click', () => {
+            if (gameState.cash >= 250) {
+                gameState.cash -= 250;
+                gameState.savings += 250;
+                sound.playCoin();
+                updateHUD();
+                openLoansModal();
+            }
+        });
+
+        document.getElementById('btnWithdrawSavings').addEventListener('click', () => {
+            if (gameState.savings >= 250) {
+                gameState.savings -= 250;
+                gameState.cash += 250;
+                sound.playCoin();
+                updateHUD();
+                openLoansModal();
+            }
+        });
+
+        // BORROW / PAY LOAN (BAD INTEREST)
+        document.getElementById('btnTakeLoan').addEventListener('click', () => {
+            gameState.loans += 500;
+            gameState.cash += 500;
+            sound.playCoin();
+            updateHUD();
+            openLoansModal();
+        });
+
+        document.getElementById('btnPayoffLoan').addEventListener('click', () => {
+            const payoffAmount = Math.min(500, gameState.loans, gameState.cash);
+            if (payoffAmount > 0) {
+                gameState.cash -= payoffAmount;
+                gameState.loans -= payoffAmount;
+                sound.playCoin();
+                updateHUD();
+                openLoansModal();
+            }
+        });
+
+        // Event Listeners
+        document.getElementById('btnStartShift').addEventListener('click', startShift);
+        document.getElementById('btnPayBillsAndContinue').addEventListener('click', payBillsAndAdvance);
+
+        document.getElementById('btnPause').addEventListener('click', () => {
+            if (!gameState.isShiftActive) return;
+            gameState.isPaused = !gameState.isPaused;
+            document.getElementById('pauseOverlay').classList.toggle('hidden', !gameState.isPaused);
+        });
+
+        document.getElementById('btnResume').addEventListener('click', () => {
+            gameState.isPaused = false;
+            document.getElementById('pauseOverlay').classList.add('hidden');
+        });
+
+        document.getElementById('btnCloseTipBanner').addEventListener('click', () => {
+            document.getElementById('eduTipBanner').classList.add('hidden');
+        });
+
+        document.getElementById('btnCareersModal').addEventListener('click', openCareersModal);
+        document.getElementById('btnLoansModal').addEventListener('click', openLoansModal);
+
+        document.querySelectorAll('.btnCloseModal').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.getElementById('modalCareers').classList.add('hidden');
+                document.getElementById('modalLoans').classList.add('hidden');
+            });
+        });
+
+        // Touch Control Buttons
+        document.getElementById('btnTouchShield').addEventListener('click', activateShield);
+        document.getElementById('btnTouchLeft').addEventListener('touchstart', (e) => { e.preventDefault(); keys.Left = true; });
+        document.getElementById('btnTouchLeft').addEventListener('touchend', (e) => { e.preventDefault(); keys.Left = false; });
+        document.getElementById('btnTouchRight').addEventListener('touchstart', (e) => { e.preventDefault(); keys.Left = false; keys.Right = true; });
+        document.getElementById('btnTouchRight').addEventListener('touchend', (e) => { e.preventDefault(); keys.Right = false; });
+
+        document.getElementById('btnToggleSound').addEventListener('click', () => {
+            sound.muted = !sound.muted;
+            const icon = document.getElementById('soundIcon');
+            icon.className = sound.muted ? 'fa-solid fa-volume-xmark text-cream/40 mr-1' : 'fa-solid fa-volume-high text-azure mr-1';
+        });
+
+        window.onload = function() {
+            resizeCanvas();
+            updateHUD();
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>

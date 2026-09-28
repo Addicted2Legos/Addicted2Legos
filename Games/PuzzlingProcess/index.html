@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pop & Protect - Shape Puzzle Game</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="gameContainer">
+        <!-- Top HUD & Navigation -->
+        <header class="header-bar">
+            <div class="level-info">
+                <div class="level-badge-row">
+                    <span id="shapeBadge" class="shape-badge">● Circle Intro</span>
+                    <div id="hudStars" class="hud-stars">
+                        <span class="star-dim">★</span>
+                        <span class="star-dim">★</span>
+                        <span class="star-dim">★</span>
+                    </div>
+                </div>
+                <h1 id="levelTitle" class="level-title">Level 1: The Gentle Roll</h1>
+                <p id="levelSubtitle" class="level-subtitle">Place a safety cushion to protect the circle!</p>
+            </div>
+
+            <div class="header-controls">
+                <button id="sfxBtn" class="btn btn-secondary btn-icon" title="Toggle Sound FX">🔊 SFX</button>
+                <button id="bgmBtn" class="btn btn-secondary btn-icon" title="Toggle Background Music">🎵 Music</button>
+                <button id="levelsBtn" class="btn btn-secondary btn-icon" title="Level Select">📑 Levels</button>
+                <button id="sandboxBtn" class="btn btn-secondary btn-icon" title="Level Editor & Sandbox">🛠 Sandbox</button>
+            </div>
+        </header>
+
+        <!-- Canvas Game Viewport & Modals -->
+        <div class="canvas-wrapper">
+            <canvas id="gameCanvas"></canvas>
+
+            <!-- Victory Modal Overlay -->
+            <div id="victoryModal" class="modal-overlay hidden">
+                <div class="modal-content">
+                    <div class="modal-stars" id="victoryStars">
+                        <span class="star-gold">★</span>
+                        <span class="star-gold">★</span>
+                        <span class="star-gold">★</span>
+                    </div>
+                    <h2 class="modal-title victory-title">Level Protected! 🎉</h2>
+                    <p class="modal-text">The Circle reached the portal safely without getting punctured!</p>
+                    <div class="modal-actions">
+                        <button id="replayVictoryBtn" class="btn btn-secondary">↺ Replay</button>
+                        <button id="nextLevelBtn" class="btn btn-primary">Next Level ➔</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Defeat Modal Overlay -->
+            <div id="defeatModal" class="modal-overlay hidden">
+                <div class="modal-content">
+                    <div style="font-size: 3rem;">💥</div>
+                    <h2 class="modal-title defeat-title">POPPED!</h2>
+                    <p class="modal-text">A sharp corner punctured the Circle! Troubleshoot your barriers and try again.</p>
+                    <div class="modal-actions">
+                        <button id="retryBtn" class="btn btn-primary">↺ Try Again</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Level Select Modal Overlay -->
+            <div id="levelsModal" class="modal-overlay hidden">
+                <div class="modal-content" style="max-width: 540px;">
+                    <h2 class="modal-title">Select Level</h2>
+                    <p class="modal-text">Troubleshoot shape puzzles & protect the Circle</p>
+                    <div id="levelsGrid" class="levels-grid"></div>
+                    <div class="modal-actions">
+                        <button id="closeLevelsBtn" class="btn btn-secondary">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sandbox Mode Toolbar (Hidden by default) -->
+        <div id="sandboxToolbar" class="sandbox-toolbar hidden">
+            <span style="font-size: 0.8rem; font-weight: 700; color: #00E5FF; margin-right: 4px;">ADD:</span>
+            <button class="sandbox-tool active" data-tool="cushion">🛋️ Cushion</button>
+            <button class="sandbox-tool" data-tool="plank">🪵 Plank</button>
+            <button class="sandbox-tool" data-tool="spring">⚡ Spring</button>
+            <button class="sandbox-tool" data-tool="circle">● Circle</button>
+            <button class="sandbox-tool" data-tool="triangle">▲ Triangle</button>
+            <button class="sandbox-tool" data-tool="square">■ Square</button>
+            <button class="sandbox-tool" data-tool="star">★ Star</button>
+            <button class="sandbox-tool" data-tool="fan">💨 Fan</button>
+            <button class="sandbox-tool" data-tool="wall">🧱 Wall</button>
+            <button class="sandbox-tool" data-tool="goal">🌀 Portal</button>
+            <button class="sandbox-tool" data-tool="star_coin">⭐ Star</button>
+            <button class="sandbox-tool" data-tool="delete" style="color: #FF5252;">🗑 Delete</button>
+        </div>
+
+        <!-- Bottom Action Dock & Inventory -->
+        <footer class="control-dock">
+            <div class="inventory-section">
+                <span class="inventory-label">Tools:</span>
+                <div id="inventoryItems" class="inventory-items"></div>
+            </div>
+
+            <div class="action-controls">
+                <button id="speedBtn" class="btn btn-secondary btn-icon" title="Simulation Speed">1x</button>
+                <button id="resetBtn" class="btn btn-secondary" title="Reset level setup">↺ Reset</button>
+                <button id="runBtn" class="btn btn-primary btn-run">▶ RUN PHYSICS</button>
+            </div>
+        </footer>
+
+        <!-- Helpful Quick Tips -->
+        <div class="instructions-card">
+            <div>💡 <b>Tip:</b> Click an inventory item then click on the canvas to place it. Drag its rotation handle to angle deflectors!</div>
+            <div><span class="key-hint">Space</span> Run/Reset &nbsp; <span class="key-hint">Del</span> Remove Item</div>
+        </div>
+    </div>
+
+    <!-- Core Game Scripts in Dependency Order -->
+    <script src="js/engine/vector.js"></script>
+    <script src="js/engine/physics.js"></script>
+    <script src="js/engine/textures.js"></script>
+    <script src="js/engine/particles.js"></script>
+    <script src="js/engine/audio.js"></script>
+    <script src="js/game/entities.js"></script>
+    <script src="js/game/levels.js"></script>
+    <script src="js/game/editor.js"></script>
+    <script src="js/game/main.js"></script>
+</body>
+</html>

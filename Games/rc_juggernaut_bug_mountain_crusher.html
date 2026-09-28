@@ -1,0 +1,2273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RC Juggernaut - Bug Mountain Crusher</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap');
+
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background-color: #050811;
+            color: #e0e6ed;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+        }
+
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .rc-panel {
+            background: rgba(10, 16, 30, 0.9);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(56, 189, 248, 0.1);
+        }
+
+        .rc-display {
+            background: #030712;
+            border: 1px solid #1e3a8a;
+            box-shadow: inset 0 0 12px rgba(0, 240, 255, 0.2);
+        }
+
+        .btn-touch {
+            transition: all 0.12s ease;
+            box-shadow: 0 4px 8px -1px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        }
+        .btn-touch:active {
+            transform: scale(0.95);
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .upgrade-card {
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            transition: all 0.2s ease;
+        }
+        .upgrade-card:hover {
+            border-color: rgba(56, 189, 248, 0.7);
+            box-shadow: 0 0 18px rgba(56, 189, 248, 0.25);
+        }
+
+        canvas {
+            display: block;
+            touch-action: none;
+        }
+
+        @keyframes damageFlashAnimation {
+            0% { opacity: 0.8; }
+            100% { opacity: 0; }
+        }
+        .damage-overlay {
+            animation: damageFlashAnimation 0.3s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen flex flex-col justify-between items-center relative overflow-hidden select-none">
+
+    <div id="damageFlash" class="pointer-events-none fixed inset-0 z-40 bg-red-600/30 opacity-0"></div>
+
+    <!-- Canvas Background -->
+    <div class="absolute inset-0 z-0">
+        <canvas id="gameCanvas" class="w-full h-full"></canvas>
+    </div>
+
+    <!-- Top Telemetry Header -->
+    <header class="relative z-10 w-full max-w-7xl px-4 pt-3 flex justify-between items-start pointer-events-none">
+        
+        <!-- Left Status Badge & Hull Health -->
+        <div class="rc-panel rounded-xl px-4 py-2 border-l-4 border-l-cyan-400 flex flex-col space-y-1 pointer-events-auto w-56 flex-shrink-0">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
+                    <span class="text-xs uppercase tracking-widest text-cyan-400 font-orbitron font-bold">JUGGERNAUT</span>
+                </div>
+                <span id="hazardLevelText" class="text-[10px] bg-red-950 text-red-400 px-1.5 py-0.5 rounded font-orbitron border border-red-800 text-center w-11 inline-block">LVL 1</span>
+            </div>
+
+            <!-- Hull Health Bar -->
+            <div class="w-full bg-slate-950 rounded-full h-3 border border-slate-700 overflow-hidden relative">
+                <div id="hullHealthBar" class="h-full bg-emerald-500 transition-all duration-150 w-full"></div>
+            </div>
+            <div class="flex justify-between text-[10px] font-orbitron text-slate-400">
+                <span>HULL INTEGRITY</span>
+                <span id="hullHealthText" class="text-right w-24 font-mono font-bold">100%</span>
+            </div>
+        </div>
+
+        <!-- Middle Telemetry Pills -->
+        <div class="rc-panel rounded-xl px-4 py-2 flex items-center space-x-3 text-xs font-orbitron pointer-events-auto">
+            <div class="flex items-center space-x-2 w-24 flex-shrink-0">
+                <i class="fa-solid fa-trophy text-amber-400 text-base flex-shrink-0"></i>
+                <div class="overflow-hidden">
+                    <div class="text-slate-400 text-[9px]">SCORE</div>
+                    <div id="scoreText" class="text-amber-400 font-bold text-sm font-mono truncate">0</div>
+                </div>
+            </div>
+            <div class="h-6 w-px bg-slate-700 flex-shrink-0"></div>
+            <div class="flex items-center space-x-2 w-20 flex-shrink-0">
+                <i class="fa-solid fa-bug text-emerald-400 text-base flex-shrink-0"></i>
+                <div class="overflow-hidden">
+                    <div class="text-slate-400 text-[9px]">CRUSHED</div>
+                    <div id="killsText" class="text-emerald-400 font-bold text-sm font-mono truncate">0</div>
+                </div>
+            </div>
+            <div class="h-6 w-px bg-slate-700 flex-shrink-0"></div>
+            <div class="flex items-center space-x-2 w-24 flex-shrink-0">
+                <i class="fa-solid fa-coins text-yellow-400 text-base flex-shrink-0"></i>
+                <div class="overflow-hidden">
+                    <div class="text-slate-400 text-[9px]">BIO-SCRAP</div>
+                    <div id="scrapText" class="text-yellow-400 font-bold text-sm font-mono truncate">$0</div>
+                </div>
+            </div>
+            <div class="h-6 w-px bg-slate-700 flex-shrink-0"></div>
+            <div id="penaltyContainer" class="flex items-center space-x-2 w-36 flex-shrink-0 opacity-0 transition-opacity duration-200">
+                <i id="penaltyIcon" class="fa-solid fa-triangle-exclamation text-rose-500 text-base animate-bounce flex-shrink-0"></i>
+                <div id="penaltyBox">
+                    <div class="text-rose-400 text-[9px] font-bold">BUG MOUNT PENALTY</div>
+                    <div id="penaltyText" class="text-rose-500 font-bold text-xs font-mono">-5 PTS/SEC</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Quick Actions & Garage Button -->
+        <div class="flex space-x-2 pointer-events-auto flex-shrink-0">
+            <button id="shopToggleBtn" class="rc-panel hover:bg-slate-800 text-cyan-400 font-orbitron font-bold text-xs px-3 py-2.5 rounded-xl border border-cyan-500/40 flex items-center gap-2 transition btn-touch">
+                <i class="fa-solid fa-wrench"></i>
+                <span>GARAGE</span>
+            </button>
+            <button id="resetBtn" class="rc-panel hover:bg-slate-800 text-cyan-400 font-orbitron font-bold text-xs px-3 py-2.5 rounded-xl border border-cyan-500/40 flex items-center gap-2 transition btn-touch">
+                <i class="fa-solid fa-rotate-right"></i>
+            </button>
+            <button id="audioToggleBtn" class="rc-panel hover:bg-slate-800 text-slate-300 font-orbitron font-bold text-xs px-3 py-2.5 rounded-xl border border-slate-700 flex items-center gap-2 transition btn-touch">
+                <i id="audioIcon" class="fa-solid fa-volume-high text-cyan-400"></i>
+            </button>
+        </div>
+    </header>
+
+    <div id="shopModal" class="hidden absolute inset-0 z-30 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="rc-panel max-w-4xl w-full rounded-2xl p-6 border border-cyan-500/40 shadow-2xl flex flex-col space-y-5">
+            
+            <div class="flex justify-between items-center border-b border-slate-700/80 pb-3">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-truck-monster text-cyan-400 text-2xl"></i>
+                    <div>
+                        <h2 class="font-orbitron text-xl font-extrabold text-cyan-400">JUGGERNAUT DEFENSE BAY</h2>
+                        <p class="text-xs text-slate-400">Upgrade offensive & defensive systems to crush swarms and eliminate stalkers behind you.</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-yellow-400 font-orbitron font-bold text-lg"><i class="fa-solid fa-coins"></i> <span id="modalScrapText">$0</span></div>
+                    <button id="closeShopBtn" class="text-slate-400 hover:text-white text-xl p-2"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-1">
+                
+                <!-- Upgrade 1: Snowplow / Front Ram -->
+                <div class="upgrade-card rounded-xl p-4 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="font-orbitron font-bold text-sm text-amber-400"><i class="fa-solid fa-snowflake text-amber-500 mr-2"></i>Utah Winter City Snow Plow</span>
+                            <span id="plowLevelTag" class="text-[10px] font-orbitron bg-cyan-950 text-cyan-400 border border-cyan-800 px-2 py-0.5 rounded">LVL 0</span>
+                        </div>
+                        <p class="text-xs text-slate-300">Heavy curved highway moldboard with carbide scraper edge, hazard chevrons, and guide whips. Pushes and shreds swarms like heavy mountain snowdrifts.</p>
+                    </div>
+                    <div class="flex justify-between items-center mt-4 pt-3 border-t border-slate-800">
+                        <span id="plowCostText" class="font-orbitron text-xs text-yellow-400 font-bold">$100</span>
+                        <div class="flex items-center gap-2">
+                            <button id="togglePlowBtn" class="hidden font-orbitron font-bold text-xs px-3 py-1.5 rounded-lg border transition btn-touch">ACTIVE</button>
+                            <button id="buyPlowBtn" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-orbitron font-bold text-xs px-4 py-1.5 rounded-lg transition btn-touch">UNLOCK</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Upgrade 2: Rear Defense Turret -->
+                <div class="upgrade-card rounded-xl p-4 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="font-orbitron font-bold text-sm text-rose-400"><i class="fa-solid fa-crosshairs text-rose-500 mr-2"></i>Rear Stalker Turret</span>
+                            <span id="rearLevelTag" class="text-[10px] font-orbitron bg-rose-950 text-rose-400 border border-rose-800 px-2 py-0.5 rounded">LOCKED</span>
+                        </div>
+                        <p class="text-xs text-slate-300">Automatically targets and shoots centipedes and bugs trying to attack your rear hull!</p>
+                    </div>
+                    <div class="flex justify-between items-center mt-4 pt-3 border-t border-slate-800">
+                        <span id="rearCostText" class="font-orbitron text-xs text-yellow-400 font-bold">$150</span>
+                        <button id="buyRearBtn" class="bg-rose-600 hover:bg-rose-500 text-slate-950 font-orbitron font-bold text-xs px-4 py-1.5 rounded-lg transition btn-touch">UNLOCK</button>
+                    </div>
+                </div>
+
+                <!-- Upgrade 3: Plasma Flamethrower -->
+                <div class="upgrade-card rounded-xl p-4 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="font-orbitron font-bold text-sm text-amber-400"><i class="fa-solid fa-fire text-amber-500 mr-2"></i>Plasma Flamethrower</span>
+                            <span id="flameLevelTag" class="text-[10px] font-orbitron bg-amber-950 text-amber-400 border border-amber-800 px-2 py-0.5 rounded">LOCKED</span>
+                        </div>
+                        <p class="text-xs text-slate-300">Front oscillating flame jet sweeps up and down to incinerate small crawling bugs and scorch steep mountain slopes.</p>
+                    </div>
+                    <div class="flex justify-between items-center mt-4 pt-3 border-t border-slate-800">
+                        <span id="flameCostText" class="font-orbitron text-xs text-yellow-400 font-bold">$200</span>
+                        <button id="buyFlameBtn" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-orbitron font-bold text-xs px-4 py-1.5 rounded-lg transition btn-touch">UNLOCK</button>
+                    </div>
+                </div>
+
+                <!-- Upgrade 4: Engine Power & Chassis Repair -->
+                <div class="upgrade-card rounded-xl p-4 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="font-orbitron font-bold text-sm text-emerald-400"><i class="fa-solid fa-bolt text-emerald-400 mr-2"></i>Crusher Engine & Repair</span>
+                            <span id="engineLevelTag" class="text-[10px] font-orbitron bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded">LVL 1</span>
+                        </div>
+                        <p class="text-xs text-slate-300">Increases crushing torque for climbing giant bug mounds + repairs 50% hull health.</p>
+                    </div>
+                    <div class="flex justify-between items-center mt-4 pt-3 border-t border-slate-800">
+                        <span id="engineCostText" class="font-orbitron text-xs text-yellow-400 font-bold">$120</span>
+                        <div class="flex items-center gap-2">
+                            <button id="toggleEngineBtn" class="hidden font-orbitron font-bold text-xs px-3 py-1.5 rounded-lg border transition btn-touch">STOCK</button>
+                            <button id="buyEngineBtn" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-orbitron font-bold text-xs px-4 py-1.5 rounded-lg transition btn-touch">UPGRADE</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="flex justify-end pt-2">
+                <button id="resumeDriveBtn" class="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-orbitron font-bold text-sm px-6 py-2 rounded-xl transition btn-touch">
+                    RESUME DRIVE
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="gameOverModal" class="hidden absolute inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="rc-panel max-w-md w-full rounded-2xl p-6 border border-red-500/50 text-center flex flex-col items-center space-y-4 shadow-2xl">
+            <div class="w-16 h-16 rounded-full bg-red-950/80 border-2 border-red-500 flex items-center justify-center text-red-500 text-3xl animate-bounce">
+                <i class="fa-solid fa-skull-crossbones"></i>
+            </div>
+            <h2 class="font-orbitron text-2xl font-black text-red-500 tracking-wider">HULL DESTROYED</h2>
+            <p class="text-xs text-slate-300">The alien swarm overwhelmed the Juggernaut's defenses!</p>
+            
+            <div class="rc-display w-full p-3 rounded-xl flex justify-around text-xs font-orbitron">
+                <div>
+                    <div class="text-slate-400 text-[10px]">FINAL SCORE</div>
+                    <div id="finalScoreText" class="text-amber-400 font-bold text-base">0</div>
+                </div>
+                <div class="h-8 w-px bg-slate-800"></div>
+                <div>
+                    <div class="text-slate-400 text-[10px]">BUGS CRUSHED</div>
+                    <div id="finalKillsText" class="text-emerald-400 font-bold text-base">0</div>
+                </div>
+            </div>
+
+            <button id="restartGameBtn" class="w-full bg-red-600 hover:bg-red-500 text-white font-orbitron font-bold text-sm py-3 rounded-xl transition btn-touch shadow-lg shadow-red-950">
+                DEPLOY NEW JUGGERNAUT
+            </button>
+        </div>
+    </div>
+
+    <!-- Bottom RC Controls HUD -->
+    <main class="relative z-10 w-full max-w-5xl px-4 pb-4 mt-auto pointer-events-none flex flex-col items-center">
+        
+        <!-- Quick Weapon & Systems Deactivation Toolbar -->
+        <div id="quickSystemsBar" class="hidden pointer-events-auto mb-2 flex flex-wrap items-center justify-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/85 backdrop-blur-md border border-slate-700/60 shadow-lg">
+            <span class="text-[9px] font-orbitron text-slate-400 font-bold uppercase tracking-wider mr-1 flex items-center gap-1.5">
+                <i class="fa-solid fa-power-off text-cyan-400"></i> SYSTEMS:
+            </span>
+            <button id="hudTogglePlow" class="hidden px-2.5 py-1 rounded-lg text-[10px] font-orbitron font-bold border transition flex items-center gap-1.5 btn-touch"></button>
+            <button id="hudToggleTurret" class="hidden px-2.5 py-1 rounded-lg text-[10px] font-orbitron font-bold border transition flex items-center gap-1.5 btn-touch"></button>
+            <button id="hudToggleFlame" class="hidden px-2.5 py-1 rounded-lg text-[10px] font-orbitron font-bold border transition flex items-center gap-1.5 btn-touch"></button>
+            <button id="hudToggleEngine" class="hidden px-2.5 py-1 rounded-lg text-[10px] font-orbitron font-bold border transition flex items-center gap-1.5 btn-touch"></button>
+        </div>
+
+        <div class="rc-panel w-full rounded-2xl p-3 md:p-4 grid grid-cols-12 gap-3 items-center pointer-events-auto border-t-2 border-t-cyan-500/50">
+            
+            <!-- Left Reverse Button -->
+            <div class="col-span-3 flex flex-col items-center">
+                <button id="btnReverse" class="rc-display w-full py-4 rounded-xl flex flex-col items-center justify-center border border-red-800/50 text-red-400 hover:bg-red-950/40 btn-touch">
+                    <i class="fa-solid fa-arrow-left text-2xl"></i>
+                    <span class="text-[10px] font-orbitron mt-1 font-bold">REVERSE [A / ←]</span>
+                </button>
+            </div>
+
+            <!-- Telemetry Display & Manual Flamethrower Trigger -->
+            <div class="col-span-6 flex justify-center items-center">
+                <div class="rc-display rounded-xl p-2.5 w-full flex justify-around items-center border border-cyan-500/30">
+                    
+                    <!-- Pitch Inclinometer Canvas -->
+                    <div class="flex flex-col items-center w-20 flex-shrink-0">
+                        <span class="text-[9px] font-orbitron text-slate-400 mb-1">CHASSIS PITCH</span>
+                        <div class="relative w-12 h-12 flex items-center justify-center">
+                            <canvas id="inclinometerCanvas" width="48" height="48" class="rounded-full"></canvas>
+                        </div>
+                        <span id="pitchAngleText" class="text-[10px] font-orbitron text-cyan-400 font-bold mt-1 font-mono text-center w-12 inline-block">0.0°</span>
+                    </div>
+
+                    <!-- Speed & Throttle -->
+                    <div class="flex flex-col items-center w-2/5 min-w-[140px] flex-shrink-0">
+                        <span class="text-[9px] font-orbitron text-slate-400 mb-1">SPEED DRIVE</span>
+                        <div id="speedVal" class="text-cyan-400 font-orbitron font-bold text-base mb-1 font-mono text-center w-28">0.0 km/h</div>
+                        <div class="w-full bg-slate-900 rounded-full h-2.5 border border-slate-700 overflow-hidden">
+                            <div id="throttleIndicator" class="h-full bg-gradient-to-r from-red-500 via-cyan-400 to-emerald-400 w-1/2 transition-all duration-75"></div>
+                        </div>
+                    </div>
+
+                    <!-- Manual Flame Trigger -->
+                    <div class="flex flex-col items-center">
+                        <span class="text-[9px] font-orbitron text-slate-400 mb-1">PURGE FLAME</span>
+                        <button id="btnFlamethrower" class="bg-amber-950/60 border border-amber-600/50 text-amber-400 px-3 py-2 rounded-lg flex items-center gap-1.5 btn-touch opacity-50 cursor-not-allowed">
+                            <i class="fa-solid fa-fire text-amber-500 text-sm animate-pulse"></i>
+                            <span class="text-[10px] font-orbitron font-bold">PURGE [F]</span>
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Right Forward Button -->
+            <div class="col-span-3 flex flex-col items-center">
+                <button id="btnThrottle" class="rc-display w-full py-4 rounded-xl flex flex-col items-center justify-center border border-emerald-800/50 text-emerald-400 hover:bg-emerald-950/40 btn-touch">
+                    <i class="fa-solid fa-arrow-right text-2xl"></i>
+                    <span class="text-[10px] font-orbitron mt-1 font-bold">FORWARD [D / →]</span>
+                </button>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        const CONFIG = {
+            numWheels: 5,
+            baseWheelRadius: 22,
+            wheelSpacing: 42,
+            suspensionRestLength: 32,
+            terrainResolution: 6
+        };
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const inclinometerCanvas = document.getElementById('inclinometerCanvas');
+        const incCtx = inclinometerCanvas.getContext('2d');
+
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+
+        function drawRoundRect(c, x, y, w, h, r) {
+            if (c.roundRect) {
+                c.beginPath();
+                c.roundRect(x, y, w, h, r);
+            } else {
+                c.beginPath();
+                c.moveTo(x + r, y);
+                c.arcTo(x + w, y, x + w, y + h, r);
+                c.arcTo(x + w, y + h, x, y + h, r);
+                c.arcTo(x, y + h, x, y, r);
+                c.arcTo(x, y, x + w, y, r);
+                c.closePath();
+            }
+        }
+
+        const keys = { left: false, right: false, flame: false };
+
+        let gameTime = 0;
+        let cameraX = 0;
+        let score = 0;
+        let totalSquished = 0;
+        let scrapCredits = 0;
+        let distanceTraveled = 0;
+        let hazardLevel = 1;
+        let maxHullHealth = 250;
+        let hullHealth = 250;
+        let isGameOver = false;
+
+        const upgrades = {
+            plowLevel: 0,
+            rearTurret: 0,
+            flameLevel: 0,
+            engineLevel: 1
+        };
+
+        const upgradesActive = {
+            plow: true,
+            rearTurret: true,
+            flame: true,
+            engine: true
+        };
+
+        const upgradeCosts = {
+            plow: 100,
+            rear: 150,
+            flame: 200,
+            engine: 120
+        };
+
+        class TerrainGenerator {
+            constructor() {
+                this.heights = new Map();
+            }
+
+            getRawHeight(x) {
+                const key = Math.floor(x / CONFIG.terrainResolution);
+                if (this.heights.has(key)) return this.heights.get(key);
+
+                const currentH = height > 0 ? height : window.innerHeight;
+                // Elevate terrain baseline so ground level never drops beneath the bottom control HUD
+                const baseGround = currentH * 0.50;
+                const wave1 = Math.sin(x * 0.0012) * 60;
+                const wave2 = Math.cos(x * 0.0035) * 22;
+                const wave3 = Math.sin(x * 0.008) * 8;
+
+                const h = baseGround - (wave1 + wave2 + wave3);
+                this.heights.set(key, h);
+                return h;
+            }
+
+            // Get height INCLUDING living bugs under a specific world position
+            getCompositeHeight(worldX) {
+                const rawH = this.getRawHeight(worldX);
+                let bugHeightStack = 0;
+
+                // Check all living bugs at this position
+                creatures.forEach((bug) => {
+                    if (bug.isCrushed) return;
+
+                    if (bug.isCentipede) {
+                        bug.segments.forEach((seg) => {
+                            const dist = Math.abs(seg.worldX - worldX);
+                            if (dist < seg.radius * 1.2) {
+                                bugHeightStack += seg.radius * 1.3 * (1 - dist / (seg.radius * 1.2));
+                            }
+                        });
+                    } else {
+                        const dist = Math.abs(bug.worldX - worldX);
+                        if (dist < bug.radius * 1.2) {
+                            bugHeightStack += bug.radius * 1.3 * (1 - dist / (bug.radius * 1.2));
+                        }
+                    }
+                });
+
+                return rawH - Math.min(bugHeightStack, 120); // Elevation lift from bug pile
+            }
+        }
+
+        const terrain = new TerrainGenerator();
+
+        class JuggernautVehicle {
+            constructor(startX, startY) {
+                this.screenX = startX;
+                this.y = startY;
+                this.angle = 0;
+                this.flameOscillationAngle = 0;
+                this.isFiringFlame = false;
+                this.wheels = [];
+                this.rebuildVehicle();
+            }
+
+            get currentWheelRadius() {
+                return CONFIG.baseWheelRadius;
+            }
+
+            get currentMotorTorque() {
+                const effLevel = upgradesActive.engine ? upgrades.engineLevel : 1;
+                return 0.6 + (effLevel - 1) * 0.3;
+            }
+
+            get currentMaxSpeed() {
+                const effLevel = upgradesActive.engine ? upgrades.engineLevel : 1;
+                return 11 + (effLevel - 1) * 3.5;
+            }
+
+            rebuildVehicle() {
+                this.wheels = [];
+                const totalWidth = (CONFIG.numWheels - 1) * CONFIG.wheelSpacing;
+                const startOffset = -totalWidth / 2;
+
+                for (let i = 0; i < CONFIG.numWheels; i++) {
+                    const localX = startOffset + i * CONFIG.wheelSpacing;
+                    this.wheels.push({
+                        localX: localX,
+                        y: this.y + CONFIG.suspensionRestLength,
+                        rotation: 0,
+                        angularVel: 0,
+                        suspensionLength: CONFIG.suspensionRestLength
+                    });
+                }
+            }
+
+            update() {
+                let throttle = 0;
+                if (keys.right) throttle += 1;
+                if (keys.left) throttle -= 1;
+
+                const cosA = Math.cos(this.angle);
+                const sinA = Math.sin(this.angle);
+
+                // Wheel contact points on COMPOSITE terrain + bugs
+                const frontWheelWorldX = cameraX + this.screenX + this.wheels[CONFIG.numWheels - 1].localX * cosA;
+                const backWheelWorldX = cameraX + this.screenX + this.wheels[0].localX * cosA;
+                const frontCompositeY = terrain.getCompositeHeight(frontWheelWorldX);
+                const backCompositeY = terrain.getCompositeHeight(backWheelWorldX);
+
+                const targetAngle = Math.atan2(
+                    frontCompositeY - backCompositeY,
+                    this.wheels[CONFIG.numWheels - 1].localX - this.wheels[0].localX
+                );
+
+                this.angle += (targetAngle - this.angle) * 0.18;
+
+                // Ground + Bug elevation solver
+                let avgGroundY = 0;
+                let wheelsOnBugsCount = 0;
+
+                this.wheels.forEach((wheel) => {
+                    const mountX = this.screenX + wheel.localX * cosA;
+                    const worldX = cameraX + mountX;
+                    const compositeY = terrain.getCompositeHeight(worldX);
+                    const rawY = terrain.getRawHeight(worldX);
+
+                    if (rawY - compositeY > 5) {
+                        wheelsOnBugsCount++;
+                    }
+
+                    avgGroundY += compositeY;
+                });
+                avgGroundY /= CONFIG.numWheels;
+
+                // Score penalty for riding on top of bugs without squishing
+                if (wheelsOnBugsCount >= 2 && gameTime % 30 === 0) {
+                    score = Math.max(0, score - 5);
+                    const pContainer = document.getElementById('penaltyContainer');
+                    if (pContainer) pContainer.style.opacity = '1';
+                } else if (wheelsOnBugsCount < 2) {
+                    const pContainer = document.getElementById('penaltyContainer');
+                    if (pContainer) pContainer.style.opacity = '0';
+                }
+
+                const clearance = CONFIG.suspensionRestLength + this.currentWheelRadius;
+                const targetChassisY = avgGroundY - clearance;
+                this.y += (targetChassisY - this.y) * 0.35;
+
+                let driveSpeed = 0;
+
+                this.wheels.forEach((wheel) => {
+                    const mountX = this.screenX + wheel.localX * cosA;
+                    const mountY = this.y + wheel.localX * sinA;
+                    const worldX = cameraX + mountX;
+                    const groundY = terrain.getCompositeHeight(worldX);
+
+                    wheel.y = groundY - this.currentWheelRadius;
+                    wheel.suspensionLength = Math.max(10, wheel.y - mountY);
+
+                    if (throttle !== 0) {
+                        const drivePower = throttle * this.currentMotorTorque;
+                        wheel.angularVel += drivePower * 0.22;
+                        driveSpeed += drivePower * 0.9;
+                    }
+
+                    wheel.angularVel *= 0.92;
+                    wheel.rotation += wheel.angularVel;
+                    driveSpeed += wheel.angularVel * 0.35;
+
+                    if (Math.abs(wheel.angularVel) > 0.15 && Math.random() < 0.25) {
+                        createDustParticle(mountX, groundY, -wheel.angularVel * 1.2, -Math.random() * 1.5);
+                    }
+                });
+
+                const maxSpd = this.currentMaxSpeed;
+                const clampedSpeed = Math.max(-maxSpd, Math.min(maxSpd, driveSpeed));
+                cameraX += clampedSpeed;
+                distanceTraveled += Math.abs(clampedSpeed) * 0.02;
+
+                // Front Oscillating Flamethrower
+                this.flameOscillationAngle = Math.sin(gameTime * 0.12) * 0.35 + 0.10;
+                this.isFiringFlame = (upgrades.flameLevel > 0 && upgradesActive.flame) && (keys.flame || throttle > 0);
+
+                if (this.isFiringFlame) {
+                    const plowOffset = (upgrades.plowLevel > 0 && upgradesActive.plow) ? (115 + upgrades.plowLevel * 5) : 108;
+                    const localX = plowOffset + Math.cos(this.flameOscillationAngle) * 16;
+                    const localY = -6 + Math.sin(this.flameOscillationAngle) * 16;
+                    const tipX = this.screenX + (localX * cosA - localY * sinA);
+                    const tipY = this.y + (localX * sinA + localY * cosA);
+                    const fireAngle = this.angle + this.flameOscillationAngle;
+
+                    emitFlame(tipX, tipY, fireAngle);
+                }
+
+                // Rear Defense Turret Auto Firing
+                if (upgrades.rearTurret > 0 && upgradesActive.rearTurret && gameTime % 15 === 0) {
+                    fireRearTurret(this.screenX - 90 * cosA, this.y - 35 * sinA);
+                }
+            }
+
+            resetPosition() {
+                const currentGround = terrain.getRawHeight(cameraX + this.screenX);
+                this.y = currentGround - (CONFIG.suspensionRestLength + this.currentWheelRadius);
+                this.angle = 0;
+                hullHealth = maxHullHealth;
+                this.rebuildVehicle();
+            }
+
+            draw(ctx) {
+                ctx.save();
+                const cosA = Math.cos(this.angle);
+                const sinA = Math.sin(this.angle);
+                const wheelR = this.currentWheelRadius;
+
+                // 1. Suspension Pistons
+                this.wheels.forEach((wheel) => {
+                    const mountX = this.screenX + wheel.localX * cosA;
+                    const mountY = this.y + wheel.localX * sinA;
+                    const wheelWorldY = mountY + wheel.suspensionLength;
+
+                    ctx.strokeStyle = '#1e293b';
+                    ctx.lineWidth = 8;
+                    ctx.beginPath();
+                    ctx.moveTo(mountX, mountY);
+                    ctx.lineTo(mountX, mountY + wheel.suspensionLength * 0.5);
+                    ctx.stroke();
+
+                    ctx.strokeStyle = '#94a3b8';
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.moveTo(mountX, mountY + wheel.suspensionLength * 0.4);
+                    ctx.lineTo(mountX, wheelWorldY);
+                    ctx.stroke();
+                });
+
+                // 2. 5 Wheels
+                this.wheels.forEach((wheel) => {
+                    const mountX = this.screenX + wheel.localX * cosA;
+                    const mountY = this.y + wheel.localX * sinA;
+                    const wheelWorldY = mountY + wheel.suspensionLength;
+
+                    ctx.save();
+                    ctx.translate(mountX, wheelWorldY);
+                    ctx.rotate(wheel.rotation);
+
+                    ctx.fillStyle = '#0f172a';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, wheelR, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#334155';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+
+                    // Treads
+                    ctx.fillStyle = '#1e293b';
+                    for (let t = 0; t < 8; t++) {
+                        const treadAngle = (Math.PI * 2 / 8) * t;
+                        ctx.save();
+                        ctx.rotate(treadAngle);
+                        ctx.fillRect(wheelR - 5, -3, 6, 6);
+                        ctx.restore();
+                    }
+
+                    // Rim Cap
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, wheelR * 0.45, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.restore();
+                });
+
+                // 3. Vehicle Armored Hull
+                ctx.save();
+                ctx.translate(this.screenX, this.y);
+                ctx.rotate(this.angle);
+
+                // Frame
+                ctx.fillStyle = '#1e293b';
+                drawRoundRect(ctx, -105, -8, 210, 18, 5);
+                ctx.fill();
+
+                // Armored Hull Body
+                const hullGrad = ctx.createLinearGradient(0, -50, 0, 10);
+                hullGrad.addColorStop(0, '#334155');
+                hullGrad.addColorStop(0.5, '#1e293b');
+                hullGrad.addColorStop(1, '#0f172a');
+
+                ctx.fillStyle = hullGrad;
+                ctx.strokeStyle = '#0284c7';
+                ctx.lineWidth = 2;
+
+                ctx.beginPath();
+                ctx.moveTo(-108, -10);
+                ctx.lineTo(-98, -40);
+                ctx.lineTo(-35, -52);
+                ctx.lineTo(28, -52);
+                ctx.lineTo(80, -36);
+                ctx.lineTo(108, -16);
+                ctx.lineTo(98, 4);
+                ctx.lineTo(-104, 4);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                // Cockpit Glass
+                const visorGrad = ctx.createLinearGradient(30, -45, 75, -28);
+                visorGrad.addColorStop(0, '#06b6d4');
+                visorGrad.addColorStop(1, '#0284c7');
+                ctx.fillStyle = visorGrad;
+                ctx.beginPath();
+                ctx.moveTo(32, -44);
+                ctx.lineTo(72, -32);
+                ctx.lineTo(65, -22);
+                ctx.lineTo(32, -28);
+                ctx.closePath();
+                ctx.fill();
+
+                // Front Heavy Ram Upgrade
+                if (upgrades.plowLevel > 0 && upgradesActive.plow) {
+                    ctx.fillStyle = '#475569';
+                    ctx.strokeStyle = '#0284c7';
+                    ctx.lineWidth = 3;
+
+                    ctx.beginPath();
+                    ctx.moveTo(95, -15);
+                    ctx.lineTo(125 + upgrades.plowLevel * 6, -25);
+                    ctx.lineTo(135 + upgrades.plowLevel * 6, 8);
+                    ctx.lineTo(95, 8);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                }
+
+                // Rear Stalker Defense Turret Upgrade
+                if (upgrades.rearTurret > 0 && upgradesActive.rearTurret) {
+                    ctx.fillStyle = '#f43f5e';
+                    ctx.beginPath();
+                    ctx.arc(-85, -42, 8, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillRect(-102, -45, 18, 5);
+                }
+
+                // Front Oscillating Plasma Flamethrower Upgrade
+                if (upgrades.flameLevel > 0 && upgradesActive.flame) {
+                    ctx.save();
+                    const plowOffset = (upgrades.plowLevel > 0 && upgradesActive.plow) ? (115 + upgrades.plowLevel * 5) : 106;
+                    ctx.translate(plowOffset, -6);
+                    ctx.rotate(this.flameOscillationAngle);
+
+                    // Swivel mount pivot
+                    ctx.fillStyle = '#1e293b';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#f59e0b';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+
+                    // Armored barrel
+                    ctx.fillStyle = '#334155';
+                    ctx.fillRect(0, -3.5, 15, 7);
+                    ctx.strokeStyle = '#0f172a';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(0, -3.5, 15, 7);
+
+                    // Flame nozzle tip
+                    ctx.fillStyle = '#f97316';
+                    ctx.fillRect(12, -2.5, 4, 5);
+
+                    // High-temperature pilot flame jet at muzzle
+                    if (this.isFiringFlame) {
+                        ctx.save();
+                        // Pilot jet core
+                        ctx.fillStyle = '#67e8f9';
+                        ctx.beginPath();
+                        ctx.moveTo(15, -2);
+                        ctx.lineTo(24 + Math.random() * 6, 0);
+                        ctx.lineTo(15, 2);
+                        ctx.closePath();
+                        ctx.fill();
+
+                        // Incandescent flash
+                        ctx.fillStyle = '#fef08a';
+                        ctx.shadowColor = '#f97316';
+                        ctx.shadowBlur = 12;
+                        ctx.beginPath();
+                        ctx.arc(16, 0, 4 + Math.random() * 2, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    }
+
+                    ctx.restore();
+                }
+
+                ctx.restore();
+                ctx.restore();
+            }
+        }
+
+        const creatures = [];
+
+        class Creature {
+            constructor(worldX, type) {
+                this.worldX = worldX;
+                this.type = type; // 'small_ant', 'spider_crawler', 'centipede', 'bear'
+                this.isCrushed = false;
+                this.attachedToHull = false;
+                this.legAngle = Math.random() * Math.PI * 2;
+
+                if (type === 'small_ant') {
+                    this.radius = 12;
+                    this.hp = 1;
+                    this.maxHp = 1;
+                    this.reward = 15;
+                    this.color = '#22c55e';
+                    this.isCentipede = false;
+                } else if (type === 'spider_crawler') {
+                    this.radius = 20;
+                    this.hp = 3;
+                    this.maxHp = 3;
+                    this.reward = 35;
+                    this.color = '#eab308';
+                    this.isCentipede = false;
+                    this.numLegs = 6 + Math.floor(Math.random() * 3) * 2;
+                    this.eyeCount = 3 + Math.floor(Math.random() * 4);
+                } else if (type === 'centipede') {
+                    this.radius = 16;
+                    this.hp = 6;
+                    this.maxHp = 6;
+                    this.reward = 80;
+                    this.color = '#a855f7';
+                    this.isCentipede = true;
+                    this.numSegments = 8 + Math.floor(Math.random() * 8); // Long wriggling body
+                    this.segments = [];
+                    for (let s = 0; s < this.numSegments; s++) {
+                        this.segments.push({
+                            worldX: this.worldX + s * 14,
+                            y: 0,
+                            radius: s === 0 ? 18 : 14 - (s * 0.4)
+                        });
+                    }
+                } else if (type === 'bear') {
+                    this.radius = 24;
+                    this.hp = 12;
+                    this.maxHp = 12;
+                    this.reward = 180;
+                    this.color = '#78350f';
+                    this.isCentipede = false;
+                }
+
+                this.y = terrain.getRawHeight(this.worldX) - this.radius * 0.7;
+            }
+
+            update() {
+                if (this.isCrushed) return;
+
+                const bugScreenX = this.worldX - cameraX;
+                const vehicleScreenX = juggernaut.screenX;
+
+                // Hitbox boundaries for front and rear of Juggernaut
+                const plowExtra = (upgrades.plowLevel > 0 && upgradesActive.plow) ? upgrades.plowLevel * 6 : 0;
+                const frontBumperX = vehicleScreenX + 90 + plowExtra;
+                const rearBumperX = vehicleScreenX - 85;
+
+                const walkSpeed = this.type === 'bear' ? 1.8 : (this.type === 'spider_crawler' ? 2.6 : (this.type === 'centipede' ? 2.2 : 2.0));
+
+                this.attachedToHull = false;
+
+                if (bugScreenX > frontBumperX) {
+                    // Walk LEFT towards the front of the vehicle
+                    this.worldX -= walkSpeed;
+                    if (bugScreenX <= frontBumperX + 12) {
+                        this.attachedToHull = true; // Attack front bumper if stopped in front
+                    }
+                } else if (bugScreenX < rearBumperX) {
+                    // Chase RIGHT towards the rear of the vehicle
+                    this.worldX += walkSpeed * 1.35;
+                    if (bugScreenX >= rearBumperX - 15) {
+                        this.attachedToHull = true; // Attach & attack rear hull when caught up
+                    }
+                } else {
+                    // Underneath vehicle wheels (rolling completely over creature)
+                    this.worldX -= walkSpeed * 0.1;
+                }
+
+                // Deal hull damage when attached to front or rear bumper
+                if (this.attachedToHull && gameTime % 25 === 0) {
+                    const dmg = this.type === 'bear' ? 1.8 : (this.type === 'centipede' ? 1.0 : 0.4);
+                    hullHealth = Math.max(0, hullHealth - dmg);
+                    triggerDamageFlash();
+                    playDamageSound();
+                }
+
+                this.legAngle += 0.25;
+
+                if (this.isCentipede) {
+                    this.segments.forEach((seg, idx) => {
+                        if (idx === 0) {
+                            seg.worldX = this.worldX;
+                            seg.y = terrain.getRawHeight(seg.worldX) - seg.radius * 0.7;
+                        } else {
+                            const prev = this.segments[idx - 1];
+                            const dx = prev.worldX - seg.worldX;
+                            seg.worldX += (dx - 12) * 0.3;
+                            seg.y = terrain.getRawHeight(seg.worldX) - seg.radius * 0.7;
+                        }
+                    });
+                    this.y = this.segments[0].y;
+                } else {
+                    this.y = terrain.getRawHeight(this.worldX) - this.radius * 0.7;
+                }
+            }
+
+            draw(ctx) {
+                if (this.isCentipede) {
+                    this.drawCentipede(ctx);
+                    return;
+                }
+                if (this.type === 'bear') {
+                    this.drawBear(ctx);
+                    return;
+                }
+
+                const screenX = this.worldX - cameraX;
+                if (screenX < -150 || screenX > width + 150) return;
+
+                ctx.save();
+                ctx.translate(screenX, this.y);
+
+                if (this.isCrushed) {
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.ellipse(0, this.radius * 0.6, this.radius * 1.6, this.radius * 0.25, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                    return;
+                }
+
+                // Procedural Multi-Legs
+                const legs = this.numLegs || 6;
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 2.5;
+                for (let l = 0; l < legs; l++) {
+                    const side = l % 2 === 0 ? 1 : -1;
+                    const legOffset = Math.sin(this.legAngle + l) * 6;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -this.radius * 0.2);
+                    ctx.lineTo(side * (this.radius + 8), this.radius * 0.6 + legOffset);
+                    ctx.stroke();
+                }
+
+                // Body Shell
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(0, -this.radius * 0.2, this.radius, 0, Math.PI, true);
+                ctx.fill();
+
+                // Randomized Multi-Eyes
+                const eyes = this.eyeCount || 2;
+                ctx.fillStyle = '#ffffff';
+                for (let e = 0; e < eyes; e++) {
+                    const ex = -this.radius * 0.5 + (e * (this.radius / eyes));
+                    ctx.beginPath();
+                    ctx.arc(ex, -this.radius * 0.5, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+
+            drawCentipede(ctx) {
+                if (this.isCrushed) {
+                    this.segments.forEach((seg) => {
+                        const screenX = seg.worldX - cameraX;
+                        if (screenX < -100 || screenX > width + 100) return;
+                        ctx.save();
+                        ctx.translate(screenX, seg.y);
+                        ctx.fillStyle = '#6b21a8';
+                        ctx.beginPath();
+                        ctx.ellipse(0, seg.radius * 0.5, seg.radius * 1.4, seg.radius * 0.25, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    });
+                    return;
+                }
+
+                // Draw segments from tail to head
+                for (let i = this.segments.length - 1; i >= 0; i--) {
+                    const seg = this.segments[i];
+                    const screenX = seg.worldX - cameraX;
+                    if (screenX < -100 || screenX > width + 100) continue;
+
+                    ctx.save();
+                    ctx.translate(screenX, seg.y);
+
+                    // Segment legs
+                    ctx.strokeStyle = '#c084fc';
+                    ctx.lineWidth = 2;
+                    const legOffset = Math.sin(this.legAngle + i * 0.5) * 5;
+                    ctx.beginPath();
+                    ctx.moveTo(-seg.radius, 0);
+                    ctx.lineTo(-seg.radius - 8, seg.radius * 0.6 + legOffset);
+                    ctx.moveTo(seg.radius, 0);
+                    ctx.lineTo(seg.radius + 8, seg.radius * 0.6 - legOffset);
+                    ctx.stroke();
+
+                    // Segment body
+                    const segGrad = ctx.createRadialGradient(0, -seg.radius * 0.3, 2, 0, 0, seg.radius);
+                    segGrad.addColorStop(0, '#e9d5ff');
+                    segGrad.addColorStop(0.5, '#a855f7');
+                    segGrad.addColorStop(1, '#581c87');
+                    ctx.fillStyle = segGrad;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, seg.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#3b0764';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+
+                    // Head details (Segment 0)
+                    if (i === 0) {
+                        // Mandibles
+                        ctx.fillStyle = '#f43f5e';
+                        ctx.beginPath();
+                        ctx.moveTo(-6, -seg.radius * 0.5);
+                        ctx.quadraticCurveTo(-14, -seg.radius - 8, -4, -seg.radius - 10);
+                        ctx.lineTo(-2, -seg.radius * 0.5);
+                        ctx.fill();
+
+                        ctx.beginPath();
+                        ctx.moveTo(6, -seg.radius * 0.5);
+                        ctx.quadraticCurveTo(14, -seg.radius - 8, 4, -seg.radius - 10);
+                        ctx.lineTo(2, -seg.radius * 0.5);
+                        ctx.fill();
+
+                        // Glowing Eyes
+                        ctx.fillStyle = '#ef4444';
+                        ctx.shadowColor = '#f43f5e';
+                        ctx.shadowBlur = 6;
+                        ctx.beginPath();
+                        ctx.arc(-5, -4, 3, 0, Math.PI * 2);
+                        ctx.arc(5, -4, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                    }
+
+                    ctx.restore();
+                }
+            }
+
+            drawBear(ctx) {
+                const screenX = this.worldX - cameraX;
+                if (screenX < -180 || screenX > width + 180) return;
+
+                ctx.save();
+                ctx.translate(screenX, this.y);
+
+                if (this.isCrushed) {
+                    // Crushed Bear Fur Pelt Splat
+                    ctx.fillStyle = '#451a03';
+                    ctx.beginPath();
+                    ctx.ellipse(0, 8, this.radius * 1.6, 6, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#78350f';
+                    ctx.beginPath();
+                    ctx.ellipse(0, 8, this.radius * 1.1, 4, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                    return;
+                }
+
+                const walkSwing = Math.sin(this.legAngle) * 7;
+
+                // 1. Bear Paws / Legs (Quadruped Stance)
+                ctx.fillStyle = '#451a03';
+                ctx.strokeStyle = '#290e02';
+                ctx.lineWidth = 1.5;
+
+                // Rear Back Leg
+                ctx.fillRect(-22, -12, 10, 22 + walkSwing);
+                ctx.strokeRect(-22, -12, 10, 22 + walkSwing);
+
+                // Front Back Leg
+                ctx.fillRect(10, -12, 10, 22 - walkSwing);
+                ctx.strokeRect(10, -12, 10, 22 - walkSwing);
+
+                // Rear Front Leg
+                ctx.fillRect(-14, -10, 11, 20 - walkSwing);
+                ctx.strokeRect(-14, -10, 11, 20 - walkSwing);
+
+                // Front Front Leg
+                ctx.fillRect(18, -10, 11, 20 + walkSwing);
+                ctx.strokeRect(18, -10, 11, 20 + walkSwing);
+
+                // Claws on front paws
+                ctx.fillStyle = '#f8fafc';
+                ctx.fillRect(25, 8 + walkSwing, 6, 2);
+                ctx.fillRect(-8, 8 - walkSwing, 6, 2);
+
+                // 2. Large Muscular Furry Body
+                const bodyGrad = ctx.createRadialGradient(-5, -22, 5, 0, -20, 26);
+                bodyGrad.addColorStop(0, '#9a3412');
+                bodyGrad.addColorStop(0.5, '#78350f');
+                bodyGrad.addColorStop(1, '#451a03');
+
+                ctx.fillStyle = bodyGrad;
+                ctx.beginPath();
+                ctx.ellipse(0, -20, 28, 18, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#290e02';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Shoulder Hump
+                ctx.beginPath();
+                ctx.arc(8, -30, 14, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 3. Bear Head & Snout
+                ctx.save();
+                ctx.translate(-22, -26); // Head facing left towards rear bumper
+
+                // Bear Head Base
+                ctx.fillStyle = '#78350f';
+                ctx.beginPath();
+                ctx.arc(0, 0, 12, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                // Rounded Bear Ears
+                ctx.fillStyle = '#451a03';
+                ctx.beginPath();
+                ctx.arc(6, -10, 5, 0, Math.PI * 2);
+                ctx.arc(-4, -10, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                // Snout / Muzzle
+                ctx.fillStyle = '#d97706';
+                ctx.beginPath();
+                ctx.ellipse(-9, 2, 7, 5, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Nose
+                ctx.fillStyle = '#0f172a';
+                ctx.beginPath();
+                ctx.arc(-14, 0, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Glowing Amber Eye
+                ctx.fillStyle = '#f59e0b';
+                ctx.shadowColor = '#f59e0b';
+                ctx.shadowBlur = 6;
+                ctx.beginPath();
+                ctx.arc(-3, -3, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // Fangs
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.moveTo(-11, 4);
+                ctx.lineTo(-9, 8);
+                ctx.lineTo(-7, 4);
+                ctx.fill();
+
+                ctx.restore();
+                ctx.restore();
+            }
+        }
+
+        const particles = [];
+        const flames = [];
+        const flameSmokes = [];
+        const flameSparks = [];
+        const groundFires = [];
+        const turretBullets = [];
+
+        // Pre-rendered high-performance volumetric flame, smoke, ember, and light textures
+        const fxTextures = (function() {
+            // 1. Flame Fireball (Volumetric Radial Heat with Incandescent Core)
+            const flameCanvas = document.createElement('canvas');
+            flameCanvas.width = 64;
+            flameCanvas.height = 64;
+            const fctx = flameCanvas.getContext('2d');
+            const fGrad = fctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            fGrad.addColorStop(0.0, 'rgba(255, 255, 240, 1.0)'); // Pure incandescent core
+            fGrad.addColorStop(0.18, 'rgba(255, 225, 75, 0.95)'); // Radiant golden yellow
+            fGrad.addColorStop(0.42, 'rgba(255, 125, 20, 0.82)'); // Blazing orange
+            fGrad.addColorStop(0.70, 'rgba(225, 45, 10, 0.45)'); // Deep fiery red
+            fGrad.addColorStop(0.92, 'rgba(150, 15, 5, 0.12)'); // Dark smoky rim
+            fGrad.addColorStop(1.0, 'rgba(100, 10, 0, 0.0)'); // Transparent falloff
+            fctx.fillStyle = fGrad;
+            fctx.fillRect(0, 0, 64, 64);
+
+            // 2. Smoke Puff (Soft turbulent soot)
+            const smokeCanvas = document.createElement('canvas');
+            smokeCanvas.width = 64;
+            smokeCanvas.height = 64;
+            const sctx = smokeCanvas.getContext('2d');
+            const sGrad = sctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            sGrad.addColorStop(0.0, 'rgba(40, 35, 42, 0.45)');
+            sGrad.addColorStop(0.45, 'rgba(32, 28, 35, 0.28)');
+            sGrad.addColorStop(0.75, 'rgba(22, 18, 25, 0.12)');
+            sGrad.addColorStop(1.0, 'rgba(18, 15, 20, 0.0)');
+            sctx.fillStyle = sGrad;
+            sctx.fillRect(0, 0, 64, 64);
+
+            // 3. Spark / Ember (Intense point light)
+            const sparkCanvas = document.createElement('canvas');
+            sparkCanvas.width = 16;
+            sparkCanvas.height = 16;
+            const spctx = sparkCanvas.getContext('2d');
+            const spGrad = spctx.createRadialGradient(8, 8, 0, 8, 8, 8);
+            spGrad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
+            spGrad.addColorStop(0.25, 'rgba(255, 240, 150, 0.95)');
+            spGrad.addColorStop(0.65, 'rgba(255, 140, 30, 0.45)');
+            spGrad.addColorStop(1.0, 'rgba(255, 60, 0, 0.0)');
+            spctx.fillStyle = spGrad;
+            spctx.fillRect(0, 0, 16, 16);
+
+            // 4. Ambient Illumination Glow
+            const glowCanvas = document.createElement('canvas');
+            glowCanvas.width = 128;
+            glowCanvas.height = 128;
+            const gctx = glowCanvas.getContext('2d');
+            const gGrad = gctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+            gGrad.addColorStop(0.0, 'rgba(255, 160, 40, 0.35)');
+            gGrad.addColorStop(0.5, 'rgba(240, 90, 15, 0.15)');
+            gGrad.addColorStop(0.85, 'rgba(180, 40, 5, 0.05)');
+            gGrad.addColorStop(1.0, 'rgba(120, 20, 0, 0.0)');
+            gctx.fillStyle = gGrad;
+            gctx.fillRect(0, 0, 128, 128);
+
+            return { flame: flameCanvas, smoke: smokeCanvas, spark: sparkCanvas, glow: glowCanvas };
+        })();
+
+        function createSplatFX(x, y, color) {
+            playSquishSound();
+            for (let i = 0; i < 18; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 9,
+                    vy: (Math.random() - 0.8) * 7,
+                    size: 3 + Math.random() * 6,
+                    color: color,
+                    life: 1.0,
+                    decay: 0.03 + Math.random() * 0.02
+                });
+            }
+        }
+
+        function createDustParticle(x, y, vx, vy) {
+            particles.push({
+                x: x,
+                y: y,
+                vx: vx,
+                vy: vy,
+                size: 2 + Math.random() * 4,
+                color: 'rgba(160, 110, 80, 0.6)',
+                life: 1.0,
+                decay: 0.04
+            });
+        }
+
+        function emitFlame(startX, startY, fireAngle) {
+            // High-velocity liquid napalm stream with realistic dispersion
+            for (let i = 0; i < 4; i++) {
+                const spread = (Math.random() - 0.5) * 0.15;
+                const spd = 13 + Math.random() * 7;
+                const angle = fireAngle + spread;
+                flames.push({
+                    x: startX,
+                    y: startY,
+                    vx: Math.cos(angle) * spd,
+                    vy: Math.sin(angle) * spd,
+                    baseSize: 8 + Math.random() * 6,
+                    maxSize: 34 + Math.random() * 22,
+                    life: 1.0,
+                    decay: 0.030 + Math.random() * 0.015,
+                    age: 0,
+                    seed: Math.random() * 100
+                });
+            }
+
+            // High-speed incandescent sparks & crackling embers
+            if (Math.random() < 0.7) {
+                const spd = 16 + Math.random() * 9;
+                const sparkAngle = fireAngle + (Math.random() - 0.5) * 0.35;
+                flameSparks.push({
+                    x: startX,
+                    y: startY,
+                    vx: Math.cos(sparkAngle) * spd,
+                    vy: Math.sin(sparkAngle) * spd,
+                    size: 1.5 + Math.random() * 2.5,
+                    life: 1.0,
+                    decay: 0.032 + Math.random() * 0.02
+                });
+            }
+        }
+
+        function fireRearTurret(startX, startY) {
+            turretBullets.push({
+                x: startX,
+                y: startY,
+                vx: -16,
+                vy: (Math.random() - 0.5) * 3,
+                life: 1.0
+            });
+        }
+
+        function updateProjectilesAndFX(ctx) {
+            // Rear Turret Bullets
+            for (let i = turretBullets.length - 1; i >= 0; i--) {
+                const b = turretBullets[i];
+                b.x += b.vx;
+                b.y += b.vy;
+                b.life -= 0.03;
+
+                ctx.fillStyle = '#f43f5e';
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Hit detection against rear bugs
+                creatures.forEach((bug) => {
+                    if (!bug.isCrushed && Math.abs(bug.worldX - cameraX - b.x) < bug.radius + 10) {
+                        bug.hp -= 2;
+                        b.life = 0;
+                        if (bug.hp <= 0) {
+                            bug.isCrushed = true;
+                            score += bug.reward;
+                            totalSquished++;
+                            scrapCredits += bug.reward;
+                            createSplatFX(bug.worldX - cameraX, bug.y, bug.color);
+                        }
+                    }
+                });
+
+                if (b.life <= 0) turretBullets.splice(i, 1);
+            }
+
+            // --- Realistic Flamethrower FX System ---
+
+            // 1. Ground Fires (Persistent burning napalm stuck to slopes & ground)
+            for (let i = groundFires.length - 1; i >= 0; i--) {
+                const gf = groundFires[i];
+                gf.life -= gf.decay;
+                gf.flicker += 0.3;
+
+                if (gf.life <= 0) {
+                    groundFires.splice(i, 1);
+                    continue;
+                }
+
+                const screenX = gf.worldX - cameraX;
+                if (screenX < -100 || screenX > width + 100) continue;
+
+                // Burn bugs crawling over sticky ground flame
+                creatures.forEach((bug) => {
+                    if (bug.isCrushed) return;
+                    if (Math.abs(bug.worldX - gf.worldX) < bug.radius + gf.size * 0.7) {
+                        bug.hp -= 0.09;
+                        if (bug.hp <= 0) {
+                            bug.isCrushed = true;
+                            score += bug.reward;
+                            totalSquished++;
+                            scrapCredits += bug.reward;
+                            createSplatFX(bug.worldX - cameraX, bug.y, '#f97316');
+                        }
+                    }
+                });
+
+                // Spawn occasional smoke puff from ground fire
+                if (Math.random() < 0.06) {
+                    flameSmokes.push({
+                        x: screenX + (Math.random() - 0.5) * 10,
+                        y: gf.groundY - 10,
+                        vx: (Math.random() - 0.5) * 0.8 + 0.5,
+                        vy: -1.2 - Math.random() * 1.0,
+                        size: 10 + Math.random() * 8,
+                        life: 0.8,
+                        decay: 0.02
+                    });
+                }
+            }
+
+            // 2. Smoke Layer (Soft dark sooty clouds rising from expiring flames)
+            ctx.save();
+            ctx.globalCompositeOperation = 'source-over';
+            for (let i = flameSmokes.length - 1; i >= 0; i--) {
+                const sm = flameSmokes[i];
+                sm.x += sm.vx;
+                sm.y += sm.vy;
+                sm.vx *= 0.96;
+                sm.vy -= 0.05; // Thermal rising buoyancy
+                sm.size += 0.45; // Smoke expands as it rises
+                sm.life -= sm.decay;
+
+                if (sm.life <= 0) {
+                    flameSmokes.splice(i, 1);
+                    continue;
+                }
+
+                ctx.globalAlpha = Math.max(0, Math.min(0.4, sm.life * 0.4));
+                ctx.drawImage(fxTextures.smoke, sm.x - sm.size, sm.y - sm.size, sm.size * 2, sm.size * 2);
+            }
+            ctx.restore();
+
+            // 3. Additive Luminous Fire Layer (Lighter Blending)
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+
+            // Ground Licking Flames
+            for (let i = 0; i < groundFires.length; i++) {
+                const gf = groundFires[i];
+                const screenX = gf.worldX - cameraX;
+                if (screenX < -100 || screenX > width + 100) continue;
+
+                const flickerH = gf.size * (0.8 + Math.sin(gf.flicker) * 0.25) * gf.life;
+                const flickerW = gf.size * (0.9 + Math.cos(gf.flicker * 1.3) * 0.2) * gf.life;
+                ctx.globalAlpha = Math.max(0, Math.min(1.0, gf.life * 1.2));
+                ctx.drawImage(fxTextures.flame, screenX - flickerW * 0.5, gf.groundY - flickerH * 1.2, flickerW, flickerH * 1.4);
+            }
+
+            // Dynamic Ambient Firelight Illumination along jet stream
+            if (flames.length > 0) {
+                const head = flames[0];
+                ctx.globalAlpha = 0.45;
+                ctx.drawImage(fxTextures.glow, head.x - 50, head.y - 50, 100, 100);
+
+                if (flames.length > 8) {
+                    const mid = flames[Math.floor(flames.length / 2)];
+                    ctx.globalAlpha = 0.35;
+                    ctx.drawImage(fxTextures.glow, mid.x - 70, mid.y - 70, 140, 140);
+                }
+            }
+
+            // 4. Main Flame Jet Stream & Mushrooming Fire Puffs
+            for (let i = flames.length - 1; i >= 0; i--) {
+                const f = flames[i];
+                f.age++;
+                f.x += f.vx;
+                f.y += f.vy;
+
+                // Atmospheric deceleration, hot-air buoyancy, and turbulent swirl
+                f.vx *= 0.965; // Air drag slows down forward stream
+                f.vy -= 0.12;  // Hot flame rises
+                f.vy += Math.sin(f.age * 0.2 + f.seed) * 0.35; // Fluid turbulence
+
+                f.life -= f.decay;
+
+                if (f.life <= 0) {
+                    flames.splice(i, 1);
+                    continue;
+                }
+
+                // Spawn smoke puffs as flame cools and approaches end of life
+                if (f.life < 0.4 && Math.random() < 0.22) {
+                    flameSmokes.push({
+                        x: f.x + (Math.random() - 0.5) * 8,
+                        y: f.y - 4,
+                        vx: f.vx * 0.3 + (Math.random() - 0.5) * 0.5,
+                        vy: -0.8 - Math.random() * 0.8,
+                        size: f.baseSize * 1.4,
+                        life: 0.75,
+                        decay: 0.02
+                    });
+                }
+
+                // Terrain interaction: deflect along hill slopes and ignite sticky napalm
+                const groundY = terrain.getRawHeight(cameraX + f.x);
+                if (f.y >= groundY - 6) {
+                    f.y = groundY - 6;
+                    f.vy = -Math.abs(f.vy) * 0.15; // softly deflect up along slope
+                    f.vx *= 0.90; // hill friction
+
+                    // Ignite ground with persistent licking napalm flame
+                    if (Math.random() < 0.18 && groundFires.length < 35) {
+                        groundFires.push({
+                            worldX: cameraX + f.x,
+                            groundY: groundY,
+                            life: 1.0,
+                            decay: 0.018 + Math.random() * 0.018,
+                            size: 16 + Math.random() * 12,
+                            flicker: Math.random() * 50
+                        });
+                    }
+                }
+
+                // Dynamic expansion: tight at muzzle, expanding into large billowing rolling fireballs
+                const progress = 1.0 - f.life; // 0 to 1
+                const currentRadius = f.baseSize + (f.maxSize - f.baseSize) * Math.pow(progress, 0.7);
+
+                // Additive drawing with volumetric radial heat texture
+                ctx.globalAlpha = Math.max(0, Math.min(1.0, f.life * 1.5));
+                ctx.drawImage(
+                    fxTextures.flame,
+                    f.x - currentRadius,
+                    f.y - currentRadius,
+                    currentRadius * 2,
+                    currentRadius * 2
+                );
+
+                // Burn bugs (including small bugs, spiders, centipede segments, bears)
+                creatures.forEach((bug) => {
+                    if (bug.isCrushed) return;
+
+                    let hit = false;
+                    let hitX = bug.worldX - cameraX;
+                    let hitY = bug.y;
+
+                    if (bug.isCentipede && bug.segments && bug.segments.length > 0) {
+                        for (let s = 0; s < bug.segments.length; s++) {
+                            const seg = bug.segments[s];
+                            const sx = seg.worldX - cameraX;
+                            if (Math.hypot(sx - f.x, seg.y - f.y) < seg.radius + currentRadius * 0.85) {
+                                hit = true;
+                                hitX = sx;
+                                hitY = seg.y;
+                                break;
+                            }
+                        }
+                    } else {
+                        if (Math.hypot(hitX - f.x, hitY - f.y) < bug.radius + currentRadius * 0.85) {
+                            hit = true;
+                        }
+                    }
+
+                    if (hit) {
+                        bug.hp -= 0.16;
+                        if (bug.hp <= 0) {
+                            bug.isCrushed = true;
+                            score += bug.reward;
+                            totalSquished++;
+                            scrapCredits += bug.reward;
+                            createSplatFX(hitX, hitY, '#f97316');
+                        }
+                    }
+                });
+            }
+
+            // 5. Flying Sparks & Crackling Embers
+            for (let i = flameSparks.length - 1; i >= 0; i--) {
+                const sp = flameSparks[i];
+                sp.x += sp.vx;
+                sp.y += sp.vy;
+                sp.vy += 0.18; // Spark gravity
+                sp.vx *= 0.98;
+                sp.life -= sp.decay;
+
+                if (sp.life <= 0) {
+                    flameSparks.splice(i, 1);
+                    continue;
+                }
+
+                // Bounce off terrain
+                const groundY = terrain.getRawHeight(cameraX + sp.x);
+                if (sp.y >= groundY - 2) {
+                    sp.y = groundY - 2;
+                    sp.vy = -Math.abs(sp.vy) * 0.45;
+                    sp.vx *= 0.8;
+                }
+
+                ctx.globalAlpha = Math.max(0, Math.min(1.0, sp.life * 1.3));
+                ctx.drawImage(fxTextures.spark, sp.x - sp.size, sp.y - sp.size, sp.size * 2, sp.size * 2);
+            }
+
+            ctx.restore();
+
+            // Splats & Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.22;
+                p.life -= p.decay;
+
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function drawBackground(ctx) {
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
+            skyGrad.addColorStop(0, '#040711');
+            skyGrad.addColorStop(0.5, '#0f172a');
+            skyGrad.addColorStop(1, '#2e1022');
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, width, height);
+
+            // Alien Sun
+            const sunX = width * 0.8 - (cameraX * 0.01) % width;
+            const sunGrad = ctx.createRadialGradient(sunX, 140, 10, sunX, 140, 80);
+            sunGrad.addColorStop(0, '#fef08a');
+            sunGrad.addColorStop(0.4, '#f97316');
+            sunGrad.addColorStop(1, 'rgba(249, 115, 22, 0)');
+            ctx.fillStyle = sunGrad;
+            ctx.beginPath();
+            ctx.arc(sunX, 140, 80, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Parallax Mountains
+            ctx.fillStyle = '#151022';
+            ctx.beginPath();
+            ctx.moveTo(0, height);
+            for (let x = 0; x <= width; x += 30) {
+                const worldX = cameraX * 0.05 + x;
+                const mHeight = height * 0.62 - Math.sin(worldX * 0.0015) * 75;
+                ctx.lineTo(x, mHeight);
+            }
+            ctx.lineTo(width, height);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawTerrain(ctx) {
+            ctx.save();
+            ctx.fillStyle = '#120d18';
+
+            ctx.beginPath();
+            ctx.moveTo(0, height);
+            for (let x = 0; x <= width; x += CONFIG.terrainResolution) {
+                const worldX = cameraX + x;
+                ctx.lineTo(x, terrain.getRawHeight(worldX));
+            }
+            ctx.lineTo(width, height);
+            ctx.closePath();
+            ctx.fill();
+
+            // Ground Top Outline
+            ctx.beginPath();
+            for (let x = 0; x <= width; x += CONFIG.terrainResolution) {
+                const worldX = cameraX + x;
+                const h = terrain.getRawHeight(worldX);
+                if (x === 0) ctx.moveTo(x, h);
+                else ctx.lineTo(x, h);
+            }
+            ctx.strokeStyle = '#22c55e';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        let lastSpawnTime = 0;
+        function updateSpawning() {
+            const seconds = gameTime / 60;
+
+            if (seconds > 45) hazardLevel = 4;
+            else if (seconds > 25) hazardLevel = 3;
+            else if (seconds > 10) hazardLevel = 2;
+
+            document.getElementById('hazardLevelText').innerText = `LVL ${hazardLevel}`;
+
+            const spawnInterval = Math.max(25, 110 - seconds * 1.8);
+            if (gameTime - lastSpawnTime > spawnInterval) {
+                lastSpawnTime = gameTime;
+
+                const spawnWorldX = cameraX + width + 100 + Math.random() * 200;
+                let creatureType = 'small_ant';
+
+                const roll = Math.random();
+                if (hazardLevel >= 4 && roll < 0.35) creatureType = 'bear';
+                else if (hazardLevel >= 3 && roll < 0.5) creatureType = 'centipede';
+                else if (hazardLevel >= 2 && roll < 0.7) creatureType = 'spider_crawler';
+
+                creatures.push(new Creature(spawnWorldX, creatureType));
+            }
+        }
+
+        const juggernaut = new JuggernautVehicle(window.innerWidth * 0.35, 200);
+
+        function checkWheelSquishCollisions() {
+            juggernaut.wheels.forEach((wheel) => {
+                const cosA = Math.cos(juggernaut.angle);
+                const wheelWorldX = cameraX + juggernaut.screenX + wheel.localX * cosA;
+
+                creatures.forEach((bug) => {
+                    if (bug.isCrushed) return;
+
+                    const bugX = bug.worldX;
+                    const dist = Math.abs(wheelWorldX - bugX);
+
+                    // Wheels press directly down on bug
+                    if (dist < bug.radius + 12) {
+                        const effectiveEngine = upgradesActive.engine ? upgrades.engineLevel : 1;
+                        const squishDamage = 0.2 * effectiveEngine;
+                        bug.hp -= squishDamage;
+
+                        if (bug.hp <= 0) {
+                            bug.isCrushed = true;
+                            score += bug.reward;
+                            totalSquished++;
+                            scrapCredits += bug.reward;
+                            createSplatFX(bug.worldX - cameraX, bug.y, bug.color);
+                        }
+                    }
+                });
+            });
+
+            // Front Ram Upgrade Collision
+            if (upgrades.plowLevel > 0 && upgradesActive.plow) {
+                const plowWorldX = cameraX + juggernaut.screenX + 110;
+                creatures.forEach((bug) => {
+                    if (!bug.isCrushed && Math.abs(plowWorldX - bug.worldX) < 40) {
+                        bug.hp -= 0.2 * upgrades.plowLevel;
+                    }
+                });
+            }
+        }
+
+        function triggerDamageFlash() {
+            const flash = document.getElementById('damageFlash');
+            flash.classList.remove('damage-overlay');
+            void flash.offsetWidth;
+            flash.classList.add('damage-overlay');
+
+            if (hullHealth <= 0 && !isGameOver) {
+                triggerGameOver();
+            }
+        }
+
+        function triggerGameOver() {
+            isGameOver = true;
+            document.getElementById('finalScoreText').innerText = score;
+            document.getElementById('finalKillsText').innerText = totalSquished;
+            document.getElementById('gameOverModal').classList.remove('hidden');
+        }
+
+        function fullResetGame() {
+            isGameOver = false;
+            maxHullHealth = 250;
+            hullHealth = 250;
+            score = 0;
+            totalSquished = 0;
+            gameTime = 0;
+            hazardLevel = 1;
+            cameraX = 0;
+            creatures.length = 0;
+            particles.length = 0;
+            flames.length = 0;
+            flameSmokes.length = 0;
+            flameSparks.length = 0;
+            groundFires.length = 0;
+            turretBullets.length = 0;
+            terrain.heights.clear();
+            juggernaut.resetPosition();
+            document.getElementById('gameOverModal').classList.add('hidden');
+            if (typeof updateUpgradesUI === 'function') updateUpgradesUI();
+        }
+
+        function drawInclinometer(angle) {
+            incCtx.clearRect(0, 0, 48, 48);
+
+            incCtx.fillStyle = '#030712';
+            incCtx.beginPath();
+            incCtx.arc(24, 24, 22, 0, Math.PI * 2);
+            incCtx.fill();
+            incCtx.strokeStyle = '#1e3a8a';
+            incCtx.lineWidth = 2;
+            incCtx.stroke();
+
+            incCtx.save();
+            incCtx.translate(24, 24);
+            incCtx.rotate(angle);
+
+            incCtx.strokeStyle = '#06b6d4';
+            incCtx.lineWidth = 2;
+            incCtx.beginPath();
+            incCtx.moveTo(-14, 0);
+            incCtx.lineTo(14, 0);
+            incCtx.stroke();
+
+            incCtx.fillStyle = '#f59e0b';
+            incCtx.fillRect(-3, -2, 6, 4);
+
+            incCtx.restore();
+        }
+
+        function animate() {
+            if (!isGameOver) {
+                gameTime++;
+
+                ctx.clearRect(0, 0, width, height);
+
+                juggernaut.update();
+                updateSpawning();
+                checkWheelSquishCollisions();
+
+                drawBackground(ctx);
+                drawTerrain(ctx);
+
+                creatures.forEach((c) => {
+                    c.update();
+                    c.draw(ctx);
+                });
+
+                updateProjectilesAndFX(ctx);
+                juggernaut.draw(ctx);
+
+                updateUI();
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        function updateUI() {
+            const speed = (Math.abs(juggernaut.wheels[2].angularVel) * 12.0).toFixed(1);
+            document.getElementById('speedVal').innerText = `${speed} km/h`;
+            document.getElementById('scoreText').innerText = score;
+            document.getElementById('killsText').innerText = totalSquished;
+            document.getElementById('scrapText').innerText = `$${scrapCredits}`;
+            document.getElementById('modalScrapText').innerText = `$${scrapCredits}`;
+
+            // Hull Health Bar Update
+            const healthPercent = Math.max(0, Math.min(100, Math.ceil((hullHealth / maxHullHealth) * 100)));
+            const healthBar = document.getElementById('hullHealthBar');
+            healthBar.style.width = `${healthPercent}%`;
+            document.getElementById('hullHealthText').innerText = `${healthPercent}% (${Math.ceil(hullHealth)} HP)`;
+            if (healthPercent < 30) {
+                healthBar.className = "h-full bg-rose-600 transition-all duration-150 animate-pulse";
+            } else {
+                healthBar.className = "h-full bg-emerald-500 transition-all duration-150";
+            }
+
+            const degrees = (juggernaut.angle * (180 / Math.PI)).toFixed(1);
+            document.getElementById('pitchAngleText').innerText = `${degrees}°`;
+            drawInclinometer(juggernaut.angle);
+
+            let throttlePercent = 50;
+            if (keys.right) throttlePercent = 100;
+            else if (keys.left) throttlePercent = 0;
+            document.getElementById('throttleIndicator').style.width = `${throttlePercent}%`;
+        }
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            if (terrain) terrain.heights.clear();
+            if (juggernaut) juggernaut.screenX = width * 0.35;
+        }
+
+        window.addEventListener('resize', resize);
+        window.addEventListener('click', () => window.focus());
+
+        window.addEventListener('keydown', (e) => {
+            const k = e.key.toLowerCase();
+            if (k === 'a' || e.key === 'ArrowLeft') keys.left = true;
+            if (k === 'd' || e.key === 'ArrowRight') keys.right = true;
+            if (k === 'f' || e.key === ' ') keys.flame = true;
+            if (k === 'r') juggernaut.resetPosition();
+
+            // Quick Weapon & System Toggles via number keys
+            if (e.key === '1' && upgrades.plowLevel > 0) {
+                upgradesActive.plow = !upgradesActive.plow;
+                playToggleSound(upgradesActive.plow);
+                updateUpgradesUI();
+            } else if (e.key === '2' && upgrades.rearTurret > 0) {
+                upgradesActive.rearTurret = !upgradesActive.rearTurret;
+                playToggleSound(upgradesActive.rearTurret);
+                updateUpgradesUI();
+            } else if (e.key === '3' && upgrades.flameLevel > 0) {
+                upgradesActive.flame = !upgradesActive.flame;
+                playToggleSound(upgradesActive.flame);
+                updateUpgradesUI();
+            } else if (e.key === '4' && upgrades.engineLevel > 1) {
+                upgradesActive.engine = !upgradesActive.engine;
+                playToggleSound(upgradesActive.engine);
+                updateUpgradesUI();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if (k === 'a' || e.key === 'ArrowLeft') keys.left = false;
+            if (k === 'd' || e.key === 'ArrowRight') keys.right = false;
+            if (k === 'f' || e.key === ' ') keys.flame = false;
+        });
+
+        function setupTouchButton(id, keyName) {
+            const btn = document.getElementById(id);
+            const startHandler = (e) => { e.preventDefault(); keys[keyName] = true; };
+            const endHandler = (e) => { e.preventDefault(); keys[keyName] = false; };
+
+            btn.addEventListener('mousedown', startHandler);
+            btn.addEventListener('mouseup', endHandler);
+            btn.addEventListener('mouseleave', endHandler);
+
+            btn.addEventListener('touchstart', startHandler, { passive: false });
+            btn.addEventListener('touchend', endHandler, { passive: false });
+        }
+
+        setupTouchButton('btnThrottle', 'right');
+        setupTouchButton('btnReverse', 'left');
+        setupTouchButton('btnFlamethrower', 'flame');
+
+        document.getElementById('resetBtn').addEventListener('click', () => juggernaut.resetPosition());
+        document.getElementById('restartGameBtn').addEventListener('click', () => fullResetGame());
+
+        const shopModal = document.getElementById('shopModal');
+        const shopToggleBtn = document.getElementById('shopToggleBtn');
+        if (shopToggleBtn) {
+            shopToggleBtn.addEventListener('click', () => shopModal.classList.remove('hidden'));
+        }
+        document.getElementById('closeShopBtn').addEventListener('click', () => shopModal.classList.add('hidden'));
+        document.getElementById('resumeDriveBtn').addEventListener('click', () => shopModal.classList.add('hidden'));
+
+        function playToggleSound(isActive) {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                const now = audioCtx.currentTime;
+                if (isActive) {
+                    osc.frequency.setValueAtTime(480, now);
+                    osc.frequency.exponentialRampToValueAtTime(960, now + 0.1);
+                } else {
+                    osc.frequency.setValueAtTime(640, now);
+                    osc.frequency.exponentialRampToValueAtTime(240, now + 0.1);
+                }
+                gain.gain.setValueAtTime(0.14, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } catch (e) {}
+        }
+
+        function updateHUDQuickToolbar() {
+            const bar = document.getElementById('quickSystemsBar');
+            const hudPlow = document.getElementById('hudTogglePlow');
+            const hudTurret = document.getElementById('hudToggleTurret');
+            const hudFlame = document.getElementById('hudToggleFlame');
+            const hudEngine = document.getElementById('hudToggleEngine');
+
+            let anyUnlocked = false;
+
+            // Plow
+            if (upgrades.plowLevel > 0) {
+                anyUnlocked = true;
+                hudPlow.classList.remove('hidden');
+                const on = upgradesActive.plow;
+                hudPlow.innerHTML = `<span class="opacity-60 text-[9px]">[1]</span> <i class="fa-solid fa-shield text-cyan-400"></i> PLOW: <span class="${on ? 'text-emerald-400' : 'text-rose-400'} font-black">${on ? 'ON' : 'OFF'}</span>`;
+                hudPlow.className = `px-2.5 py-1 rounded-lg text-[10px] font-orbitron font-bold border transition flex items-center gap-1.5 btn-touch ${on ? 'bg-cyan-950/80 text-cyan-200 border-cyan-500/60 shadow-sm shadow-cyan-900/50 hover:bg-cyan-900/80' : 'bg-slate-900/80 text-slate-500 border-slate-700 hover:bg-slate-800'}`;
+            } else {
+                hudPlow.classList.add('hidden');
+            }
+
+            // Turret
+            if (upgrades.rearTurret > 0) {
+                anyUnlocked = true;
+                hudTurret.classList.remove('hidden');
+                const on = upgradesActive.rearTurret;
+                hudTurret.innerHTML = `<span class="opacity-60 text-[9px]">[2]</span> <i class="fa-solid fa-crosshairs text-rose-400"></i> TURRET: <span class="${on ? 'text-emerald-400' : 'text-rose-400'} font-black">${on ? 'ON' : 'OFF'}</span>`;
+                hudTurret.className = `px-2.5 py-1 rounded-lg text-[10px] font-orbitron font-bold border transition flex items-center gap-1.5 btn-touch ${on ? 'bg-rose-950/80 text-rose-200 border-rose-500/60 shadow-sm shadow-rose-900/50 hover:bg-rose-900/80' : 'bg-slate-900/80 text-slate-500 border-slate-700 hover:bg-slate-800'}`;
+            } else {
+                hudTurret.classList.add('hidden');
+            }
+
+            // Flamethrower
+            if (upgrades.flameLevel > 0) {
+                anyUnlocked = true;
+                hudFlame.classList.remove('hidden');
+                const on = upgradesActive.flame;
+                hudFlame.innerHTML = `<span class="opacity-60 text-[9px]">[3]</span> <i class="fa-solid fa-fire text-amber-400"></i> FLAME: <span class="${on ? 'text-emerald-400' : 'text-rose-400'} font-black">${on ? 'ON' : 'OFF'}</span>`;
+                hudFlame.className = `px-2.5 py-1 rounded-lg text-[10px] font-orbitron font-bold border transition flex items-center gap-1.5 btn-touch ${on ? 'bg-amber-950/80 text-amber-200 border-amber-500/60 shadow-sm shadow-amber-900/50 hover:bg-amber-900/80' : 'bg-slate-900/80 text-slate-500 border-slate-700 hover:bg-slate-800'}`;
+            } else {
+                hudFlame.classList.add('hidden');
+            }
+
+            // Engine Tuning
+            if (upgrades.engineLevel > 1) {
+                anyUnlocked = true;
+                hudEngine.classList.remove('hidden');
+                const on = upgradesActive.engine;
+                hudEngine.innerHTML = `<span class="opacity-60 text-[9px]">[4]</span> <i class="fa-solid fa-bolt text-emerald-400"></i> ENGINE: <span class="${on ? 'text-emerald-400' : 'text-amber-400'} font-black">${on ? `LVL ${upgrades.engineLevel}` : 'STOCK'}</span>`;
+                hudEngine.className = `px-2.5 py-1 rounded-lg text-[10px] font-orbitron font-bold border transition flex items-center gap-1.5 btn-touch ${on ? 'bg-emerald-950/80 text-emerald-200 border-emerald-500/60 shadow-sm shadow-emerald-900/50 hover:bg-emerald-900/80' : 'bg-slate-900/80 text-slate-500 border-slate-700 hover:bg-slate-800'}`;
+            } else {
+                hudEngine.classList.add('hidden');
+            }
+
+            if (anyUnlocked) {
+                bar.classList.remove('hidden');
+            } else {
+                bar.classList.add('hidden');
+            }
+        }
+
+        function updateUpgradesUI() {
+            // 1. Front Plow / Ram
+            const plowLevelTag = document.getElementById('plowLevelTag');
+            const plowCostText = document.getElementById('plowCostText');
+            const buyPlowBtn = document.getElementById('buyPlowBtn');
+            const togglePlowBtn = document.getElementById('togglePlowBtn');
+
+            if (upgrades.plowLevel === 0) {
+                plowLevelTag.innerText = 'LOCKED';
+                plowLevelTag.className = 'text-[10px] font-orbitron bg-slate-900 text-slate-400 border border-slate-700 px-2 py-0.5 rounded';
+                plowCostText.innerText = `$${upgradeCosts.plow}`;
+                buyPlowBtn.innerText = 'UNLOCK';
+                togglePlowBtn.classList.add('hidden');
+            } else {
+                const isActive = upgradesActive.plow;
+                plowLevelTag.innerText = `LVL ${upgrades.plowLevel} ${isActive ? '• ACTIVE' : '• OFFLINE'}`;
+                plowLevelTag.className = `text-[10px] font-orbitron px-2 py-0.5 rounded border ${isActive ? 'bg-cyan-950 text-cyan-400 border-cyan-800' : 'bg-slate-900 text-slate-500 border-slate-700'}`;
+                plowCostText.innerText = `$${upgradeCosts.plow * (upgrades.plowLevel + 1)}`;
+                buyPlowBtn.innerText = 'UPGRADE';
+                togglePlowBtn.classList.remove('hidden');
+                togglePlowBtn.innerHTML = isActive ? '<i class="fa-solid fa-power-off text-emerald-400 mr-1"></i>ACTIVE' : '<i class="fa-solid fa-ban text-rose-400 mr-1"></i>OFFLINE';
+                togglePlowBtn.className = `font-orbitron font-bold text-xs px-3 py-1.5 rounded-lg border transition btn-touch ${isActive ? 'bg-emerald-950/80 text-emerald-300 border-emerald-600/60 hover:bg-rose-950/60 hover:text-rose-300 hover:border-rose-600' : 'bg-slate-800 text-slate-400 border-slate-600 hover:bg-emerald-950/50 hover:text-emerald-300 hover:border-emerald-600'}`;
+            }
+
+            // 2. Rear Stalker Turret
+            const rearLevelTag = document.getElementById('rearLevelTag');
+            const rearCostText = document.getElementById('rearCostText');
+            const buyRearBtn = document.getElementById('buyRearBtn');
+
+            if (upgrades.rearTurret === 0) {
+                rearLevelTag.innerText = 'LOCKED';
+                rearLevelTag.className = 'text-[10px] font-orbitron bg-slate-900 text-slate-400 border border-slate-700 px-2 py-0.5 rounded';
+                rearCostText.innerText = `$${upgradeCosts.rear}`;
+                buyRearBtn.innerText = 'UNLOCK';
+                buyRearBtn.className = 'bg-rose-600 hover:bg-rose-500 text-slate-950 font-orbitron font-bold text-xs px-4 py-1.5 rounded-lg transition btn-touch';
+            } else {
+                const isActive = upgradesActive.rearTurret;
+                rearLevelTag.innerText = isActive ? 'ONLINE' : 'OFFLINE';
+                rearLevelTag.className = `text-[10px] font-orbitron px-2 py-0.5 rounded border ${isActive ? 'bg-rose-950 text-rose-400 border-rose-800' : 'bg-slate-900 text-slate-500 border-slate-700'}`;
+                rearCostText.innerText = 'OWNED';
+                buyRearBtn.innerHTML = isActive ? '<i class="fa-solid fa-power-off mr-1.5 text-emerald-400"></i>ACTIVE (CLICK TO DEACTIVATE)' : '<i class="fa-solid fa-ban mr-1.5 text-rose-400"></i>OFFLINE (CLICK TO ACTIVATE)';
+                buyRearBtn.className = `font-orbitron font-bold text-xs px-3 py-1.5 rounded-lg border transition btn-touch ${isActive ? 'bg-rose-950/70 text-rose-300 border-rose-600/70 hover:bg-rose-900/80' : 'bg-slate-800 text-slate-400 border-slate-600 hover:bg-slate-700'}`;
+            }
+
+            // 3. Plasma Flamethrower
+            const flameLevelTag = document.getElementById('flameLevelTag');
+            const flameCostText = document.getElementById('flameCostText');
+            const buyFlameBtn = document.getElementById('buyFlameBtn');
+            const btnFlamethrower = document.getElementById('btnFlamethrower');
+
+            if (upgrades.flameLevel === 0) {
+                flameLevelTag.innerText = 'LOCKED';
+                flameLevelTag.className = 'text-[10px] font-orbitron bg-slate-900 text-slate-400 border border-slate-700 px-2 py-0.5 rounded';
+                flameCostText.innerText = `$${upgradeCosts.flame}`;
+                buyFlameBtn.innerText = 'UNLOCK';
+                buyFlameBtn.className = 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-orbitron font-bold text-xs px-4 py-1.5 rounded-lg transition btn-touch';
+                btnFlamethrower.classList.add('opacity-50', 'cursor-not-allowed');
+                btnFlamethrower.querySelector('span').innerText = 'PURGE [F]';
+            } else {
+                const isActive = upgradesActive.flame;
+                flameLevelTag.innerText = isActive ? 'ONLINE' : 'OFFLINE';
+                flameLevelTag.className = `text-[10px] font-orbitron px-2 py-0.5 rounded border ${isActive ? 'bg-amber-950 text-amber-400 border-amber-800' : 'bg-slate-900 text-slate-500 border-slate-700'}`;
+                flameCostText.innerText = 'OWNED';
+                buyFlameBtn.innerHTML = isActive ? '<i class="fa-solid fa-power-off mr-1.5 text-emerald-400"></i>ACTIVE (CLICK TO DEACTIVATE)' : '<i class="fa-solid fa-ban mr-1.5 text-amber-400"></i>OFFLINE (CLICK TO ACTIVATE)';
+                buyFlameBtn.className = `font-orbitron font-bold text-xs px-3 py-1.5 rounded-lg border transition btn-touch ${isActive ? 'bg-amber-950/70 text-amber-300 border-amber-600/70 hover:bg-amber-900/80' : 'bg-slate-800 text-slate-400 border-slate-600 hover:bg-slate-700'}`;
+
+                if (isActive) {
+                    btnFlamethrower.classList.remove('opacity-50', 'cursor-not-allowed');
+                    btnFlamethrower.querySelector('span').innerText = 'PURGE [F]';
+                } else {
+                    btnFlamethrower.classList.add('opacity-50', 'cursor-not-allowed');
+                    btnFlamethrower.querySelector('span').innerText = 'OFFLINE';
+                }
+            }
+
+            // 4. Crusher Engine
+            const engineLevelTag = document.getElementById('engineLevelTag');
+            const engineCostText = document.getElementById('engineCostText');
+            const buyEngineBtn = document.getElementById('buyEngineBtn');
+            const toggleEngineBtn = document.getElementById('toggleEngineBtn');
+
+            const isEngineActive = upgradesActive.engine;
+            engineLevelTag.innerText = `LVL ${upgrades.engineLevel} ${isEngineActive ? (upgrades.engineLevel > 1 ? '• TUNED' : '• BASE') : '• STOCK LVL 1'}`;
+            engineLevelTag.className = `text-[10px] font-orbitron px-2 py-0.5 rounded border ${isEngineActive ? 'bg-emerald-950 text-emerald-400 border-emerald-800' : 'bg-slate-900 text-slate-500 border-slate-700'}`;
+            engineCostText.innerText = `$${upgradeCosts.engine * upgrades.engineLevel}`;
+
+            if (upgrades.engineLevel > 1) {
+                toggleEngineBtn.classList.remove('hidden');
+                toggleEngineBtn.innerHTML = isEngineActive ? '<i class="fa-solid fa-bolt text-emerald-400 mr-1"></i>TUNED' : '<i class="fa-solid fa-gauge-simple text-slate-400 mr-1"></i>STOCK';
+                toggleEngineBtn.className = `font-orbitron font-bold text-xs px-3 py-1.5 rounded-lg border transition btn-touch ${isEngineActive ? 'bg-emerald-950/80 text-emerald-300 border-emerald-600/60 hover:bg-slate-800' : 'bg-slate-800 text-slate-400 border-slate-600 hover:bg-emerald-950/50'}`;
+            } else {
+                toggleEngineBtn.classList.add('hidden');
+            }
+
+            // 5. Update Quick HUD Toolbar
+            updateHUDQuickToolbar();
+        }
+
+        function setupUpgradeButtons() {
+            // Front Ram / Plow
+            document.getElementById('buyPlowBtn').addEventListener('click', () => {
+                const cost = upgradeCosts.plow * (upgrades.plowLevel + 1);
+                if (scrapCredits >= cost) {
+                    scrapCredits -= cost;
+                    upgrades.plowLevel++;
+                    upgradesActive.plow = true;
+                    playToggleSound(true);
+                    updateUpgradesUI();
+                }
+            });
+
+            document.getElementById('togglePlowBtn').addEventListener('click', () => {
+                if (upgrades.plowLevel > 0) {
+                    upgradesActive.plow = !upgradesActive.plow;
+                    playToggleSound(upgradesActive.plow);
+                    updateUpgradesUI();
+                }
+            });
+
+            document.getElementById('hudTogglePlow').addEventListener('click', () => {
+                if (upgrades.plowLevel > 0) {
+                    upgradesActive.plow = !upgradesActive.plow;
+                    playToggleSound(upgradesActive.plow);
+                    updateUpgradesUI();
+                }
+            });
+
+            // Rear Turret
+            const handleRearToggle = () => {
+                if (upgrades.rearTurret === 0) {
+                    if (scrapCredits >= upgradeCosts.rear) {
+                        scrapCredits -= upgradeCosts.rear;
+                        upgrades.rearTurret = 1;
+                        upgradesActive.rearTurret = true;
+                        playToggleSound(true);
+                        updateUpgradesUI();
+                    }
+                } else {
+                    upgradesActive.rearTurret = !upgradesActive.rearTurret;
+                    playToggleSound(upgradesActive.rearTurret);
+                    updateUpgradesUI();
+                }
+            };
+            document.getElementById('buyRearBtn').addEventListener('click', handleRearToggle);
+            document.getElementById('hudToggleTurret').addEventListener('click', () => {
+                if (upgrades.rearTurret > 0) {
+                    upgradesActive.rearTurret = !upgradesActive.rearTurret;
+                    playToggleSound(upgradesActive.rearTurret);
+                    updateUpgradesUI();
+                }
+            });
+
+            // Plasma Flamethrower
+            const handleFlameToggle = () => {
+                if (upgrades.flameLevel === 0) {
+                    if (scrapCredits >= upgradeCosts.flame) {
+                        scrapCredits -= upgradeCosts.flame;
+                        upgrades.flameLevel = 1;
+                        upgradesActive.flame = true;
+                        playToggleSound(true);
+                        updateUpgradesUI();
+                    }
+                } else {
+                    upgradesActive.flame = !upgradesActive.flame;
+                    playToggleSound(upgradesActive.flame);
+                    updateUpgradesUI();
+                }
+            };
+            document.getElementById('buyFlameBtn').addEventListener('click', handleFlameToggle);
+            document.getElementById('hudToggleFlame').addEventListener('click', () => {
+                if (upgrades.flameLevel > 0) {
+                    upgradesActive.flame = !upgradesActive.flame;
+                    playToggleSound(upgradesActive.flame);
+                    updateUpgradesUI();
+                }
+            });
+            document.getElementById('btnFlamethrower').addEventListener('click', () => {
+                if (upgrades.flameLevel > 0 && !upgradesActive.flame) {
+                    upgradesActive.flame = true;
+                    playToggleSound(true);
+                    updateUpgradesUI();
+                }
+            });
+
+            // Engine & Repair
+            document.getElementById('buyEngineBtn').addEventListener('click', () => {
+                const cost = upgradeCosts.engine * upgrades.engineLevel;
+                if (scrapCredits >= cost) {
+                    scrapCredits -= cost;
+                    upgrades.engineLevel++;
+                    maxHullHealth += 25;
+                    hullHealth = Math.min(maxHullHealth, hullHealth + 100);
+                    upgradesActive.engine = true;
+                    playToggleSound(true);
+                    updateUpgradesUI();
+                }
+            });
+
+            const handleEngineToggle = () => {
+                if (upgrades.engineLevel > 1) {
+                    upgradesActive.engine = !upgradesActive.engine;
+                    playToggleSound(upgradesActive.engine);
+                    updateUpgradesUI();
+                }
+            };
+            document.getElementById('toggleEngineBtn').addEventListener('click', handleEngineToggle);
+            document.getElementById('hudToggleEngine').addEventListener('click', handleEngineToggle);
+
+            updateUpgradesUI();
+        }
+        setupUpgradeButtons();
+
+        let audioCtx = null;
+        function playSquishSound() {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(160 + Math.random() * 90, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(25, audioCtx.currentTime + 0.14);
+
+                gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.14);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.14);
+            } catch (e) {}
+        }
+
+        function playDamageSound() {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(80, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
+
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } catch (e) {}
+        }
+
+        document.getElementById('audioToggleBtn').addEventListener('click', () => {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                document.getElementById('audioIcon').className = "fa-solid fa-volume-high text-emerald-400";
+            }
+        });
+
+        window.onload = function () {
+            resize();
+            animate();
+        };
+    </script>
+</body>
+</html>
