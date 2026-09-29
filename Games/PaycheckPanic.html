@@ -57,9 +57,9 @@
         .canvas-container {
             position: relative;
             width: 100%;
-            height: calc(100vh - 280px);
-            min-height: 380px;
-            max-height: 620px;
+            height: calc(100vh - 210px);
+            min-height: 400px;
+            max-height: 640px;
         }
 
         canvas {
@@ -71,11 +71,10 @@
         }
 
         .modal-overlay {
-            background-color: rgba(15, 23, 42, 0.90);
+            background-color: rgba(15, 23, 42, 0.92);
             backdrop-filter: blur(8px);
         }
 
-        /* Screen Shake Animation Class */
         .screen-shake {
             animation: shake 0.25s cubic-bezier(.36,.07,.19,.97) both;
         }
@@ -86,121 +85,92 @@
             30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
             40%, 60% { transform: translate3d(6px, 0, 0); }
         }
+
+        input[type=range] {
+            accent-color: #0284C7;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between p-2 sm:p-4 bg-navy text-cream">
 
+    <!-- STREAMLINED CLEAN HUD (ACTION PHASE) -->
     <header class="w-full max-w-6xl mx-auto bg-navyLight border border-navyBorder rounded-xl p-3 mb-3 shadow-lg">
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+        <div class="flex items-center justify-between gap-2 sm:gap-4">
             
-            <!-- Logo & Month Status -->
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-lg bg-azure text-cream flex items-center justify-center text-xl font-black shadow azure-glow">
+            <!-- Logo & Current Job -->
+            <div class="flex items-center gap-2.5">
+                <div class="w-10 h-10 rounded-lg bg-azure text-cream flex items-center justify-center text-xl font-black shadow azure-glow flex-shrink-0">
                     <i class="fa-solid fa-wallet"></i>
                 </div>
-                <div>
-                    <h1 class="text-lg font-bold text-cream leading-none tracking-wide">PAYCHECK PANIC</h1>
-                    <p class="text-xs text-azure font-medium mt-1" id="hudMonthDisplay">Month 1 • Day 1 / 30</p>
+                <div class="hidden sm:block">
+                    <h1 class="text-base font-bold text-cream leading-none tracking-wide">PAYCHECK PANIC</h1>
+                    <p class="text-xs text-cream/60 font-medium mt-1 truncate max-w-[120px]" id="hudJobTitle">Fast Food Attendant</p>
                 </div>
             </div>
 
-            <!-- Primary Account Cards -->
-            <div class="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm">
-                <!-- Checking Cash Account -->
-                <div class="bg-navy p-2 px-3 rounded-lg border border-navyBorder flex flex-col min-w-[110px]">
-                    <span class="text-cream/60 text-[10px] uppercase tracking-wider">Checking Cash</span>
-                    <span class="text-azure font-mono font-bold text-base" id="hudCash">$500.00</span>
+            <!-- CORE 3 HUD STATS ONLY: Cash, Savings, Days Left -->
+            <div class="flex items-center gap-2 sm:gap-4">
+                <!-- 1. Checking Balance -->
+                <div class="bg-navy p-2 px-3.5 rounded-lg border border-navyBorder flex flex-col min-w-[100px] text-center">
+                    <span class="text-cream/60 text-[10px] uppercase font-semibold tracking-wider">Checking Cash</span>
+                    <span class="text-azure font-mono font-bold text-base sm:text-lg leading-tight" id="hudCash">$500.00</span>
                 </div>
 
-                <!-- High-Yield Savings Account (Good Interest) -->
-                <div class="bg-navy p-2 px-3 rounded-lg border border-navyBorder flex flex-col min-w-[110px]">
-                    <span class="text-cream/60 text-[10px] uppercase tracking-wider">HYSA Savings</span>
-                    <span class="text-cream font-mono font-bold text-base" id="hudSavings">$0.00</span>
+                <!-- 2. Emergency / HYSA Savings -->
+                <div class="bg-navy p-2 px-3.5 rounded-lg border border-navyBorder flex flex-col min-w-[100px] text-center">
+                    <span class="text-cream/60 text-[10px] uppercase font-semibold tracking-wider">Emergency Fund</span>
+                    <span class="text-emerald-400 font-mono font-bold text-base sm:text-lg leading-tight" id="hudSavings">$0.00</span>
                 </div>
 
-                <!-- Total Debt / Credit Cards -->
-                <div class="bg-navy p-2 px-3 rounded-lg border border-navyBorder flex flex-col min-w-[100px]">
-                    <span class="text-cream/60 text-[10px] uppercase tracking-wider">Total Loans</span>
-                    <span class="text-cream font-mono font-semibold text-base" id="hudLoans">$0.00</span>
-                </div>
-
-                <!-- Current Career Role -->
-                <div class="bg-navy p-2 px-3 rounded-lg border border-navyBorder flex flex-col min-w-[120px]">
-                    <span class="text-cream/60 text-[10px] uppercase tracking-wider">Current Job</span>
-                    <span class="text-cream font-medium truncate max-w-[110px]" id="hudJobTitle">Fast Food Attendant</span>
+                <!-- 3. Days Remaining in Month -->
+                <div class="bg-navy p-2 px-3.5 rounded-lg border border-navyBorder flex flex-col min-w-[110px] text-center">
+                    <span class="text-cream/60 text-[10px] uppercase font-semibold tracking-wider" id="hudMonthTitle">Month 1</span>
+                    <span class="text-amber-400 font-mono font-bold text-base sm:text-lg leading-tight" id="hudDaysLeft">30 Days Left</span>
                 </div>
             </div>
 
-            <!-- Action Buttons -->
+            <!-- Quick Action Buttons -->
             <div class="flex items-center gap-2">
-                <button id="btnShieldAbility" class="px-3 py-1.5 text-xs bg-cyan-900/60 border border-cyan-400 text-cyan-300 rounded-lg hover:bg-cyan-500 hover:text-navy transition font-bold flex items-center gap-1.5 shadow">
+                <button id="btnShieldAbility" class="px-3 py-2 text-xs bg-cyan-900/60 border border-cyan-400 text-cyan-300 rounded-lg hover:bg-cyan-500 hover:text-navy transition font-bold flex items-center gap-1.5 shadow">
                     <i class="fa-solid fa-shield-halved"></i>
-                    <span id="shieldBtnLabel">Shield (Space)</span>
+                    <span id="shieldBtnLabel" class="hidden md:inline">Shield (Space)</span>
                 </button>
-                <button id="btnLoansModal" class="px-3 py-1.5 text-xs bg-navy border border-azure text-azure rounded-lg hover:bg-azure hover:text-cream transition font-semibold">
-                    <i class="fa-solid fa-building-columns mr-1"></i> Loans
+                <button id="btnLoansModal" class="px-2.5 py-2 text-xs bg-navy border border-azure text-azure rounded-lg hover:bg-azure hover:text-cream transition font-semibold" title="Loans & HYSA">
+                    <i class="fa-solid fa-building-columns"></i>
                 </button>
-                <button id="btnCareersModal" class="px-3 py-1.5 text-xs bg-azure text-cream font-bold rounded-lg hover:bg-azureHover transition">
-                    <i class="fa-solid fa-user-graduate mr-1"></i> Careers
+                <button id="btnCareersModal" class="px-2.5 py-2 text-xs bg-azure text-cream font-bold rounded-lg hover:bg-azureHover transition" title="Careers">
+                    <i class="fa-solid fa-user-graduate"></i>
                 </button>
             </div>
         </div>
 
-        <!-- Month Calendar Progress Bar -->
-        <div class="w-full bg-navy h-2.5 rounded-full mb-3 overflow-hidden border border-navyBorder relative">
+        <!-- Progress Bar -->
+        <div class="w-full bg-navy h-2 rounded-full mt-2.5 overflow-hidden border border-navyBorder relative">
             <div id="monthProgressBar" class="bg-azure h-full transition-all duration-300 w-0"></div>
             <div class="absolute left-[83.3%] top-0 bottom-0 w-1 bg-red-500/80 animate-pulse" title="Panic Phase Trigger (Day 25)"></div>
         </div>
-
-        <!-- PERSISTENT ON-SCREEN CATEGORIZED FINANCIAL BREAKDOWN PANEL -->
-        <div class="bg-navy/90 border border-navyBorder rounded-lg p-2 text-xs grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
-            <div class="bg-navyLight/60 p-1.5 rounded border border-navyBorder">
-                <span class="text-[10px] text-cream/50 block uppercase">Total Earned</span>
-                <span class="text-azure font-mono font-bold" id="hudTotalEarned">$0.00</span>
-            </div>
-            <div class="bg-navyLight/60 p-1.5 rounded border border-navyBorder">
-                <span class="text-[10px] text-cream/50 block uppercase">Total Saved</span>
-                <span class="text-cream font-mono font-bold" id="hudTotalSaved">$0.00</span>
-            </div>
-            <div class="bg-navyLight/60 p-1.5 rounded border border-navyBorder">
-                <span class="text-[10px] text-cream/50 block uppercase">Total Spent</span>
-                <span class="text-cream font-mono font-bold" id="hudTotalSpent">$0.00</span>
-            </div>
-            <div class="bg-navyLight/60 p-1.5 rounded border border-navyBorder">
-                <span class="text-[10px] text-cream/50 block uppercase">Total Late Fees</span>
-                <span class="text-cream font-mono font-bold" id="hudTotalFees">$0.00</span>
-            </div>
-            <div class="bg-navyLight/60 p-1.5 rounded border border-navyBorder col-span-2 sm:col-span-1">
-                <span class="text-[10px] text-cream/50 block uppercase">Interest (Earned / Paid)</span>
-                <span class="font-mono font-bold">
-                    <span class="text-azure" id="hudInterestEarned">+$0</span> / 
-                    <span class="text-cream/80" id="hudInterestPaid">-$0</span>
-                </span>
-            </div>
-        </div>
     </header>
 
-    <!-- MAIN GAMEPLAY CANVAS AREA -->
+    <!-- MAIN GAMEPLAY CANVAS -->
     <main class="w-full max-w-6xl mx-auto flex-1 flex flex-col items-center justify-center relative">
         <div id="canvasContainer" class="canvas-container w-full rounded-xl overflow-hidden border border-navyBorder shadow-2xl bg-navy">
             <canvas id="gameCanvas"></canvas>
 
-            <!-- END OF MONTH "PANIC PHASE" ALARM BANNER -->
-            <div id="panicBanner" class="hidden absolute top-3 left-1/2 -translate-x-1/2 bg-red-600/90 border-2 border-red-400 text-white px-6 py-2 rounded-full shadow-2xl flex items-center gap-3 animate-bounce z-20">
-                <i class="fa-solid fa-triangle-exclamation text-xl text-yellow-300 animate-spin"></i>
-                <span class="font-black tracking-wider text-xs sm:text-sm">PANIC PHASE! INFLATION & SURPRISE BILL RUSH!</span>
-                <i class="fa-solid fa-triangle-exclamation text-xl text-yellow-300 animate-spin"></i>
+            <!-- End-of-Month Panic Alarm -->
+            <div id="panicBanner" class="hidden absolute top-3 left-1/2 -translate-x-1/2 bg-red-600/90 border-2 border-red-400 text-white px-5 py-1.5 rounded-full shadow-2xl flex items-center gap-2.5 animate-bounce z-20">
+                <i class="fa-solid fa-triangle-exclamation text-base text-yellow-300 animate-spin"></i>
+                <span class="font-black tracking-wider text-xs">PANIC PHASE! INFLATION & SURPRISE BILL RUSH!</span>
             </div>
 
-            <!-- Educational Tip Callout Banner -->
+            <!-- Tip Callout Banner -->
             <div id="eduTipBanner" class="absolute top-3 left-3 right-3 bg-navyLight/95 border border-azure/40 text-cream p-3 rounded-xl shadow-lg flex items-start gap-3 text-xs transition-all duration-300 z-10">
                 <div class="w-7 h-7 rounded-lg bg-azure text-cream flex-shrink-0 flex items-center justify-center font-bold text-sm">
                     <i class="fa-solid fa-lightbulb"></i>
                 </div>
                 <div class="flex-1">
-                    <span class="font-bold text-azure block mb-0.5" id="eduTipTitle">Visual Micro-Badges & Shield Filter</span>
+                    <span class="font-bold text-azure block mb-0.5" id="eduTipTitle">Streamlined Focus</span>
                     <p class="text-cream/90 leading-relaxed" id="eduTipBody">
-                        Identify items instantly by color! Avoid unexpected expense traps during End-of-Month Panic!
+                        Dodge negative expense bills and catch paychecks! Full financial ledger breakdowns appear in your Month-End Review.
                     </p>
                 </div>
                 <button id="btnCloseTipBanner" class="text-cream/40 hover:text-cream px-1">
@@ -208,10 +178,10 @@
                 </button>
             </div>
 
-            <!-- On-Canvas Pause Overlay -->
+            <!-- Pause Overlay -->
             <div id="pauseOverlay" class="hidden absolute inset-0 bg-navy/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center z-20">
                 <h2 class="text-3xl font-extrabold text-azure mb-2">SHIFT PAUSED</h2>
-                <p class="text-cream/80 max-w-md text-sm mb-6">Check your live ledger stats or review career and investment upgrades.</p>
+                <p class="text-cream/80 max-w-md text-sm mb-6">Take a breath. Ready to jump back into managing cash flow?</p>
                 <button id="btnResume" class="px-6 py-2.5 bg-azure text-cream font-bold rounded-xl hover:bg-azureHover transition">
                     Resume Shift
                 </button>
@@ -222,22 +192,22 @@
                 <div class="w-16 h-16 rounded-2xl bg-azure text-cream flex items-center justify-center text-3xl font-black mb-4 shadow-lg azure-glow">
                     <i class="fa-solid fa-graduation-cap"></i>
                 </div>
-                <h2 class="text-2xl sm:text-3xl font-bold text-cream mb-2" id="startOverlayTitle">Month 1: Learning Good vs. Bad Interest</h2>
+                <h2 class="text-2xl sm:text-3xl font-bold text-cream mb-2" id="startOverlayTitle">Month 1: Fast Food Attendant</h2>
                 <p class="text-sm text-cream/80 max-w-lg mb-6 leading-relaxed" id="shiftDescriptionText">
-                    Watch out for Days 25-30 Panic Phase! Bills drop faster and surprise emergencies appear. Catch Paychecks and activate your Shield!
+                    Focus on survival during the shift! Watch out for Days 25-30 Panic Phase when surprise bills drop faster.
                 </p>
                 
                 <div class="flex flex-wrap gap-3 justify-center mb-6">
                     <div class="bg-navyLight border border-navyBorder px-4 py-2 rounded-lg text-left text-xs">
-                        <span class="text-cream/60 block">Shift Pace</span>
+                        <span class="text-cream/60 block">Shift Speed</span>
                         <span class="text-azure font-bold text-sm" id="shiftSpeedLabel">Level 1 - Very Slow</span>
                     </div>
                     <div class="bg-navyLight border border-navyBorder px-4 py-2 rounded-lg text-left text-xs">
-                        <span class="text-cream/60 block">Paycheck Schedule</span>
-                        <span class="text-azure font-bold text-sm">Bi-Weekly (Days 15 & 30)</span>
+                        <span class="text-cream/60 block">Pay Schedule</span>
+                        <span class="text-azure font-bold text-sm">Days 15 & 30</span>
                     </div>
                     <div class="bg-navyLight border border-navyBorder px-4 py-2 rounded-lg text-left text-xs">
-                        <span class="text-cream/60 block">Background Environment</span>
+                        <span class="text-cream/60 block">Environment</span>
                         <span class="text-cyan-400 font-bold text-sm" id="bgEnvironmentLabel">Bus Stop / Entry Desk</span>
                     </div>
                 </div>
@@ -278,74 +248,86 @@
         </div>
     </main>
 
-    <!-- MODAL 1: MONTH-END BUDGET ANALYZER -->
+    <!-- POST-ACTION FINANCIAL REVIEW SCREEN (MONTH-END DASHBOARD) -->
     <div id="modalBudget" class="hidden fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4 overflow-y-auto">
-        <div class="bg-navy border border-navyBorder w-full max-w-2xl rounded-2xl p-5 sm:p-6 shadow-2xl relative my-auto">
+        <div class="bg-navy border border-navyBorder w-full max-w-3xl rounded-2xl p-5 sm:p-6 shadow-2xl relative my-auto">
             
-            <div class="flex items-center justify-between pb-3 border-b border-navyBorder mb-3">
+            <div class="flex items-center justify-between pb-3 border-b border-navyBorder mb-4">
                 <div>
                     <h3 class="text-xl font-bold text-azure flex items-center gap-2">
-                        <i class="fa-solid fa-file-invoice-dollar"></i> Month-End Ledger & Savings Review
+                        <i class="fa-solid fa-chart-pie"></i> Monthly Financial Review Dashboard
                     </h3>
-                    <p class="text-xs text-cream/70">Analyze income, cut unnecessary wants, and set up auto-pay to eliminate late fees!</p>
+                    <p class="text-xs text-cream/70">Review your monthly performance, identify money drains, and adjust spending sliders!</p>
                 </div>
-                <span class="text-xs bg-navyLight border border-azure/30 text-azure px-2.5 py-1 rounded-full font-mono" id="budgetMonthTag">Month 1</span>
+                <span class="text-xs bg-navyLight border border-azure/30 text-azure px-3 py-1 rounded-full font-mono font-bold" id="budgetMonthTag">Month 1 Review</span>
             </div>
 
-            <!-- AUTO-PAY TOGGLE BANNER -->
-            <div class="bg-navyLight border border-azure/40 p-3 rounded-xl mb-4 flex items-center justify-between gap-3">
-                <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-lg bg-azure/20 text-azure flex items-center justify-center text-lg">
-                        <i class="fa-solid fa-clock-rotate-left"></i>
-                    </div>
-                    <div>
-                        <span class="text-xs font-bold text-cream block">Punctuality Focus: Auto-Pay System ($20/mo)</span>
-                        <p class="text-[11px] text-cream/70">Puts effort into paying on time to completely prevent $35+ late payment fees!</p>
+            <!-- REVEAL 1: DETAILED FINANCIAL LEDGER BREAKDOWN GRID -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                <!-- Total Earned vs Spent -->
+                <div class="bg-navyLight border border-navyBorder p-3 rounded-xl">
+                    <span class="text-[10px] text-cream/60 uppercase font-semibold block mb-0.5">💰 Earned vs. Spent</span>
+                    <div class="text-xs font-mono font-bold">
+                        <span class="text-emerald-400" id="summaryEarned">$0</span> / 
+                        <span class="text-red-400" id="summarySpent">-$0</span>
                     </div>
                 </div>
-                <button id="btnToggleAutoPay" class="px-4 py-1.5 text-xs font-bold rounded-lg transition bg-navy border border-azure text-azure hover:bg-azure hover:text-cream">
+
+                <!-- Money Lost to Late Fees & Bad APR -->
+                <div class="bg-navyLight border border-navyBorder p-3 rounded-xl">
+                    <span class="text-[10px] text-cream/60 uppercase font-semibold block mb-0.5">💸 Late Fees & Bad APR</span>
+                    <span class="text-red-400 font-mono font-extrabold text-sm" id="summaryFeesAndAPR">-$0.00</span>
+                </div>
+
+                <!-- High-Yield Interest Earned -->
+                <div class="bg-navyLight border border-navyBorder p-3 rounded-xl">
+                    <span class="text-[10px] text-cream/60 uppercase font-semibold block mb-0.5">📈 HYSA Interest Earned</span>
+                    <span class="text-emerald-400 font-mono font-extrabold text-sm" id="summaryHYSAEarned">+$0.00</span>
+                </div>
+
+                <!-- Net Monthly Cash Flow -->
+                <div class="bg-navyLight border border-azure/50 p-3 rounded-xl">
+                    <span class="text-[10px] text-cream/60 uppercase font-semibold block mb-0.5">💵 Net Monthly Cash</span>
+                    <span class="text-azure font-mono font-extrabold text-sm" id="summaryNetCash">$0.00</span>
+                </div>
+            </div>
+
+            <!-- REVEAL 2: INTERACTIVE CUT-OR-KEEP SLIDERS -->
+            <div class="mb-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="text-xs uppercase font-extrabold text-cream/80 tracking-wider flex items-center gap-2">
+                        <span>✂️ Interactive Cut-or-Keep Expense Sliders</span>
+                    </h4>
+                    <span class="text-emerald-400 font-mono font-bold text-xs" id="sliderSavingsTotal">+$0.00 / mo Saved</span>
+                </div>
+
+                <div class="space-y-3 bg-navyLight/60 border border-navyBorder p-3.5 rounded-xl max-h-52 overflow-y-auto" id="sliderContainer">
+                    <!-- Dynamically Populated with Interactive Sliders -->
+                </div>
+            </div>
+
+            <!-- Punctuality / Auto-Pay Helper -->
+            <div class="bg-navyLight border border-navyBorder p-3 rounded-xl mb-5 flex items-center justify-between gap-3 text-xs">
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-solid fa-clock-rotate-left text-azure text-lg"></i>
+                    <div>
+                        <span class="font-bold text-cream block">Punctuality Protection: Auto-Pay ($20/mo)</span>
+                        <span class="text-cream/60 text-[11px]">Eliminates $35+ late fee traps automatically.</span>
+                    </div>
+                </div>
+                <button id="btnToggleAutoPay" class="px-3 py-1.5 text-xs font-bold rounded-lg transition bg-navy border border-azure text-azure hover:bg-azure hover:text-cream flex-shrink-0">
                     ENABLE AUTO-PAY
                 </button>
             </div>
 
-            <!-- Ledger Breakdown Header -->
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 text-xs">
-                <div class="bg-navyLight border border-navyBorder p-2.5 rounded-xl">
-                    <span class="text-[10px] text-cream/60 block">Bi-Weekly Pay (2x)</span>
-                    <span class="text-azure font-mono font-bold text-sm" id="summaryGrossIncome">$1,600.00</span>
-                </div>
-                <div class="bg-navyLight border border-navyBorder p-2.5 rounded-xl">
-                    <span class="text-[10px] text-cream/60 block">Commute Gas Cost</span>
-                    <span class="text-cream font-mono font-medium text-sm" id="summaryCommuteCost">$40.00</span>
-                </div>
-                <div class="bg-navyLight border border-navyBorder p-2.5 rounded-xl">
-                    <span class="text-[10px] text-cream/60 block">Late Fees & Debt APR Lost</span>
-                    <span class="text-cream font-mono font-bold text-sm" id="summaryLateFeesLost">$0.00</span>
-                </div>
-                <div class="bg-navyLight border border-navyBorder p-2.5 rounded-xl">
-                    <span class="text-[10px] text-cream/60 block">Net Remaining Cash</span>
-                    <span class="text-azure font-mono font-bold text-sm" id="summaryNetCash">$880.00</span>
-                </div>
-            </div>
-
-            <h4 class="text-xs uppercase font-bold text-cream/60 tracking-wider mb-2 flex justify-between items-center">
-                <span>Budget Helper: Cut Wants & Avoid Debt Traps</span>
-                <span class="text-azure text-[11px] font-normal">Click 'CUT IT' to save money</span>
-            </h4>
-
-            <!-- Expenses List -->
-            <div class="space-y-2 mb-4 max-h-48 overflow-y-auto pr-1" id="expenseListContainer">
-                <!-- Dynamically Populated -->
-            </div>
-
-            <!-- Summary Modal Actions -->
+            <!-- Dashboard Actions -->
             <div class="flex items-center justify-between pt-3 border-t border-navyBorder">
                 <div>
-                    <span class="text-xs text-cream/60 block">Total Monthly Savings Created</span>
-                    <span class="text-azure font-mono font-extrabold text-base" id="totalSavedFromCuts">$0.00 / mo</span>
+                    <span class="text-xs text-cream/60 block">Ready for the Next Month?</span>
+                    <span class="text-cream text-xs font-semibold">Adjusted budget will take effect on Day 1.</span>
                 </div>
-                <button id="btnPayBillsAndContinue" class="px-6 py-2.5 bg-azure text-cream font-bold rounded-xl hover:bg-azureHover transition shadow">
-                    Pay Bills & Start Next Month
+                <button id="btnPayBillsAndContinue" class="px-6 py-2.5 bg-azure text-cream font-bold rounded-xl hover:bg-azureHover transition shadow-lg">
+                    Confirm Budget & Start Next Month
                 </button>
             </div>
         </div>
@@ -354,88 +336,63 @@
     <!-- MODAL 2: CAREER & EDUCATION UPGRADES -->
     <div id="modalCareers" class="hidden fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4 overflow-y-auto">
         <div class="bg-navy border border-navyBorder w-full max-w-3xl rounded-2xl p-5 sm:p-6 shadow-2xl relative my-auto">
-            
             <div class="flex items-center justify-between pb-3 border-b border-navyBorder mb-4">
                 <div>
                     <h3 class="text-xl font-bold text-azure flex items-center gap-2">
-                        <i class="fa-solid fa-user-graduate"></i> Career & Skill Advancement
+                        <i class="fa-solid fa-user-graduate"></i> Career Advancement
                     </h3>
-                    <p class="text-xs text-cream/70">Invest saved cash into higher education to unlock well-paying job roles & luxury backgrounds!</p>
+                    <p class="text-xs text-cream/70">Invest saved cash into higher education to unlock well-paying job roles!</p>
                 </div>
                 <button class="btnCloseModal text-cream/50 hover:text-cream text-lg">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4" id="careersContainer">
-                <!-- Dynamically populated careers -->
-            </div>
-
-            <div class="bg-navyLight border border-navyBorder rounded-xl p-3 text-xs text-cream/80 flex justify-between items-center">
-                <span><i class="fa-solid fa-car text-azure mr-1"></i> Upgrading unlocks new lifestyle background visuals & salary!</span>
-                <span class="text-azure font-semibold" id="careerCurrentBalanceDisplay">Cash: $500.00</span>
-            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4" id="careersContainer"></div>
         </div>
     </div>
 
     <!-- MODAL 3: BANK LOANS & SAVINGS INVESTMENTS -->
     <div id="modalLoans" class="hidden fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4 overflow-y-auto">
         <div class="bg-navy border border-navyBorder w-full max-w-xl rounded-2xl p-5 sm:p-6 shadow-2xl relative my-auto">
-            
             <div class="flex items-center justify-between pb-3 border-b border-navyBorder mb-4">
                 <div>
                     <h3 class="text-xl font-bold text-azure flex items-center gap-2">
-                        <i class="fa-solid fa-landmark"></i> Good vs. Bad Interest Management
+                        <i class="fa-solid fa-landmark"></i> High-Yield Savings & Debt
                     </h3>
-                    <p class="text-xs text-cream/70">Put money into High-Yield Savings to earn Good Interest, or pay down Bad Debt!</p>
+                    <p class="text-xs text-cream/70">Deposit cash into High-Yield Savings or pay down debt!</p>
                 </div>
                 <button class="btnCloseModal text-cream/50 hover:text-cream text-lg">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                <!-- High-Yield Savings Account (Good Interest) -->
                 <div class="bg-navyLight border border-azure/50 p-4 rounded-xl flex flex-col justify-between">
                     <div>
-                        <h4 class="font-bold text-cream text-sm mb-1 flex items-center gap-1.5">
-                            <i class="fa-solid fa-chart-line text-azure"></i> High-Yield Savings (HYSA)
-                        </h4>
-                        <p class="text-xs text-cream/70 mb-3">Deposit cash to earn **6% Good Compound Interest** every month!</p>
+                        <h4 class="font-bold text-cream text-sm mb-1"><i class="fa-solid fa-chart-line text-azure mr-1"></i> High-Yield Savings</h4>
+                        <p class="text-xs text-cream/70 mb-3">Earn **6% Good Compound Interest** every month!</p>
                         <div class="text-xs space-y-1 mb-4">
                             <div class="flex justify-between"><span class="text-cream/60">HYSA Balance:</span> <span class="text-azure font-mono font-bold" id="loanModalSavings">$0.00</span></div>
-                            <div class="flex justify-between"><span class="text-cream/60">Monthly Yield:</span> <span class="text-azure font-mono">+6% / Month</span></div>
+                            <div class="flex justify-between"><span class="text-cream/60">Monthly Yield:</span> <span class="text-emerald-400 font-mono">+6% / Mo</span></div>
                         </div>
                     </div>
                     <div class="flex gap-2">
-                        <button id="btnDepositSavings" class="flex-1 py-2 bg-azure text-cream text-xs font-bold rounded-lg hover:bg-azureHover transition">
-                            Deposit $250
-                        </button>
-                        <button id="btnWithdrawSavings" class="px-3 py-2 bg-navy border border-navyBorder text-cream/80 text-xs font-bold rounded-lg hover:border-azure transition">
-                            Withdraw
-                        </button>
+                        <button id="btnDepositSavings" class="flex-1 py-2 bg-azure text-cream text-xs font-bold rounded-lg hover:bg-azureHover transition">Deposit $250</button>
+                        <button id="btnWithdrawSavings" class="px-3 py-2 bg-navy border border-navyBorder text-cream/80 text-xs font-bold rounded-lg hover:border-azure transition">Withdraw</button>
                     </div>
                 </div>
 
-                <!-- Debt & Credit Cards (Bad Interest) -->
                 <div class="bg-navyLight border border-navyBorder p-4 rounded-xl flex flex-col justify-between">
                     <div>
-                        <h4 class="font-bold text-cream text-sm mb-1 flex items-center gap-1.5">
-                            <i class="fa-solid fa-credit-card text-cream/60"></i> Debt & Credit Cards
-                        </h4>
-                        <p class="text-xs text-cream/70 mb-3">Borrow micro-loans, but eliminate debt to stop paying **8% Bad Interest**!</p>
+                        <h4 class="font-bold text-cream text-sm mb-1"><i class="fa-solid fa-credit-card text-cream/60 mr-1"></i> Credit Card Debt</h4>
+                        <p class="text-xs text-cream/70 mb-3">Eliminate loans to stop paying **8% Bad Interest**!</p>
                         <div class="text-xs space-y-1 mb-4">
                             <div class="flex justify-between"><span class="text-cream/60">Current Debt:</span> <span class="text-cream font-mono font-bold" id="loanModalCurrentDebt">$0.00</span></div>
-                            <div class="flex justify-between"><span class="text-cream/60">Interest Charge:</span> <span class="text-cream/80 font-mono">-8% / Month</span></div>
+                            <div class="flex justify-between"><span class="text-cream/60">Interest Charge:</span> <span class="text-red-400 font-mono">-8% / Mo</span></div>
                         </div>
                     </div>
                     <div class="flex gap-2">
-                        <button id="btnTakeLoan" class="flex-1 py-2 bg-navy border border-azure text-azure text-xs font-bold rounded-lg hover:bg-azure hover:text-cream transition">
-                            Borrow $500
-                        </button>
-                        <button id="btnPayoffLoan" class="flex-1 py-2 bg-azure text-cream text-xs font-bold rounded-lg hover:bg-azureHover transition">
-                            Pay $500 Debt
-                        </button>
+                        <button id="btnTakeLoan" class="flex-1 py-2 bg-navy border border-azure text-azure text-xs font-bold rounded-lg hover:bg-azure hover:text-cream transition">Borrow $500</button>
+                        <button id="btnPayoffLoan" class="flex-1 py-2 bg-azure text-cream text-xs font-bold rounded-lg hover:bg-azureHover transition">Pay $500 Debt</button>
                     </div>
                 </div>
             </div>
@@ -443,25 +400,18 @@
     </div>
 
     <script>
-        // --- JUICE: WEB AUDIO API SOUND ENGINE ---
+        // Sound Engine
         class SoundEngine {
-            constructor() {
-                this.ctx = null;
-                this.muted = false;
-            }
-
+            constructor() { this.ctx = null; this.muted = false; }
             init() {
                 if (!this.ctx) {
                     const AudioContext = window.AudioContext || window.webkitAudioContext;
                     if (AudioContext) this.ctx = new AudioContext();
                 }
             }
-
-            // JUICE: Cash Register Chiming Sound on Paycheck
             playCashRegister() {
                 if (this.muted || !this.ctx) return;
                 const now = this.ctx.currentTime;
-                // High double bell chime
                 const createChime = (freq, start, duration) => {
                     const osc = this.ctx.createOscillator();
                     const gain = this.ctx.createGain();
@@ -474,10 +424,9 @@
                     osc.start(now + start);
                     osc.stop(now + start + duration);
                 };
-                createChime(987.77, 0, 0.15); // B5
-                createChime(1318.51, 0.08, 0.35); // E6
+                createChime(987.77, 0, 0.15);
+                createChime(1318.51, 0.08, 0.35);
             }
-
             playCoin() {
                 if (this.muted || !this.ctx) return;
                 const osc = this.ctx.createOscillator();
@@ -492,8 +441,6 @@
                 osc.start();
                 osc.stop(this.ctx.currentTime + 0.1);
             }
-
-            // JUICE: Heavy Buzzer / Trap Sound on Penalty
             playTrap() {
                 if (this.muted || !this.ctx) return;
                 const osc = this.ctx.createOscillator();
@@ -508,7 +455,6 @@
                 osc.start();
                 osc.stop(this.ctx.currentTime + 0.3);
             }
-
             playShield() {
                 if (this.muted || !this.ctx) return;
                 const osc = this.ctx.createOscillator();
@@ -527,100 +473,27 @@
 
         const sound = new SoundEngine();
 
-        // --- CAREERS CONFIGURATION WITH LIFESTYLE BACKGROUNDS ---
         const CAREERS = [
-            {
-                id: 'fast_food',
-                title: 'Fast Food Attendant',
-                level: 1,
-                speedLabel: 'Level 1 (Entry Level)',
-                bgName: 'Entry: Bus Stop & Alley',
-                itemSpeedMin: 0.9,
-                itemSpeedMax: 1.3,
-                spawnInterval: 110,
-                biweeklyPay: 800,
-                commuteMiles: 5,
-                gasCostMonthly: 40,
-                eduRequired: 'None',
-                upgradeCost: 0,
-                icon: 'fa-burger'
-            },
-            {
-                id: 'retail_clerk',
-                title: 'Retail Store Clerk',
-                level: 2,
-                speedLabel: 'Level 2 (Steady Pace)',
-                bgName: 'Mid-Career: Apartment & Sedan',
-                itemSpeedMin: 1.3,
-                itemSpeedMax: 1.8,
-                spawnInterval: 85,
-                biweeklyPay: 1100,
-                commuteMiles: 10,
-                gasCostMonthly: 75,
-                eduRequired: 'High School Diploma',
-                upgradeCost: 300,
-                icon: 'fa-store'
-            },
-            {
-                id: 'jr_dev',
-                title: 'Junior Web Developer',
-                level: 3,
-                speedLabel: 'Level 3 (Moderate Rush)',
-                bgName: 'Mid-Career: Apartment & Sedan',
-                itemSpeedMin: 1.9,
-                itemSpeedMax: 2.6,
-                spawnInterval: 65,
-                biweeklyPay: 2200,
-                commuteMiles: 15,
-                gasCostMonthly: 120,
-                eduRequired: 'Coding Bootcamp Cert',
-                upgradeCost: 1500,
-                icon: 'fa-code'
-            },
-            {
-                id: 'fin_analyst',
-                title: 'Financial Analyst',
-                level: 4,
-                speedLabel: 'Level 4 (Fast Pace)',
-                bgName: 'Executive: City Penthouse & HYSA Board',
-                itemSpeedMin: 2.7,
-                itemSpeedMax: 3.5,
-                spawnInterval: 48,
-                biweeklyPay: 3600,
-                commuteMiles: 22,
-                gasCostMonthly: 180,
-                eduRequired: 'Finance Degree',
-                upgradeCost: 3500,
-                icon: 'fa-chart-pie'
-            },
-            {
-                id: 'executive',
-                title: 'Corporate Executive',
-                level: 5,
-                speedLabel: 'Level 5 (Expert Rush)',
-                bgName: 'Executive: High-Rise Penthouse View',
-                itemSpeedMin: 3.6,
-                itemSpeedMax: 5.0,
-                spawnInterval: 32,
-                biweeklyPay: 6000,
-                commuteMiles: 30,
-                gasCostMonthly: 250,
-                eduRequired: 'MBA / Executive Master',
-                upgradeCost: 8000,
-                icon: 'fa-briefcase'
-            }
+            { id: 'fast_food', title: 'Fast Food Attendant', level: 1, speedLabel: 'Level 1 (Entry Level)', bgName: 'Bus Stop & Alley', itemSpeedMin: 0.9, itemSpeedMax: 1.3, spawnInterval: 110, biweeklyPay: 800, gasCostMonthly: 40, upgradeCost: 0, icon: 'fa-burger' },
+            { id: 'retail_clerk', title: 'Retail Store Clerk', level: 2, speedLabel: 'Level 2 (Steady Pace)', bgName: 'Apartment & Sedan', itemSpeedMin: 1.3, itemSpeedMax: 1.8, spawnInterval: 85, biweeklyPay: 1100, gasCostMonthly: 75, upgradeCost: 300, icon: 'fa-store' },
+            { id: 'jr_dev', title: 'Junior Web Developer', level: 3, speedLabel: 'Level 3 (Moderate Rush)', bgName: 'Apartment & Sedan', itemSpeedMin: 1.9, itemSpeedMax: 2.6, spawnInterval: 65, biweeklyPay: 2200, gasCostMonthly: 120, upgradeCost: 1500, icon: 'fa-code' },
+            { id: 'fin_analyst', title: 'Financial Analyst', level: 4, speedLabel: 'Level 4 (Fast Pace)', bgName: 'City Penthouse View', itemSpeedMin: 2.7, itemSpeedMax: 3.5, spawnInterval: 48, biweeklyPay: 3600, gasCostMonthly: 180, upgradeCost: 3500, icon: 'fa-chart-pie' },
+            { id: 'executive', title: 'Corporate Executive', level: 5, speedLabel: 'Level 5 (Expert Rush)', bgName: 'High-Rise Luxury View', itemSpeedMin: 3.6, itemSpeedMax: 5.0, spawnInterval: 32, biweeklyPay: 6000, gasCostMonthly: 250, upgradeCost: 8000, icon: 'fa-briefcase' }
         ];
 
-        const BASE_EXPENSES = [
-            { id: 'rent', name: 'Housing & Rent', amount: 750, discretionary: false, icon: 'fa-house' },
-            { id: 'groceries', name: 'Essential Groceries', amount: 250, discretionary: false, icon: 'fa-cart-shopping' },
-            { id: 'utilities', name: 'Electricity & Water', amount: 120, discretionary: false, icon: 'fa-bolt' },
-            { id: 'dining_out', name: 'Dining Out & Fast Food', amount: 180, discretionary: true, icon: 'fa-utensils' },
-            { id: 'streaming', name: 'Streaming & Gaming Subs', amount: 45, discretionary: true, icon: 'fa-tv' },
-            { id: 'gym', name: 'Luxury Gym Membership', amount: 65, discretionary: true, icon: 'fa-dumbbell' }
+        // SLIDER EXPENSES SCHEMA
+        const DISCRETIONARY_SLIDER_EXPENSES = [
+            { id: 'dining_out', name: 'Dining Out & Takeout', maxAmount: 180, currentAmount: 180, icon: 'fa-utensils' },
+            { id: 'streaming', name: 'Streaming & Gaming Subs', maxAmount: 50, currentAmount: 50, icon: 'fa-tv' },
+            { id: 'gym', name: 'Luxury Gym Membership', maxAmount: 70, currentAmount: 70, icon: 'fa-dumbbell' }
         ];
 
-        // GLOBAL GAME STATE
+        const FIXED_EXPENSES = [
+            { id: 'rent', name: 'Housing & Rent', amount: 750 },
+            { id: 'groceries', name: 'Essential Groceries', amount: 250 },
+            { id: 'utilities', name: 'Electricity & Water', amount: 120 }
+        ];
+
         const gameState = {
             month: 1,
             day: 1,
@@ -629,21 +502,18 @@
             savings: 0,
             loans: 0,
             
-            // LEDGER STATS
-            totalEarned: 500,
-            totalSaved: 0,
-            totalSpent: 0,
-            totalFees: 0,
-            interestEarned: 0,
-            interestPaid: 0,
+            // STATS FOR POST-ACTION FINANCIAL DASHBOARD
+            monthEarned: 500,
+            monthSpent: 0,
+            monthLateFees: 0,
+            monthInterestPaid: 0,
+            monthHYSAEarned: 0,
             
-            // PANIC MECHANIC & SHIELD
             isPanicPhase: false,
             shieldActive: false,
             shieldTimer: 0,
             shieldCooldown: 0,
             
-            // JUICE ENGINE TIMERS
             damageFlashTimer: 0,
             shakeDuration: 0,
             particles: [],
@@ -651,19 +521,11 @@
             autoPayEnabled: false,
             currentJobIndex: 0,
             unlockedJobMax: 0,
-            cutExpenses: new Set(),
             gameMode: 'FALLING',
             isShiftActive: false,
             isPaused: false,
             
-            player: {
-                x: 0,
-                y: 0,
-                width: 120,
-                height: 22,
-                speed: 9
-            },
-
+            player: { x: 0, y: 0, width: 120, height: 22, speed: 9 },
             items: [],
             spawnTimer: 0
         };
@@ -688,10 +550,7 @@
             if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.Right = true;
             if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.Up = true;
             if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.Down = true;
-            if (e.key === ' ' || e.code === 'Space') {
-                e.preventDefault();
-                activateShield();
-            }
+            if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); activateShield(); }
         });
         window.addEventListener('keyup', (e) => {
             if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.Left = false;
@@ -701,54 +560,32 @@
         });
 
         let isDragging = false;
-        canvas.addEventListener('mousedown', (e) => {
-            sound.init();
-            isDragging = true;
-            movePlayerToInput(e.clientX, e.clientY);
-        });
-        canvas.addEventListener('mousemove', (e) => {
-            if (isDragging) movePlayerToInput(e.clientX, e.clientY);
-        });
+        canvas.addEventListener('mousedown', (e) => { sound.init(); isDragging = true; movePlayerToInput(e.clientX, e.clientY); });
+        canvas.addEventListener('mousemove', (e) => { if (isDragging) movePlayerToInput(e.clientX, e.clientY); });
         window.addEventListener('mouseup', () => isDragging = false);
 
-        canvas.addEventListener('touchstart', (e) => {
-            sound.init();
-            if (e.touches.length > 0) movePlayerToInput(e.touches[0].clientX, e.touches[0].clientY);
-        }, { passive: true });
-        canvas.addEventListener('touchmove', (e) => {
-            if (e.touches.length > 0) movePlayerToInput(e.touches[0].clientX, e.touches[0].clientY);
-        }, { passive: true });
+        canvas.addEventListener('touchstart', (e) => { sound.init(); if (e.touches.length > 0) movePlayerToInput(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+        canvas.addEventListener('touchmove', (e) => { if (e.touches.length > 0) movePlayerToInput(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
 
         function movePlayerToInput(clientX, clientY) {
             const rect = canvas.getBoundingClientRect();
             const mouseX = clientX - rect.left;
             const mouseY = clientY - rect.top;
-
             gameState.player.x = Math.max(0, Math.min(canvas.width - gameState.player.width, mouseX - gameState.player.width / 2));
             if (gameState.gameMode === 'CONVEYOR') {
                 gameState.player.y = Math.max(40, Math.min(canvas.height - gameState.player.height - 20, mouseY - gameState.player.height / 2));
             }
         }
 
-        // VISUAL MICRO-BADGES ITEM SCHEMA
         const ITEM_TYPES = [
-            // 🟢 INCOME
             { type: 'income', badgeStyle: 'income', label: 'Paycheck', value: 500, isPositive: true, category: 'Income', icon: '💵' },
             { type: 'income', badgeStyle: 'income', label: 'Overtime', value: 80, isPositive: true, category: 'Income', icon: '⚡' },
-            
-            // 💎 GOOD INTEREST / BLUE GEM
             { type: 'good_interest', badgeStyle: 'good_interest', label: 'HYSA Yield', value: 75, isPositive: true, category: 'Good Interest', icon: '💎' },
             { type: 'good_interest', badgeStyle: 'good_interest', label: 'Compound', value: 100, isPositive: true, category: 'Good Interest', icon: '📈' },
-
-            // 🔴 REQUIRED EXPENSES
             { type: 'expense', badgeStyle: 'expense', label: 'Rent / Housing', value: -250, isPositive: false, category: 'Required Expense', icon: '🏠' },
             { type: 'expense', badgeStyle: 'expense', label: 'Electric / Gas', value: -120, isPositive: false, category: 'Required Expense', icon: '⚡' },
-
-            // 🟡 DISCRETIONARY WANTS
             { type: 'want', badgeStyle: 'want', label: 'Takeout Food', value: -45, isPositive: false, category: 'Discretionary Want', icon: '🍔' },
             { type: 'want', badgeStyle: 'want', label: 'Game Console', value: -35, isPositive: false, category: 'Discretionary Want', icon: '🎮' },
-
-            // ⚠️ BAD INTEREST & SURPRISE PANIC EXPENSES
             { type: 'bad_interest', badgeStyle: 'bad_interest', label: 'Credit Card APR', value: -65, isPositive: false, category: 'Bad Interest', icon: '⚠️' },
             { type: 'late_fee', badgeStyle: 'bad_interest', label: 'Late Fee Trap', value: -40, isPositive: false, category: 'Late Fee Trap', icon: '⚠️' }
         ];
@@ -762,8 +599,8 @@
         function activateShield() {
             if (gameState.shieldCooldown <= 0 && !gameState.shieldActive) {
                 gameState.shieldActive = true;
-                gameState.shieldTimer = 300; // 5s
-                gameState.shieldCooldown = 900; // 15s Cooldown
+                gameState.shieldTimer = 300;
+                gameState.shieldCooldown = 900;
                 sound.playShield();
                 showFloatingText('SHIELD FILTER ACTIVE!', canvas.width / 2, canvas.height / 2 - 30, '#38BDF8');
                 updateShieldButtonUI();
@@ -775,13 +612,13 @@
             const lbl = document.getElementById('shieldBtnLabel');
             if (gameState.shieldActive) {
                 lbl.textContent = `Active (${Math.ceil(gameState.shieldTimer / 60)}s)`;
-                btn.className = 'px-3 py-1.5 text-xs bg-cyan-500 text-navy rounded-lg font-extrabold shadow azure-glow animate-pulse';
+                btn.className = 'px-3 py-2 text-xs bg-cyan-500 text-navy rounded-lg font-extrabold shadow azure-glow animate-pulse';
             } else if (gameState.shieldCooldown > 0) {
                 lbl.textContent = `Cooldown (${Math.ceil(gameState.shieldCooldown / 60)}s)`;
-                btn.className = 'px-3 py-1.5 text-xs bg-navy border border-navyBorder text-cream/40 rounded-lg font-semibold cursor-not-allowed';
+                btn.className = 'px-3 py-2 text-xs bg-navy border border-navyBorder text-cream/40 rounded-lg font-semibold cursor-not-allowed';
             } else {
                 lbl.textContent = 'Shield (Space)';
-                btn.className = 'px-3 py-1.5 text-xs bg-cyan-900/60 border border-cyan-400 text-cyan-300 rounded-lg hover:bg-cyan-500 hover:text-navy transition font-bold flex items-center gap-1.5 shadow';
+                btn.className = 'px-3 py-2 text-xs bg-cyan-900/60 border border-cyan-400 text-cyan-300 rounded-lg hover:bg-cyan-500 hover:text-navy transition font-bold flex items-center gap-1.5 shadow';
             }
         }
 
@@ -799,30 +636,24 @@
         }
 
         function triggerScreenShakeAndFlash() {
-            gameState.shakeDuration = 15; // 15 frames of canvas shake
-            gameState.damageFlashTimer = 18; // 18 frames of red vignette flash
+            gameState.shakeDuration = 15;
+            gameState.damageFlashTimer = 18;
             const container = document.getElementById('canvasContainer');
             container.classList.remove('screen-shake');
-            void container.offsetWidth; // Force reflow
+            void container.offsetWidth;
             container.classList.add('screen-shake');
             setTimeout(() => container.classList.remove('screen-shake'), 300);
         }
 
         function spawnItem() {
-            let template;
-            // PANIC PHASE: Heavy spawn of unexpected emergency bills
-            if (gameState.isPanicPhase && Math.random() < 0.45) {
-                template = PANIC_UNEXPECTED_EXPENSES[Math.floor(Math.random() * PANIC_UNEXPECTED_EXPENSES.length)];
-            } else {
-                template = ITEM_TYPES[Math.floor(Math.random() * ITEM_TYPES.length)];
-            }
+            let template = (gameState.isPanicPhase && Math.random() < 0.45)
+                ? PANIC_UNEXPECTED_EXPENSES[Math.floor(Math.random() * PANIC_UNEXPECTED_EXPENSES.length)]
+                : ITEM_TYPES[Math.floor(Math.random() * ITEM_TYPES.length)];
 
             const currentJob = CAREERS[gameState.currentJobIndex];
             let speedMult = gameState.isPanicPhase ? 1.5 : 1.0;
             const baseSpeed = (currentJob.itemSpeedMin + Math.random() * (currentJob.itemSpeedMax - currentJob.itemSpeedMin)) * speedMult;
-            
-            const cardWidth = 110;
-            const cardHeight = 36;
+            const cardWidth = 110, cardHeight = 36;
 
             if (gameState.gameMode === 'FALLING') {
                 gameState.items.push({
@@ -852,7 +683,6 @@
 
             const currentJob = CAREERS[gameState.currentJobIndex];
 
-            // Shield Ability
             if (gameState.shieldActive) {
                 gameState.shieldTimer--;
                 if (gameState.shieldTimer <= 0) gameState.shieldActive = false;
@@ -863,23 +693,21 @@
                 updateShieldButtonUI();
             }
 
-            // Calendar Days & PANIC PHASE (Days 25 - 30)
+            // Calendar & Panic Phase Progression
             gameState.dayTimer++;
             if (gameState.dayTimer >= (gameState.isPanicPhase ? 40 : 60)) {
                 gameState.dayTimer = 0;
                 gameState.day++;
 
-                // CHECK FOR DAYS 25-30 PANIC PHASE TRIGGER
                 if (gameState.day >= 25 && !gameState.isPanicPhase) {
                     gameState.isPanicPhase = true;
                     document.getElementById('panicBanner').classList.remove('hidden');
                     sound.playTrap();
                 }
 
-                // BI-WEEKLY PAYCHECK TRIGGER (Day 15 & Day 30)
                 if (gameState.day === 15 || gameState.day === 30) {
                     gameState.cash += currentJob.biweeklyPay;
-                    gameState.totalEarned += currentJob.biweeklyPay;
+                    gameState.monthEarned += currentJob.biweeklyPay;
                     sound.playCashRegister();
                     triggerJuiceSparks(canvas.width / 2, canvas.height / 2, '#38BDF8');
                     showFloatingText(`+$${currentJob.biweeklyPay} PAYCHECK!`, canvas.width / 2, canvas.height / 2, '#0284C7');
@@ -892,7 +720,7 @@
                 updateHUD();
             }
 
-            // Keyboard Movement
+            // Controls logic
             if (gameState.gameMode === 'FALLING') {
                 if (keys.Left) gameState.player.x -= gameState.player.speed;
                 if (keys.Right) gameState.player.x += gameState.player.speed;
@@ -906,7 +734,6 @@
                 gameState.player.y = Math.max(40, Math.min(canvas.height - gameState.player.height - 20, gameState.player.y));
             }
 
-            // Spawning Rate (Faster during Panic Phase)
             gameState.spawnTimer++;
             const effectiveInterval = gameState.isPanicPhase ? Math.floor(currentJob.spawnInterval * 0.6) : currentJob.spawnInterval;
             if (gameState.spawnTimer >= effectiveInterval) {
@@ -914,7 +741,6 @@
                 gameState.spawnTimer = 0;
             }
 
-            // Collision Check & Dynamic Repel Physics
             for (let i = gameState.items.length - 1; i >= 0; i--) {
                 const item = gameState.items[i];
 
@@ -942,21 +768,20 @@
                     if (gameState.cash < 0) gameState.cash = 0;
 
                     if (item.type === 'good_interest') {
-                        gameState.interestEarned += item.value;
-                        gameState.totalEarned += item.value;
+                        gameState.monthHYSAEarned += item.value;
+                        gameState.monthEarned += item.value;
                     } else if (item.type === 'income') {
-                        gameState.totalEarned += item.value;
+                        gameState.monthEarned += item.value;
                     } else if (item.type === 'bad_interest') {
-                        gameState.interestPaid += Math.abs(item.value);
-                        gameState.totalSpent += Math.abs(item.value);
+                        gameState.monthInterestPaid += Math.abs(item.value);
+                        gameState.monthSpent += Math.abs(item.value);
                     } else if (item.type === 'late_fee') {
-                        gameState.totalFees += Math.abs(item.value);
-                        gameState.totalSpent += Math.abs(item.value);
+                        gameState.monthLateFees += Math.abs(item.value);
+                        gameState.monthSpent += Math.abs(item.value);
                     } else {
-                        gameState.totalSpent += Math.abs(item.value);
+                        gameState.monthSpent += Math.abs(item.value);
                     }
 
-                    // JUICE FEEDBACK TRIGGERS
                     if (item.value >= 0) {
                         if (item.label === 'Paycheck') {
                             sound.playCashRegister();
@@ -982,7 +807,6 @@
                 }
             }
 
-            // Update Particle Sparks
             for (let p = gameState.particles.length - 1; p >= 0; p--) {
                 const particle = gameState.particles[p];
                 particle.x += particle.vx;
@@ -997,96 +821,51 @@
             floatingTexts.push({ text, x, y, color, opacity: 1.0, life: 45 });
         }
 
-        // --- VISUAL LIFE MILESTONES: DYNAMIC EVOLVING BACKGROUND SCENES ---
         function renderBackgroundEnvironment() {
             const level = CAREERS[gameState.currentJobIndex].level;
 
             if (level === 1) {
-                // ENTRY LEVEL: Bus Stop / Alley Streetlights
                 ctx.fillStyle = '#0F172A';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                // Bus Stop Sign Line
                 ctx.strokeStyle = '#334155';
                 ctx.lineWidth = 4;
                 ctx.beginPath();
                 ctx.moveTo(60, canvas.height);
                 ctx.lineTo(60, canvas.height - 130);
                 ctx.stroke();
-
                 ctx.fillStyle = '#0284C7';
                 ctx.fillRect(40, canvas.height - 160, 40, 30);
                 ctx.fillStyle = '#FFFFFF';
                 ctx.font = 'bold 10px Inter';
                 ctx.fillText('BUS', 60, canvas.height - 142);
-
-                // Cracked Pavement Line
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-                ctx.beginPath();
-                ctx.moveTo(0, canvas.height - 20);
-                ctx.lineTo(canvas.width, canvas.height - 20);
-                ctx.stroke();
-
             } else if (level === 2 || level === 3) {
-                // MID CAREER: Suburban Apartment & Starter Car Silhouette
                 ctx.fillStyle = '#1E293B';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                // Apartment Skyline Windows
                 ctx.fillStyle = 'rgba(2, 132, 199, 0.15)';
                 for (let x = 40; x < canvas.width; x += 100) {
                     ctx.fillRect(x, canvas.height - 220, 50, 180);
                 }
-
-                // Sedan Silhouette Line at bottom
-                ctx.fillStyle = '#0F172A';
-                ctx.fillRect(canvas.width - 160, canvas.height - 50, 120, 30);
-                ctx.beginPath();
-                ctx.arc(canvas.width - 130, canvas.height - 18, 12, 0, Math.PI * 2);
-                ctx.arc(canvas.width - 70, canvas.height - 18, 12, 0, Math.PI * 2);
-                ctx.fillStyle = '#334155';
-                ctx.fill();
-
             } else {
-                // EXECUTIVE / INVESTOR: High-Rise Penthouse City View & Glowing HYSA Yield Board
                 ctx.fillStyle = '#090D16';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                // City Lights
                 for (let i = 0; i < 30; i++) {
                     const lx = (i * 45) % canvas.width;
                     const ly = 80 + (i * 35) % (canvas.height - 160);
                     ctx.fillStyle = i % 2 === 0 ? 'rgba(56, 189, 248, 0.3)' : 'rgba(245, 158, 11, 0.3)';
                     ctx.fillRect(lx, ly, 12, 18);
                 }
-
-                // Glowing High-Yield Asset Board in Background
-                ctx.fillStyle = 'rgba(2, 132, 199, 0.1)';
-                ctx.strokeStyle = '#0284C7';
-                ctx.lineWidth = 1;
-                ctx.fillRect(canvas.width - 200, 20, 180, 80);
-                ctx.strokeRect(canvas.width - 200, 20, 180, 80);
-
-                ctx.fillStyle = '#38BDF8';
-                ctx.font = 'bold 11px Courier New';
-                ctx.textAlign = 'left';
-                ctx.fillText('HYSA YIELD: +6.0% APR', canvas.width - 190, 42);
-                ctx.fillText(`SAVINGS: $${gameState.savings}`, canvas.width - 190, 62);
-                ctx.fillText('NET WORTH: EXPONENTIAL', canvas.width - 190, 82);
             }
         }
 
         function renderCanvas() {
             renderBackgroundEnvironment();
 
-            // JUICE: Red Damage Flash Overlay
             if (gameState.damageFlashTimer > 0) {
                 ctx.fillStyle = `rgba(239, 68, 68, ${gameState.damageFlashTimer / 36})`;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 gameState.damageFlashTimer--;
             }
 
-            // Player Basket
             ctx.fillStyle = gameState.shieldActive ? '#38BDF8' : '#0284C7';
             ctx.beginPath();
             if (ctx.roundRect) {
@@ -1100,7 +879,6 @@
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Draw Dynamic Shield Aura
             if (gameState.shieldActive) {
                 ctx.save();
                 ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
@@ -1108,12 +886,7 @@
                 ctx.shadowColor = '#38BDF8';
                 ctx.shadowBlur = 15;
                 ctx.beginPath();
-                ctx.arc(
-                    gameState.player.x + gameState.player.width / 2,
-                    gameState.player.y + gameState.player.height / 2,
-                    gameState.player.width * 0.75,
-                    0, Math.PI * 2
-                );
+                ctx.arc(gameState.player.x + gameState.player.width / 2, gameState.player.y + gameState.player.height / 2, gameState.player.width * 0.75, 0, Math.PI * 2);
                 ctx.stroke();
                 ctx.restore();
             }
@@ -1127,49 +900,32 @@
                 gameState.player.y + 15
             );
 
-            // RENDER VISUAL MICRO-BADGES
             gameState.items.forEach((item) => {
                 ctx.save();
                 let bgGradient, borderColor, valueColor, iconBgColor;
 
                 if (item.badgeStyle === 'income') {
-                    borderColor = '#22C55E';
-                    valueColor = '#4ADE80';
-                    iconBgColor = '#10B981';
+                    borderColor = '#22C55E'; valueColor = '#4ADE80'; iconBgColor = '#10B981';
                     bgGradient = ctx.createLinearGradient(item.x, item.y, item.x, item.y + item.h);
-                    bgGradient.addColorStop(0, '#064E3B');
-                    bgGradient.addColorStop(1, '#022C22');
+                    bgGradient.addColorStop(0, '#064E3B'); bgGradient.addColorStop(1, '#022C22');
                 } else if (item.badgeStyle === 'good_interest') {
                     const pulse = Math.sin(Date.now() / 150) * 5 + 10;
-                    ctx.shadowColor = '#007FFF';
-                    ctx.shadowBlur = pulse;
-                    borderColor = '#38BDF8';
-                    valueColor = '#7DD3FC';
-                    iconBgColor = '#0284C7';
+                    ctx.shadowColor = '#007FFF'; ctx.shadowBlur = pulse;
+                    borderColor = '#38BDF8'; valueColor = '#7DD3FC'; iconBgColor = '#0284C7';
                     bgGradient = ctx.createLinearGradient(item.x, item.y, item.x, item.y + item.h);
-                    bgGradient.addColorStop(0, '#0C4A6E');
-                    bgGradient.addColorStop(1, '#075985');
+                    bgGradient.addColorStop(0, '#0C4A6E'); bgGradient.addColorStop(1, '#075985');
                 } else if (item.badgeStyle === 'expense') {
-                    borderColor = '#EF4444';
-                    valueColor = '#FCA5A5';
-                    iconBgColor = '#DC2626';
+                    borderColor = '#EF4444'; valueColor = '#FCA5A5'; iconBgColor = '#DC2626';
                     bgGradient = ctx.createLinearGradient(item.x, item.y, item.x, item.y + item.h);
-                    bgGradient.addColorStop(0, '#7F1D1D');
-                    bgGradient.addColorStop(1, '#450A0A');
+                    bgGradient.addColorStop(0, '#7F1D1D'); bgGradient.addColorStop(1, '#450A0A');
                 } else if (item.badgeStyle === 'want') {
-                    borderColor = '#F59E0B';
-                    valueColor = '#FDE68A';
-                    iconBgColor = '#D97706';
+                    borderColor = '#F59E0B'; valueColor = '#FDE68A'; iconBgColor = '#D97706';
                     bgGradient = ctx.createLinearGradient(item.x, item.y, item.x, item.y + item.h);
-                    bgGradient.addColorStop(0, '#78350F');
-                    bgGradient.addColorStop(1, '#451A03');
+                    bgGradient.addColorStop(0, '#78350F'); bgGradient.addColorStop(1, '#451A03');
                 } else {
-                    borderColor = '#DC2626';
-                    valueColor = '#F87171';
-                    iconBgColor = '#B91C1C';
+                    borderColor = '#DC2626'; valueColor = '#F87171'; iconBgColor = '#B91C1C';
                     bgGradient = ctx.createLinearGradient(item.x, item.y, item.x, item.y + item.h);
-                    bgGradient.addColorStop(0, '#450A0A');
-                    bgGradient.addColorStop(1, '#0F172A');
+                    bgGradient.addColorStop(0, '#450A0A'); bgGradient.addColorStop(1, '#0F172A');
                 }
 
                 ctx.fillStyle = bgGradient;
@@ -1185,7 +941,6 @@
                 ctx.fill();
                 ctx.stroke();
 
-                // Icon Left Circle
                 const circleRadius = 13;
                 const circleX = item.x + circleRadius + 5;
                 const circleY = item.y + item.h / 2;
@@ -1200,7 +955,6 @@
                 ctx.textBaseline = 'middle';
                 ctx.fillText(item.icon, circleX, circleY + 1);
 
-                // Right Value Text
                 ctx.font = 'extrabold 12px Courier New';
                 ctx.textAlign = 'center';
                 ctx.fillStyle = valueColor;
@@ -1210,7 +964,6 @@
                 ctx.restore();
             });
 
-            // JUICE: Render Particles / Sparkles
             gameState.particles.forEach(p => {
                 ctx.fillStyle = p.color;
                 ctx.beginPath();
@@ -1218,7 +971,6 @@
                 ctx.fill();
             });
 
-            // Floating Text Animations
             for (let i = floatingTexts.length - 1; i >= 0; i--) {
                 const ft = floatingTexts[i];
                 ctx.fillStyle = ft.color;
@@ -1240,21 +992,17 @@
             requestAnimationFrame(gameLoop);
         }
 
+        // UPDATE STREAMLINED MAIN HUD (ACTION PHASE)
         function updateHUD() {
             document.getElementById('hudCash').textContent = `$${gameState.cash.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
             document.getElementById('hudSavings').textContent = `$${gameState.savings.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-            document.getElementById('hudLoans').textContent = `$${gameState.loans.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
             
+            const daysLeft = Math.max(0, 30 - gameState.day);
+            document.getElementById('hudDaysLeft').textContent = `${daysLeft} Days Left`;
+            document.getElementById('hudMonthTitle').textContent = `Month ${gameState.month}`;
+
             const currentJob = CAREERS[gameState.currentJobIndex];
             document.getElementById('hudJobTitle').textContent = currentJob.title;
-            document.getElementById('hudMonthDisplay').textContent = `Month ${gameState.month} • Day ${gameState.day} / 30`;
-            
-            document.getElementById('hudTotalEarned').textContent = `$${gameState.totalEarned.toLocaleString()}`;
-            document.getElementById('hudTotalSaved').textContent = `$${gameState.totalSaved.toLocaleString()}`;
-            document.getElementById('hudTotalSpent').textContent = `$${gameState.totalSpent.toLocaleString()}`;
-            document.getElementById('hudTotalFees').textContent = `$${gameState.totalFees.toLocaleString()}`;
-            document.getElementById('hudInterestEarned').textContent = `+$${gameState.interestEarned.toLocaleString()}`;
-            document.getElementById('hudInterestPaid').textContent = `-$${gameState.interestPaid.toLocaleString()}`;
 
             const percent = (gameState.day / 30) * 100;
             document.getElementById('monthProgressBar').style.width = `${percent}%`;
@@ -1270,6 +1018,13 @@
             gameState.isShiftActive = true;
             gameState.isPaused = false;
 
+            // Reset Shift Stats
+            gameState.monthEarned = 0;
+            gameState.monthSpent = 0;
+            gameState.monthLateFees = 0;
+            gameState.monthInterestPaid = 0;
+            gameState.monthHYSAEarned = 0;
+
             document.getElementById('panicBanner').classList.add('hidden');
             document.getElementById('startOverlay').classList.add('hidden');
             document.getElementById('pauseOverlay').classList.add('hidden');
@@ -1281,140 +1036,144 @@
             gameState.isPanicPhase = false;
             document.getElementById('panicBanner').classList.add('hidden');
             
+            // Apply HYSA Savings Interest
             if (gameState.savings > 0) {
                 const yieldBonus = Math.round(gameState.savings * 0.06);
                 gameState.savings += yieldBonus;
-                gameState.interestEarned += yieldBonus;
-                gameState.totalEarned += yieldBonus;
+                gameState.monthHYSAEarned += yieldBonus;
+                gameState.monthEarned += yieldBonus;
             }
 
-            openBudgetModal();
+            openFinancialReviewDashboard();
         }
 
-        function openBudgetModal() {
+        // POST-ACTION PHASE: MONTHLY FINANCIAL REVIEW SCREEN
+        function openFinancialReviewDashboard() {
             const job = CAREERS[gameState.currentJobIndex];
             const monthlyGross = job.biweeklyPay * 2;
-            const commuteCost = job.gasCostMonthly;
 
-            document.getElementById('budgetMonthTag').textContent = `Month ${gameState.month}`;
-            document.getElementById('summaryGrossIncome').textContent = `$${monthlyGross.toLocaleString()}`;
-            document.getElementById('summaryCommuteCost').textContent = `$${commuteCost.toLocaleString()}`;
+            document.getElementById('budgetMonthTag').textContent = `Month ${gameState.month} Financial Review`;
 
-            const btnAutoPay = document.getElementById('btnToggleAutoPay');
-            if (gameState.autoPayEnabled) {
-                btnAutoPay.textContent = 'AUTO-PAY ACTIVE ($20/mo)';
-                btnAutoPay.className = 'px-4 py-1.5 text-xs font-bold rounded-lg transition bg-azure text-cream shadow';
-            } else {
-                btnAutoPay.textContent = 'ENABLE AUTO-PAY';
-                btnAutoPay.className = 'px-4 py-1.5 text-xs font-bold rounded-lg transition bg-navy border border-azure text-azure hover:bg-azure hover:text-cream';
-            }
+            // Populate Interactive Expense Sliders
+            const container = document.getElementById('sliderContainer');
+            container.innerHTML = '';
 
-            const listContainer = document.getElementById('expenseListContainer');
-            listContainer.innerHTML = '';
-
-            let totalBills = commuteCost;
-            if (gameState.autoPayEnabled) totalBills += 20;
-
-            BASE_EXPENSES.forEach(exp => {
-                const isCut = gameState.cutExpenses.has(exp.id);
-                if (!isCut) totalBills += exp.amount;
-
-                const itemRow = document.createElement('div');
-                itemRow.className = `flex items-center justify-between p-2.5 rounded-xl border ${isCut ? 'bg-navy/40 border-navyBorder opacity-50' : 'bg-navyLight border-navyBorder'}`;
+            DISCRETIONARY_SLIDER_EXPENSES.forEach(exp => {
+                const row = document.createElement('div');
+                row.className = 'bg-navy/80 border border-navyBorder p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2';
                 
-                itemRow.innerHTML = `
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-lg ${isCut ? 'bg-navyBorder text-cream/40' : 'bg-azure/20 text-azure'} flex items-center justify-center text-sm">
+                row.innerHTML = `
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-azure/20 text-azure flex items-center justify-center text-sm">
                             <i class="fa-solid ${exp.icon}"></i>
                         </div>
                         <div>
-                            <span class="text-xs font-semibold text-cream block">${exp.name}</span>
-                            <span class="text-[10px] ${exp.discretionary ? 'text-azure' : 'text-cream/50'}">
-                                ${exp.discretionary ? 'Discretionary Want (Optional)' : 'Fixed Essential Need'}
-                            </span>
+                            <span class="text-xs font-bold text-cream block">${exp.name}</span>
+                            <span class="text-[10px] text-cream/50">Discretionary Want • Adjust budget slider</span>
                         </div>
                     </div>
+
                     <div class="flex items-center gap-3">
-                        <span class="font-mono text-sm ${isCut ? 'line-through text-cream/40' : 'text-cream font-bold'}">$${exp.amount}</span>
-                        ${exp.discretionary ? `
-                            <button onclick="toggleCutExpense('${exp.id}')" class="px-3 py-1 text-[11px] font-bold rounded-lg transition ${isCut ? 'bg-azure text-cream' : 'bg-navy border border-navyBorder text-cream hover:border-azure'}">
-                                ${isCut ? 'UNCUT' : 'CUT IT'}
-                            </button>
-                        ` : `
-                            <span class="text-[10px] uppercase text-cream/40 font-bold px-2 py-1 bg-navy rounded">Fixed Need</span>
-                        `}
+                        <input type="range" min="0" max="${exp.maxAmount}" value="${exp.currentAmount}" step="5" 
+                            class="w-28 sm:w-36 h-1.5 bg-navy border border-navyBorder rounded-lg cursor-pointer"
+                            oninput="updateExpenseSlider('${exp.id}', this.value)">
+                        <span class="font-mono font-bold text-xs text-azure w-16 text-right" id="sliderVal_${exp.id}">$${exp.currentAmount}/mo</span>
                     </div>
                 `;
-                listContainer.appendChild(itemRow);
+                container.appendChild(row);
             });
 
-            let loanInterestCharge = 0;
-            if (gameState.loans > 0) {
-                loanInterestCharge = gameState.loans * 0.08;
-                totalBills += loanInterestCharge;
-            }
-
-            let lateFeePenalty = 0;
-            if (!gameState.autoPayEnabled && (monthlyGross - totalBills < 200)) {
-                lateFeePenalty = 35;
-                totalBills += lateFeePenalty;
-            }
-
-            document.getElementById('summaryLateFeesLost').textContent = `$${(lateFeePenalty + loanInterestCharge).toFixed(2)}`;
-
-            let totalSaved = 0;
-            gameState.cutExpenses.forEach(id => {
-                const exp = BASE_EXPENSES.find(e => e.id === id);
-                if (exp) totalSaved += exp.amount;
-            });
-
-            document.getElementById('totalSavedFromCuts').textContent = `$${totalSaved.toLocaleString()} / mo saved`;
-            document.getElementById('summaryNetCash').textContent = `$${(monthlyGross - totalBills).toLocaleString()}`;
-            
+            calculateDashboardSummary();
             document.getElementById('modalBudget').classList.remove('hidden');
         }
 
-        document.getElementById('btnToggleAutoPay').addEventListener('click', () => {
-            gameState.autoPayEnabled = !gameState.autoPayEnabled;
-            openBudgetModal();
-        });
-
-        window.toggleCutExpense = function(id) {
-            if (gameState.cutExpenses.has(id)) {
-                gameState.cutExpenses.delete(id);
-            } else {
-                gameState.cutExpenses.add(id);
+        window.updateExpenseSlider = function(id, val) {
+            const item = DISCRETIONARY_SLIDER_EXPENSES.find(e => e.id === id);
+            if (item) {
+                item.currentAmount = parseInt(val, 10);
+                document.getElementById(`sliderVal_${id}`).textContent = `$${val}/mo`;
             }
-            openBudgetModal();
+            calculateDashboardSummary();
         };
 
-        function payBillsAndAdvance() {
+        function calculateDashboardSummary() {
             const job = CAREERS[gameState.currentJobIndex];
             const monthlyGross = job.biweeklyPay * 2;
             let totalBills = job.gasCostMonthly;
 
+            // Add Fixed Needs
+            FIXED_EXPENSES.forEach(f => totalBills += f.amount);
+
+            // Add Sliders
+            let sliderTotal = 0;
+            let totalSavingsFromMax = 0;
+            DISCRETIONARY_SLIDER_EXPENSES.forEach(s => {
+                sliderTotal += s.currentAmount;
+                totalSavingsFromMax += (s.maxAmount - s.currentAmount);
+            });
+            totalBills += sliderTotal;
+
             if (gameState.autoPayEnabled) totalBills += 20;
 
-            BASE_EXPENSES.forEach(exp => {
-                if (!gameState.cutExpenses.has(exp.id)) totalBills += exp.amount;
-            });
+            // Bad Loans APR Charge
+            let loanAPR = 0;
+            if (gameState.loans > 0) {
+                loanAPR = gameState.loans * 0.08;
+                totalBills += loanAPR;
+            }
+
+            // Late Fees Penalty
+            let lateFees = 0;
+            if (!gameState.autoPayEnabled && (monthlyGross - totalBills < 200)) {
+                lateFees = 35;
+                totalBills += lateFees;
+            }
+
+            const netCash = monthlyGross - totalBills;
+
+            // Update UI
+            document.getElementById('summaryEarned').textContent = `+$${gameState.monthEarned.toLocaleString()}`;
+            document.getElementById('summarySpent').textContent = `-$${(gameState.monthSpent + totalBills).toLocaleString()}`;
+            document.getElementById('summaryFeesAndAPR').textContent = `-$${(gameState.monthLateFees + gameState.monthInterestPaid + lateFees + loanAPR).toFixed(2)}`;
+            document.getElementById('summaryHYSAEarned').textContent = `+$${gameState.monthHYSAEarned.toLocaleString()}`;
+            document.getElementById('summaryNetCash').textContent = `$${netCash.toLocaleString()}`;
+            document.getElementById('sliderSavingsTotal').textContent = `+$${totalSavingsFromMax.toLocaleString()} / mo Saved`;
+
+            const btnAutoPay = document.getElementById('btnToggleAutoPay');
+            if (gameState.autoPayEnabled) {
+                btnAutoPay.textContent = 'AUTO-PAY ACTIVE ($20)';
+                btnAutoPay.className = 'px-3 py-1.5 text-xs font-bold rounded-lg transition bg-azure text-cream shadow';
+            } else {
+                btnAutoPay.textContent = 'ENABLE AUTO-PAY';
+                btnAutoPay.className = 'px-3 py-1.5 text-xs font-bold rounded-lg transition bg-navy border border-azure text-azure hover:bg-azure hover:text-cream';
+            }
+        }
+
+        document.getElementById('btnToggleAutoPay').addEventListener('click', () => {
+            gameState.autoPayEnabled = !gameState.autoPayEnabled;
+            calculateDashboardSummary();
+        });
+
+        function confirmBudgetAndAdvance() {
+            const job = CAREERS[gameState.currentJobIndex];
+            const monthlyGross = job.biweeklyPay * 2;
+            let totalBills = job.gasCostMonthly;
+
+            FIXED_EXPENSES.forEach(f => totalBills += f.amount);
+            DISCRETIONARY_SLIDER_EXPENSES.forEach(s => totalBills += s.currentAmount);
+
+            if (gameState.autoPayEnabled) totalBills += 20;
 
             if (gameState.loans > 0) {
-                const interest = gameState.loans * 0.08;
-                totalBills += interest;
-                gameState.interestPaid += interest;
+                totalBills += (gameState.loans * 0.08);
             }
 
             if (!gameState.autoPayEnabled && (monthlyGross - totalBills < 200)) {
                 totalBills += 35;
-                gameState.totalFees += 35;
             }
 
             const netCashLeft = monthlyGross - totalBills;
             gameState.cash += netCashLeft;
-            gameState.totalSpent += totalBills;
-
-            if (netCashLeft > 0) gameState.totalSaved += netCashLeft;
 
             gameState.month++;
             gameState.gameMode = (gameState.month % 2 === 1) ? 'FALLING' : 'CONVEYOR';
@@ -1424,8 +1183,8 @@
             document.getElementById('startOverlayTitle').textContent = `Month ${gameState.month}: ${job.title} Shift`;
             document.getElementById('shiftSpeedLabel').textContent = job.speedLabel;
             document.getElementById('shiftDescriptionText').textContent = gameState.gameMode === 'FALLING'
-                ? 'Catch Good Interest & Income cards falling from above. Watch out for Days 25-30 Panic Phase!'
-                : 'Conveyor belt mode! Collect incoming Good Interest cards moving right to left!';
+                ? 'Catch Paychecks and Good Interest. Watch out for Days 25-30 Panic Phase!'
+                : 'Conveyor belt shift! Collect incoming Good Interest cards moving right to left!';
             
             document.getElementById('startOverlay').classList.remove('hidden');
             updateHUD();
@@ -1456,7 +1215,6 @@
                         <div class="text-xs space-y-1.5 mb-3 text-cream/70">
                             <div class="flex justify-between"><span class="text-cream/50">Level & Speed:</span> <span class="text-azure font-medium">${career.speedLabel}</span></div>
                             <div class="flex justify-between"><span class="text-cream/50">Bi-Weekly Pay:</span> <span class="text-azure font-mono font-bold">$${career.biweeklyPay.toLocaleString()}</span></div>
-                            <div class="flex justify-between"><span class="text-cream/50">Lifestyle Scene:</span> <span class="text-cream font-medium">${career.bgName}</span></div>
                         </div>
                     </div>
 
@@ -1474,7 +1232,6 @@
                 container.appendChild(card);
             });
 
-            document.getElementById('careerCurrentBalanceDisplay').textContent = `Cash: $${gameState.cash.toLocaleString()}`;
             document.getElementById('modalCareers').classList.remove('hidden');
         }
 
@@ -1543,7 +1300,7 @@
 
         // Event Listeners
         document.getElementById('btnStartShift').addEventListener('click', startShift);
-        document.getElementById('btnPayBillsAndContinue').addEventListener('click', payBillsAndAdvance);
+        document.getElementById('btnPayBillsAndContinue').addEventListener('click', confirmBudgetAndAdvance);
         document.getElementById('btnShieldAbility').addEventListener('click', activateShield);
         document.getElementById('btnTouchShield').addEventListener('touchstart', (e) => { e.preventDefault(); activateShield(); });
 
@@ -1572,7 +1329,6 @@
             });
         });
 
-        // Touch Control Buttons
         document.getElementById('btnTouchLeft').addEventListener('touchstart', (e) => { e.preventDefault(); keys.Left = true; });
         document.getElementById('btnTouchLeft').addEventListener('touchend', (e) => { e.preventDefault(); keys.Left = false; });
         document.getElementById('btnTouchRight').addEventListener('touchstart', (e) => { e.preventDefault(); keys.Left = false; keys.Right = true; });
