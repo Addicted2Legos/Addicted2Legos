@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chroma Craft</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background-color: #0f172a; /* Slate 900 */
+            color: #f8fafc;
+            overflow: hidden;
+            /* CRITICAL: Prevents pull-to-refresh and page scrolling while dragging on mobile */
+            touch-action: none; 
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .glow-r { filter: drop-shadow(0 0 8px #ef4444); }
+        .glow-y { filter: drop-shadow(0 0 8px #eab308); }
+        .glow-b { filter: drop-shadow(0 0 8px #3b82f6); }
+        .glow-g { filter: drop-shadow(0 0 8px #22c55e); }
+        .glow-o { filter: drop-shadow(0 0 8px #f97316); }
+        .glow-p { filter: drop-shadow(0 0 8px #a855f7); }
+        .glow-white { filter: drop-shadow(0 0 6px #ffffff); }
+        
+        .slot, .blueprint-slot {
+            transition: background-color 0.2s, border-color 0.2s;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+        
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+            100% { transform: scale(1); }
+        }
+        .anim-pop { animation: pop 0.3s ease-out; }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        .anim-shake { animation: shake 0.3s ease-in-out; }
+        
+        @keyframes successGlow {
+            0% { box-shadow: 0 0 20px #22c55e; background-color: rgba(34, 197, 94, 0.4); }
+            100% { box-shadow: 0 0 0px #22c55e; background-color: transparent; }
+        }
+        .anim-success { animation: successGlow 1s ease-out; }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Prevents SVG from blocking pointer hits on the slot */
+        }
+
+        #drag-ghost {
+            position: fixed;
+            pointer-events: none; /* Crucial so elementFromPoint looks UNDER the ghost */
+            z-index: 9999;
+            transform: scale(1.1);
+            display: none;
+            will-change: left, top;
+        }
+
+        /* Dispensers visual feedback */
+        .dispenser:active {
+            transform: scale(0.95);
+            transition: transform 0.1s;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center">
+    
+    <div id="drag-ghost" class="w-16 h-16 md:w-20 md:h-20 flex items-center justify-center"></div>
+
+    <header class="w-full max-w-lg p-3 md:p-4 flex justify-between items-center bg-slate-800 border-b border-slate-700 shadow-md z-10 shrink-0">
+        <div>
+            <h1 class="text-lg md:text-2xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 glow-white">
+                CHROMA CRAFT
+            </h1>
+            <button onclick="showInstructions()" class="text-[10px] md:text-xs text-sky-400 underline mt-1 block">How to Play</button>
+        </div>
+        <div class="text-right">
+            <div class="text-sm md:text-lg font-bold text-emerald-400">Level: <span id="ui-level">1</span></div>
+            <div class="text-xs md:text-sm text-slate-300">Score: <span id="ui-score">0</span></div>
+        </div>
+    </header>
+
+    <main class="flex-1 w-full max-w-lg flex flex-col p-3 md:p-4 gap-4 relative z-10 overflow-hidden">
+        
+        <!-- SECTION 1: BLUEPRINT (Top) -->
+        <section class="bg-slate-800/80 rounded-2xl p-4 border border-slate-600 shadow-[0_4px_20px_rgba(0,0,0,0.5)] flex flex-col items-center shrink-0">
+            <h2 class="text-xs md:text-sm text-slate-400 uppercase tracking-widest mb-3 font-bold flex items-center gap-2">
+                <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                Blueprint
+            </h2>
+            <div id="blueprint-container" class="flex justify-center items-center gap-2 md:gap-4 flex-wrap w-full min-h-[70px]">
+                <!-- Blueprint slots injected here -->
+            </div>
+        </section>
+
+        <!-- SECTION 2: FORGE (Middle) -->
+        <section class="flex-1 flex flex-col justify-center">
+            <h2 class="text-xs md:text-sm text-slate-400 uppercase tracking-widest mb-2 text-center font-bold flex justify-center items-center gap-2">
+                <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                The Forge (Crafting Area)
+            </h2>
+            <div class="flex justify-between items-center gap-2 bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50">
+                <div id="forge-container" class="flex gap-2 md:gap-3 flex-1 justify-center">
+                    <!-- 4 Forge Slots -->
+                    <div class="slot w-14 h-14 md:w-16 md:h-16 rounded-xl border-2 border-slate-600 bg-slate-900/80 flex items-center justify-center touch-none relative" data-forge-idx="0"></div>
+                    <div class="slot w-14 h-14 md:w-16 md:h-16 rounded-xl border-2 border-slate-600 bg-slate-900/80 flex items-center justify-center touch-none relative" data-forge-idx="1"></div>
+                    <div class="slot w-14 h-14 md:w-16 md:h-16 rounded-xl border-2 border-slate-600 bg-slate-900/80 flex items-center justify-center touch-none relative" data-forge-idx="2"></div>
+                    <div class="slot w-14 h-14 md:w-16 md:h-16 rounded-xl border-2 border-slate-600 bg-slate-900/80 flex items-center justify-center touch-none relative" data-forge-idx="3"></div>
+                </div>
+                
+                <!-- Trash Can -->
+                <div id="trash-slot" class="slot w-14 h-14 md:w-16 md:h-16 rounded-xl border-2 border-red-900 bg-red-950/40 flex items-center justify-center touch-none ml-2 shrink-0 shadow-[0_0_15px_rgba(220,38,38,0.15)]">
+                    <svg viewBox="0 0 24 24" class="w-7 h-7 md:w-8 md:h-8 text-red-500/80" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: DISPENSERS (Bottom) -->
+        <section class="bg-slate-900 rounded-t-3xl p-4 border-t-2 border-slate-700 mt-auto pb-8 shrink-0 shadow-[0_-10px_20px_rgba(0,0,0,0.4)]">
+            <h2 class="text-xs text-slate-500 uppercase tracking-widest mb-3 text-center font-bold">Infinite Supplies (Drag Upward)</h2>
+            <div class="flex flex-col gap-4">
+                <!-- Color Dispensers -->
+                <div class="flex justify-center gap-4">
+                    <div class="dispenser w-14 h-14 md:w-16 md:h-16 rounded-full bg-slate-800 border-2 border-red-500 flex items-center justify-center p-2 shadow-[0_0_15px_rgba(239,68,68,0.3)] touch-none cursor-grab active:cursor-grabbing" data-spawn-type="color" data-spawn-val="r">
+                        <div class="w-8 h-8 rounded-full bg-red-500 glow-r pointer-events-none"></div>
+                    </div>
+                    <div class="dispenser w-14 h-14 md:w-16 md:h-16 rounded-full bg-slate-800 border-2 border-yellow-500 flex items-center justify-center p-2 shadow-[0_0_15px_rgba(234,179,8,0.3)] touch-none cursor-grab active:cursor-grabbing" data-spawn-type="color" data-spawn-val="y">
+                        <div class="w-8 h-8 rounded-full bg-yellow-500 glow-y pointer-events-none"></div>
+                    </div>
+                    <div class="dispenser w-14 h-14 md:w-16 md:h-16 rounded-full bg-slate-800 border-2 border-blue-500 flex items-center justify-center p-2 shadow-[0_0_15px_rgba(59,130,246,0.3)] touch-none cursor-grab active:cursor-grabbing" data-spawn-type="color" data-spawn-val="b">
+                        <div class="w-8 h-8 rounded-full bg-blue-500 glow-b pointer-events-none"></div>
+                    </div>
+                </div>
+                <!-- Shape Dispensers -->
+                <div class="flex justify-center gap-4">
+                    <div class="dispenser w-14 h-14 md:w-16 md:h-16 rounded-xl bg-slate-800 border-2 border-slate-400 flex items-center justify-center p-2 shadow-[0_0_10px_rgba(255,255,255,0.1)] touch-none cursor-grab active:cursor-grabbing" data-spawn-type="shape" data-spawn-val="square">
+                        <svg viewBox="0 0 100 100"><rect x="15" y="15" width="70" height="70" rx="10" stroke="#cbd5e1" stroke-width="8" fill="none"/></svg>
+                    </div>
+                    <div class="dispenser w-14 h-14 md:w-16 md:h-16 rounded-xl bg-slate-800 border-2 border-slate-400 flex items-center justify-center p-2 shadow-[0_0_10px_rgba(255,255,255,0.1)] touch-none cursor-grab active:cursor-grabbing" data-spawn-type="shape" data-spawn-val="circle">
+                        <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="35" stroke="#cbd5e1" stroke-width="8" fill="none"/></svg>
+                    </div>
+                    <div class="dispenser w-14 h-14 md:w-16 md:h-16 rounded-xl bg-slate-800 border-2 border-slate-400 flex items-center justify-center p-2 shadow-[0_0_10px_rgba(255,255,255,0.1)] touch-none cursor-grab active:cursor-grabbing" data-spawn-type="shape" data-spawn-val="triangle">
+                        <svg viewBox="0 0 100 100"><polygon points="50,15 85,80 15,80" stroke="#cbd5e1" stroke-width="8" fill="none" stroke-linejoin="round"/></svg>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Instructions Modal Overlay -->
+    <div id="instructions-modal" class="fixed inset-0 bg-slate-900/95 z-[100] flex flex-col items-center justify-center backdrop-blur-md px-6 text-center">
+        <h2 class="text-3xl md:text-4xl font-black mb-6 text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-500 glow-white">HOW TO PLAY</h2>
+        
+        <div class="text-slate-300 text-sm md:text-base mb-8 max-w-sm text-left space-y-4">
+            <p><strong>1. The Blueprint:</strong> Top area shows the final Colored Shapes you need to complete the level.</p>
+            <p><strong>2. The Forge:</strong> Drag raw materials from the bottom into the empty slots in the middle to store them.</p>
+            <p><strong>3. Crafting:</strong> Drag a <span class="text-red-400 font-bold">Color</span> onto a <span class="text-slate-100 font-bold">Shape</span> inside the Forge to combine them into a Colored Shape.</p>
+            <p><strong>4. Placement:</strong> Drag your finished Colored Shape up to the matching slot in the Blueprint.</p>
+            <p><strong>5. Mistakes:</strong> Messed up? Drag unwanted items from the Forge into the <span class="text-red-500 font-bold">Trash Can</span>.</p>
+        </div>
+
+        <button onclick="closeInstructions()" class="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-[0_0_20px_rgba(79,70,229,0.5)] transition-transform active:scale-95 uppercase tracking-widest border-2 border-indigo-400">
+            START CRAFTING
+        </button>
+    </div>
+
+    <!-- Win Modal Overlay -->
+    <div id="win-modal" class="fixed inset-0 bg-slate-900/95 z-[100] hidden flex-col items-center justify-center backdrop-blur-md px-6 text-center">
+        <h2 class="text-4xl md:text-5xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600 glow-g">LEVEL CLEARED!</h2>
+        <p class="text-slate-300 text-lg md:text-xl mb-8">Blueprint target achieved.</p>
+        <button onclick="nextLevel()" class="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-transform active:scale-95 uppercase tracking-widest border-2 border-emerald-400">
+            Next Level
+        </button>
+    </div>
+
+    <script>
+        const COLORS = {
+            'r': { hex: '#ef4444', name: 'Red' },
+            'y': { hex: '#eab308', name: 'Yellow' },
+            'b': { hex: '#3b82f6', name: 'Blue' },
+            'o': { hex: '#f97316', name: 'Orange' },
+            'g': { hex: '#22c55e', name: 'Green' },
+            'p': { hex: '#a855f7', name: 'Purple' }
+        };
+        const SHAPES = ['square', 'circle', 'triangle'];
+        
+        // Secondary color combinations (just in case they appear in later levels)
+        const MIX_RECIPES = {
+            'r-y': 'o', 'y-r': 'o',
+            'r-b': 'p', 'b-r': 'p',
+            'y-b': 'g', 'b-y': 'g'
+        };
+
+        let state = {
+            level: 1,
+            score: 0,
+            forge: [null, null, null, null],
+            blueprint: []
+        };
+
+        const els = {
+            level: document.getElementById('ui-level'),
+            score: document.getElementById('ui-score'),
+            blueprintContainer: document.getElementById('blueprint-container'),
+            forgeSlots: document.querySelectorAll('[data-forge-idx]'),
+            trashSlot: document.getElementById('trash-slot'),
+            ghost: document.getElementById('drag-ghost'),
+            winModal: document.getElementById('win-modal'),
+            instructionsModal: document.getElementById('instructions-modal')
+        };
+
+        function getShapePath(shape) {
+            if (shape === 'square') return `<rect x="15" y="15" width="70" height="70" rx="10" />`;
+            if (shape === 'circle') return `<circle cx="50" cy="50" r="35" />`;
+            if (shape === 'triangle') return `<polygon points="50,15 85,80 15,80" stroke-linejoin="round" />`;
+            return '';
+        }
+
+        function renderItemSVG(item, isTarget = false, isFilledTarget = false) {
+            if (!item) return '';
+            let content = '';
+            let classes = isTarget && !isFilledTarget ? 'opacity-40' : '';
+            
+            if (item.type === 'color') {
+                const hex = COLORS[item.color].hex;
+                content = `<circle cx="50" cy="50" r="28" fill="${hex}" filter="url(#glow-${item.color})" />`;
+                classes += ` glow-${item.color}`;
+            } else if (item.type === 'shape') {
+                content = `<g stroke="#f8fafc" stroke-width="8" fill="none">${getShapePath(item.shape)}</g>`;
+                classes += ` glow-white`;
+            } else if (item.type === 'colored_shape') {
+                const hex = COLORS[item.color].hex;
+                if (isTarget && !isFilledTarget) {
+                    content = `<g fill="transparent" stroke="${hex}" stroke-width="8" stroke-dasharray="8 8">${getShapePath(item.shape)}</g>`; 
+                } else {
+                    content = `<g fill="${hex}" stroke="#ffffff" stroke-width="2">${getShapePath(item.shape)}</g>`;
+                    classes += ` glow-${item.color}`;
+                }
+            }
+
+            return `
+                <svg viewBox="0 0 100 100" class="w-10 h-10 md:w-14 md:h-14 ${classes}">
+                    <defs>
+                        <filter id="glow-r"><feGaussianBlur stdDeviation="4" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                        <filter id="glow-y"><feGaussianBlur stdDeviation="4" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                        <filter id="glow-b"><feGaussianBlur stdDeviation="4" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                        <filter id="glow-o"><feGaussianBlur stdDeviation="4" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                        <filter id="glow-g"><feGaussianBlur stdDeviation="4" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                        <filter id="glow-p"><feGaussianBlur stdDeviation="4" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                    </defs>
+                    ${content}
+                </svg>
+            `;
+        }
+
+        function generateLevel() {
+            state.blueprint = [];
+            // Increase targets slowly
+            const numTargets = Math.min(1 + Math.floor(state.level / 2), 4);
+            
+            // Allow secondary colors at level 4+
+            const useSecondary = state.level >= 4;
+            const primaryColors = ['r', 'y', 'b'];
+            const secondaryColors = ['o', 'g', 'p'];
+            const allAvailableColors = useSecondary ? [...primaryColors, ...secondaryColors] : primaryColors;
+
+            for (let i = 0; i < numTargets; i++) {
+                const shape = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+                const color = allAvailableColors[Math.floor(Math.random() * allAvailableColors.length)];
+                state.blueprint.push({
+                    item: { type: 'colored_shape', shape: shape, color: color },
+                    filled: false
+                });
+            }
+            renderBlueprint();
+            
+            // Clear forge on new level
+            state.forge = [null, null, null, null];
+            renderForge();
+        }
+
+        function renderForge() {
+            els.forgeSlots.forEach((slotEl, idx) => {
+                slotEl.innerHTML = renderItemSVG(state.forge[idx]);
+                slotEl.style.opacity = '1'; 
+            });
+        }
+
+        function renderBlueprint() {
+            els.blueprintContainer.innerHTML = state.blueprint.map((target, idx) => `
+                <div class="blueprint-slot w-14 h-14 md:w-16 md:h-16 rounded-xl border-2 border-dashed ${target.filled ? 'border-emerald-400 bg-emerald-900/30' : 'border-slate-500 bg-slate-900/50'} flex items-center justify-center touch-none relative transition-colors duration-300" data-bp-index="${idx}">
+                    ${renderItemSVG(target.item, true, target.filled)}
+                </div>
+            `).join('');
+        }
+
+        function triggerAnim(el, animClass) {
+            if(!el) return;
+            el.classList.remove(animClass);
+            void el.offsetWidth; // Trigger reflow
+            el.classList.add(animClass);
+            setTimeout(() => el.classList.remove(animClass), 300);
+        }
+
+        function mixItems(itemA, itemB) {
+            // Shape + Color = Colored Shape
+            if ((itemA.type === 'color' && itemB.type === 'shape') || 
+                (itemA.type === 'shape' && itemB.type === 'color')) {
+                const color = itemA.type === 'color' ? itemA.color : itemB.color;
+                const shape = itemA.type === 'shape' ? itemA.shape : itemB.shape;
+                return { type: 'colored_shape', color: color, shape: shape };
+            }
+            
+            // Color + Color = Secondary Color (if applicable)
+            if (itemA.type === 'color' && itemB.type === 'color') {
+                const mixKey = `${itemA.color}-${itemB.color}`;
+                if (MIX_RECIPES[mixKey]) return { type: 'color', color: MIX_RECIPES[mixKey] };
+            }
+
+            return null; // Invalid mix
+        }
+
+        function checkWinCondition() {
+            if (state.blueprint.every(t => t.filled)) {
+                els.blueprintContainer.classList.add('anim-success');
+                setTimeout(() => {
+                    els.blueprintContainer.classList.remove('anim-success');
+                    els.winModal.classList.remove('hidden');
+                    els.winModal.classList.add('flex');
+                }, 800);
+            }
+        }
+
+        let dragContext = null; // { source: 'dispenser'|'forge', idx: num, item: obj }
+
+        document.addEventListener('pointerdown', (e) => {
+            // Find what we clicked on
+            const dispenserEl = e.target.closest('.dispenser');
+            const forgeSlotEl = e.target.closest('[data-forge-idx]');
+
+            if (dispenserEl) {
+                // Dragging from infinite supply
+                const type = dispenserEl.dataset.spawnType;
+                const val = dispenserEl.dataset.spawnVal;
+                
+                dragContext = {
+                    source: 'dispenser',
+                    item: type === 'color' ? { type: 'color', color: val } : { type: 'shape', shape: val }
+                };
+            } else if (forgeSlotEl) {
+                // Dragging an existing item from the Forge
+                const idx = parseInt(forgeSlotEl.dataset.forgeIdx);
+                if (!state.forge[idx]) return; // Slot is empty
+                
+                dragContext = {
+                    source: 'forge',
+                    idx: idx,
+                    item: state.forge[idx]
+                };
+                // Visually dim the source slot while dragging
+                forgeSlotEl.style.opacity = '0.2';
+            } else {
+                return; // Not dragging anything draggable
+            }
+
+            // Setup ghost element
+            els.ghost.innerHTML = renderItemSVG(dragContext.item);
+            els.ghost.style.display = 'flex';
+            moveGhost(e.clientX, e.clientY);
+            
+            e.preventDefault();
+        }, { passive: false });
+
+        document.addEventListener('pointermove', (e) => {
+            if (!dragContext) return;
+            moveGhost(e.clientX, e.clientY);
+            e.preventDefault();
+        }, { passive: false });
+
+        document.addEventListener('pointerup', (e) => {
+            if (!dragContext) return;
+
+            // Hide ghost temporarily to find what's underneath it
+            els.ghost.style.display = 'none';
+            const dropTargetEl = document.elementFromPoint(e.clientX, e.clientY);
+            
+            let handled = false;
+
+            if (dropTargetEl) {
+                const targetForge = dropTargetEl.closest('[data-forge-idx]');
+                const targetBlueprint = dropTargetEl.closest('[data-bp-index]');
+                const targetTrash = dropTargetEl.closest('#trash-slot');
+
+                if (targetForge) {
+                    // Dropped onto the Forge
+                    const targetIdx = parseInt(targetForge.dataset.forgeIdx);
+                    
+                    if (dragContext.source === 'forge' && dragContext.idx === targetIdx) {
+                        // Dropped back onto itself, do nothing
+                    } else if (state.forge[targetIdx] === null) {
+                        // Empty slot, place it
+                        state.forge[targetIdx] = dragContext.item;
+                        if (dragContext.source === 'forge') state.forge[dragContext.idx] = null;
+                        triggerAnim(targetForge, 'anim-pop');
+                        handled = true;
+                    } else {
+                        // Slot occupied, attempt to mix
+                        const mixed = mixItems(dragContext.item, state.forge[targetIdx]);
+                        if (mixed) {
+                            state.forge[targetIdx] = mixed;
+                            if (dragContext.source === 'forge') state.forge[dragContext.idx] = null;
+                            state.score += 15;
+                            els.score.innerText = state.score;
+                            triggerAnim(targetForge, 'anim-pop');
+                            handled = true;
+                        } else {
+                            // Invalid mix, shake it
+                            triggerAnim(targetForge, 'anim-shake');
+                        }
+                    }
+                } else if (targetBlueprint) {
+                    // Dropped onto Blueprint
+                    const bpIdx = parseInt(targetBlueprint.dataset.bpIndex);
+                    const targetData = state.blueprint[bpIdx];
+                    const droppedItem = dragContext.item;
+
+                    if (!targetData.filled && 
+                        droppedItem.type === 'colored_shape' && 
+                        droppedItem.color === targetData.item.color && 
+                        droppedItem.shape === targetData.item.shape) {
+                        
+                        // Match successful!
+                        targetData.filled = true;
+                        if (dragContext.source === 'forge') state.forge[dragContext.idx] = null;
+                        
+                        state.score += 100;
+                        els.score.innerText = state.score;
+                        triggerAnim(targetBlueprint, 'anim-pop');
+                        checkWinCondition();
+                        handled = true;
+                    } else {
+                        triggerAnim(targetBlueprint, 'anim-shake');
+                    }
+                } else if (targetTrash) {
+                    // Dropped in Trash
+                    if (dragContext.source === 'forge') {
+                        state.forge[dragContext.idx] = null; // Delete it forever
+                    }
+                    triggerAnim(els.trashSlot, 'anim-pop');
+                    handled = true;
+                }
+            }
+            
+            // Clean up
+            dragContext = null;
+            els.ghost.innerHTML = '';
+            renderForge();
+            renderBlueprint();
+        });
+
+        function moveGhost(x, y) {
+            els.ghost.style.left = (x - els.ghost.offsetWidth / 2) + 'px';
+            els.ghost.style.top = (y - els.ghost.offsetHeight / 2) + 'px';
+        }
+
+        function closeInstructions() {
+            els.instructionsModal.classList.add('hidden');
+        }
+
+        function showInstructions() {
+            els.instructionsModal.classList.remove('hidden');
+            els.instructionsModal.classList.add('flex');
+        }
+
+        function nextLevel() {
+            els.winModal.classList.add('hidden');
+            els.winModal.classList.remove('flex');
+            state.level++;
+            els.level.innerText = state.level;
+            generateLevel();
+        }
+
+        // Initialize first level
+        generateLevel();
+
+    </script>
+</body>
+</html>
