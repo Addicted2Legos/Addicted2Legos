@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Canvas Pixel Farm Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #2c3e50;
+            font-family: 'VT323', monospace;
+            touch-action: none; /* Prevent zooming/scrolling on mobile */
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #1a252f;
+        }
+
+        canvas {
+            background-color: #7cb342;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            image-rendering: pixelated;
+        }
+
+        /* UI Overlay Styles */
+        .hud-panel {
+            position: absolute;
+            background: rgba(139, 69, 19, 0.9);
+            border: 4px solid #5c4033;
+            border-radius: 8px;
+            color: #fff;
+            padding: 10px 15px;
+            pointer-events: none; /* Let clicks pass through to canvas */
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        #tasks-panel {
+            top: 20px;
+            left: 20px;
+            min-width: 250px;
+        }
+
+        #tasks-panel h2 {
+            margin: 0 0 10px 0;
+            font-size: 1.8rem;
+            color: #f1c40f;
+            border-bottom: 2px dashed #f1c40f;
+            padding-bottom: 5px;
+        }
+
+        .task-item {
+            font-size: 1.4rem;
+            margin: 5px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .task-completed {
+            color: #2ecc71;
+            text-decoration: line-through;
+        }
+
+        #stats-panel {
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .stat-box {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px 15px;
+            border-radius: 5px;
+            font-size: 1.6rem;
+            border: 2px solid #34495e;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .gold-text { color: #f1c40f; }
+        .time-text { color: #3498db; }
+        
+        #message-box {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(41, 128, 185, 0.9);
+            border: 4px solid #2980b9;
+            padding: 15px 30px;
+            font-size: 1.5rem;
+            border-radius: 8px;
+            color: white;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        
+        <!-- HUD Overlay -->
+        <div id="tasks-panel" class="hud-panel">
+            <h2>Current Tasks</h2>
+            <div id="task-list">
+                <!-- Tasks will be injected here via JS -->
+            </div>
+        </div>
+
+        <div id="stats-panel" class="hud-panel !bg-transparent !border-none !p-0">
+            <div class="stat-box">
+                <span>🪙</span> <span id="gold-display" class="gold-text">0G</span>
+            </div>
+            <div class="stat-box">
+                <span>🕒</span> <span id="time-display" class="time-text">06:00 AM</span>
+            </div>
+        </div>
+
+        <div id="message-box">Welcome to the Farm! Click crops to grow/harvest.</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Virtual resolution (game internal logic size)
+        const GAME_WIDTH = 1024;
+        const GAME_HEIGHT = 768;
+
+        // Game State
+        let state = {
+            gold: 150,
+            time: { hours: 6, minutes: 0, raw: 6 * 60 }, // Raw minutes since midnight
+            tasks: [],
+            floatingTexts: [],
+            lastTime: 0,
+            daySpeed: 2, // How fast game time passes relative to real time (1 real sec = daySpeed in-game mins)
+        };
+
+        // Entities arrays
+        let crops = [];
+        let animals = [];
+        let buildings = [];
+        let breakables = [];
+        let decorations = [];
+
+        // UI Elements
+        const taskListEl = document.getElementById('task-list');
+        const goldDisplayEl = document.getElementById('gold-display');
+        const timeDisplayEl = document.getElementById('time-display');
+        const messageBoxEl = document.getElementById('message-box');
+
+        const possibleTasks = [
+            { id: 'harvest_corn', name: 'Harvest Corn', icon: '🌽', type: 'harvest', target: 'corn', maxAmount: 5 },
+            { id: 'harvest_carrot', name: 'Harvest Carrots', icon: '🥕', type: 'harvest', target: 'carrot', maxAmount: 5 },
+            { id: 'milk_cow', name: 'Milk Cows', icon: '🥛', type: 'collect', target: 'cow', maxAmount: 3 },
+            { id: 'sheer_sheep', name: 'Sheer Sheep', icon: '🧶', type: 'collect', target: 'sheep', maxAmount: 2 },
+            { id: 'fix_items', name: 'Fix Equipment', icon: '🔧', type: 'fix', target: 'any', maxAmount: 2 }
+        ];
+
+        function generateTask() {
+            const template = possibleTasks[Math.floor(Math.random() * possibleTasks.length)];
+            const amount = Math.floor(Math.random() * template.maxAmount) + 1;
+            
+            return {
+                id: template.id + '_' + Date.now(),
+                template: template,
+                current: 0,
+                required: amount,
+                completed: false
+            };
+        }
+
+        function initTasks() {
+            state.tasks = [generateTask(), generateTask(), generateTask()];
+            renderTasks();
+        }
+
+        function createCrop(x, y, subType) {
+            return {
+                type: 'crop', subType: subType, x: x, y: y, w: 60, h: 60,
+                state: 'empty', // empty -> growing -> ready
+                timer: 0, maxTime: subType === 'corn' ? 10 : 8, // seconds
+                emoji: subType === 'corn' ? '🌽' : '🥕',
+                seedEmoji: '🌱', dirtEmoji: '🟫'
+            };
+        }
+
+        function createAnimal(x, y, subType) {
+            return {
+                type: 'animal', subType: subType, x: x, y: y, w: 70, h: 70,
+                state: 'idle', // idle -> cooldown
+                timer: 0, maxTime: subType === 'cow' ? 15 : (subType === 'sheep' ? 20 : 10),
+                emoji: subType === 'cow' ? '🐄' : (subType === 'sheep' ? '🐑' : '🐓'),
+                productEmoji: subType === 'cow' ? '🥛' : (subType === 'sheep' ? '🧶' : '🥚'),
+                moveTimer: 0, targetX: x, targetY: y, originX: x, originY: y // basic wandering
+            };
+        }
+
+        function createBreakable(x, y, subType, emoji) {
+            return {
+                type: 'breakable', subType: subType, x: x, y: y, w: 80, h: 80,
+                state: 'normal', // normal -> broken
+                emoji: emoji,
+                brokenTimer: Math.random() * 60 + 30 // Initial random break time
+            };
+        }
+
+        function createBuilding(x, y, w, h, emoji, label) {
+            return { type: 'building', x: x, y: y, w: w, h: h, emoji: emoji, label: label };
+        }
+
+        function initWorld() {
+            // Field 1 (Corn) - Top Left
+            for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < 3; c++) {
+                    crops.push(createCrop(100 + c * 70, 150 + r * 70, 'corn'));
+                }
+            }
+            
+            // Field 2 (Carrots) - Middle Left
+            for (let r = 0; r < 2; r++) {
+                for (let c = 0; c < 4; c++) {
+                    crops.push(createCrop(100 + c * 70, 400 + r * 70, 'carrot'));
+                }
+            }
+
+            // Animals - Bottom Right
+            animals.push(createAnimal(750, 500, 'cow'));
+            animals.push(createAnimal(850, 550, 'cow'));
+            animals.push(createAnimal(700, 650, 'sheep'));
+            animals.push(createAnimal(800, 600, 'chicken'));
+            animals.push(createAnimal(880, 680, 'chicken'));
+
+            // Buildings - Top Right
+            buildings.push(createBuilding(750, 80, 180, 160, '🏠', 'Farmhouse'));
+            buildings.push(createBuilding(550, 120, 160, 140, '🛖', 'Barn'));
+
+            // Breakables / Machinery
+            breakables.push(createBreakable(350, 250, 'tractor', '🚜'));
+            breakables.push(createBreakable(480, 380, 'pipe', '🚰'));
+            breakables.push(createBreakable(650, 480, 'fence', '🚧'));
+
+            // Decorations (trees, rocks)
+            for(let i=0; i<10; i++) {
+                decorations.push({
+                    x: Math.random() * GAME_WIDTH, 
+                    y: Math.random() * GAME_HEIGHT, 
+                    emoji: Math.random() > 0.5 ? '🌲' : '🌳',
+                    size: 40 + Math.random() * 40
+                });
+            }
+        }
+
+        function resizeCanvas() {
+            const container = document.getElementById('game-container');
+            const containerWidth = container.clientWidth;
+            const containerHeight = container.clientHeight;
+            
+            // Maintain aspect ratio
+            const scaleX = containerWidth / GAME_WIDTH;
+            const scaleY = containerHeight / GAME_HEIGHT;
+            const scale = Math.min(scaleX, scaleY) * 0.95; // 95% to leave slight margin
+
+            canvas.width = GAME_WIDTH;
+            canvas.height = GAME_HEIGHT;
+            
+            // Apply CSS transform to scale visually
+            canvas.style.transform = `scale(${scale})`;
+            
+            // Store scale for input coordinate mapping
+            state.scale = scale;
+            
+            // Ensure crisp rendering for pixel art style
+            ctx.imageSmoothingEnabled = false;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        function handleInput(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            
+            // Calculate coordinates relative to the actual canvas pixel size
+            // We use the bounding client rect which includes the CSS transform scale
+            const x = (clientX - rect.left) / state.scale;
+            const y = (clientY - rect.top) / state.scale;
+
+            // Check interactions in reverse order (top layer first)
+            
+            // 1. Check Breakables
+            for (let b of breakables) {
+                if (checkClick(x, y, b)) {
+                    if (b.state === 'broken') {
+                        b.state = 'normal';
+                        b.brokenTimer = Math.random() * 60 + 60; // Reset timer
+                        addGold(50, b.x, b.y);
+                        spawnFloatingText('Fixed! +50G', b.x, b.y, '#2ecc71');
+                        progressTask('fix', 'any');
+                    } else {
+                        spawnFloatingText('Working fine!', b.x, b.y, '#bdc3c7');
+                    }
+                    return;
+                }
+            }
+
+            // 2. Check Animals
+            for (let a of animals) {
+                if (checkClick(x, y, a)) {
+                    if (a.state === 'idle') {
+                        a.state = 'cooldown';
+                        a.timer = a.maxTime;
+                        const reward = a.subType === 'cow' ? 30 : 15;
+                        addGold(reward, a.x, a.y);
+                        spawnFloatingText(`+${reward}G`, a.x, a.y, '#f1c40f');
+                        progressTask('collect', a.subType);
+                    } else {
+                        spawnFloatingText('Resting...', a.x, a.y, '#95a5a6');
+                    }
+                    return;
+                }
+            }
+
+            // 3. Check Crops
+            for (let c of crops) {
+                if (checkClick(x, y, c)) {
+                    if (c.state === 'ready') {
+                        c.state = 'empty';
+                        const reward = c.subType === 'corn' ? 20 : 10;
+                        addGold(reward, c.x, c.y);
+                        spawnFloatingText(`+${reward}G`, c.x, c.y, '#f1c40f');
+                        progressTask('harvest', c.subType);
+                    } else if (c.state === 'empty') {
+                        if (state.gold >= 5) {
+                            state.gold -= 5;
+                            c.state = 'growing';
+                            c.timer = c.maxTime;
+                            updateStatsUI();
+                            spawnFloatingText('-5G', c.x, c.y, '#e74c3c');
+                        } else {
+                            showMessage("Not enough gold to plant seeds! (Need 5G)");
+                        }
+                    } else if (c.state === 'growing') {
+                        spawnFloatingText('Growing...', c.x, c.y, '#3498db');
+                    }
+                    return;
+                }
+            }
+        }
+
+        function checkClick(mx, my, entity) {
+            return mx >= entity.x && mx <= entity.x + entity.w &&
+                   my >= entity.y && my <= entity.y + entity.h;
+        }
+
+        // Attach listeners
+        canvas.addEventListener('mousedown', (e) => handleInput(e.clientX, e.clientY));
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Prevent scrolling
+            if(e.touches.length > 0) {
+                handleInput(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, {passive: false});
+
+        function update(dt) {
+            // Update Time
+            state.time.raw += state.daySpeed * dt;
+            if (state.time.raw >= 24 * 60) state.time.raw = 0;
+            state.time.hours = Math.floor(state.time.raw / 60);
+            state.time.minutes = Math.floor(state.time.raw % 60);
+            updateStatsUI();
+
+            // Update Crops
+            for (let c of crops) {
+                if (c.state === 'growing') {
+                    c.timer -= dt;
+                    if (c.timer <= 0) {
+                        c.state = 'ready';
+                    }
+                }
+            }
+
+            // Update Animals
+            for (let a of animals) {
+                if (a.state === 'cooldown') {
+                    a.timer -= dt;
+                    if (a.timer <= 0) {
+                        a.state = 'idle';
+                    }
+                }
+                
+                // Wandering logic
+                a.moveTimer -= dt;
+                if(a.moveTimer <= 0) {
+                    a.moveTimer = Math.random() * 5 + 2;
+                    // Pick new target within 50px of origin
+                    a.targetX = a.originX + (Math.random() - 0.5) * 100;
+                    a.targetY = a.originY + (Math.random() - 0.5) * 100;
+                }
+                
+                // Move towards target smoothly
+                a.x += (a.targetX - a.x) * dt * 0.5;
+                a.y += (a.targetY - a.y) * dt * 0.5;
+            }
+
+            // Update Breakables
+            for (let b of breakables) {
+                if (b.state === 'normal') {
+                    b.brokenTimer -= dt;
+                    if (b.brokenTimer <= 0) {
+                        b.state = 'broken';
+                        showMessage(`Oh no! The ${b.subType} is broken!`);
+                    }
+                }
+            }
+
+            // Update Floating Texts
+            for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
+                let ft = state.floatingTexts[i];
+                ft.y -= 20 * dt; // Float up
+                ft.life -= dt;
+                if (ft.life <= 0) {
+                    state.floatingTexts.splice(i, 1);
+                }
+            }
+        }
+
+        function addGold(amount) {
+            state.gold += amount;
+            updateStatsUI();
+            
+            // Visual bump effect on UI
+            goldDisplayEl.style.transform = 'scale(1.3)';
+            setTimeout(() => { goldDisplayEl.style.transform = 'scale(1)'; }, 200);
+        }
+
+        function progressTask(actionType, targetType) {
+            let uiUpdated = false;
+            for (let i = 0; i < state.tasks.length; i++) {
+                let t = state.tasks[i];
+                if (!t.completed && t.template.type === actionType && (t.template.target === targetType || t.template.target === 'any')) {
+                    t.current++;
+                    if (t.current >= t.required) {
+                        t.completed = true;
+                        addGold(50); // Bonus for completing task
+                        spawnFloatingText('+50G Bonus!', GAME_WIDTH/2, GAME_HEIGHT/2, '#f1c40f');
+                        
+                        // Replace task after a short delay
+                        setTimeout(() => {
+                            state.tasks[i] = generateTask();
+                            renderTasks();
+                        }, 2000);
+                    }
+                    uiUpdated = true;
+                }
+            }
+            if (uiUpdated) renderTasks();
+        }
+
+        function renderTasks() {
+            taskListEl.innerHTML = '';
+            state.tasks.forEach(t => {
+                const div = document.createElement('div');
+                div.className = `task-item ${t.completed ? 'task-completed' : ''}`;
+                div.innerHTML = `
+                    <span>${t.template.icon}</span> 
+                    <span>${t.template.name} [${t.current}/${t.required}]</span>
+                    ${t.completed ? '<span>✅</span>' : ''}
+                `;
+                taskListEl.appendChild(div);
+            });
+        }
+
+        function updateStatsUI() {
+            goldDisplayEl.innerText = `${Math.floor(state.gold)}G`;
+            
+            let h = state.time.hours;
+            const m = state.time.minutes.toString().padStart(2, '0');
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12;
+            h = h ? h : 12; // 0 becomes 12
+            timeDisplayEl.innerText = `${h}:${m} ${ampm}`;
+        }
+
+        function showMessage(msg) {
+            messageBoxEl.innerText = msg;
+            messageBoxEl.style.opacity = 1;
+            setTimeout(() => {
+                messageBoxEl.style.opacity = 0;
+            }, 3000);
+        }
+
+        function spawnFloatingText(text, x, y, color) {
+            state.floatingTexts.push({
+                text: text, x: x + 20, y: y, color: color, life: 1.5, initialLife: 1.5
+            });
+        }
+
+        function drawMap(ctx) {
+            // Base grass
+            ctx.fillStyle = '#7cb342';
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+            // Draw a subtle grid/pattern for grass texture
+            ctx.fillStyle = 'rgba(0,0,0,0.05)';
+            for(let i=0; i<GAME_WIDTH; i+=40) {
+                for(let j=0; j<GAME_HEIGHT; j+=40) {
+                    if((i+j)%80 === 0) ctx.fillRect(i, j, 40, 40);
+                }
+            }
+
+            // Draw Paths
+            ctx.fillStyle = '#d7ccc8'; // Dirt color
+            // Main horizontal path
+            ctx.fillRect(0, 320, GAME_WIDTH, 60);
+            // Main vertical path
+            ctx.fillRect(400, 0, 60, GAME_HEIGHT);
+            // Paths to buildings
+            ctx.fillRect(400, 180, 250, 40); // to barn
+            ctx.fillRect(460, 220, 290, 40); // to house
+
+            // Draw Decorations (Trees) - Rendered behind everything else
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            for(let d of decorations) {
+                ctx.font = `${d.size}px Arial`;
+                ctx.fillText(d.emoji, d.x, d.y);
+            }
+        }
+
+        function drawEntities(ctx) {
+            // Draw Buildings
+            for(let b of buildings) {
+                // Shadow
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.fillRoundRect(b.x + 10, b.y + 10, b.w, b.h, 10);
+                
+                // Base structure (simulate depth)
+                ctx.fillStyle = '#8d6e63'; // Brown walls
+                ctx.fillRoundRect(b.x, b.y, b.w, b.h, 10);
+                
+                // Emoji
+                ctx.font = `${b.w * 0.7}px Arial`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(b.emoji, b.x + b.w/2, b.y + b.h/2);
+
+                // Label
+                ctx.fillStyle = 'white';
+                ctx.font = '24px VT323';
+                ctx.fillText(b.label, b.x + b.w/2, b.y - 10);
+            }
+
+            // Draw Crops
+            for (let c of crops) {
+                // Plot background
+                ctx.fillStyle = '#5d4037';
+                ctx.fillRoundRect(c.x, c.y, c.w, c.h, 5);
+                ctx.strokeStyle = '#3e2723';
+                ctx.lineWidth = 3;
+                ctx.strokeRoundRect(c.x, c.y, c.w, c.h, 5);
+
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                const cx = c.x + c.w/2;
+                const cy = c.y + c.h/2;
+
+                if (c.state === 'empty') {
+                    ctx.font = '30px Arial';
+                    ctx.fillText(c.dirtEmoji, cx, cy);
+                } else if (c.state === 'growing') {
+                    ctx.font = '30px Arial';
+                    ctx.fillText(c.seedEmoji, cx, cy);
+                    // Progress bar
+                    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                    ctx.fillRect(c.x + 5, c.y + c.h - 10, c.w - 10, 5);
+                    ctx.fillStyle = '#2ecc71';
+                    const pct = 1 - (c.timer / c.maxTime);
+                    ctx.fillRect(c.x + 5, c.y + c.h - 10, (c.w - 10) * pct, 5);
+                } else if (c.state === 'ready') {
+                    // Sway animation based on time
+                    const sway = Math.sin(Date.now() / 200 + c.x) * 5;
+                    ctx.font = '40px Arial';
+                    ctx.fillText(c.emoji, cx + sway, cy);
+                    
+                    // Ready indicator
+                    ctx.fillStyle = '#f1c40f';
+                    ctx.font = '20px Arial';
+                    ctx.fillText('✨', cx + c.w/2 - 10, cy - c.h/2 + 10);
+                }
+            }
+
+            // Draw Breakables
+            for (let b of breakables) {
+                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                ctx.fillRoundRect(b.x, b.y, b.w, b.h, 8);
+                
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.font = '50px Arial';
+                const cx = b.x + b.w/2;
+                const cy = b.y + b.h/2;
+                
+                // Shake if broken
+                let dx = 0, dy = 0;
+                if (b.state === 'broken') {
+                    dx = (Math.random() - 0.5) * 4;
+                    dy = (Math.random() - 0.5) * 4;
+                    
+                    // Red glow
+                    ctx.shadowColor = 'red';
+                    ctx.shadowBlur = 15;
+                }
+
+                ctx.fillText(b.emoji, cx + dx, cy + dy);
+                ctx.shadowBlur = 0; // reset
+
+                if (b.state === 'broken') {
+                    ctx.font = '30px Arial';
+                    // Pulse animation for wrench
+                    const scale = 1 + Math.sin(Date.now() / 150) * 0.2;
+                    ctx.save();
+                    ctx.translate(cx, cy - b.h/2);
+                    ctx.scale(scale, scale);
+                    ctx.fillText('🔧', 0, 0);
+                    ctx.restore();
+                }
+            }
+
+            // Draw Animals
+            for (let a of animals) {
+                // Shadow
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.fillEllipse(a.x + a.w/2, a.y + a.h - 10, a.w*0.8, 15);
+
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                const cx = a.x + a.w/2;
+                const cy = a.y + a.h/2;
+
+                // Bobbing animation if moving
+                let yOffset = 0;
+                if(Math.abs(a.targetX - a.x) > 1 || Math.abs(a.targetY - a.y) > 1) {
+                    yOffset = Math.sin(Date.now() / 100) * 3;
+                }
+
+                if (a.state === 'cooldown') {
+                    ctx.globalAlpha = 0.5;
+                }
+                ctx.font = '50px Arial';
+                // Flip horizontally based on movement direction
+                ctx.save();
+                ctx.translate(cx, cy + yOffset);
+                if (a.targetX < a.x) {
+                    ctx.scale(-1, 1);
+                }
+                ctx.fillText(a.emoji, 0, 0);
+                ctx.restore();
+                ctx.globalAlpha = 1.0;
+
+                // Status icons
+                if (a.state === 'idle') {
+                    // Ready to collect bubble
+                    ctx.fillStyle = 'white';
+                    ctx.beginPath();
+                    ctx.arc(cx + 20, cy - 25, 15, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#333';
+                    ctx.stroke();
+                    ctx.font = '16px Arial';
+                    ctx.fillText(a.productEmoji, cx + 20, cy - 25);
+                } else if (a.state === 'cooldown') {
+                    // Sleeping/resting Zzz
+                    ctx.fillStyle = 'white';
+                    ctx.font = '16px VT323';
+                    ctx.fillText('Zzz', cx + 20, cy - 30 - yOffset);
+                }
+            }
+        }
+
+        function drawOverlay(ctx) {
+            // Draw Floating Texts
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.font = 'bold 28px VT323';
+            for (let ft of state.floatingTexts) {
+                ctx.globalAlpha = ft.life / ft.initialLife;
+                
+                // Stroke
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = 4;
+                ctx.strokeText(ft.text, ft.x, ft.y);
+                
+                // Fill
+                ctx.fillStyle = ft.color;
+                ctx.fillText(ft.text, ft.x, ft.y);
+            }
+            ctx.globalAlpha = 1.0;
+
+            // Day/Night Cycle Overlay (Color tint)
+            let hour = state.time.raw / 60;
+            let overlayColor = 'rgba(0,0,0,0)';
+            
+            if (hour < 5 || hour > 20) {
+                // Night
+                overlayColor = 'rgba(10, 10, 40, 0.4)';
+            } else if (hour >= 5 && hour < 7) {
+                // Dawn
+                overlayColor = 'rgba(255, 100, 0, 0.2)';
+            } else if (hour >= 18 && hour <= 20) {
+                // Dusk
+                overlayColor = 'rgba(255, 50, 50, 0.2)';
+            }
+
+            if (overlayColor !== 'rgba(0,0,0,0)') {
+                ctx.fillStyle = overlayColor;
+                ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+            }
+        }
+
+        
+        // Canvas extensions for easier shape drawing
+        CanvasRenderingContext2D.prototype.fillRoundRect = function (x, y, w, h, r) {
+            this.beginPath();
+            this.moveTo(x + r, y);
+            this.arcTo(x + w, y, x + w, y + h, r);
+            this.arcTo(x + w, y + h, x, y + h, r);
+            this.arcTo(x, y + h, x, y, r);
+            this.arcTo(x, y, x + r, y, r);
+            this.fill();
+        };
+
+        CanvasRenderingContext2D.prototype.strokeRoundRect = function (x, y, w, h, r) {
+            this.beginPath();
+            this.moveTo(x + r, y);
+            this.arcTo(x + w, y, x + w, y + h, r);
+            this.arcTo(x + w, y + h, x, y + h, r);
+            this.arcTo(x, y + h, x, y, r);
+            this.arcTo(x, y, x + r, y, r);
+            this.stroke();
+        };
+
+        CanvasRenderingContext2D.prototype.fillEllipse = function(x, y, rx, ry) {
+            this.beginPath();
+            this.ellipse(x, y, rx, ry, 0, 0, 2 * Math.PI);
+            this.fill();
+        }
+
+        function loop(timestamp) {
+            if (!state.lastTime) state.lastTime = timestamp;
+            const dt = (timestamp - state.lastTime) / 1000; // Delta time in seconds
+            state.lastTime = timestamp;
+
+            // Cap dt to prevent huge jumps if tab is inactive
+            if (dt < 0.1) {
+                update(dt);
+                
+                // Clear and draw
+                ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+                drawMap(ctx);
+                drawEntities(ctx);
+                drawOverlay(ctx);
+            }
+
+            requestAnimationFrame(loop);
+        }
+
+        // Initialize Game
+        function start() {
+            resizeCanvas();
+            initWorld();
+            initTasks();
+            updateStatsUI();
+            requestAnimationFrame(loop);
+        }
+
+        // Wait for font to load before starting to prevent missing text
+        document.fonts.ready.then(() => {
+            start();
+        });
+
+    </script>
+</body>
+</html>
