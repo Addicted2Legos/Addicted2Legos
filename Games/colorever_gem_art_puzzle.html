@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Colorever - Gem Art Puzzle</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Disable selection, scrolling, and double-tap zoom */
+        * {
+            touch-action: manipulation;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            height: 100dvh;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            position: fixed;
+            background-color: #e5def7;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overscroll-behavior: none;
+        }
+
+        /* Subtle textured background */
+        .bg-lavender-pattern {
+            background-color: #e2dbf7;
+            background-image: 
+                linear-gradient(135deg, rgba(255,255,255,0.2) 25%, transparent 25%), 
+                linear-gradient(225deg, rgba(255,255,255,0.2) 25%, transparent 25%), 
+                linear-gradient(45deg, rgba(255,255,255,0.2) 25%, transparent 25%), 
+                linear-gradient(315deg, rgba(255,255,255,0.2) 25%, transparent 25%);
+            background-position: 16px 0, 16px 0, 0 0, 0 0;
+            background-size: 32px 32px;
+            background-repeat: repeat;
+        }
+
+        /* Cream wooden frame container */
+        .board-frame {
+            background: linear-gradient(135deg, #fbf7ed 0%, #ede3ce 100%);
+            border: 3px solid #d4c4a8;
+            box-shadow: 0 10px 24px rgba(95, 78, 126, 0.3), inset 0 2px 6px rgba(255, 255, 255, 0.9);
+            position: relative;
+        }
+
+        /* STRICT 20x20 GRID CONFIGURATION FIX */
+        #art-grid {
+            display: grid !important;
+            grid-template-columns: repeat(20, minmax(0, 1fr)) !important;
+            grid-template-rows: repeat(20, minmax(0, 1fr)) !important;
+            width: 100% !important;
+            height: 100% !important;
+            aspect-ratio: 1 / 1 !important;
+            gap: 1px;
+        }
+
+        .board-socket {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .gem-selected {
+            animation: gemGlowPulse 0.8s infinite alternate ease-in-out;
+            z-index: 30;
+        }
+
+        @keyframes gemGlowPulse {
+            0% {
+                transform: scale(1.15);
+                filter: drop-shadow(0 0 4px #38bdf8) drop-shadow(0 0 8px #0284c7);
+            }
+            100% {
+                transform: scale(1.3);
+                filter: drop-shadow(0 0 8px #38bdf8) drop-shadow(0 0 12px #0284c7);
+            }
+        }
+
+        /* Staging Tray Container */
+        .staging-tray-container {
+            background: linear-gradient(180deg, #fdfbf7 0%, #f3ebd9 100%);
+            border: 3px solid #e2d2b5;
+            box-shadow: 0 8px 20px rgba(80, 60, 110, 0.22), inset 0 2px 4px rgba(255, 255, 255, 0.9);
+        }
+
+        .staging-tray-container.destination-active {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 18px rgba(59, 130, 246, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.9);
+            animation: trayPulse 1.2s infinite alternate ease-in-out;
+        }
+
+        @keyframes trayPulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.01); }
+        }
+
+        .tray-slot-inset {
+            background: #ded5c2;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25);
+            border-radius: 9999px;
+        }
+
+        #flying-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        #particle-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 90;
+        }
+    </style>
+</head>
+<body class="bg-lavender-pattern flex flex-col justify-between h-[100dvh] w-full select-none overflow-hidden">
+
+    <header class="w-full pt-3 pb-2 px-4 flex items-center justify-between shrink-0 z-20 max-w-md mx-auto">
+        <div class="flex items-center gap-2">
+            <button id="btn-gallery" class="w-9 h-9 rounded-xl bg-white/90 border border-slate-300 shadow-sm flex items-center justify-center text-slate-700 active:scale-95 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+            <div class="flex flex-col">
+                <span id="header-level-num" class="text-[10px] font-extrabold uppercase tracking-wider text-purple-700">Level 1</span>
+                <h1 id="header-level-name" class="text-sm sm:text-base font-black text-slate-900 leading-none">Giraffe on African Plains</h1>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <!-- Progress badge -->
+            <div class="px-2.5 py-1 rounded-full bg-amber-100 border border-amber-300 text-amber-900 font-extrabold text-xs shadow-sm">
+                <span id="progress-percent">0%</span>
+            </div>
+            <!-- Reset Button -->
+            <button id="btn-restart" class="w-9 h-9 rounded-xl bg-white/90 border border-slate-300 shadow-sm flex items-center justify-center text-slate-700 active:scale-95 transition" title="Restart Level">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col justify-between items-center px-2 py-1 w-full max-w-md mx-auto relative overflow-hidden">
+
+        <!-- 20x20 GEM PUZZLE BOARD -->
+        <div class="w-full flex-1 flex justify-center items-center my-1 relative">
+            <div id="board-container" class="board-frame p-2 sm:p-3 rounded-2xl w-full max-w-[350px] sm:max-w-[390px] aspect-square flex flex-col items-center justify-center">
+                <!-- Frame Ornaments -->
+                <div class="absolute top-1 left-1 w-3.5 h-3.5 border-t-2 border-l-2 border-amber-800/30 rounded-tl"></div>
+                <div class="absolute top-1 right-1 w-3.5 h-3.5 border-t-2 border-r-2 border-amber-800/30 rounded-tr"></div>
+                <div class="absolute bottom-1 left-1 w-3.5 h-3.5 border-b-2 border-l-2 border-amber-800/30 rounded-bl"></div>
+                <div class="absolute bottom-1 right-1 w-3.5 h-3.5 border-b-2 border-r-2 border-amber-800/30 rounded-br"></div>
+
+                <!-- Explicit 20x20 Grid -->
+                <div id="art-grid">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- STAGING TRAY (50 SLOTS: 5 ROWS x 10 COLS) -->
+        <div class="w-full px-1 my-2 shrink-0">
+            <div id="staging-tray-panel" class="staging-tray-container p-2 sm:p-2.5 rounded-2xl transition-all duration-300 cursor-pointer">
+                <div id="staging-tray" class="grid grid-cols-10 gap-1.5 w-full justify-items-center">
+                    <!-- Tray slots populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <div id="modal-gallery" class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-end justify-center opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-gradient-to-b from-amber-50 to-amber-100 rounded-t-3xl w-full max-w-md p-5 border-t-4 border-amber-400 shadow-2xl transform translate-y-full transition-transform duration-300 max-h-[80vh] flex flex-col">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-amber-200">
+                <h2 class="text-lg font-black text-slate-900">Artwork Gallery</h2>
+                <button id="btn-close-gallery" class="w-8 h-8 rounded-full bg-amber-200/80 text-amber-900 font-bold flex items-center justify-center">✕</button>
+            </div>
+            <div id="gallery-list" class="grid grid-cols-2 gap-3 overflow-y-auto pr-1">
+                <!-- Gallery Cards -->
+            </div>
+        </div>
+    </div>
+
+    <!-- VICTORY CELEBRATION MODAL -->
+    <div id="modal-victory" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-gradient-to-b from-amber-50 to-amber-100 border-4 border-amber-400 rounded-3xl w-full max-w-xs flex flex-col items-center p-5 text-center shadow-2xl transform scale-95 transition-transform duration-300">
+            <div class="text-4xl mb-1 animate-bounce">🦒✨</div>
+            <h2 class="text-xl font-black text-slate-900 mb-0.5">SAVANNAH COMPLETED!</h2>
+            <p id="victory-level-name" class="text-xs text-amber-800 font-bold mb-3">Giraffe on African Plains</p>
+
+            <button id="btn-next-level" class="w-full py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl font-black text-sm shadow-lg hover:brightness-105 active:scale-95 transition">
+                Next Masterpiece ✨
+            </button>
+        </div>
+    </div>
+
+    <!-- FLYING LAYER & CANVAS PARTICLES -->
+    <div id="flying-layer"></div>
+    <canvas id="particle-canvas"></canvas>
+
+    <script>
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) this.ctx = new AudioCtx();
+                }
+            }
+
+            playTone(freq, type = 'sine', duration = 0.08, vol = 0.2) {
+                if (!this.enabled || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {}
+            }
+
+            playSelect() { this.playTone(880, 'sine', 0.08, 0.2); }
+            playCascadeChime(stepIndex) {
+                const baseFreq = 440;
+                const scale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
+                const noteOffset = scale[stepIndex % scale.length];
+                const freq = baseFreq * Math.pow(2, noteOffset / 12);
+                this.playTone(freq, 'triangle', 0.1, 0.2);
+            }
+            playSnap() { this.playTone(1200, 'sine', 0.08, 0.22); }
+            playSwap() { this.playTone(600, 'sawtooth', 0.1, 0.18); }
+            playError() { this.playTone(180, 'sawtooth', 0.12, 0.2); }
+            playVictory() {
+                const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+                notes.forEach((freq, idx) => {
+                    setTimeout(() => this.playTone(freq, 'triangle', 0.2, 0.25), idx * 75);
+                });
+            }
+            vibrate(ms = 15) {
+                if ('vibrate' in navigator) {
+                    try { navigator.vibrate(ms); } catch (e) {}
+                }
+            }
+        }
+
+        const sound = new SoundEngine();
+
+        const GEM_COLORS = {
+            1: { name: 'Giraffe Gold', primary: '#fbbf24', light: '#fef08a', dark: '#d97706' },
+            2: { name: 'Savannah Brown', primary: '#78350f', light: '#9a3412', dark: '#451a03' },
+            3: { name: 'Dusk Sky Purple', primary: '#6b21a8', light: '#a855f7', dark: '#3b0764' },
+            4: { name: 'Sunset Orange', primary: '#ea580c', light: '#fdba74', dark: '#9a3412' },
+            5: { name: 'Golden Grass', primary: '#84cc16', light: '#bef264', dark: '#3f6212' },
+            6: { name: 'Acacia Dark Green', primary: '#15803d', light: '#4ade80', dark: '#14532d' },
+            7: { name: 'Sand Tan', primary: '#d97706', light: '#fde68a', dark: '#92400e' }
+        };
+
+        function renderGemSVG(colorId, size = 16) {
+            const c = GEM_COLORS[colorId] || GEM_COLORS[1];
+            const uid = `gem-grad-${colorId}-${Math.floor(Math.random()*1000000)}`;
+
+            return `
+                <svg width="100%" height="100%" viewBox="0 0 32 32" class="drop-shadow pointer-events-none">
+                    <defs>
+                        <radialGradient id="${uid}" cx="35%" cy="30%" r="70%">
+                            <stop offset="0%" stop-color="${c.light}" />
+                            <stop offset="50%" stop-color="${c.primary}" />
+                            <stop offset="100%" stop-color="${c.dark}" />
+                        </radialGradient>
+                    </defs>
+                    <circle cx="16" cy="16" r="14" fill="url(#${uid})" />
+                    <circle cx="11" cy="10" r="3.5" fill="#ffffff" opacity="0.75" />
+                    <circle cx="8.5" cy="13" r="1.5" fill="#ffffff" opacity="0.45" />
+                </svg>
+            `;
+        }
+
+        // 1: Giraffe Gold, 2: Deep Brown Spots, 3: Dusk Sky Purple, 4: Sunset Orange, 5: Golden Grass, 6: Acacia Green, 7: Sand Tan
+        const GIRAFFE_GRID = [
+            [3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],
+            [3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1,2,3,1,2],
+            [3,3,3,3,3,3,3,3,3,3,3,3,3,3,1,1,1,1,1,2],
+            [3,3,3,3,3,3,3,3,3,3,3,3,3,3,1,2,1,1,1,2],
+            [3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1,1,1,2,2],
+            [4,4,4,4,4,4,4,4,4,4,4,4,4,3,3,1,1,2,2,4],
+            [4,4,4,4,4,4,4,4,4,4,4,4,4,4,1,1,1,2,4,4],
+            [4,4,4,4,4,4,4,4,4,4,4,4,4,1,1,2,1,2,4,4],
+            [4,4,4,6,6,6,4,4,4,4,4,4,1,1,1,2,1,2,4,4],
+            [4,4,6,6,6,6,6,4,4,4,4,1,1,2,1,1,2,2,4,4],
+            [7,7,6,6,6,6,6,7,7,7,1,1,1,2,1,2,2,7,7,7],
+            [7,7,7,6,6,6,7,7,7,1,1,2,1,1,2,2,7,7,7,7],
+            [7,7,7,7,6,7,7,7,1,1,1,2,1,2,2,7,7,7,7,7],
+            [7,7,7,7,7,7,7,1,1,2,1,1,2,2,7,7,7,7,7,7],
+            [7,7,7,7,7,7,1,1,1,2,1,2,2,7,7,7,7,7,7,7],
+            [5,5,5,5,5,1,1,2,1,1,2,2,1,1,5,5,5,5,5,5],
+            [5,5,5,5,1,1,1,2,1,2,2,1,1,1,1,5,5,5,5,5],
+            [5,5,5,5,1,2,1,5,5,1,2,1,5,5,1,2,5,5,5,5],
+            [5,5,5,5,1,2,1,5,5,1,2,1,5,5,1,2,5,5,5,5],
+            [5,5,5,5,2,2,5,5,5,2,2,5,5,5,2,2,5,5,5,5]
+        ];
+
+        const ROSE_GRID = [
+            [3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],
+            [3,5,5,5,5,5,5,5,3,3,3,3,5,5,5,5,3,3,3,3],
+            [3,5,5,5,5,5,5,3,3,2,2,3,3,5,5,3,3,3,3,3],
+            [3,5,5,5,5,5,3,3,2,2,2,2,3,3,5,5,3,3,3,3],
+            [3,5,5,5,5,5,3,2,1,1,1,1,2,3,5,5,6,6,3,3],
+            [3,5,5,5,5,3,3,2,1,1,1,1,2,3,3,6,6,6,3,3],
+            [3,5,5,5,3,3,1,1,2,2,2,2,1,1,3,3,6,6,3,3],
+            [3,5,5,3,3,1,1,2,3,3,3,3,2,1,1,3,3,3,3,3],
+            [3,5,3,3,1,1,1,2,3,4,4,3,2,1,1,1,3,3,5,3],
+            [3,5,3,1,1,1,2,3,4,4,4,4,3,2,1,1,1,3,5,3],
+            [3,3,3,1,1,1,2,3,4,4,4,4,3,2,1,1,1,3,3,3],
+            [3,5,3,1,1,1,2,3,4,4,4,4,3,2,1,1,1,3,5,3],
+            [3,5,3,3,1,1,1,2,3,4,4,3,2,1,1,1,3,3,3,3],
+            [3,5,5,3,3,1,1,2,3,3,3,3,2,1,1,3,3,3,3,3],
+            [3,5,6,3,3,3,1,1,2,2,2,2,1,1,3,3,3,3,3,3],
+            [3,6,6,6,5,3,3,2,1,1,1,1,2,3,3,5,5,5,3,3],
+            [3,6,6,6,5,5,3,2,1,1,1,1,2,3,5,5,5,5,5,3],
+            [3,2,2,2,2,2,3,3,2,2,2,2,3,3,5,5,5,5,5,3],
+            [3,2,2,2,2,2,5,5,3,3,3,3,5,5,6,6,6,6,6,6],
+            [3,3,3,3,3,3,3,3,7,7,7,7,7,7,7,7,7,7,7,3]
+        ];
+
+        const LEVEL_DATABASE = [
+            { id: 1, name: "Giraffe on African Plains", cols: 20, rows: 20, grid: GIRAFFE_GRID },
+            { id: 2, name: "Floral Rose Garden", cols: 20, rows: 20, grid: ROSE_GRID }
+        ];
+
+        let currentLevelIdx = 0;
+        let stagingSlots = new Array(50).fill(null);
+        let boardSockets = [];
+        let currentSelection = null;
+
+        const artGridEl = document.getElementById('art-grid');
+        const stagingTrayEl = document.getElementById('staging-tray');
+        const stagingTrayPanelEl = document.getElementById('staging-tray-panel');
+        const flyingLayerEl = document.getElementById('flying-layer');
+        const modalVictory = document.getElementById('modal-victory');
+        const modalGallery = document.getElementById('modal-gallery');
+
+        function initLevel(levelIdx) {
+            currentLevelIdx = levelIdx;
+            stagingSlots = new Array(50).fill(null);
+            boardSockets = [];
+            currentSelection = null;
+
+            const level = LEVEL_DATABASE[currentLevelIdx];
+            document.getElementById('header-level-num').textContent = `Level ${level.id}`;
+            document.getElementById('header-level-name').textContent = level.name;
+
+            const requiredColors = [];
+            level.grid.forEach(row => {
+                row.forEach(colorId => {
+                    requiredColors.push(colorId);
+                });
+            });
+
+            let scrambled = generateContiguousScramble(level.grid, requiredColors);
+
+            let socketIdx = 0;
+            level.grid.forEach((row, r) => {
+                row.forEach((targetColor, c) => {
+                    const initialColor = scrambled[socketIdx++];
+                    boardSockets.push({
+                        id: `socket-${r}-${c}`,
+                        row: r,
+                        col: c,
+                        targetColor: targetColor,
+                        currentColor: initialColor,
+                        isLocked: false,
+                        el: null
+                    });
+                });
+            });
+
+            renderBoardGrid();
+            renderStagingTray();
+            updateProgressStats();
+
+            modalVictory.classList.add('opacity-0', 'pointer-events-none');
+            modalVictory.children[0].classList.add('scale-95');
+            closeGallery();
+        }
+
+        function generateContiguousScramble(grid, allColors) {
+            const uniqueColors = [...new Set(allColors)];
+            let flatList = [];
+            let colorIdx = 0;
+
+            grid.forEach((row) => {
+                row.forEach(() => {
+                    let wrongColor = uniqueColors[colorIdx % uniqueColors.length];
+                    flatList.push(wrongColor);
+                });
+                if (Math.random() > 0.3) colorIdx++;
+            });
+
+            let socketIdx = 0;
+            grid.forEach((row) => {
+                row.forEach((targetColor) => {
+                    if (flatList[socketIdx] === targetColor) {
+                        let replacement = uniqueColors.find(c => c !== targetColor) || ((targetColor % 7) + 1);
+                        flatList[socketIdx] = replacement;
+                    }
+                    socketIdx++;
+                });
+            });
+
+            return flatList;
+        }
+
+        function renderBoardGrid() {
+            artGridEl.innerHTML = '';
+
+            boardSockets.forEach(socket => {
+                const socketDiv = document.createElement('div');
+                socket.el = socketDiv;
+                socketDiv.className = `board-socket cursor-pointer`;
+
+                updateSocketDOM(socket);
+                socketDiv.addEventListener('click', (e) => handleSocketTap(socket, e));
+                artGridEl.appendChild(socketDiv);
+            });
+        }
+
+        function updateSocketDOM(socket) {
+            if (!socket.el) return;
+
+            socket.el.className = 'board-socket cursor-pointer';
+
+            if (socket.isLocked) {
+                socket.el.innerHTML = renderGemSVG(socket.currentColor, 15);
+            } else if (socket.currentColor !== null) {
+                socket.el.innerHTML = renderGemSVG(socket.currentColor, 15);
+
+                if (currentSelection && currentSelection.sockets.some(s => s.id === socket.id)) {
+                    socket.el.classList.add('gem-selected');
+                }
+            } else {
+                if (currentSelection && currentSelection.color === socket.targetColor) {
+                    socket.el.innerHTML = `<div class="w-2.5 h-2.5 rounded-full border border-dashed border-sky-400 bg-sky-400/30 animate-ping"></div>`;
+                } else {
+                    socket.el.innerHTML = `<div class="w-1.5 h-1.5 rounded-full bg-slate-400/40"></div>`;
+                }
+            }
+        }
+
+        function renderStagingTray() {
+            stagingTrayEl.innerHTML = '';
+            const occupiedCount = stagingSlots.filter(s => s !== null).length;
+
+            if (currentSelection && occupiedCount < stagingSlots.length) {
+                stagingTrayPanelEl.classList.add('destination-active');
+            } else {
+                stagingTrayPanelEl.classList.remove('destination-active');
+            }
+
+            stagingSlots.forEach((colorId, i) => {
+                const slotDiv = document.createElement('div');
+                const isSelected = currentSelection && currentSelection.source === 'staging' && currentSelection.trayIndices.includes(i);
+
+                slotDiv.className = `w-5 h-5 sm:w-6 sm:h-6 tray-slot-inset flex items-center justify-center ${colorId ? 'cursor-pointer' : ''} ${isSelected ? 'gem-selected' : ''}`;
+
+                if (colorId) {
+                    slotDiv.innerHTML = renderGemSVG(colorId, 18);
+                    slotDiv.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        handleTrayGemTap(i);
+                    });
+                } else {
+                    slotDiv.innerHTML = `<div class="w-1 h-1 rounded-full bg-amber-900/10"></div>`;
+                }
+
+                stagingTrayEl.appendChild(slotDiv);
+            });
+        }
+
+        function updateProgressStats() {
+            const locked = boardSockets.filter(s => s.isLocked).length;
+            const percent = Math.floor((locked / boardSockets.length) * 100);
+            document.getElementById('progress-percent').textContent = `${percent}%`;
+        }
+
+        stagingTrayPanelEl.addEventListener('click', () => {
+            sound.init();
+            if (currentSelection) {
+                transferSelectedToStaging();
+            }
+        });
+
+        function getContiguousBoardGroup(startSocket) {
+            if (!startSocket || startSocket.currentColor === null || startSocket.isLocked) return [];
+            const color = startSocket.currentColor;
+            const visited = new Set();
+            const queue = [startSocket];
+            const group = [];
+
+            visited.add(startSocket.id);
+
+            while (queue.length > 0) {
+                const curr = queue.shift();
+                group.push(curr);
+
+                const neighbors = boardSockets.filter(s => {
+                    if (s.isLocked || s.currentColor !== color || visited.has(s.id)) return false;
+                    const isAdjacent = (Math.abs(s.row - curr.row) === 1 && s.col === curr.col) ||
+                                       (Math.abs(s.col - curr.col) === 1 && s.row === curr.row);
+                    return isAdjacent;
+                });
+
+                neighbors.forEach(n => {
+                    visited.add(n.id);
+                    queue.push(n);
+                });
+            }
+            return group;
+        }
+
+        function handleSocketTap(socket) {
+            sound.init();
+            if (socket.isLocked) return;
+
+            if (!currentSelection) {
+                if (socket.currentColor !== null) {
+                    const group = getContiguousBoardGroup(socket);
+                    if (group.length > 0) {
+                        setSelection({
+                            source: 'board',
+                            color: socket.currentColor,
+                            sockets: group,
+                            trayIndices: []
+                        });
+                        sound.playSelect();
+                        sound.vibrate(12);
+                    }
+                }
+            } else {
+                if (socket.currentColor === currentSelection.color) {
+                    const group = getContiguousBoardGroup(socket);
+                    const isSame = group.length === currentSelection.sockets.length && 
+                                   group.every(s => currentSelection.sockets.some(cs => cs.id === s.id));
+                    if (isSame) {
+                        clearSelection();
+                    } else {
+                        setSelection({
+                            source: 'board',
+                            color: socket.currentColor,
+                            sockets: group,
+                            trayIndices: []
+                        });
+                        sound.playSelect();
+                    }
+                } else if (socket.currentColor !== null && socket.targetColor !== currentSelection.color) {
+                    const group = getContiguousBoardGroup(socket);
+                    if (group.length > 0) {
+                        setSelection({
+                            source: 'board',
+                            color: socket.currentColor,
+                            sockets: group,
+                            trayIndices: []
+                        });
+                        sound.playSelect();
+                        sound.vibrate(12);
+                    }
+                } else {
+                    if (socket.targetColor === currentSelection.color) {
+                        transferSelectedToBoard();
+                    } else {
+                        sound.playError();
+                    }
+                }
+            }
+        }
+
+        function handleTrayGemTap(trayIndex) {
+            const colorId = stagingSlots[trayIndex];
+            if (!colorId) return;
+
+            if (!currentSelection || currentSelection.color !== colorId || currentSelection.source !== 'staging') {
+                const matchingIndices = [];
+                stagingSlots.forEach((c, idx) => {
+                    if (c === colorId) matchingIndices.push(idx);
+                });
+
+                setSelection({
+                    source: 'staging',
+                    color: colorId,
+                    sockets: [],
+                    trayIndices: matchingIndices
+                });
+                sound.playSelect();
+                sound.vibrate(12);
+            } else {
+                clearSelection();
+            }
+        }
+
+        function transferSelectedToStaging() {
+            if (!currentSelection) return;
+
+            const emptyIndices = [];
+            stagingSlots.forEach((val, idx) => {
+                if (val === null) emptyIndices.push(idx);
+            });
+
+            if (emptyIndices.length === 0) {
+                sound.playError();
+                return;
+            }
+
+            const colorToMove = currentSelection.color;
+            let itemsToMove = [];
+
+            if (currentSelection.source === 'board') {
+                itemsToMove = [...currentSelection.sockets];
+            } else {
+                clearSelection();
+                return;
+            }
+
+            const countToTransfer = Math.min(itemsToMove.length, emptyIndices.length);
+
+            if (countToTransfer > 0) {
+                for (let i = 0; i < countToTransfer; i++) {
+                    const srcSocket = itemsToMove[i];
+                    const targetTrayIdx = emptyIndices[i];
+                    const startRect = srcSocket.el.getBoundingClientRect();
+
+                    srcSocket.currentColor = null;
+                    updateSocketDOM(srcSocket);
+
+                    stagingSlots[targetTrayIdx] = colorToMove;
+
+                    setTimeout(() => {
+                        sound.playCascadeChime(i);
+                        sound.vibrate(10);
+
+                        const targetSlotEl = stagingTrayEl.children[targetTrayIdx];
+                        const targetRect = targetSlotEl ? targetSlotEl.getBoundingClientRect() : startRect;
+
+                        animateGemFlight(colorToMove, startRect, targetRect, () => {
+                            renderStagingTray();
+                        });
+                    }, i * 35);
+                }
+
+                clearSelection();
+            }
+        }
+
+        function transferSelectedToBoard() {
+            if (!currentSelection) return;
+
+            const colorToMove = currentSelection.color;
+            const openTargetSockets = boardSockets.filter(s => s.targetColor === colorToMove && !s.isLocked);
+
+            if (openTargetSockets.length === 0) {
+                sound.playError();
+                return;
+            }
+
+            let sourceItems = [];
+            if (currentSelection.source === 'board') {
+                sourceItems = currentSelection.sockets.map(s => ({ type: 'board', socket: s }));
+            } else {
+                sourceItems = currentSelection.trayIndices.map(idx => ({ type: 'staging', trayIndex: idx }));
+            }
+
+            const countToTransfer = Math.min(sourceItems.length, openTargetSockets.length);
+
+            if (countToTransfer > 0) {
+                for (let i = 0; i < countToTransfer; i++) {
+                    const src = sourceItems[i];
+                    const targetSocket = openTargetSockets[i];
+
+                    // Auto-eject misplaced gem directly into tray
+                    if (targetSocket.currentColor !== null && targetSocket.currentColor !== colorToMove) {
+                        const wrongColor = targetSocket.currentColor;
+                        const emptyTrayIndex = stagingSlots.findIndex(s => s === null);
+
+                        if (emptyTrayIndex !== -1) {
+                            stagingSlots[emptyTrayIndex] = wrongColor;
+
+                            const wrongStartRect = targetSocket.el.getBoundingClientRect();
+                            const traySlotEl = stagingTrayEl.children[emptyTrayIndex];
+                            const trayTargetRect = traySlotEl ? traySlotEl.getBoundingClientRect() : wrongStartRect;
+
+                            setTimeout(() => {
+                                sound.playSwap();
+                                animateGemFlight(wrongColor, wrongStartRect, trayTargetRect, () => {
+                                    renderStagingTray();
+                                });
+                            }, i * 35);
+                        }
+                    }
+
+                    let startRect = null;
+
+                    if (src.type === 'board') {
+                        startRect = src.socket.el.getBoundingClientRect();
+                        src.socket.currentColor = null;
+                        updateSocketDOM(src.socket);
+                    } else {
+                        const trayEl = stagingTrayEl.children[src.trayIndex];
+                        startRect = trayEl ? trayEl.getBoundingClientRect() : targetSocket.el.getBoundingClientRect();
+                        stagingSlots[src.trayIndex] = null;
+                    }
+
+                    targetSocket.currentColor = colorToMove;
+                    targetSocket.isLocked = true;
+                    updateSocketDOM(targetSocket);
+
+                    const targetRect = targetSocket.el.getBoundingClientRect();
+
+                    setTimeout(() => {
+                        sound.playCascadeChime(i);
+                        sound.vibrate(12);
+
+                        animateGemFlight(colorToMove, startRect, targetRect, () => {
+                            sound.playSnap();
+                            spawnSparkles(targetRect.left + targetRect.width/2, targetRect.top + targetRect.height/2);
+                            updateProgressStats();
+                            checkLevelVictory();
+                        });
+                    }, i * 35);
+                }
+
+                renderStagingTray();
+                clearSelection();
+            }
+        }
+
+        function setSelection(sel) {
+            currentSelection = sel;
+            boardSockets.forEach(s => updateSocketDOM(s));
+            renderStagingTray();
+        }
+
+        function clearSelection() {
+            currentSelection = null;
+            boardSockets.forEach(s => updateSocketDOM(s));
+            renderStagingTray();
+        }
+
+        function animateGemFlight(colorId, startRect, targetRect, onComplete) {
+            const flyer = document.createElement('div');
+            flyer.className = 'fixed z-50 pointer-events-none transition-all duration-200 cubic-bezier(0.25, 1, 0.5, 1)';
+            flyer.style.width = '20px';
+            flyer.style.height = '20px';
+            flyer.style.left = `${startRect.left + (startRect.width/2 || 0) - 10}px`;
+            flyer.style.top = `${startRect.top + (startRect.height/2 || 0) - 10}px`;
+            flyer.innerHTML = renderGemSVG(colorId, 20);
+            flyingLayerEl.appendChild(flyer);
+
+            requestAnimationFrame(() => {
+                flyer.style.left = `${targetRect.left + (targetRect.width/2 || 0) - 10}px`;
+                flyer.style.top = `${targetRect.top + (targetRect.height/2 || 0) - 10}px`;
+            });
+
+            setTimeout(() => {
+                flyer.remove();
+                if (onComplete) onComplete();
+            }, 200);
+        }
+
+        function checkLevelVictory() {
+            const isAllLocked = boardSockets.every(s => s.isLocked);
+            if (isAllLocked) {
+                setTimeout(() => {
+                    sound.playVictory();
+                    sound.vibrate([100, 50, 100, 50, 150]);
+
+                    document.getElementById('victory-level-name').textContent = LEVEL_DATABASE[currentLevelIdx].name;
+
+                    modalVictory.classList.remove('opacity-0', 'pointer-events-none');
+                    modalVictory.children[0].classList.remove('scale-95');
+
+                    spawnConfetti();
+                }, 300);
+            }
+        }
+
+        function openGallery() {
+            const listEl = document.getElementById('gallery-list');
+            listEl.innerHTML = '';
+
+            LEVEL_DATABASE.forEach((lvl, idx) => {
+                const card = document.createElement('div');
+                card.className = `p-3 rounded-2xl bg-white border ${idx === currentLevelIdx ? 'border-amber-500 ring-2 ring-amber-400' : 'border-amber-200'} shadow-sm flex flex-col items-center cursor-pointer active:scale-95 transition`;
+                card.innerHTML = `
+                    <div class="text-2xl mb-1">${idx === 0 ? '🦒' : '🌹'}</div>
+                    <span class="text-xs font-black text-slate-800 text-center leading-tight">${lvl.name}</span>
+                    <span class="text-[10px] text-amber-700 font-bold mt-1">20x20 Gems</span>
+                `;
+                card.addEventListener('click', () => {
+                    initLevel(idx);
+                });
+                listEl.appendChild(card);
+            });
+
+            modalGallery.classList.remove('opacity-0', 'pointer-events-none');
+            modalGallery.children[0].classList.remove('translate-y-full');
+        }
+
+        function closeGallery() {
+            modalGallery.classList.add('opacity-0', 'pointer-events-none');
+            modalGallery.children[0].classList.add('translate-y-full');
+        }
+
+        document.getElementById('btn-gallery').addEventListener('click', () => {
+            sound.init();
+            openGallery();
+        });
+        document.getElementById('btn-close-gallery').addEventListener('click', closeGallery);
+
+        document.getElementById('btn-restart').addEventListener('click', () => {
+            sound.init();
+            initLevel(currentLevelIdx);
+        });
+
+        document.getElementById('btn-next-level').addEventListener('click', () => {
+            const nextIdx = (currentLevelIdx + 1) % LEVEL_DATABASE.length;
+            initLevel(nextIdx);
+        });
+
+        // Particle System
+        const particleCanvas = document.getElementById('particle-canvas');
+        const pCtx = particleCanvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            particleCanvas.width = window.innerWidth;
+            particleCanvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function spawnSparkles(x, y) {
+            for (let i = 0; i < 6; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: (Math.random() - 0.5) * 4,
+                    size: Math.random() * 3 + 1,
+                    color: ['#fef08a', '#38bdf8', '#f472b6', '#4ade80'][Math.floor(Math.random() * 4)],
+                    life: 1
+                });
+            }
+        }
+
+        function spawnConfetti() {
+            for (let i = 0; i < 60; i++) {
+                particles.push({
+                    x: window.innerWidth / 2, y: window.innerHeight / 2,
+                    vx: (Math.random() - 0.5) * 16,
+                    vy: (Math.random() - 0.7) * 16,
+                    size: Math.random() * 5 + 2,
+                    color: ['#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#8b5cf6'][Math.floor(Math.random() * 5)],
+                    life: 1.5
+                });
+            }
+        }
+
+        function renderParticles() {
+            pCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+            particles.forEach((p, idx) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.03;
+
+                pCtx.save();
+                pCtx.globalAlpha = Math.max(0, p.life);
+                pCtx.fillStyle = p.color;
+                pCtx.beginPath();
+                pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                pCtx.fill();
+                pCtx.restore();
+
+                if (p.life <= 0) particles.splice(idx, 1);
+            });
+            requestAnimationFrame(renderParticles);
+        }
+        renderParticles();
+
+        // Prevent Mobile Zoom & Double Tap
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function (event) {
+            const now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) event.preventDefault();
+            lastTouchEnd = now;
+        }, false);
+
+        document.addEventListener('gesturestart', function (e) {
+            e.preventDefault();
+        });
+
+        window.onload = function() {
+            initLevel(0);
+        };
+    </script>
+</body>
+</html>

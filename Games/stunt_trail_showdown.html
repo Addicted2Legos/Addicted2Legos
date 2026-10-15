@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Stunt Trail Showdown - King of the Hill & Trail Domination</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        body {
+            font-family: 'Outfit', sans-serif;
+            overflow: hidden;
+            background-color: #090d16;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        .arcade-glow {
+            text-shadow: 0 0 12px rgba(245, 158, 11, 0.8), 0 0 24px rgba(234, 179, 8, 0.6);
+        }
+        .crown-glow {
+            animation: pulseGlow 1.2s infinite alternate;
+        }
+        @keyframes pulseGlow {
+            0% { transform: scale(1); filter: drop-shadow(0 0 6px #fbbf24); }
+            100% { transform: scale(1.08); filter: drop-shadow(0 0 16px #f59e0b); }
+        }
+        .trick-pop {
+            animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.4); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .touch-btn {
+            background: rgba(15, 23, 42, 0.85);
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(8px);
+            transition: transform 0.05s ease, background-color 0.1s ease;
+        }
+        .touch-btn:active, .touch-btn.active {
+            transform: scale(0.92);
+            background: rgba(245, 158, 11, 0.85);
+            border-color: #fbbf24;
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen m-0 p-0 overflow-hidden select-none bg-slate-950 text-white">
+
+    <!-- Main Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-3 sm:p-5">
+        <!-- Top Navigation Bar -->
+        <div class="flex justify-between items-start w-full gap-2">
+            
+            <!-- Left Stats Panel -->
+            <div class="flex flex-col gap-1.5 sm:gap-2">
+                <!-- Score & Crown Multiplier -->
+                <div class="bg-slate-900/85 backdrop-blur border-2 border-amber-400/60 rounded-xl px-3 py-1.5 sm:px-4 sm:py-2 shadow-xl flex items-center gap-3">
+                    <div>
+                        <div class="text-[9px] sm:text-xs text-amber-400 font-bold uppercase tracking-wider">Hype Score</div>
+                        <div id="scoreText" class="text-xl sm:text-3xl font-black text-amber-300 tracking-tight">0</div>
+                    </div>
+                    <div id="crownBadge" class="hidden bg-gradient-to-r from-amber-500 to-yellow-300 text-slate-950 font-black text-xs px-2 py-1 rounded-lg crown-glow flex items-center gap-1 shadow-lg">
+                        <span>👑</span>
+                        <span id="crownTimerText">CROWN HOLDER</span>
+                    </div>
+                </div>
+
+                <!-- Speedometer & Nitro Bar -->
+                <div class="bg-slate-900/85 backdrop-blur border border-cyan-400/50 rounded-xl px-3 py-1.5 sm:px-4 sm:py-2 shadow-lg flex items-center gap-3">
+                    <div>
+                        <div class="text-[9px] sm:text-xs text-cyan-400 font-bold uppercase tracking-wider">Speed</div>
+                        <div id="speedText" class="text-base sm:text-xl font-black text-cyan-200">0 MPH</div>
+                    </div>
+                    <div class="w-12 sm:w-16 h-2.5 sm:h-3 bg-slate-800 rounded-full border border-cyan-500/40 overflow-hidden">
+                        <div id="nitroBar" class="h-full bg-gradient-to-r from-cyan-500 to-blue-400 w-full transition-all duration-75"></div>
+                    </div>
+                </div>
+
+                <!-- Trail Domination Meter -->
+                <div class="bg-slate-900/85 backdrop-blur border border-pink-500/40 rounded-xl px-3 py-1.5 sm:px-4 sm:py-1.5 shadow-lg flex items-center gap-2">
+                    <div class="text-[9px] sm:text-xs text-pink-400 font-bold uppercase tracking-wider">Trail Paint</div>
+                    <div class="w-16 sm:w-20 h-2 sm:h-2.5 bg-slate-800 rounded-full overflow-hidden border border-pink-500/30">
+                        <div id="dominationBar" class="h-full bg-gradient-to-r from-pink-500 to-purple-500 w-0 transition-all duration-150"></div>
+                    </div>
+                    <span id="dominationText" class="text-[10px] sm:text-xs font-black text-pink-300">0%</span>
+                </div>
+            </div>
+
+            <!-- Stunt Combo & Airtime Banner -->
+            <div id="trickBanner" class="hidden flex flex-col items-center justify-center text-center">
+                <div id="trickName" class="text-xl sm:text-4xl font-black italic text-amber-400 arcade-glow uppercase tracking-wider trick-pop">360 BACKFLIP!</div>
+                <div id="multiplierText" class="text-xs sm:text-base font-bold text-pink-300 bg-pink-950/80 px-2.5 py-0.5 rounded-full border border-pink-500 mt-0.5 shadow-lg">STREAK 2.5x</div>
+                <div id="airtimeText" class="text-[10px] sm:text-xs font-semibold text-cyan-300 mt-0.5">Airtime: 1.2s</div>
+            </div>
+
+            <!-- Right Panel: Keys & MiniMap -->
+            <div class="flex flex-col items-end gap-1.5 sm:gap-2">
+                <!-- Golden Keys Collection Widget -->
+                <div class="bg-slate-900/85 backdrop-blur border border-amber-500/50 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 flex items-center gap-2 shadow-xl">
+                    <div class="text-[10px] sm:text-xs text-amber-300 font-bold uppercase">Mega Keys:</div>
+                    <div class="flex gap-1">
+                        <span id="keyIcon1" class="opacity-30 text-xs sm:text-base transition-all duration-300">🔑</span>
+                        <span id="keyIcon2" class="opacity-30 text-xs sm:text-base transition-all duration-300">🔑</span>
+                        <span id="keyIcon3" class="opacity-30 text-xs sm:text-base transition-all duration-300">🔑</span>
+                    </div>
+                </div>
+
+                <!-- Mini Map Box -->
+                <div class="w-24 h-24 sm:w-36 sm:h-36 bg-slate-950/90 border-2 border-emerald-500/60 rounded-xl overflow-hidden relative shadow-2xl">
+                    <canvas id="miniMapCanvas" class="w-full h-full"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Dynamic Notification Box -->
+        <div id="centerNotification" class="self-center text-center opacity-0 transition-opacity duration-200 pointer-events-none">
+            <div id="notifyTitle" class="text-xl sm:text-4xl font-black uppercase tracking-wider text-emerald-400 drop-shadow-md">CLEAN LANDING!</div>
+            <div id="notifySub" class="text-xs sm:text-base font-bold text-white shadow-black drop-shadow">+500 PTS BONUS</div>
+        </div>
+
+        <!-- Bottom Controls Legend -->
+        <div class="flex justify-between items-end w-full">
+            <div class="hidden lg:flex bg-slate-900/80 backdrop-blur border border-slate-700/80 rounded-xl p-2.5 gap-3 text-[11px]">
+                <div><span class="text-amber-400 font-bold">STEER:</span> A/D or Left/Right</div>
+                <div><span class="text-amber-400 font-bold">ACCEL / BRAKE:</span> W/S or Up/Down</div>
+                <div><span class="text-amber-400 font-bold">BOOST:</span> SHIFT / SPACE</div>
+                <div><span class="text-amber-400 font-bold">AIR TRICKS:</span> Arrow Keys / WASD</div>
+            </div>
+
+            <!-- Active Objective Pill -->
+            <div class="bg-indigo-900/90 border border-indigo-400/50 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl backdrop-blur shadow-lg flex items-center gap-2">
+                <div class="text-base sm:text-lg">🏆</div>
+                <div>
+                    <div class="text-[9px] text-indigo-300 font-bold uppercase tracking-wider">Objective</div>
+                    <div id="objectiveText" class="text-[10px] sm:text-xs font-bold text-white">Steal the Crown & Collect 3 Golden Keys!</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="mobileControls" class="absolute inset-0 pointer-events-none flex justify-between items-end p-3 sm:p-5">
+        <!-- Left Touch Joystick Area -->
+        <div id="joystickZone" class="pointer-events-auto relative w-28 h-28 sm:w-36 sm:h-36 bg-slate-900/40 border-2 border-slate-500/30 rounded-full backdrop-blur-sm flex items-center justify-center">
+            <div id="joystickKnob" class="absolute w-12 h-12 sm:w-14 sm:h-14 bg-amber-500/85 border-2 border-yellow-200 rounded-full shadow-lg transition-transform duration-75"></div>
+            <div class="text-[9px] text-slate-400 font-bold uppercase tracking-widest pointer-events-none opacity-50">STEER</div>
+        </div>
+
+        <!-- Right Touch Stunt & Drive Action Buttons -->
+        <div class="pointer-events-auto flex flex-col gap-2.5 items-end">
+            <!-- Airborne Trick Group -->
+            <div id="stuntTouchGroup" class="grid grid-cols-2 gap-1.5 bg-slate-900/80 p-1.5 rounded-2xl border border-amber-500/40 backdrop-blur-md">
+                <button id="btnFlipLeft" class="touch-btn w-11 h-11 sm:w-13 sm:h-13 rounded-xl text-amber-300 font-black text-xs flex flex-col items-center justify-center shadow-md">
+                    <span>↺</span>
+                    <span class="text-[7px]">FLIP L</span>
+                </button>
+                <button id="btnFlipRight" class="touch-btn w-11 h-11 sm:w-13 sm:h-13 rounded-xl text-amber-300 font-black text-xs flex flex-col items-center justify-center shadow-md">
+                    <span>↻</span>
+                    <span class="text-[7px]">FLIP R</span>
+                </button>
+                <button id="btnSpin" class="touch-btn w-11 h-11 sm:w-13 sm:h-13 rounded-xl text-purple-300 font-black text-xs flex flex-col items-center justify-center shadow-md">
+                    <span>💫</span>
+                    <span class="text-[7px]">SPIN</span>
+                </button>
+                <button id="btnWhip" class="touch-btn w-11 h-11 sm:w-13 sm:h-13 rounded-xl text-pink-300 font-black text-xs flex flex-col items-center justify-center shadow-md">
+                    <span>⚡</span>
+                    <span class="text-[7px]">WHIP</span>
+                </button>
+            </div>
+
+            <!-- Ground Driving Controls -->
+            <div class="flex gap-2">
+                <button id="btnBrake" class="touch-btn w-12 h-12 sm:w-14 sm:h-14 rounded-full text-red-300 font-black text-xs border-red-500/40 flex flex-col items-center justify-center shadow-lg">
+                    <span>🛑</span>
+                    <span class="text-[8px]">BRAKE</span>
+                </button>
+                <button id="btnNitro" class="touch-btn w-14 h-14 sm:w-16 sm:h-16 rounded-full text-cyan-300 font-black text-xs border-cyan-400/50 flex flex-col items-center justify-center shadow-xl bg-cyan-950/60">
+                    <span class="text-base">🚀</span>
+                    <span class="text-[9px] font-black">NITRO</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const miniCanvas = document.getElementById('miniMapCanvas');
+        const miniCtx = miniCanvas.getContext('2d');
+
+        let screenWidth = window.innerWidth;
+        let screenHeight = window.innerHeight;
+
+        function resizeCanvas() {
+            screenWidth = window.innerWidth;
+            screenHeight = window.innerHeight;
+            canvas.width = screenWidth;
+            canvas.height = screenHeight;
+            miniCanvas.width = 150;
+            miniCanvas.height = 150;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Input Handling State
+        const keys = { up: false, down: false, left: false, right: false, nitro: false };
+
+        window.addEventListener('keydown', (e) => {
+            if (['ArrowUp', 'w', 'W'].includes(e.key)) keys.up = true;
+            if (['ArrowDown', 's', 'S'].includes(e.key)) keys.down = true;
+            if (['ArrowLeft', 'a', 'A'].includes(e.key)) keys.left = true;
+            if (['ArrowRight', 'd', 'D'].includes(e.key)) keys.right = true;
+            if (['Shift', ' '].includes(e.key)) keys.nitro = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (['ArrowUp', 'w', 'W'].includes(e.key)) keys.up = false;
+            if (['ArrowDown', 's', 'S'].includes(e.key)) keys.down = false;
+            if (['ArrowLeft', 'a', 'A'].includes(e.key)) keys.left = false;
+            if (['ArrowRight', 'd', 'D'].includes(e.key)) keys.right = false;
+            if (['Shift', ' '].includes(e.key)) keys.nitro = false;
+        });
+
+        const joystickZone = document.getElementById('joystickZone');
+        const joystickKnob = document.getElementById('joystickKnob');
+        let joystickTouchId = null;
+        let joystickCenter = { x: 0, y: 0 };
+
+        joystickZone.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            if (!touch) return;
+            joystickTouchId = touch.identifier;
+            const rect = joystickZone.getBoundingClientRect();
+            joystickCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            updateJoystick(touch);
+        }, { passive: false });
+
+        joystickZone.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === joystickTouchId) {
+                    updateJoystick(e.changedTouches[i]);
+                    break;
+                }
+            }
+        }, { passive: false });
+
+        const resetJoystick = () => {
+            joystickTouchId = null;
+            joystickKnob.style.transform = `translate(0px, 0px)`;
+            keys.left = false; keys.right = false; keys.up = false; keys.down = false;
+        };
+
+        joystickZone.addEventListener('touchend', resetJoystick);
+        joystickZone.addEventListener('touchcancel', resetJoystick);
+
+        function updateJoystick(touch) {
+            if (!touch) return;
+            const dx = touch.clientX - joystickCenter.x;
+            const dy = touch.clientY - joystickCenter.y;
+            const dist = Math.hypot(dx, dy);
+            const maxRadius = 40;
+            const angle = Math.atan2(dy, dx);
+            const clampedDist = Math.min(dist, maxRadius);
+
+            const knobX = Math.cos(angle) * clampedDist;
+            const knobY = Math.sin(angle) * clampedDist;
+            joystickKnob.style.transform = `translate(${knobX}px, ${knobY}px)`;
+
+            const threshold = 10;
+            keys.left = dx < -threshold;
+            keys.right = dx > threshold;
+            keys.up = dy < -threshold;
+            keys.down = dy > threshold;
+        }
+
+        function setupTouchActionButton(id, keyProp) {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            const handleStart = (e) => { e.preventDefault(); keys[keyProp] = true; btn.classList.add('active'); };
+            const handleEnd = (e) => { e.preventDefault(); keys[keyProp] = false; btn.classList.remove('active'); };
+            btn.addEventListener('touchstart', handleStart, { passive: false });
+            btn.addEventListener('touchend', handleEnd, { passive: false });
+            btn.addEventListener('touchcancel', handleEnd, { passive: false });
+            btn.addEventListener('mousedown', handleStart);
+            btn.addEventListener('mouseup', handleEnd);
+            btn.addEventListener('mouseleave', handleEnd);
+        }
+
+        setupTouchActionButton('btnFlipLeft', 'left');
+        setupTouchActionButton('btnFlipRight', 'right');
+        setupTouchActionButton('btnSpin', 'up');
+        setupTouchActionButton('btnWhip', 'down');
+        setupTouchActionButton('btnBrake', 'down');
+        setupTouchActionButton('btnNitro', 'nitro');
+
+        const WORLD_SIZE = 4800;
+
+        const camera = {
+            x: 0, y: 0, shakeTime: 0, shakeIntensity: 0,
+            triggerShake(intensity, duration) {
+                this.shakeIntensity = intensity;
+                this.shakeTime = duration;
+            },
+            update(targetX, targetY) {
+                this.x += (targetX - screenWidth / 2 - this.x) * 0.08;
+                this.y += (targetY - screenHeight / 2 - this.y) * 0.08;
+                if (this.shakeTime > 0) {
+                    this.shakeTime -= 0.016;
+                    this.x += (Math.random() - 0.5) * this.shakeIntensity;
+                    this.y += (Math.random() - 0.5) * this.shakeIntensity;
+                }
+            }
+        };
+
+        const trailWaypoints = [];
+        const numWaypoints = 28;
+        const centerX = WORLD_SIZE / 2;
+        const centerY = WORLD_SIZE / 2;
+
+        for (let i = 0; i < numWaypoints; i++) {
+            const angle = (i / numWaypoints) * Math.PI * 2;
+            const rX = 1800 + Math.sin(angle * 3) * 350;
+            const rY = 1600 + Math.cos(angle * 2) * 300;
+            trailWaypoints.push({
+                x: centerX + Math.cos(angle) * rX,
+                y: centerY + Math.sin(angle) * rY
+            });
+        }
+
+        // Secret Mega Ramp Zone Location (Canyon Plateau)
+        const secretZone = {
+            x: WORLD_SIZE - 900,
+            y: 900,
+            radius: 450,
+            unlocked: false,
+            ramps: [
+                { x: WORLD_SIZE - 1050, y: 850, angle: 0.2, isMega: true },
+                { x: WORLD_SIZE - 750, y: 1000, angle: -2.2, isMega: true }
+            ]
+        };
+
+        // Stunt Ramps setup
+        const ramps = [];
+        for (let i = 0; i < numWaypoints; i++) {
+            const wp1 = trailWaypoints[i];
+            const wp2 = trailWaypoints[(i + 1) % numWaypoints];
+            ramps.push({
+                x: (wp1.x + wp2.x) / 2,
+                y: (wp1.y + wp2.y) / 2,
+                angle: Math.atan2(wp2.y - wp1.y, wp2.x - wp1.x),
+                width: 75,
+                height: 50,
+                isMega: false
+            });
+        }
+
+        for (const mr of secretZone.ramps) {
+            ramps.push({ x: mr.x, y: mr.y, angle: mr.angle, width: 110, height: 70, isMega: true });
+        }
+
+        // Golden Keys Placement
+        const goldenKeys = [
+            { x: trailWaypoints[4].x + 120, y: trailWaypoints[4].y - 90, collected: false },
+            { x: trailWaypoints[12].x - 140, y: trailWaypoints[12].y + 110, collected: false },
+            { x: trailWaypoints[20].x + 100, y: trailWaypoints[20].y + 130, collected: false }
+        ];
+        let keysCollectedCount = 0;
+
+        const droppedGems = [];
+        const paintedTrails = [];
+        const MAX_PAINT_SEGMENTS = 600;
+
+        function addPaintSegment(x, y, color, riderId) {
+            paintedTrails.push({ x, y, color, riderId });
+            if (paintedTrails.length > MAX_PAINT_SEGMENTS) paintedTrails.shift();
+        }
+
+        function calculateDominationPercentage(riderId) {
+            if (paintedTrails.length === 0) return 0;
+            const count = paintedTrails.filter(p => p.riderId === riderId).length;
+            return Math.round((count / paintedTrails.length) * 100);
+        }
+
+        // Particle FX Engine
+        const particles = [];
+        function createParticle(x, y, vx, vy, color, size, life) {
+            particles.push({ x, y, vx, vy, color, size, maxLife: life, life });
+        }
+
+        function createExplosion(x, y, color, count = 18) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 2 + Math.random() * 6;
+                createParticle(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, color, 3 + Math.random() * 5, 0.4 + Math.random() * 0.4);
+            }
+        }
+
+        let currentCrownHolder = null;
+
+        class Motorcycle {
+            constructor(id, x, y, isAI = false, color = '#f59e0b', name = 'Player') {
+                this.id = id;
+                this.x = x;
+                this.y = y;
+                this.isAI = isAI;
+                this.color = color;
+                this.name = name;
+
+                // Physics
+                this.angle = 0;
+                this.speed = 0;
+                this.maxSpeed = 7.2;
+                this.accel = 0.15;
+                this.friction = 0.955;
+                this.steerSens = 0.050;
+
+                // Altitude & Airtime
+                this.z = 0;
+                this.vz = 0;
+                this.gravity = 0.42;
+                this.isAirborne = false;
+                this.airTime = 0;
+
+                // Mid-Air Tricks
+                this.pitchAngle = 0;
+                this.spinAngle = 0;
+                this.whipAngle = 0;
+                this.tricksPerformed = [];
+
+                // Nitro & Scoring
+                this.nitro = 100;
+                this.isBoosting = false;
+                this.isCrashed = false;
+                this.respawnTimer = 0;
+                this.score = 0;
+                this.streakMultiplier = 1.0;
+                this.hasCrown = false;
+
+                // AI Pathing
+                this.currentWaypoint = 0;
+                this.aiSteerVariance = (Math.random() - 0.5) * 0.2;
+            }
+
+            update() {
+                if (this.isCrashed) {
+                    this.respawnTimer -= 0.016;
+                    if (this.respawnTimer <= 0) {
+                        this.isCrashed = false;
+                        this.speed = 0;
+                        this.z = 0; this.vz = 0;
+                    }
+                    return;
+                }
+
+                if (this.hasCrown) {
+                    this.score += 2;
+                    if (Math.random() > 0.4) {
+                        createParticle(this.x, this.y, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, '#fbbf24', 4, 0.5);
+                    }
+                }
+
+                if (!this.isAirborne) {
+                    this.updateGroundPhysics();
+                } else {
+                    this.updateAirbornePhysics();
+                }
+
+                this.x += Math.cos(this.angle) * this.speed;
+                this.y += Math.sin(this.angle) * this.speed;
+
+                this.x = Math.max(100, Math.min(WORLD_SIZE - 100, this.x));
+                this.y = Math.max(100, Math.min(WORLD_SIZE - 100, this.y));
+
+                // Check Ramp Launches
+                if (!this.isAirborne) {
+                    for (const ramp of ramps) {
+                        if (ramp.isMega && !secretZone.unlocked) continue;
+
+                        const dist = Math.hypot(this.x - ramp.x, this.y - ramp.y);
+                        if (dist < 45) {
+                            this.isAirborne = true;
+                            const jumpPower = ramp.isMega ? 12 : 7.2;
+                            this.vz = jumpPower + (this.speed * 0.35);
+                            this.speed += ramp.isMega ? 3.5 : 1.2;
+                            this.airTime = 0;
+                            this.pitchAngle = 0; this.spinAngle = 0; this.whipAngle = 0;
+                            this.tricksPerformed = [];
+
+                            if (!this.isAI) camera.triggerShake(ramp.isMega ? 12 : 5, 0.2);
+                            createExplosion(this.x, this.y, ramp.isMega ? '#a855f7' : '#f59e0b', 15);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            updateGroundPhysics() {
+                let onOwnPaint = false;
+                let onRivalPaint = false;
+
+                for (let i = paintedTrails.length - 1; i >= 0; i -= 10) {
+                    const pt = paintedTrails[i];
+                    if (pt && Math.hypot(this.x - pt.x, this.y - pt.y) < 30) {
+                        if (pt.riderId === this.id) onOwnPaint = true;
+                        else onRivalPaint = true;
+                        break;
+                    }
+                }
+
+                const paintSpeedBonus = onOwnPaint ? 1.25 : (onRivalPaint ? 0.85 : 1.0);
+
+                if (!this.isAI) {
+                    if (keys.left) this.angle -= this.steerSens * (Math.min(this.speed, 5) / 5);
+                    if (keys.right) this.angle += this.steerSens * (Math.min(this.speed, 5) / 5);
+
+                    if (keys.up) {
+                        let topSpeed = this.maxSpeed * paintSpeedBonus;
+                        if (keys.nitro && this.nitro > 0) {
+                            topSpeed *= 1.35;
+                            this.speed += this.accel * 1.6;
+                            this.nitro = Math.max(0, this.nitro - 0.5);
+                            this.isBoosting = true;
+                            createParticle(this.x - Math.cos(this.angle) * 15, this.y - Math.sin(this.angle) * 15, -Math.cos(this.angle) * 3, -Math.sin(this.angle) * 3, '#06b6d4', 4, 0.3);
+                        } else {
+                            this.speed += this.accel * paintSpeedBonus;
+                            this.isBoosting = false;
+                        }
+                        this.speed = Math.min(this.speed, topSpeed);
+                    } else if (keys.down) {
+                        this.speed -= this.accel * 1.2;
+                        this.speed = Math.max(this.speed, -2.2);
+                    } else {
+                        this.speed *= this.friction;
+                    }
+                } else {
+                    this.updateAILogic();
+                }
+
+                if (this.nitro < 100) this.nitro += 0.08;
+            }
+
+            updateAirbornePhysics() {
+                this.airTime += 0.016;
+                this.z += this.vz;
+                this.vz -= this.gravity;
+
+                if (!this.isAI) {
+                    const flipSpeed = 0.13;
+                    const spinSpeed = 0.11;
+
+                    if (keys.left) {
+                        this.pitchAngle -= flipSpeed;
+                        if (Math.abs(this.pitchAngle) >= Math.PI * 2) {
+                            this.pitchAngle %= Math.PI * 2;
+                            this.registerTrick('BACKFLIP');
+                        }
+                    }
+                    if (keys.right) {
+                        this.pitchAngle += flipSpeed;
+                        if (Math.abs(this.pitchAngle) >= Math.PI * 2) {
+                            this.pitchAngle %= Math.PI * 2;
+                            this.registerTrick('FRONTFLIP');
+                        }
+                    }
+                    if (keys.up) {
+                        this.spinAngle += spinSpeed;
+                        if (Math.abs(this.spinAngle) >= Math.PI * 2) {
+                            this.spinAngle %= Math.PI * 2;
+                            this.registerTrick('360 SPIN');
+                        }
+                    }
+                    if (keys.down) {
+                        this.whipAngle = Math.sin(this.airTime * 10) * 0.8;
+                        if (Math.abs(this.whipAngle) > 0.5) this.registerTrick('TAIL WHIP');
+                    } else {
+                        this.whipAngle *= 0.8;
+                    }
+
+                    if (this.tricksPerformed.length > 0) {
+                        showTrickUI(this.tricksPerformed.join(' + '), this.streakMultiplier, this.airTime);
+                    }
+                } else {
+                    this.pitchAngle += 0.05;
+                }
+
+                createParticle(this.x, this.y, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, '#ffffff', 2, 0.2);
+
+                if (this.z <= 0) {
+                    this.z = 0; this.vz = 0;
+                    this.isAirborne = false;
+                    this.evaluateLanding();
+                }
+            }
+
+            registerTrick(name) {
+                if (!this.tricksPerformed.includes(name)) {
+                    this.tricksPerformed.push(name);
+                    createExplosion(this.x, this.y, '#a855f7', 8);
+                }
+            }
+
+            evaluateLanding() {
+                const pitchError = Math.abs(this.pitchAngle % (Math.PI * 2));
+                const isCleanPitch = pitchError < 0.65 || pitchError > (Math.PI * 2 - 0.65);
+
+                if (isCleanPitch) {
+                    let trickPoints = 200 * (1 + this.tricksPerformed.length);
+                    if (this.airTime > 1.2) trickPoints += 350;
+
+                    this.streakMultiplier = Math.min(5.0, this.streakMultiplier + 0.5);
+                    const totalGained = Math.round(trickPoints * this.streakMultiplier);
+                    this.score += totalGained;
+
+                    for (let i = 0; i < 12; i++) {
+                        const px = this.x - Math.cos(this.angle) * (i * 8);
+                        const py = this.y - Math.sin(this.angle) * (i * 8);
+                        addPaintSegment(px, py, this.color, this.id);
+                    }
+
+                    if (!this.isAI) {
+                        showNotification('CLEAN LANDING!', `+${totalGained} HYPE PTS (Trail Painted!)`, '#10b981');
+                        camera.triggerShake(5, 0.15);
+                    }
+
+                    if (this.tricksPerformed.length >= 2 && currentCrownHolder !== this) {
+                        transferCrown(this, 'STUNT COMBO STEAL!');
+                    }
+
+                    this.speed += 2.0;
+                    createExplosion(this.x, this.y, '#10b981', 15);
+                } else {
+                    this.isCrashed = true;
+                    this.respawnTimer = 2.0;
+                    this.streakMultiplier = 1.0;
+                    this.speed = 0;
+
+                    if (this.hasCrown) {
+                        dropCrownGems(this.x, this.y);
+                        transferCrown(null, 'CROWN DROPPED!');
+                    }
+
+                    if (!this.isAI) {
+                        showNotification('WIPEOUT!', 'Keep bike aligned on landing!', '#ef4444');
+                        camera.triggerShake(16, 0.35);
+                    }
+                    createExplosion(this.x, this.y, '#ef4444', 35);
+                }
+
+                hideTrickUI();
+                this.pitchAngle = 0; this.spinAngle = 0; this.whipAngle = 0;
+            }
+
+            updateAILogic() {
+                const target = trailWaypoints[this.currentWaypoint];
+                if (!target) return;
+                const dx = target.x - this.x;
+                const dy = target.y - this.y;
+                const dist = Math.hypot(dx, dy);
+
+                if (dist < 150) {
+                    this.currentWaypoint = (this.currentWaypoint + 1) % trailWaypoints.length;
+                }
+
+                const desiredAngle = Math.atan2(dy, dx) + this.aiSteerVariance;
+                let angleDiff = desiredAngle - this.angle;
+                while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+
+                this.angle += Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), this.steerSens);
+                const targetSpeed = 4.8 + (this.currentWaypoint % 3) * 0.6;
+                if (this.speed < targetSpeed) this.speed += this.accel;
+                this.speed *= this.friction;
+            }
+
+            draw() {
+                ctx.save();
+
+                const shadowScale = 1 + (this.z / 100);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                ctx.beginPath();
+                ctx.ellipse(this.x, this.y + (this.z * 0.2), 18 * shadowScale, 7 * shadowScale, this.angle, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (this.isCrashed) {
+                    ctx.translate(this.x, this.y);
+                    ctx.rotate(this.angle + Math.PI / 3);
+                    
+                    // Fallen bike frame
+                    ctx.fillStyle = '#334155';
+                    ctx.fillRect(-14, -3, 28, 6);
+                    ctx.fillStyle = this.color;
+                    ctx.fillRect(-8, -5, 14, 5);
+                    
+                    // Smoke & damage accent
+                    ctx.fillStyle = '#ef4444';
+                    ctx.beginPath();
+                    ctx.arc(4, -2, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                    return;
+                }
+
+                const renderX = this.x;
+                const renderY = this.y - this.z;
+
+                ctx.translate(renderX, renderY);
+                ctx.rotate(this.angle + this.spinAngle + this.whipAngle);
+                ctx.scale(1 + (this.z * 0.003), 1 + (this.z * 0.003));
+
+                if (this.hasCrown) {
+                    ctx.strokeStyle = '#fbbf24';
+                    ctx.lineWidth = 3;
+                    ctx.shadowColor = '#f59e0b';
+                    ctx.shadowBlur = 18;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 24, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                if (this.isBoosting) {
+                    ctx.shadowColor = '#06b6d4';
+                    ctx.shadowBlur = 15;
+                }
+
+                // 1. Exhaust Pipe & Heat Shield
+                ctx.fillStyle = '#475569';
+                ctx.beginPath();
+                ctx.roundRect(-16, 3, 18, 3, 1);
+                ctx.fill();
+                ctx.fillStyle = '#cbd5e1';
+                ctx.fillRect(-17, 3.5, 3, 2);
+
+                // 2. Rear & Front Tires (Slim & Curved)
+                ctx.fillStyle = '#0f172a';
+                // Rear Wheel
+                ctx.beginPath();
+                ctx.ellipse(-14, 0, 7, 3.5, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Front Wheel
+                ctx.beginPath();
+                ctx.ellipse(14, 0, 7, 3, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Wheel Rims / Axle Points
+                ctx.fillStyle = '#94a3b8';
+                ctx.fillRect(-15, -1, 2, 2);
+                ctx.fillRect(13, -1, 2, 2);
+
+                // 3. Engine Block & Chassis Frame
+                ctx.fillStyle = '#1e293b';
+                ctx.beginPath();
+                ctx.roundRect(-8, -3, 14, 6, 2);
+                ctx.fill();
+
+                // Chrome Engine Accents
+                ctx.fillStyle = '#64748b';
+                ctx.fillRect(-4, -2, 6, 4);
+
+                // 4. Main Bodywork / Fuel Tank / Sharp Fairings
+                ctx.fillStyle = this.color;
+                
+                // Slim Main Tank & Tail Section
+                ctx.beginPath();
+                ctx.moveTo(-16, -2);  // Tail end
+                ctx.lineTo(-6, -4);   // Seat area
+                ctx.lineTo(8, -4.5);  // Fuel tank front
+                ctx.lineTo(19, 0);    // Front Beak / Fender
+                ctx.lineTo(8, 4.5);   // Lower cowl
+                ctx.lineTo(-6, 4);    // Lower body
+                ctx.lineTo(-16, 2);   // Rear cowl
+                ctx.closePath();
+                ctx.fill();
+
+                // High-contrast racing decal on tank
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.moveTo(-2, -3);
+                ctx.lineTo(6, -3.5);
+                ctx.lineTo(4, 0);
+                ctx.lineTo(-2, 0);
+                ctx.closePath();
+                ctx.fill();
+
+                // 5. Handlebars & Front Fork Assembly
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.moveTo(9, -7);
+                ctx.lineTo(9, 7);
+                ctx.stroke();
+
+                // Handlebar Grips
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(8, -8, 2.5, 2.5);
+                ctx.fillRect(8, 5.5, 2.5, 2.5);
+
+                // 6. Rider Dynamics (Torso, Suit, Visored Helmet)
+                // Leather Riding Jacket
+                ctx.fillStyle = '#0f172a';
+                ctx.beginPath();
+                ctx.ellipse(-3, 0, 6, 4, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Rider Team Accent Stripe
+                ctx.fillStyle = this.color;
+                ctx.fillRect(-5, -2, 4, 4);
+
+                // Arms extending to handlebars
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-2, -3);
+                ctx.lineTo(8, -6);
+                ctx.moveTo(-2, 3);
+                ctx.lineTo(8, 6);
+                ctx.stroke();
+
+                // Aerodynamic Helmet
+                ctx.fillStyle = '#f8fafc';
+                ctx.beginPath();
+                ctx.arc(1, 0, 4.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Tinted Blue Visor
+                ctx.fillStyle = '#0284c7';
+                ctx.beginPath();
+                ctx.arc(2.5, 0, 2.8, -Math.PI / 2.5, Math.PI / 2.5);
+                ctx.fill();
+
+                ctx.restore();
+
+                if (this.hasCrown) {
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.font = 'bold 18px Outfit, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('👑', renderX, renderY - this.z - 22);
+                }
+
+                if (this.isAI) {
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
+                    ctx.fillRect(renderX - 25, renderY - this.z - 22, 50, 13);
+                    ctx.fillStyle = '#e2e8f0';
+                    ctx.font = '9px Outfit, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(this.name, renderX, renderY - this.z - 12);
+                }
+            }
+        }
+
+        const player = new Motorcycle('player', centerX, centerY, false, '#f59e0b', 'You');
+
+        const aiRiders = [];
+        const aiColors = ['#ef4444', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#84cc16', '#eab308', '#6366f1'];
+        const aiNames = ['Blaze', 'Viper', 'RiderX', 'Nitro', 'Shadow', 'Apex', 'Storm', 'Turbo', 'Ghost', 'Rocket'];
+
+        for (let i = 0; i < 10; i++) {
+            const wp = trailWaypoints[i % trailWaypoints.length];
+            const ai = new Motorcycle(`ai_${i}`, wp.x + (Math.random() - 0.5) * 80, wp.y + (Math.random() - 0.5) * 80, true, aiColors[i], aiNames[i]);
+            ai.currentWaypoint = i;
+            aiRiders.push(ai);
+        }
+
+        const trickBanner = document.getElementById('trickBanner');
+        const trickNameEl = document.getElementById('trickName');
+        const multiplierTextEl = document.getElementById('multiplierText');
+        const airtimeTextEl = document.getElementById('airtimeText');
+
+        const centerNotify = document.getElementById('centerNotification');
+        const notifyTitle = document.getElementById('notifyTitle');
+        const notifySub = document.getElementById('notifySub');
+        let notifyTimeout = null;
+
+        function showNotification(title, sub, colorHex) {
+            notifyTitle.textContent = title;
+            notifyTitle.style.color = colorHex;
+            notifySub.textContent = sub;
+            centerNotify.style.opacity = '1';
+
+            if (notifyTimeout) clearTimeout(notifyTimeout);
+            notifyTimeout = setTimeout(() => { centerNotify.style.opacity = '0'; }, 2200);
+        }
+
+        function transferCrown(newHolder, reasonText) {
+            if (currentCrownHolder) currentCrownHolder.hasCrown = false;
+            currentCrownHolder = newHolder;
+
+            const crownBadge = document.getElementById('crownBadge');
+
+            if (newHolder) {
+                newHolder.hasCrown = true;
+                if (!newHolder.isAI) {
+                    crownBadge.classList.remove('hidden');
+                    showNotification('CROWN CLAIMED!', `${reasonText} You are King!`, '#fbbf24');
+                } else {
+                    crownBadge.classList.add('hidden');
+                    showNotification('CROWN STOLEN!', `${newHolder.name} took the Crown!`, '#ef4444');
+                }
+            } else {
+                crownBadge.classList.add('hidden');
+                showNotification('CROWN IS FREE!', 'First to touch the crown gets it!', '#eab308');
+            }
+        }
+
+        function dropCrownGems(x, y) {
+            for (let i = 0; i < 8; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 30 + Math.random() * 80;
+                droppedGems.push({
+                    x: x + Math.cos(angle) * dist,
+                    y: y + Math.sin(angle) * dist,
+                    value: 300,
+                    active: true
+                });
+            }
+        }
+
+        function showTrickUI(trickName, multiplier, airtime) {
+            trickBanner.classList.remove('hidden');
+            trickNameEl.textContent = trickName;
+            multiplierTextEl.textContent = `STREAK ${multiplier.toFixed(1)}x`;
+            airtimeTextEl.textContent = `Airtime: ${airtime.toFixed(1)}s`;
+        }
+
+        function hideTrickUI() { trickBanner.classList.add('hidden'); }
+
+        function drawEnvironment() {
+            ctx.fillStyle = '#09130d';
+            ctx.fillRect(0, 0, screenWidth, screenHeight);
+
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+
+            // Draw World Outer Zone Background
+            ctx.fillStyle = '#020617';
+            ctx.fillRect(0, 0, WORLD_SIZE, WORLD_SIZE);
+
+            // Playable Field Ground
+            ctx.fillStyle = '#09130d';
+            ctx.fillRect(100, 100, WORLD_SIZE - 200, WORLD_SIZE - 200);
+
+            // Exterior Border Wall (Glowing Neon Red & Amber Warning Line)
+            ctx.lineWidth = 14;
+            ctx.strokeStyle = '#ef4444';
+            ctx.shadowColor = '#f87171';
+            ctx.shadowBlur = 20;
+            ctx.strokeRect(100, 100, WORLD_SIZE - 200, WORLD_SIZE - 200);
+            ctx.shadowBlur = 0;
+
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#fbbf24';
+            ctx.strokeRect(108, 108, WORLD_SIZE - 216, WORLD_SIZE - 216);
+
+            // Render Secret Canyon Zone Platform
+            ctx.fillStyle = secretZone.unlocked ? '#3b0764' : '#1e1b4b';
+            ctx.beginPath();
+            ctx.arc(secretZone.x, secretZone.y, secretZone.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = secretZone.unlocked ? '#c084fc' : '#4338ca';
+            ctx.lineWidth = 8;
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 16px Outfit, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(secretZone.unlocked ? '⚡ MEGA RAMP CANYON (UNLOCKED!)' : '🔒 SECRET ZONE (Need 3 Keys)', secretZone.x, secretZone.y - secretZone.radius + 35);
+
+            // Dirt Track Circuit
+            ctx.strokeStyle = '#3d2817';
+            ctx.lineWidth = 140;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            for (let i = 0; i < trailWaypoints.length; i++) {
+                const wp = trailWaypoints[i];
+                if (i === 0) ctx.moveTo(wp.x, wp.y);
+                else ctx.lineTo(wp.x, wp.y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+
+            // Render Painted Stunt Trails
+            for (const pt of paintedTrails) {
+                if (!pt) continue;
+                ctx.fillStyle = pt.color;
+                ctx.globalAlpha = 0.55;
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, 18, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            }
+
+            // Stunt Ramps
+            for (const ramp of ramps) {
+                if (ramp.isMega && !secretZone.unlocked) continue;
+
+                ctx.save();
+                ctx.translate(ramp.x, ramp.y);
+                ctx.rotate(ramp.angle);
+                ctx.fillStyle = ramp.isMega ? '#9333ea' : '#b45309';
+                ctx.fillRect(-ramp.width / 2, -ramp.height / 2, ramp.width, ramp.height);
+
+                ctx.fillStyle = '#fbbf24';
+                for (let x = -ramp.width / 2 + 5; x < ramp.width / 2; x += 15) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, -ramp.height / 2);
+                    ctx.lineTo(x + 8, 0);
+                    ctx.lineTo(x, ramp.height / 2);
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = '#f59e0b';
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            // Render Golden Keys
+            for (let i = 0; i < goldenKeys.length; i++) {
+                const key = goldenKeys[i];
+                if (key.collected) continue;
+
+                ctx.save();
+                ctx.translate(key.x, key.y);
+                ctx.fillStyle = '#fbbf24';
+                ctx.shadowColor = '#f59e0b';
+                ctx.shadowBlur = 15;
+                ctx.font = 'bold 24px Outfit, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('🔑', 0, 8);
+                ctx.restore();
+
+                if (Math.hypot(player.x - key.x, player.y - key.y) < 35) {
+                    key.collected = true;
+                    keysCollectedCount++;
+                    const keyIcon = document.getElementById(`keyIcon${keysCollectedCount}`);
+                    if (keyIcon) keyIcon.style.opacity = '1.0';
+
+                    createExplosion(key.x, key.y, '#fbbf24', 20);
+
+                    if (keysCollectedCount >= 3) {
+                        secretZone.unlocked = true;
+                        showNotification('SECRET ZONE UNLOCKED!', 'Mega Canyon Ramps Opened!', '#a855f7');
+                        camera.triggerShake(10, 0.3);
+                    } else {
+                        showNotification('GOLDEN KEY FOUND!', `Key ${keysCollectedCount}/3 Collected!`, '#fbbf24');
+                    }
+                }
+            }
+
+            // Render Dropped Hype Gems
+            for (let i = droppedGems.length - 1; i >= 0; i--) {
+                const gem = droppedGems[i];
+                if (!gem || !gem.active) continue;
+
+                ctx.save();
+                ctx.translate(gem.x, gem.y);
+                ctx.fillStyle = '#38bdf8';
+                ctx.shadowColor = '#0284c7';
+                ctx.shadowBlur = 12;
+                ctx.beginPath();
+                ctx.arc(0, 0, 10, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 10px Outfit, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('💎', 0, 4);
+                ctx.restore();
+
+                if (Math.hypot(player.x - gem.x, player.y - gem.y) < 30) {
+                    gem.active = false;
+                    player.score += gem.value;
+                    showNotification('GEMS SCOOPED!', `+${gem.value} HYPE PTS`, '#38bdf8');
+                    createExplosion(gem.x, gem.y, '#38bdf8', 10);
+                }
+            }
+
+            // Particle Engine
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx; p.y += p.vy;
+                p.life -= 0.016;
+                if (p.life <= 0) { particles.splice(i, 1); continue; }
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            }
+
+            // AI Competitors
+            for (const ai of aiRiders) {
+                ai.update();
+                ai.draw();
+
+                const dist = Math.hypot(player.x - ai.x, player.y - ai.y);
+                if (dist < 24 && !player.isAirborne && !ai.isAirborne && !ai.isCrashed && !player.isCrashed) {
+                    ai.speed *= 0.5;
+                    player.speed *= 0.9;
+                    createExplosion((player.x + ai.x) / 2, (player.y + ai.y) / 2, '#f97316', 10);
+
+                    if (ai.hasCrown) {
+                        transferCrown(player, 'TACKLE STEAL!');
+                    } else if (player.hasCrown && player.speed < 2.0) {
+                        transferCrown(ai, `${ai.name} tackled you!`);
+                    }
+                }
+            }
+
+            // Player Draw
+            player.update();
+            player.draw();
+
+            if (!currentCrownHolder) {
+                for (const rider of [player, ...aiRiders]) {
+                    if (Math.hypot(rider.x - centerX, rider.y - centerY) < 50) {
+                        transferCrown(rider, 'CROWN RECOVERED!');
+                        break;
+                    }
+                }
+            }
+
+            ctx.restore();
+        }
+
+        function drawMiniMap() {
+            miniCtx.fillStyle = '#020617';
+            miniCtx.fillRect(0, 0, miniCanvas.width, miniCanvas.height);
+
+            const scale = miniCanvas.width / WORLD_SIZE;
+
+            // Exterior Boundary Border on Minimap
+            miniCtx.strokeStyle = '#ef4444';
+            miniCtx.lineWidth = 2;
+            miniCtx.strokeRect(100 * scale, 100 * scale, (WORLD_SIZE - 200) * scale, (WORLD_SIZE - 200) * scale);
+
+            miniCtx.strokeStyle = '#334155';
+            miniCtx.lineWidth = 4;
+            miniCtx.beginPath();
+            for (let i = 0; i < trailWaypoints.length; i++) {
+                const wp = trailWaypoints[i];
+                if (i === 0) miniCtx.moveTo(wp.x * scale, wp.y * scale);
+                else miniCtx.lineTo(wp.x * scale, wp.y * scale);
+            }
+            miniCtx.closePath();
+            miniCtx.stroke();
+
+            miniCtx.strokeStyle = secretZone.unlocked ? '#c084fc' : '#4338ca';
+            miniCtx.lineWidth = 2;
+            miniCtx.beginPath();
+            miniCtx.arc(secretZone.x * scale, secretZone.y * scale, secretZone.radius * scale, 0, Math.PI * 2);
+            miniCtx.stroke();
+
+            for (const ai of aiRiders) {
+                miniCtx.fillStyle = ai.color;
+                miniCtx.beginPath();
+                miniCtx.arc(ai.x * scale, ai.y * scale, 2.5, 0, Math.PI * 2);
+                miniCtx.fill();
+            }
+
+            miniCtx.fillStyle = '#f59e0b';
+            miniCtx.beginPath();
+            miniCtx.arc(player.x * scale, player.y * scale, 4, 0, Math.PI * 2);
+            miniCtx.fill();
+
+            if (currentCrownHolder) {
+                miniCtx.fillStyle = '#fbbf24';
+                miniCtx.shadowColor = '#fbbf24';
+                miniCtx.shadowBlur = 8;
+                miniCtx.beginPath();
+                miniCtx.arc(currentCrownHolder.x * scale, currentCrownHolder.y * scale, 6, 0, Math.PI * 2);
+                miniCtx.fill();
+                miniCtx.shadowBlur = 0;
+            }
+        }
+
+        const scoreText = document.getElementById('scoreText');
+        const speedText = document.getElementById('speedText');
+        const nitroBar = document.getElementById('nitroBar');
+        const dominationBar = document.getElementById('dominationBar');
+        const dominationText = document.getElementById('dominationText');
+
+        function updateHUD() {
+            scoreText.textContent = player.score.toLocaleString();
+            speedText.textContent = `${Math.round(Math.abs(player.speed) * 8)} MPH`;
+            nitroBar.style.width = `${player.nitro}%`;
+
+            const domPct = calculateDominationPercentage(player.id);
+            dominationBar.style.width = `${domPct}%`;
+            dominationText.textContent = `${domPct}%`;
+        }
+
+        function gameLoop() {
+            camera.update(player.x, player.y);
+            drawEnvironment();
+            drawMiniMap();
+            updateHUD();
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.onload = function() {
+            resizeCanvas();
+            transferCrown(player, 'MATCH START!');
+            showNotification('STUNT SHOWDOWN!', 'Steal the Crown & Collect 3 Mega Keys!', '#f59e0b');
+            gameLoop();
+        };
+    </script>
+</body>
+</html>

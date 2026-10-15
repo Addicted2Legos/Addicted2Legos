@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Sleepy Sheep Count - Bedtime & Speed Challenge</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #0b0d1b;
+      font-family: 'Nunito', sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      touch-action: manipulation;
+    }
+    h1, h2, h3, .font-heading {
+      font-family: 'Fredoka', cursive, sans-serif;
+    }
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    .glass-dark {
+      background: rgba(15, 23, 42, 0.82);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    @keyframes pulse-subtle {
+      0%, 100% { transform: scale(1); opacity: 0.95; }
+      50% { transform: scale(1.04); opacity: 1; }
+    }
+    .animate-pulse-subtle {
+      animation: pulse-subtle 3s ease-in-out infinite;
+    }
+    #gameCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      touch-action: manipulation;
+    }
+  </style>
+</head>
+<body class="relative w-full h-full text-white flex flex-col justify-between overflow-hidden select-none">
+
+  <header class="absolute top-0 left-0 right-0 z-20 p-4 md:p-6 flex justify-between items-center pointer-events-none">
+    <!-- Counter Box -->
+    <div class="pointer-events-auto glass-panel px-5 py-3 rounded-2xl flex items-center gap-4 shadow-xl border border-white/20">
+      <div class="flex flex-col">
+        <span class="text-xs uppercase tracking-widest text-indigo-200 font-semibold">Sheep Counted</span>
+        <div class="flex items-baseline gap-1">
+          <span id="sheepCountText" class="text-3xl md:text-4xl font-extrabold text-amber-200 font-heading">0</span>
+          <span class="text-sm font-semibold text-indigo-200">/ 100</span>
+        </div>
+      </div>
+      <!-- Mode Badge -->
+      <span id="modeBadge" class="text-xs font-bold px-3 py-1 rounded-full bg-indigo-500/30 border border-indigo-300/40 text-indigo-100 hidden sm:inline-block">
+        🌙 Serene Bedtime
+      </span>
+    </div>
+
+    <!-- Controls -->
+    <div class="pointer-events-auto flex items-center gap-2 sm:gap-3">
+      <!-- Stage Badge -->
+      <div id="stageInfoCard" class="glass-dark px-4 py-2 rounded-xl text-right hidden sm:block border border-white/10">
+        <div id="stageTitle" class="text-xs font-bold text-amber-300 uppercase tracking-wider">Stage 1 of 4</div>
+        <div id="stageSubtext" class="text-xs text-indigo-100/80">Gentle Sunset Pace</div>
+      </div>
+
+      <!-- Mode Toggle -->
+      <button id="toggleModeBtn" title="Switch Mode" class="glass-panel hover:bg-white/20 active:scale-95 transition p-3 rounded-xl flex items-center justify-center text-xl shadow-lg border border-white/20">
+        🌙
+      </button>
+
+      <!-- Audio Toggle -->
+      <button id="toggleAudioBtn" title="Toggle Sound" class="glass-panel hover:bg-white/20 active:scale-95 transition p-3 rounded-xl flex items-center justify-center text-xl shadow-lg border border-white/20">
+        🎵
+      </button>
+
+      <!-- Menu Button -->
+      <button id="menuBtn" title="Menu" class="glass-panel hover:bg-white/20 active:scale-95 transition p-3 rounded-xl flex items-center justify-center text-xl shadow-lg border border-white/20">
+        ⚙️
+      </button>
+    </div>
+  </header>
+
+  <!-- Interactive Hint Banner -->
+  <div id="hintBanner" class="absolute top-24 left-1/2 -translate-x-1/2 z-20 pointer-events-none transition-opacity duration-1000 opacity-100 text-center px-4">
+    <div class="glass-dark px-6 py-2.5 rounded-full text-xs sm:text-sm text-indigo-100 border border-indigo-300/30 shadow-lg animate-pulse-subtle">
+      ✨ Tap sheep to make them hop happily over the ranch fence!
+    </div>
+  </div>
+
+  <!-- Game Canvas Container -->
+  <div class="absolute inset-0 z-0">
+    <canvas id="gameCanvas"></canvas>
+  </div>
+
+  <!-- Bottom Footer -->
+  <footer class="absolute bottom-4 left-0 right-0 z-20 px-6 flex justify-between items-end pointer-events-none">
+    <div class="glass-dark px-4 py-2 rounded-xl text-xs text-indigo-200/80 pointer-events-auto max-w-xs hidden sm:block">
+      <span id="footerDesc">Relax, breathe deeply, and gently watch each sheep bounce into dreamland.</span>
+    </div>
+    
+    <div class="glass-dark px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-200 pointer-events-auto sm:hidden">
+      <span id="mobileStageText">Stage 1/4: Sunset</span>
+    </div>
+  </footer>
+
+  <!-- Options Modal -->
+  <div id="menuModal" class="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="glass-dark max-w-md w-full p-6 sm:p-8 rounded-3xl border border-white/20 shadow-2xl text-center flex flex-col gap-5">
+      <h2 class="text-2xl font-bold font-heading text-amber-200">Game Options</h2>
+      <p class="text-sm text-indigo-100/80">Choose how you wish to experience your night sky sheep journey.</p>
+      
+      <div class="flex flex-col gap-3 my-2 text-left">
+        <label class="flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 cursor-pointer border border-white/10">
+          <div class="flex flex-col">
+            <span class="font-bold text-sm text-amber-100">Serene Bedtime Mode</span>
+            <span class="text-xs text-indigo-200/70">Slower, soothing lullaby rhythm</span>
+          </div>
+          <input type="radio" name="gameModeSelect" value="calm" checked class="w-4 h-4 accent-amber-300">
+        </label>
+
+        <label class="flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 cursor-pointer border border-white/10">
+          <div class="flex flex-col">
+            <span class="font-bold text-sm text-sky-200">Speed Challenge Mode</span>
+            <span class="text-xs text-indigo-200/70">Paced rhythm with faster spawns</span>
+          </div>
+          <input type="radio" name="gameModeSelect" value="speed" class="w-4 h-4 accent-sky-300">
+        </label>
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <button id="resumeBtn" class="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 font-bold text-white shadow-lg hover:brightness-110 active:scale-95 transition">
+          Resume Journey
+        </button>
+        <button id="restartBtn" class="w-full py-2.5 rounded-xl bg-white/10 font-semibold text-xs text-indigo-200 hover:bg-white/20 transition">
+          Reset Counter to 0
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Victory Modal -->
+  <div id="victoryModal" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-xl hidden flex items-center justify-center p-4">
+    <div class="glass-dark max-w-lg w-full p-8 sm:p-10 rounded-3xl border border-amber-300/30 shadow-2xl text-center flex flex-col items-center gap-6 relative overflow-hidden">
+      <div class="text-6xl animate-bounce">🌙</div>
+      <div>
+        <h2 class="text-3xl sm:text-4xl font-extrabold font-heading text-amber-200 tracking-wide">Sweet Dreams!</h2>
+        <p class="text-indigo-100 text-sm mt-2">You have counted all 100 peaceful sheep.</p>
+      </div>
+
+      <div class="w-full glass-panel p-4 rounded-2xl border border-white/10 flex justify-around text-center">
+        <div>
+          <div class="text-xs text-indigo-200 uppercase font-semibold">Total Time</div>
+          <div id="finalTimeText" class="text-xl font-bold text-amber-300 font-heading">00:00</div>
+        </div>
+        <div>
+          <div class="text-xs text-indigo-200 uppercase font-semibold">Mode</div>
+          <div id="finalModeText" class="text-xl font-bold text-amber-300 font-heading">Bedtime</div>
+        </div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-3 w-full mt-2">
+        <button id="sleepNowBtn" class="flex-1 py-3.5 px-4 rounded-xl bg-indigo-900/80 hover:bg-indigo-800 text-indigo-100 font-bold border border-indigo-400/30 shadow-lg transition active:scale-95 text-sm">
+          😴 Dim Screen & Sleep
+        </button>
+        <button id="playAgainBtn" class="flex-1 py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-extrabold shadow-lg transition active:scale-95 text-sm">
+          ✨ Count Again
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dimmed Sleep Overlay -->
+  <div id="dimmedSleepOverlay" class="fixed inset-0 z-50 bg-black hidden flex flex-col items-center justify-center p-6 text-center cursor-pointer">
+    <div class="text-4xl mb-4 opacity-50">✨ 🌌 ✨</div>
+    <p class="text-indigo-200/50 text-sm font-light">Screen Dimmed for Sleep.</p>
+    <p class="text-indigo-200/30 text-xs mt-2">Tap anywhere to wake UI.</p>
+  </div>
+
+  <script>
+    document.addEventListener('gesturestart', function (e) {
+      e.preventDefault();
+    }, { passive: false });
+
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function (e) {
+      const now = (new Date()).getTime();
+      if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, { passive: false });
+
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.isMuted = false;
+        this.isPlayingAmbient = false;
+        this.lullabyTimer = null;
+      }
+
+      init() {
+        if (this.ctx) return;
+        try {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) {
+            this.ctx = new AudioCtx();
+          }
+        } catch (e) {}
+      }
+
+      toggleAudio() {
+        this.init();
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume().catch(() => {});
+        }
+        this.isMuted = !this.isMuted;
+        if (this.isMuted) {
+          this.stopAmbient();
+        } else {
+          this.startAmbient();
+        }
+        return !this.isMuted;
+      }
+
+      playJumpChime(frequency = 440, volume = 0.08) {
+        if (this.isMuted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          if (this.ctx.state === 'suspended') {
+            this.ctx.resume().catch(() => {});
+          }
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(frequency, this.ctx.currentTime);
+          
+          gain.gain.setValueAtTime(0.001, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(volume, this.ctx.currentTime + 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 1.2);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc.start();
+          osc.stop(this.ctx.currentTime + 1.25);
+        } catch (e) {}
+      }
+
+      startAmbient() {
+        if (this.isMuted || this.isPlayingAmbient) return;
+        this.init();
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume().catch(() => {});
+        }
+        if (!this.ctx) return;
+
+        this.isPlayingAmbient = true;
+        const notes = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25];
+        const playNextLullabyNote = () => {
+          if (!this.isPlayingAmbient || this.isMuted) return;
+          const randomNote = notes[Math.floor(Math.random() * notes.length)];
+          this.playJumpChime(randomNote * 0.5, 0.03);
+          this.lullabyTimer = setTimeout(playNextLullabyNote, 2500 + Math.random() * 3000);
+        };
+        playNextLullabyNote();
+      }
+
+      stopAmbient() {
+        this.isPlayingAmbient = false;
+        if (this.lullabyTimer) clearTimeout(this.lullabyTimer);
+      }
+    }
+
+    const audio = new SoundEngine();
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let width = 0;
+    let height = 0;
+    let horizonY = 0;
+
+    // Angled Fence Trajectory (Top-Left to Bottom-Right)
+    let fenceTop = { x: 0, y: 0 };
+    let fenceBottom = { x: 0, y: 0 };
+
+    function resizeCanvas() {
+      width = window.innerWidth || document.documentElement.clientWidth || 360;
+      height = window.innerHeight || document.documentElement.clientHeight || 640;
+      
+      const rawDpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(rawDpr, 2); // Cap at 2 to prevent WebKit memory allocation failure
+
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+      
+      horizonY = height * 0.42;
+
+      // Starts top-left (32% screen width) down to bottom-right (72% screen width)
+      fenceTop = { x: width * 0.32, y: horizonY - 15 };
+      fenceBottom = { x: width * 0.72, y: height + 80 };
+    }
+
+    class Firefly {
+      constructor() {
+        this.reset();
+      }
+
+      reset() {
+        this.x = Math.random() * (width || 300);
+        this.y = Math.random() * ((horizonY || 200) + 150);
+        this.radius = 1 + Math.random() * 2.2;
+        this.alpha = Math.random();
+        this.speedAlpha = 0.008 + Math.random() * 0.015;
+        this.vx = (Math.random() - 0.5) * 0.4;
+        this.vy = (Math.random() - 0.5) * 0.3;
+      }
+
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.alpha += this.speedAlpha;
+
+        if (this.alpha >= 1 || this.alpha <= 0.1) {
+          this.speedAlpha = -this.speedAlpha;
+        }
+
+        if (this.x < 0 || this.x > width || this.y < 0 || this.y > height) {
+          this.reset();
+        }
+      }
+
+      draw(c) {
+        c.save();
+        c.globalAlpha = Math.max(0, Math.min(1, this.alpha));
+        c.beginPath();
+        c.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        c.fillStyle = '#fef08a';
+        c.shadowColor = '#fef08a';
+        c.shadowBlur = 8;
+        c.fill();
+        c.restore();
+      }
+    }
+
+    class SparkleParticle {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 3;
+        this.vy = (Math.random() - 0.7) * 3;
+        this.life = 1.0;
+        this.decay = 0.02 + Math.random() * 0.03;
+        this.size = 2.5 + Math.random() * 3.5;
+        this.color = ['#fef08a', '#e0e7ff', '#f472b6', '#a7f3d0'][Math.floor(Math.random() * 4)];
+      }
+
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += 0.05;
+        this.life -= this.decay;
+      }
+
+      draw(c) {
+        if (this.life <= 0) return;
+        c.save();
+        c.globalAlpha = Math.max(0, this.life);
+        c.fillStyle = this.color;
+        c.beginPath();
+        c.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        c.fill();
+        c.restore();
+      }
+    }
+
+    class Sheep {
+      constructor(id, speedMultiplier) {
+        this.id = id;
+        
+        // Depth factor along hill
+        this.depthFactor = 0.5 + Math.random() * 0.48;
+        this.scale = (0.55 + this.depthFactor * 0.5);
+        
+        this.groundLevelY = horizonY + (height - horizonY) * (this.depthFactor * 0.78);
+        this.x = -70 - Math.random() * 80;
+        
+        this.baseSpeed = (1.1 + Math.random() * 0.4) * speedMultiplier * (0.8 + this.depthFactor * 0.3);
+        this.speed = this.baseSpeed;
+        
+        this.isJumping = false;
+        this.hasCrossedFence = false;
+        this.jumpProgress = 0;
+        this.jumpHeight = 70 * this.scale;
+        
+        this.bouncePhase = Math.random() * Math.PI * 2;
+
+        this.isHappy = false;
+        this.happyTimer = 0;
+
+        const notes = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25];
+        this.note = notes[id % notes.length];
+      }
+
+      getFenceXAtY(y) {
+        const t = (y - fenceTop.y) / (fenceBottom.y - fenceTop.y);
+        return fenceTop.x + t * (fenceBottom.x - fenceTop.x);
+      }
+
+      update(onFenceCross) {
+        this.bouncePhase += 0.08 * (this.speed / 1.5);
+
+        const currentFenceX = this.getFenceXAtY(this.groundLevelY);
+        const jumpDistance = 80 * this.scale;
+        const jumpStartX = currentFenceX - jumpDistance;
+        const jumpEndX = currentFenceX + jumpDistance;
+
+        if (this.x >= jumpStartX && this.x <= jumpEndX) {
+          if (!this.isJumping) {
+            this.isJumping = true;
+          }
+          this.jumpProgress = (this.x - jumpStartX) / (jumpEndX - jumpStartX);
+
+          if (this.x >= currentFenceX && !this.hasCrossedFence) {
+            this.hasCrossedFence = true;
+            audio.playJumpChime(this.note, 0.09);
+            onFenceCross(this);
+          }
+        } else {
+          this.isJumping = false;
+          this.jumpProgress = 0;
+        }
+
+        this.x += this.speed;
+
+        if (this.isHappy) {
+          this.happyTimer--;
+          if (this.happyTimer <= 0) this.isHappy = false;
+        }
+      }
+
+      containsPoint(px, py) {
+        const currY = this.getCurrentY();
+        const dx = px - this.x;
+        const dy = py - currY;
+        return (dx * dx + dy * dy) <= (40 * this.scale) * (40 * this.scale);
+      }
+
+      pet() {
+        this.isHappy = true;
+        this.happyTimer = 45;
+        this.speed = this.baseSpeed * 1.35;
+        audio.playJumpChime(this.note * 1.25, 0.12);
+      }
+
+      getCurrentY() {
+        let yOffset = 0;
+        if (this.isJumping) {
+          yOffset = -4 * this.jumpHeight * this.jumpProgress * (1 - this.jumpProgress);
+        } else {
+          yOffset = -Math.abs(Math.sin(this.bouncePhase)) * (8 * this.scale);
+        }
+        return this.groundLevelY + yOffset;
+      }
+
+      draw(c) {
+        const currY = this.getCurrentY();
+        const s = this.scale;
+
+        c.save();
+        c.translate(this.x, currY);
+
+        // Shadow
+        c.beginPath();
+        const shadowAlpha = this.isJumping ? 0.12 - (Math.sin(this.jumpProgress * Math.PI) * 0.06) : 0.25;
+        const shadowWidth = (22 * s) * (this.isJumping ? (1 - this.jumpProgress * 0.3) : 1);
+        c.ellipse(0, 18 * s, shadowWidth, 6 * s, 0, 0, Math.PI * 2);
+        c.fillStyle = `rgba(15, 23, 42, ${shadowAlpha})`;
+        c.fill();
+
+        // Legs
+        c.strokeStyle = '#334155';
+        c.lineWidth = 3.5 * s;
+        c.lineCap = 'round';
+
+        const legWobble = Math.sin(this.bouncePhase * 2) * (5 * s);
+        c.beginPath();
+        c.moveTo(-10 * s, 10 * s);
+        c.lineTo(-12 * s + legWobble, 22 * s);
+        c.moveTo(8 * s, 10 * s);
+        c.lineTo(6 * s - legWobble, 22 * s);
+        c.stroke();
+
+        c.beginPath();
+        c.moveTo(-5 * s, 10 * s);
+        c.lineTo(-7 * s - legWobble, 22 * s);
+        c.moveTo(13 * s, 10 * s);
+        c.lineTo(15 * s + legWobble, 22 * s);
+        c.stroke();
+
+        // Fluffy Body
+        c.fillStyle = this.isHappy ? '#fffbeb' : '#ffffff';
+        c.shadowColor = 'rgba(255, 255, 255, 0.35)';
+        c.shadowBlur = this.isHappy ? 16 : 4;
+
+        const bodyParts = [
+          { x: -12 * s, y: -2 * s, r: 14 * s },
+          { x: 0 * s, y: -6 * s, r: 16 * s },
+          { x: 12 * s, y: -2 * s, r: 14 * s },
+          { x: -5 * s, y: 5 * s, r: 13 * s },
+          { x: 7 * s, y: 5 * s, r: 13 * s },
+        ];
+
+        bodyParts.forEach(p => {
+          c.beginPath();
+          c.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          c.fill();
+        });
+
+        // Head
+        c.fillStyle = '#475569';
+        c.beginPath();
+        c.ellipse(18 * s, -4 * s, 10 * s, 8 * s, 0.2, 0, Math.PI * 2);
+        c.fill();
+
+        // Head Wool
+        c.fillStyle = '#ffffff';
+        c.beginPath();
+        c.arc(17 * s, -11 * s, 5 * s, 0, Math.PI * 2);
+        c.arc(21 * s, -10 * s, 4 * s, 0, Math.PI * 2);
+        c.fill();
+
+        // Eye
+        c.strokeStyle = '#f8fafc';
+        c.lineWidth = 2 * s;
+        c.beginPath();
+        if (this.isHappy) {
+          c.arc(21 * s, -5 * s, 3 * s, Math.PI, 0);
+        } else {
+          c.arc(21 * s, -4 * s, 3.5 * s, 0.2, Math.PI - 0.2);
+        }
+        c.stroke();
+
+        // Ear
+        c.fillStyle = '#334155';
+        c.beginPath();
+        c.ellipse(13 * s, -4 * s, 6 * s, 3 * s, -0.4, 0, Math.PI * 2);
+        c.fill();
+
+        if (this.isHappy) {
+          c.fillStyle = '#fef08a';
+          c.font = `${Math.floor(14 * s)}px sans-serif`;
+          c.fillText('✨', 0, -26 * s);
+        }
+
+        c.restore();
+      }
+    }
+
+    const STAGE_CONFIGS = [
+      {
+        stage: 1,
+        title: "Stage 1 of 4",
+        subtext: "Gentle Sunset Pace",
+        mobileText: "Stage 1/4: Sunset",
+        speedMult: 1.5,
+        spawnInterval: 1000, // ~1 second apart
+        skyGradients: ['#fdba74', '#f472b6', '#312e81'],
+        grassColorTop: '#16a34a',
+        grassColorBottom: '#14532d',
+        moonAlpha: 0.25
+      },
+      {
+        stage: 2,
+        title: "Stage 2 of 4",
+        subtext: "Twilight Rhythm",
+        mobileText: "Stage 2/4: Twilight",
+        speedMult: 1.8,
+        spawnInterval: 850,
+        skyGradients: ['#f472b6', '#6366f1', '#1e1b4b'],
+        grassColorTop: '#15803d',
+        grassColorBottom: '#0f3923',
+        moonAlpha: 0.5
+      },
+      {
+        stage: 3,
+        title: "Stage 3 of 4",
+        subtext: "Deep Evening Breeze",
+        mobileText: "Stage 3/4: Evening",
+        speedMult: 2.1,
+        spawnInterval: 700,
+        skyGradients: ['#4338ca', '#1e1b4b', '#0f172a'],
+        grassColorTop: '#166534',
+        grassColorBottom: '#092d19',
+        moonAlpha: 0.78
+      },
+      {
+        stage: 4,
+        title: "Stage 4 of 4",
+        subtext: "Cozy Lullaby Countdown",
+        mobileText: "Stage 4/4: Dreamland",
+        speedMult: 2.4,
+        spawnInterval: 550,
+        skyGradients: ['#1e1b4b', '#0f172a', '#020617'],
+        grassColorTop: '#14532d',
+        grassColorBottom: '#022c22',
+        moonAlpha: 1.0
+      }
+    ];
+
+    class Game {
+      constructor() {
+        this.sheepCount = 0;
+        this.targetSheep = 100;
+        this.activeSheep = [];
+        this.fireflies = [];
+        this.sparkles = [];
+        this.mode = 'calm';
+        this.isPaused = false;
+        
+        this.spawnedTotal = 0;
+        this.lastSpawnTime = 0;
+        this.startTime = Date.now();
+
+        this.initDOM();
+        this.initFireflies();
+        this.bindEvents();
+        
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+      }
+
+      initDOM() {
+        this.dom = {
+          sheepCountText: document.getElementById('sheepCountText'),
+          modeBadge: document.getElementById('modeBadge'),
+          stageTitle: document.getElementById('stageTitle'),
+          stageSubtext: document.getElementById('stageSubtext'),
+          mobileStageText: document.getElementById('mobileStageText'),
+          footerDesc: document.getElementById('footerDesc'),
+          hintBanner: document.getElementById('hintBanner'),
+          toggleModeBtn: document.getElementById('toggleModeBtn'),
+          toggleAudioBtn: document.getElementById('toggleAudioBtn'),
+          menuBtn: document.getElementById('menuBtn'),
+          menuModal: document.getElementById('menuModal'),
+          resumeBtn: document.getElementById('resumeBtn'),
+          restartBtn: document.getElementById('restartBtn'),
+          victoryModal: document.getElementById('victoryModal'),
+          finalTimeText: document.getElementById('finalTimeText'),
+          finalModeText: document.getElementById('finalModeText'),
+          sleepNowBtn: document.getElementById('sleepNowBtn'),
+          playAgainBtn: document.getElementById('playAgainBtn'),
+          dimmedSleepOverlay: document.getElementById('dimmedSleepOverlay')
+        };
+      }
+
+      initFireflies() {
+        this.fireflies = [];
+        for (let i = 0; i < 28; i++) {
+          this.fireflies.push(new Firefly());
+        }
+      }
+
+      bindEvents() {
+        this.dom.toggleModeBtn.addEventListener('click', () => this.toggleMode());
+        this.dom.toggleAudioBtn.addEventListener('click', () => {
+          const isAudioOn = audio.toggleAudio();
+          this.dom.toggleAudioBtn.innerHTML = isAudioOn ? '🎵' : '🔇';
+        });
+
+        this.dom.menuBtn.addEventListener('click', () => this.openMenu());
+        this.dom.resumeBtn.addEventListener('click', () => this.closeMenu());
+        this.dom.restartBtn.addEventListener('click', () => {
+          this.resetGame();
+          this.closeMenu();
+        });
+
+        document.querySelectorAll('input[name="gameModeSelect"]').forEach(input => {
+          input.addEventListener('change', (e) => {
+            this.mode = e.target.value;
+            this.updateHUD();
+          });
+        });
+
+        this.dom.sleepNowBtn.addEventListener('click', () => {
+          this.dom.dimmedSleepOverlay.classList.remove('hidden');
+        });
+
+        this.dom.dimmedSleepOverlay.addEventListener('click', () => {
+          this.dom.dimmedSleepOverlay.classList.add('hidden');
+        });
+
+        this.dom.playAgainBtn.addEventListener('click', () => {
+          this.dom.victoryModal.classList.add('hidden');
+          this.resetGame();
+        });
+
+        // Touch/Pointer interaction for petting sheep
+        const handlePointer = (px, py) => {
+          audio.init();
+          let hit = false;
+          this.activeSheep.forEach(s => {
+            if (s.containsPoint(px, py)) {
+              s.pet();
+              hit = true;
+              for (let k = 0; k < 8; k++) {
+                this.sparkles.push(new SparkleParticle(px, py));
+              }
+            }
+          });
+          if (this.sheepCount === 0 && !hit) {
+            audio.startAmbient();
+          }
+        };
+
+        canvas.addEventListener('click', (e) => {
+          const rect = canvas.getBoundingClientRect();
+          handlePointer(e.clientX - rect.left, e.clientY - rect.top);
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+          if (e.touches && e.touches.length > 0) {
+            const rect = canvas.getBoundingClientRect();
+            handlePointer(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top);
+          }
+        }, { passive: true });
+      }
+
+      toggleMode() {
+        this.mode = this.mode === 'calm' ? 'speed' : 'calm';
+        this.dom.toggleModeBtn.innerHTML = this.mode === 'calm' ? '🌙' : '⚡';
+        this.updateHUD();
+      }
+
+      openMenu() {
+        this.isPaused = true;
+        this.dom.menuModal.classList.remove('hidden');
+      }
+
+      closeMenu() {
+        this.isPaused = false;
+        this.dom.menuModal.classList.add('hidden');
+      }
+
+      resetGame() {
+        this.sheepCount = 0;
+        this.spawnedTotal = 0;
+        this.activeSheep = [];
+        this.sparkles = [];
+        this.startTime = Date.now();
+        this.updateHUD();
+        this.dom.hintBanner.style.opacity = '1';
+      }
+
+      getCurrentStage() {
+        if (this.sheepCount < 25) return STAGE_CONFIGS[0];
+        if (this.sheepCount < 50) return STAGE_CONFIGS[1];
+        if (this.sheepCount < 75) return STAGE_CONFIGS[2];
+        return STAGE_CONFIGS[3];
+      }
+
+      updateHUD() {
+        this.dom.sheepCountText.innerText = this.sheepCount;
+        const stage = this.getCurrentStage();
+
+        this.dom.stageTitle.innerText = stage.title;
+        this.dom.stageSubtext.innerText = stage.subtext;
+        this.dom.mobileStageText.innerText = stage.mobileText;
+
+        if (this.mode === 'calm') {
+          this.dom.modeBadge.innerText = '🌙 Serene Bedtime';
+          this.dom.footerDesc.innerText = 'Relax, breathe deeply, and gently watch each sheep bounce into dreamland.';
+        } else {
+          this.dom.modeBadge.innerText = '⚡ Speed Challenge';
+          this.dom.footerDesc.innerText = 'Fast-paced rhythmic counting! Focus and count every jumping sheep.';
+        }
+      }
+
+      spawnSheep() {
+        if (this.spawnedTotal >= this.targetSheep) return;
+        const stage = this.getCurrentStage();
+        this.spawnedTotal++;
+        const s = new Sheep(this.spawnedTotal, stage.speedMult);
+        this.activeSheep.push(s);
+      }
+
+      onFenceCross(sheep) {
+        this.sheepCount++;
+        this.updateHUD();
+
+        if (this.sheepCount >= 5) {
+          this.dom.hintBanner.style.opacity = '0';
+        }
+
+        if (this.sheepCount >= this.targetSheep) {
+          this.triggerVictory();
+        }
+      }
+
+      triggerVictory() {
+        const elapsedSec = Math.floor((Date.now() - this.startTime) / 1000);
+        const mins = Math.floor(elapsedSec / 60).toString().padStart(2, '0');
+        const secs = (elapsedSec % 60).toString().padStart(2, '0');
+
+        this.dom.finalTimeText.innerText = `${mins}:${secs}`;
+        this.dom.finalModeText.innerText = this.mode === 'calm' ? 'Bedtime' : 'Speed';
+        this.dom.victoryModal.classList.remove('hidden');
+      }
+
+      drawEnvironment() {
+        const stage = this.getCurrentStage();
+
+        // Dynamic Sky Gradient
+        const skyGrad = ctx.createLinearGradient(0, 0, 0, horizonY);
+        skyGrad.addColorStop(0, stage.skyGradients[0]);
+        skyGrad.addColorStop(0.5, stage.skyGradients[1]);
+        skyGrad.addColorStop(1, stage.skyGradients[2]);
+        ctx.fillStyle = skyGrad;
+        ctx.fillRect(0, 0, width, horizonY + 2);
+
+        // Glowing Moon
+        ctx.save();
+        ctx.globalAlpha = stage.moonAlpha;
+        const moonX = width * 0.82;
+        const moonY = horizonY * 0.35;
+        
+        ctx.fillStyle = '#fef08a';
+        ctx.shadowColor = '#fef08a';
+        ctx.shadowBlur = 24;
+        ctx.beginPath();
+        ctx.arc(moonX, moonY, 28, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = stage.skyGradients[0];
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.arc(moonX - 10, moonY - 6, 24, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // Stars
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        for (let i = 0; i < 40; i++) {
+          const sx = (Math.sin(i * 99) * 0.5 + 0.5) * width;
+          const sy = (Math.cos(i * 33) * 0.5 + 0.5) * (horizonY * 0.85);
+          const sz = (i % 3 === 0) ? 2 : 1;
+          ctx.fillRect(sx, sy, sz, sz);
+        }
+
+        // Rolling Grass Lawn
+        const grassGrad = ctx.createLinearGradient(0, horizonY, 0, height);
+        grassGrad.addColorStop(0, stage.grassColorTop);
+        grassGrad.addColorStop(1, stage.grassColorBottom);
+        ctx.fillStyle = grassGrad;
+
+        ctx.beginPath();
+        ctx.moveTo(0, horizonY);
+        ctx.quadraticCurveTo(width * 0.4, horizonY - 18, width, horizonY + 10);
+        ctx.lineTo(width, height);
+        ctx.lineTo(0, height);
+        ctx.closePath();
+        ctx.fill();
+
+        // Draw 3-Rail Brown Wooden Ranch Fence
+        this.drawViewerFacingFence();
+
+        // Update & Render Fireflies
+        this.fireflies.forEach(f => {
+          f.update();
+          f.draw(ctx);
+        });
+      }
+
+      drawViewerFacingFence() {
+        ctx.save();
+
+        const numPosts = 13;
+        const fencePosts = [];
+
+        // Calculate post positions along top-left -> bottom-right line
+        for (let i = 0; i < numPosts; i++) {
+          const t = i / (numPosts - 1);
+          const x = fenceTop.x + t * (fenceBottom.x - fenceTop.x);
+          const y = fenceTop.y + t * (fenceBottom.y - fenceTop.y);
+          
+          const scale = 0.4 + t * 1.5;
+          const postWidth = 14 * scale;
+          const postHeight = 58 * scale;
+          
+          fencePosts.push({ x, y, scale, postWidth, postHeight, t });
+        }
+
+        // 1. Cast shadows on grass lawn
+        ctx.fillStyle = 'rgba(10, 25, 10, 0.45)';
+        fencePosts.forEach(p => {
+          ctx.beginPath();
+          ctx.ellipse(p.x + p.postWidth * 1.3, p.y + p.postWidth * 0.25, p.postWidth * 2.4, p.postWidth * 0.5, 0.2, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        // 2. Three horizontal slotted rails
+        const railLevels = [0.22, 0.52, 0.82];
+
+        railLevels.forEach(railLevel => {
+          // Rail shadow
+          ctx.strokeStyle = 'rgba(12, 20, 10, 0.35)';
+          ctx.lineWidth = 10;
+          ctx.beginPath();
+          for (let i = 0; i < fencePosts.length; i++) {
+            const p = fencePosts[i];
+            const ry = p.y - p.postHeight * railLevel + 4;
+            if (i === 0) ctx.moveTo(p.x - p.postWidth * 0.2, ry);
+            else ctx.lineTo(p.x - p.postWidth * 0.2, ry);
+          }
+          ctx.stroke();
+
+          // Dark outer wood border
+          ctx.strokeStyle = '#271003';
+          ctx.lineWidth = 10;
+          ctx.lineCap = 'butt';
+          ctx.beginPath();
+          for (let i = 0; i < fencePosts.length; i++) {
+            const p = fencePosts[i];
+            const ry = p.y - p.postHeight * railLevel;
+            if (i === 0) ctx.moveTo(p.x - p.postWidth * 0.2, ry);
+            else ctx.lineTo(p.x - p.postWidth * 0.2, ry);
+          }
+          ctx.stroke();
+
+          // Cedar/Oak rail face
+          ctx.strokeStyle = '#78350f';
+          ctx.lineWidth = 7;
+          ctx.beginPath();
+          for (let i = 0; i < fencePosts.length; i++) {
+            const p = fencePosts[i];
+            const ry = p.y - p.postHeight * railLevel;
+            if (i === 0) ctx.moveTo(p.x - p.postWidth * 0.2, ry);
+            else ctx.lineTo(p.x - p.postWidth * 0.2, ry);
+          }
+          ctx.stroke();
+
+          // Top highlight edge
+          ctx.strokeStyle = '#b45309';
+          ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          for (let i = 0; i < fencePosts.length; i++) {
+            const p = fencePosts[i];
+            const ry = p.y - p.postHeight * railLevel - 2.5;
+            if (i === 0) ctx.moveTo(p.x - p.postWidth * 0.2, ry);
+            else ctx.lineTo(p.x - p.postWidth * 0.2, ry);
+          }
+          ctx.stroke();
+        });
+
+        // 3. Vertical fence posts with pyramid caps
+        fencePosts.forEach(p => {
+          const w = p.postWidth;
+          const h = p.postHeight;
+          const leftX = p.x - w * 0.5;
+          const topY = p.y - h;
+
+          // Outer dark border
+          ctx.fillStyle = '#1c0a02';
+          ctx.fillRect(leftX - 1.5, topY - 1.5, w + 3, h + 3);
+
+          // Rich brown wood gradient
+          const postGrad = ctx.createLinearGradient(leftX, 0, leftX + w, 0);
+          postGrad.addColorStop(0, '#b45309');
+          postGrad.addColorStop(0.35, '#78350f');
+          postGrad.addColorStop(0.8, '#451a03');
+          postGrad.addColorStop(1, '#270e02');
+
+          ctx.fillStyle = postGrad;
+          ctx.fillRect(leftX, topY, w, h);
+
+          // Wood grain line
+          ctx.strokeStyle = '#3b1404';
+          ctx.lineWidth = Math.max(1, p.scale * 1.2);
+          ctx.beginPath();
+          ctx.moveTo(leftX + w * 0.3, topY + 2);
+          ctx.lineTo(leftX + w * 0.35, topY + h - 2);
+          ctx.stroke();
+
+          // Pyramid cap (Matching reference photo)
+          const capHeight = w * 0.65;
+
+          // Cap left facet
+          ctx.fillStyle = '#d97706';
+          ctx.beginPath();
+          ctx.moveTo(leftX, topY);
+          ctx.lineTo(p.x, topY - capHeight);
+          ctx.lineTo(leftX + w * 0.5, topY);
+          ctx.closePath();
+          ctx.fill();
+
+          // Cap right facet
+          ctx.fillStyle = '#451a03';
+          ctx.beginPath();
+          ctx.moveTo(leftX + w * 0.5, topY);
+          ctx.lineTo(p.x, topY - capHeight);
+          ctx.lineTo(leftX + w, topY);
+          ctx.closePath();
+          ctx.fill();
+
+          // Cap border
+          ctx.strokeStyle = '#1c0a02';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(leftX, topY);
+          ctx.lineTo(p.x, topY - capHeight);
+          ctx.lineTo(leftX + w, topY);
+          ctx.stroke();
+
+          // Mortise slot cutouts where rails insert
+          railLevels.forEach(railLevel => {
+            const slotY = p.y - h * railLevel - w * 0.3;
+            ctx.fillStyle = 'rgba(28, 10, 2, 0.5)';
+            ctx.fillRect(leftX + w * 0.15, slotY, w * 0.7, w * 0.6);
+          });
+        });
+
+        ctx.restore();
+      }
+
+      loop(timestamp) {
+        if (!this.isPaused) {
+          const stage = this.getCurrentStage();
+          const spawnInterval = this.mode === 'speed' ? stage.spawnInterval * 0.8 : stage.spawnInterval;
+
+          if (timestamp - this.lastSpawnTime > spawnInterval) {
+            this.spawnSheep();
+            this.lastSpawnTime = timestamp;
+          }
+
+          const rawDpr = window.devicePixelRatio || 1;
+          const dpr = Math.min(rawDpr, 2);
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.scale(dpr, dpr);
+          ctx.clearRect(0, 0, width, height);
+
+          this.drawEnvironment();
+
+          // Sort sheep by ground level elevation
+          this.activeSheep.sort((a, b) => a.groundLevelY - b.groundLevelY);
+
+          for (let i = this.activeSheep.length - 1; i >= 0; i--) {
+            const sheep = this.activeSheep[i];
+            sheep.update((s) => this.onFenceCross(s));
+            sheep.draw(ctx);
+
+            if (sheep.x > width + 80) {
+              this.activeSheep.splice(i, 1);
+            }
+          }
+
+          for (let i = this.sparkles.length - 1; i >= 0; i--) {
+            const p = this.sparkles[i];
+            p.update();
+            p.draw(ctx);
+            if (p.life <= 0) {
+              this.sparkles.splice(i, 1);
+            }
+          }
+        }
+
+        requestAnimationFrame((ts) => this.loop(ts));
+      }
+
+      start() {
+        this.lastSpawnTime = performance.now();
+        requestAnimationFrame((ts) => this.loop(ts));
+      }
+    }
+
+    window.onload = () => {
+      const game = new Game();
+      game.start();
+    };
+  </script>
+</body>
+</html>

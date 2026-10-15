@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Asset Tycoon: Parking & Placement Strategy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        html, body, button, .game-tile {
+            touch-action: manipulation;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior: none;
+        }
+        body {
+            background-color: #090d16;
+            color: #f8fafc;
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            position: fixed;
+        }
+        .custom-scroll::-webkit-scrollbar {
+            width: 3px;
+            height: 3px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.02);
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.15);
+            border-radius: 3px;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 12px rgba(59, 130, 246, 0.4); }
+            50% { box-shadow: 0 0 22px rgba(59, 130, 246, 0.7); }
+        }
+        .glow-active {
+            animation: pulse-glow 2s infinite;
+        }
+    </style>
+</head>
+<body class="flex flex-col h-full bg-slate-950 text-slate-100">
+
+    <header class="bg-slate-900 border-b border-slate-800 px-4 py-2 flex items-center justify-between z-10 shadow-md shrink-0">
+        <div class="flex items-center space-x-2.5">
+            <div class="bg-blue-600 p-2 rounded-xl text-white font-black text-sm shadow-inner">AT</div>
+            <div>
+                <div class="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Net Worth Goal</div>
+                <div class="text-xs font-bold text-emerald-400" id="networth-display">$0 / $75,000</div>
+            </div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <div class="text-right">
+                <div class="text-[10px] text-slate-400 font-medium uppercase tracking-wider" id="round-label">Round 1 / 10</div>
+                <div class="text-sm font-extrabold text-amber-400 flex items-center justify-end space-x-1">
+                    <span id="cash-display">$14,000</span>
+                </div>
+            </div>
+            <button onclick="window.toggleAudio()" id="audio-btn" class="bg-slate-800 hover:bg-slate-700 p-2 rounded-xl text-slate-300 transition text-xs">
+                🔊
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto custom-scroll p-3 pb-24 space-y-3 max-w-lg mx-auto w-full">
+
+        <!-- Phase Banner & Turn Control -->
+        <div id="phase-banner" class="bg-gradient-to-r from-blue-900 to-indigo-950 border border-blue-700/50 rounded-2xl p-3 shadow-xl">
+            <div class="flex items-center justify-between">
+                <div>
+                    <span id="phase-badge" class="px-2 py-0.5 bg-blue-500 text-white text-[10px] font-bold rounded-full uppercase tracking-wider">Phase 1: Buy & Acquire</span>
+                    <h2 class="text-sm font-bold text-white mt-1" id="phase-title">Buy Items to Staging</h2>
+                </div>
+                <button onclick="window.advancePhase()" id="next-phase-btn" class="bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-slate-950 font-extrabold px-3.5 py-2 rounded-xl text-xs shadow-lg transition flex items-center space-x-1">
+                    <span id="next-btn-text">Go to Placement</span>
+                    <span>➔</span>
+                </button>
+            </div>
+            <p class="text-[11px] text-slate-300 mt-1.5" id="phase-desc">Purchase assets from the market below. They enter your Staging Area.</p>
+        </div>
+
+        <!-- PERMANENT PROPERTY BOARD (Always Visible!) -->
+        <div class="bg-slate-900/95 border border-emerald-500/30 rounded-2xl p-3 shadow-xl">
+            <div class="flex items-center justify-between mb-2.5">
+                <div class="flex items-center space-x-2">
+                    <span class="text-emerald-400 text-sm">🏡</span>
+                    <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wide">Property & Parking Board</h3>
+                </div>
+                <span class="text-[10px] text-emerald-400 font-semibold" id="property-capacity-label">0 / 6 Built</span>
+            </div>
+            <div id="property-grid" class="grid grid-cols-2 gap-2.5">
+                <!-- Populated via JS -->
+            </div>
+        </div>
+
+        <!-- Staging Area & Temp Buffer Row -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <!-- Staging Area -->
+            <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 shadow-lg">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center space-x-1.5">
+                        <span class="text-blue-400 text-xs">📦</span>
+                        <h3 class="text-[11px] font-bold text-slate-300 uppercase tracking-wide">Staging (Max 3)</h3>
+                    </div>
+                    <span id="staging-count" class="text-[11px] font-bold text-blue-400">0 / 3</span>
+                </div>
+                <div id="staging-grid" class="grid grid-cols-3 gap-2">
+                    <!-- Populated via JS -->
+                </div>
+            </div>
+
+            <!-- Emergency Temp Buffer -->
+            <div class="bg-slate-900/90 border border-amber-500/30 rounded-2xl p-3 shadow-lg flex flex-col justify-between">
+                <div class="flex items-center justify-between mb-1">
+                    <div class="flex items-center space-x-1.5">
+                        <span class="text-amber-400 text-xs">⚠️</span>
+                        <span class="text-[11px] font-bold text-slate-300 uppercase tracking-wide">Temp Buffer (1 Slot)</span>
+                    </div>
+                    <span class="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-medium">Spillover</span>
+                </div>
+                <div id="temp-slot-container" class="flex-1 min-h-[45px] bg-slate-950/60 border border-dashed border-slate-700 rounded-xl p-1.5 flex items-center justify-center text-[11px] text-slate-400">
+                    Empty (Spillover safety)
+                </div>
+            </div>
+        </div>
+
+        <!-- Marketplace & Builders -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 shadow-lg">
+            <div class="flex items-center justify-between mb-2.5">
+                <div class="flex items-center space-x-2">
+                    <span class="text-purple-400 text-xs">🛒</span>
+                    <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wide">Marketplace & Builders</h3>
+                </div>
+                <button onclick="window.refreshMarket()" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-purple-300 font-semibold px-2 py-1 rounded-lg transition">
+                    🔄 Refresh ($500)
+                </button>
+            </div>
+            
+            <div class="flex bg-slate-950 p-1 rounded-xl mb-2.5 border border-slate-800">
+                <button onclick="window.switchMarketTab('assets')" id="tab-assets" class="flex-1 py-1.5 text-xs font-bold rounded-lg bg-blue-600 text-white shadow transition">Buy Assets</button>
+                <button onclick="window.switchMarketTab('infra')" id="tab-infra" class="flex-1 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition">Build Parking / Lots</button>
+            </div>
+
+            <div id="market-list" class="space-y-2 max-h-48 overflow-y-auto custom-scroll pr-1">
+                <!-- Populated via JS -->
+            </div>
+        </div>
+
+        <!-- Activity Log -->
+        <div class="bg-slate-950 border border-slate-800/80 rounded-2xl p-2.5 shadow-inner">
+            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Activity Log</div>
+            <div id="activity-log" class="text-[11px] text-slate-300 space-y-1 max-h-20 overflow-y-auto custom-scroll">
+                <div>Welcome to Asset Tycoon! Board is now visible. Buy items, build parking, and deploy!</div>
+            </div>
+        </div>
+    </main>
+
+    <nav class="absolute bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-4 py-2.5 flex items-center justify-between z-20 shadow-2xl shrink-0">
+        <div class="flex items-center space-x-2">
+            <button onclick="window.openRulesModal()" class="bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 flex items-center space-x-1">
+                <span>📖 Rules</span>
+            </button>
+            <button onclick="window.showStatsModal()" class="bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 flex items-center space-x-1">
+                <span>📊 Stats</span>
+            </button>
+        </div>
+        <div>
+            <button onclick="window.endTurn()" id="end-turn-btn" class="bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-extrabold px-5 py-2 rounded-xl text-xs shadow-lg transition">
+                End Turn ➔
+            </button>
+        </div>
+    </nav>
+
+    <!-- Modal Container -->
+    <div id="modal-overlay" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div id="modal-content" class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 shadow-2xl relative max-h-[85vh] overflow-y-auto custom-scroll">
+            <!-- Populated dynamically -->
+        </div>
+    </div>
+
+    <script>
+        const GAME_CONFIG = {
+            maxRounds: 10,
+            winNetWorth: 75000,
+            startingCash: 14000,
+            stagingLimit: 3
+        };
+
+        let gameState = {
+            round: 1,
+            cash: GAME_CONFIG.startingCash,
+            phase: 1, // 1: Buy Phase, 2: Placement Phase
+            marketTab: 'assets',
+            staging: [],
+            tempSlot: null,
+            propertyLots: [
+                { id: 0, name: 'Driveway', type: 'driveway', built: true, item: null, cost: 0 },
+                { id: 1, name: 'Standard Garage', type: 'garage', built: false, item: null, cost: 2500 },
+                { id: 2, name: 'Boat Slip / Dock', type: 'boat_slip', built: false, item: null, cost: 4000 },
+                { id: 3, name: 'Large RV Pad', type: 'rv_pad', built: false, item: null, cost: 5000 },
+                { id: 4, name: 'Private Hangar', type: 'hangar', built: false, item: null, cost: 12000 },
+                { id: 5, name: 'Land Plot (House)', type: 'land_plot', built: false, item: null, cost: 18000 }
+            ],
+            marketAssets: [],
+            stats: {
+                totalSpent: 0,
+                totalEarned: 0,
+                itemsLost: 0,
+                itemsPlaced: 0
+            }
+        };
+
+        const ITEM_TYPES = {
+            car: { name: 'Sedan Car', icon: '🚗', cost: 3500, income: 600, reqType: 'driveway', desc: 'Fits basic Driveway.' },
+            truck: { name: 'Pickup Truck', icon: '🛻', cost: 5000, income: 900, reqType: 'driveway', desc: 'Fits Driveway or Garage.' },
+            boat: { name: 'Speedboat', icon: '🚤', cost: 8500, income: 1500, reqType: 'boat_slip', desc: 'Requires Boat Slip.' },
+            trailer: { name: 'Travel Trailer', icon: '🚐', cost: 7000, income: 1200, reqType: 'rv_pad', desc: 'Requires RV Pad.' },
+            rv: { name: 'Motorhome RV', icon: '🚍', cost: 12000, income: 2200, reqType: 'rv_pad', desc: 'Requires RV Pad.' },
+            plane: { name: 'Small Plane', icon: '🛩️', cost: 22000, income: 4200, reqType: 'hangar', desc: 'Requires Private Hangar.' },
+            house: { name: 'Rental House', icon: '🏠', cost: 28000, income: 5500, reqType: 'land_plot', desc: 'Massive income! Requires Land Plot.' }
+        };
+
+        let audioCtx = null;
+        let soundEnabled = true;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                initAudio();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                const now = audioCtx.currentTime;
+
+                if (type === 'buy') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(600, now + 0.15);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'place') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(450, now);
+                    osc.frequency.exponentialRampToValueAtTime(800, now + 0.2);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                } else if (type === 'error') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.setValueAtTime(100, now + 0.1);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                } else if (type === 'win') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, now);
+                    osc.frequency.setValueAtTime(659.25, now + 0.15);
+                    osc.frequency.setValueAtTime(783.99, now + 0.3);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                    osc.start(now);
+                    osc.stop(now + 0.5);
+                }
+            } catch (e) {
+                console.warn('Audio play error:', e);
+            }
+        }
+
+        // Attach all callable actions to window explicitly to prevent scope reference errors
+        window.toggleAudio = function() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('audio-btn').innerText = soundEnabled ? '🔊' : '🔇';
+            logActivity(soundEnabled ? 'Sound enabled.' : 'Sound muted.');
+        };
+
+        window.onload = function() {
+            generateMarket();
+            updateUI();
+            logActivity('Game initialized successfully. Board is visible.');
+        };
+
+        function generateMarket() {
+            const keys = Object.keys(ITEM_TYPES);
+            gameState.marketAssets = [];
+            for (let i = 0; i < 4; i++) {
+                const randomKey = keys[Math.floor(Math.random() * keys.length)];
+                const itemDef = ITEM_TYPES[randomKey];
+                gameState.marketAssets.push({
+                    id: 'asset_' + Math.random().toString(36.substr(2, 9)),
+                    type: randomKey,
+                    name: itemDef.name,
+                    icon: itemDef.icon,
+                    cost: itemDef.cost,
+                    income: itemDef.income,
+                    reqType: itemDef.reqType,
+                    desc: itemDef.desc
+                });
+            }
+        }
+
+        window.refreshMarket = function() {
+            const cost = 500;
+            if (gameState.cash < cost) {
+                playSound('error');
+                logActivity('Not enough cash to refresh market ($500).');
+                return;
+            }
+            gameState.cash -= cost;
+            gameState.stats.totalSpent += cost;
+            generateMarket();
+            playSound('buy');
+            logActivity('Market refreshed for $500.');
+            updateUI();
+        };
+
+        window.switchMarketTab = function(tab) {
+            gameState.marketTab = tab;
+            document.getElementById('tab-assets').className = tab === 'assets' ? 'flex-1 py-1.5 text-xs font-bold rounded-lg bg-blue-600 text-white shadow transition' : 'flex-1 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition';
+            document.getElementById('tab-infra').className = tab === 'infra' ? 'flex-1 py-1.5 text-xs font-bold rounded-lg bg-blue-600 text-white shadow transition' : 'flex-1 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition';
+            renderMarket();
+        };
+
+        window.buyAsset = function(marketIndex) {
+            if (gameState.phase !== 1) {
+                playSound('error');
+                logActivity('Purchasing is only allowed during Phase 1 (Buy & Acquire).');
+                return;
+            }
+
+            const asset = gameState.marketAssets[marketIndex];
+            if (gameState.cash < asset.cost) {
+                playSound('error');
+                logActivity(`Not enough cash for ${asset.name} ($${asset.cost.toLocaleString()}).`);
+                return;
+            }
+
+            if (gameState.staging.length < GAME_CONFIG.stagingLimit) {
+                gameState.cash -= asset.cost;
+                gameState.stats.totalSpent += asset.cost;
+                gameState.staging.push(asset);
+                gameState.marketAssets.splice(marketIndex, 1);
+                playSound('buy');
+                logActivity(`Purchased ${asset.icon} ${asset.name} into Staging Area.`);
+            } else {
+                if (gameState.tempSlot === null) {
+                    gameState.cash -= asset.cost;
+                    gameState.stats.totalSpent += asset.cost;
+                    gameState.tempSlot = asset;
+                    gameState.marketAssets.splice(marketIndex, 1);
+                    playSound('buy');
+                    logActivity(`⚠️ Staging full! ${asset.icon} ${asset.name} placed in Emergency Temp Buffer.`);
+                } else {
+                    playSound('error');
+                    gameState.stats.itemsLost++;
+                    gameState.marketAssets.splice(marketIndex, 1);
+                    logActivity(`❌ FORFEITED! Staging and Buffer full. ${asset.name} was lost!`);
+                }
+            }
+
+            // Replace bought item in market
+            const keys = Object.keys(ITEM_TYPES);
+            const randomKey = keys[Math.floor(Math.random() * keys.length)];
+            const itemDef = ITEM_TYPES[randomKey];
+            gameState.marketAssets.push({
+                id: 'asset_' + Math.random().toString(36.substr(2, 9)),
+                type: randomKey,
+                name: itemDef.name,
+                icon: itemDef.icon,
+                cost: itemDef.cost,
+                income: itemDef.income,
+                reqType: itemDef.reqType,
+                desc: itemDef.desc
+            });
+
+            updateUI();
+        };
+
+        window.buildInfrastructure = function(lotId) {
+            const lot = gameState.propertyLots.find(l => l.id === lotId);
+            if (lot.built) return;
+
+            if (gameState.cash < lot.cost) {
+                playSound('error');
+                logActivity(`Not enough cash to build ${lot.name} ($${lot.cost.toLocaleString()}).`);
+                return;
+            }
+
+            gameState.cash -= lot.cost;
+            gameState.stats.totalSpent += lot.cost;
+            lot.built = true;
+            playSound('buy');
+            logActivity(`🏗️ Built ${lot.name} successfully!`);
+            updateUI();
+        };
+
+        window.deployItemToProperty = function(stagingIndex, lotId, fromTemp = false) {
+            const lot = gameState.propertyLots.find(l => l.id === lotId);
+            
+            if (!lot.built) {
+                playSound('error');
+                logActivity(`Cannot deploy: ${lot.name} is not built yet.`);
+                return;
+            }
+            if (lot.item !== null) {
+                playSound('error');
+                logActivity(`Parking spot already occupied by ${lot.item.name}.`);
+                return;
+            }
+
+            let item = fromTemp ? gameState.tempSlot : gameState.staging[stagingIndex];
+
+            let validMatch = false;
+            if (lot.type === 'driveway' && item.reqType === 'driveway') validMatch = true;
+            if (lot.type === 'garage' && item.reqType === 'driveway') validMatch = true;
+            if (lot.type === 'boat_slip' && item.reqType === 'boat_slip') validMatch = true;
+            if (lot.type === 'rv_pad' && item.reqType === 'rv_pad') validMatch = true;
+            if (lot.type === 'hangar' && item.reqType === 'hangar') validMatch = true;
+            if (lot.type === 'land_plot' && item.reqType === 'land_plot') validMatch = true;
+
+            if (!validMatch) {
+                playSound('error');
+                logActivity(`❌ Incompatible spot! ${item.name} requires a ${item.reqType.replace('_', ' ')}.`);
+                return;
+            }
+
+            lot.item = item;
+            if (fromTemp) {
+                gameState.tempSlot = null;
+            } else {
+                gameState.staging.splice(stagingIndex, 1);
+            }
+
+            gameState.stats.itemsPlaced++;
+            playSound('place');
+            logActivity(`✨ Deployed ${item.icon} ${item.name} to ${lot.name}!`);
+            updateUI();
+        };
+
+        window.advancePhase = function() {
+            if (gameState.phase === 1) {
+                gameState.phase = 2;
+                logActivity('Phase 2: Placement & Deployment. Move staged items into built property lots.');
+            } else {
+                window.endTurn();
+                return;
+            }
+            updateUI();
+        };
+
+        window.endTurn = function() {
+            let totalIncome = 0;
+            gameState.propertyLots.forEach(lot => {
+                if (lot.item) {
+                    totalIncome += lot.item.income;
+                }
+            });
+
+            gameState.cash += totalIncome;
+            gameState.stats.totalEarned += totalIncome;
+            playSound('win');
+            logActivity(`💰 Round ${gameState.round} ended. Collected $${totalIncome.toLocaleString()} income!`);
+
+            let netWorth = calculateNetWorth();
+            if (netWorth >= GAME_CONFIG.winNetWorth || gameState.round >= GAME_CONFIG.maxRounds) {
+                showGameOverModal(netWorth >= GAME_CONFIG.winNetWorth);
+                return;
+            }
+
+            gameState.round++;
+            gameState.phase = 1;
+            generateMarket();
+            updateUI();
+        };
+
+        function calculateNetWorth() {
+            let assetVal = gameState.cash;
+            gameState.staging.forEach(i => assetVal += Math.floor(i.cost * 0.8));
+            if (gameState.tempSlot) assetVal += Math.floor(gameState.tempSlot.cost * 0.8);
+            gameState.propertyLots.forEach(l => {
+                if (l.built) assetVal += Math.floor(l.cost * 0.7);
+                if (l.item) assetVal += Math.floor(l.item.cost * 0.8);
+            });
+            return assetVal;
+        }
+
+        function updateUI() {
+            let netWorth = calculateNetWorth();
+            document.getElementById('networth-display').innerText = `$${netWorth.toLocaleString()} / $${GAME_CONFIG.winNetWorth.toLocaleString()}`;
+            document.getElementById('cash-display').innerText = `$${gameState.cash.toLocaleString()}`;
+            document.getElementById('round-label').innerText = `Round ${gameState.round} / ${GAME_CONFIG.maxRounds}`;
+
+            const badge = document.getElementById('phase-badge');
+            const title = document.getElementById('phase-title');
+            const desc = document.getElementById('phase-desc');
+            const btnText = document.getElementById('next-btn-text');
+
+            if (gameState.phase === 1) {
+                badge.innerText = 'Phase 1: Buy & Acquire';
+                badge.className = 'px-2 py-0.5 bg-blue-500 text-white text-[10px] font-bold rounded-full uppercase tracking-wider';
+                title.innerText = 'Buy Items to Staging';
+                desc.innerText = 'Purchase assets. Watch your Staging limit (3 max) and Buffer slot!';
+                btnText.innerText = 'Go to Placement';
+            } else {
+                badge.innerText = 'Phase 2: Placement & Deploy';
+                badge.className = 'px-2 py-0.5 bg-emerald-500 text-slate-950 text-[10px] font-bold rounded-full uppercase tracking-wider';
+                title.innerText = 'Deploy Staged Items';
+                desc.innerText = 'Tap Deploy on an item in Staging, then select an open built lot on your board.';
+                btnText.innerText = 'End Turn';
+            }
+
+            renderTempSlot();
+            renderStaging();
+            renderMarket();
+            renderPropertyGrid();
+        }
+
+        function renderTempSlot() {
+            const container = document.getElementById('temp-slot-container');
+            if (!gameState.tempSlot) {
+                container.innerHTML = `<span class="text-[11px] text-slate-500">Empty (Safe spillover slot)</span>`;
+                container.className = 'flex-1 min-h-[45px] bg-slate-950/60 border border-dashed border-slate-700 rounded-xl p-1.5 flex items-center justify-center';
+            } else {
+                const item = gameState.tempSlot;
+                container.innerHTML = `
+                    <div class="flex items-center justify-between w-full bg-amber-500/10 border border-amber-500/40 rounded-lg p-1.5">
+                        <div class="flex items-center space-x-1.5">
+                            <span class="text-base">${item.icon}</span>
+                            <div>
+                                <div class="text-[11px] font-bold text-amber-300">${item.name}</div>
+                                <div class="text-[9px] text-slate-400">Req: ${item.reqType}</div>
+                            </div>
+                        </div>
+                        <div class="flex space-x-1">
+                            <button onclick="window.promptDeploy(0, true)" class="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] px-2 py-1 rounded font-bold">Deploy</button>
+                            <button onclick="window.discardTemp()" class="bg-rose-600 hover:bg-rose-500 text-white text-[10px] px-1.5 py-1 rounded font-bold">Sell</button>
+                        </div>
+                    </div>
+                `;
+                container.className = 'flex-1 min-h-[45px] bg-slate-950/90 border border-amber-500/50 rounded-xl p-1.5';
+            }
+        }
+
+        function renderStaging() {
+            const grid = document.getElementById('staging-grid');
+            document.getElementById('staging-count').innerText = `${gameState.staging.length} / ${GAME_CONFIG.stagingLimit}`;
+            grid.innerHTML = '';
+
+            for (let i = 0; i < GAME_CONFIG.stagingLimit; i++) {
+                const item = gameState.staging[i];
+                if (!item) {
+                    grid.innerHTML += `
+                        <div class="h-20 bg-slate-950/50 border border-dashed border-slate-800 rounded-xl flex flex-col items-center justify-center text-slate-600 text-[10px]">
+                            <span>Slot ${i+1}</span>
+                            <span class="text-[9px]">Empty</span>
+                        </div>
+                    `;
+                } else {
+                    grid.innerHTML += `
+                        <div class="h-20 bg-blue-950/40 border border-blue-500/40 rounded-xl p-2 flex flex-col justify-between relative shadow-md">
+                            <div class="flex items-center justify-between">
+                                <span class="text-base">${item.icon}</span>
+                                <button onclick="window.discardStaging(${i})" class="text-slate-400 hover:text-rose-400 text-xs">✕</button>
+                            </div>
+                            <div>
+                                <div class="text-[10px] font-bold text-white truncate">${item.name}</div>
+                                <button onclick="window.promptDeploy(${i}, false)" class="mt-1 w-full bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold py-1 rounded shadow">Deploy</button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function renderMarket() {
+            const list = document.getElementById('market-list');
+            list.innerHTML = '';
+
+            if (gameState.marketTab === 'assets') {
+                gameState.marketAssets.forEach((asset, idx) => {
+                    list.innerHTML += `
+                        <div class="bg-slate-950/60 border border-slate-800 hover:border-slate-700 rounded-xl p-2 flex items-center justify-between transition">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-xl">${asset.icon}</span>
+                                <div>
+                                    <div class="text-xs font-bold text-white">${asset.name}</div>
+                                    <div class="text-[10px] text-slate-400">${asset.desc}</div>
+                                    <div class="text-[10px] text-emerald-400 font-semibold mt-0.5">+$${asset.income}/rd</div>
+                                </div>
+                            </div>
+                            <button onclick="window.buyAsset(${idx})" class="bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-[11px] px-3 py-1.5 rounded-xl shadow transition">
+                                $${asset.cost.toLocaleString()}
+                            </button>
+                        </div>
+                    `;
+                });
+            } else {
+                gameState.propertyLots.forEach((lot) => {
+                    if (lot.built) {
+                        list.innerHTML += `
+                            <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-2 flex items-center justify-between opacity-60">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-lg">✅</span>
+                                    <div>
+                                        <div class="text-xs font-bold text-slate-300">${lot.name}</div>
+                                        <div class="text-[10px] text-emerald-400">Already Built</div>
+                                    </div>
+                                </div>
+                                <span class="text-[10px] text-slate-500 font-semibold px-2.5 py-1">Owned</span>
+                            </div>
+                        `;
+                    } else {
+                        list.innerHTML += `
+                            <div class="bg-slate-950/60 border border-slate-800 hover:border-slate-700 rounded-xl p-2 flex items-center justify-between transition">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-lg">🏗️</span>
+                                    <div>
+                                        <div class="text-xs font-bold text-white">${lot.name}</div>
+                                        <div class="text-[10px] text-slate-400">Required parking structure</div>
+                                    </div>
+                                </div>
+                                <button onclick="window.buildInfrastructure(${lot.id})" class="bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-bold text-[11px] px-3 py-1.5 rounded-xl shadow transition">
+                                    $${lot.cost.toLocaleString()}
+                                </button>
+                            </div>
+                        `;
+                    }
+                });
+            }
+        }
+
+        function renderPropertyGrid() {
+            const grid = document.getElementById('property-grid');
+            let builtCount = 0;
+            let occupiedCount = 0;
+            grid.innerHTML = '';
+
+            gameState.propertyLots.forEach(lot => {
+                if (lot.built) builtCount++;
+                if (lot.item) occupiedCount++;
+
+                if (!lot.built) {
+                    grid.innerHTML += `
+                        <div class="bg-slate-950/40 border border-dashed border-slate-800 rounded-xl p-2.5 flex flex-col justify-between opacity-50">
+                            <div class="flex items-center justify-between text-[11px] text-slate-500 font-bold">
+                                <span>${lot.name}</span>
+                                <span>🔒</span>
+                            </div>
+                            <div class="text-[9px] text-slate-600 my-1">Unbuilt Spot</div>
+                            <button onclick="window.switchMarketTab('infra')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold py-1 rounded">Build ($${lot.cost.toLocaleString()})</button>
+                        </div>
+                    `;
+                } else if (!lot.item) {
+                    grid.innerHTML += `
+                        <div class="bg-emerald-950/20 border border-emerald-500/30 rounded-xl p-2.5 flex flex-col justify-between">
+                            <div class="flex items-center justify-between text-[11px] text-emerald-400 font-bold">
+                                <span>${lot.name}</span>
+                                <span>🟢 Open</span>
+                            </div>
+                            <div class="text-[9px] text-slate-400 my-1">Ready for deployment</div>
+                            <div class="text-[9px] text-slate-500 italic">Select deploy from staging</div>
+                        </div>
+                    `;
+                } else {
+                    const item = lot.item;
+                    grid.innerHTML += `
+                        <div class="bg-slate-950 border border-emerald-500/60 rounded-xl p-2.5 flex flex-col justify-between shadow-md">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xl">${item.icon}</span>
+                                <button onclick="window.removePropertyItem(${lot.id})" class="text-slate-400 hover:text-rose-400 text-xs" title="Sell Asset">💰</button>
+                            </div>
+                            <div class="my-1">
+                                <div class="text-[11px] font-bold text-white truncate">${item.name}</div>
+                                <div class="text-[10px] text-emerald-400 font-semibold">+${item.income}/rd</div>
+                            </div>
+                            <div class="text-[9px] bg-emerald-500/10 text-emerald-300 px-1.5 py-0.5 rounded text-center font-medium">${lot.name}</div>
+                        </div>
+                    `;
+                }
+            });
+
+            document.getElementById('property-capacity-label').innerText = `${occupiedCount} / ${builtCount} Built Used`;
+        }
+
+        window.discardStaging = function(index) {
+            const item = gameState.staging[index];
+            const refund = Math.floor(item.cost * 0.5);
+            gameState.cash += refund;
+            gameState.staging.splice(index, 1);
+            playSound('buy');
+            logActivity(`Sold staged ${item.name} for $${refund.toLocaleString()} (50% refund).`);
+            updateUI();
+        };
+
+        window.discardTemp = function() {
+            if (!gameState.tempSlot) return;
+            const item = gameState.tempSlot;
+            const refund = Math.floor(item.cost * 0.5);
+            gameState.cash += refund;
+            gameState.tempSlot = null;
+            playSound('buy');
+            logActivity(`Sold buffer ${item.name} for $${refund.toLocaleString()} (50% refund).`);
+            updateUI();
+        };
+
+        window.promptDeploy = function(stagingIndex, fromTemp) {
+            const item = fromTemp ? gameState.tempSlot : gameState.staging[stagingIndex];
+            const modalOverlay = document.getElementById('modal-overlay');
+            const modalContent = document.getElementById('modal-content');
+
+            let lotsHtml = '';
+            gameState.propertyLots.forEach(l => {
+                if (l.built && l.item === null) {
+                    let compatible = (l.type === 'driveway' && item.reqType === 'driveway') ||
+                                     (l.type === 'garage' && item.reqType === 'driveway') ||
+                                     (l.type === item.reqType);
+                    lotsHtml += `
+                        <div onclick="${compatible ? `window.deployItemToProperty(${stagingIndex}, ${l.id}, ${fromTemp}); window.closeModal();` : `playSound('error');`}" 
+                             class="p-2.5 rounded-xl border ${compatible ? 'border-emerald-500/50 bg-emerald-950/30 cursor-pointer hover:bg-emerald-900/40' : 'border-slate-800 bg-slate-950/40 opacity-50'} flex items-center justify-between transition mb-2">
+                            <div>
+                                <div class="text-xs font-bold text-white">${l.name}</div>
+                                <div class="text-[10px] text-slate-400">Type: ${l.type}</div>
+                            </div>
+                            <span class="text-xs font-bold ${compatible ? 'text-emerald-400' : 'text-slate-500'}">${compatible ? 'Select ➔' : 'Incompatible'}</span>
+                        </div>
+                    `;
+                }
+            });
+
+            if (lotsHtml === '') {
+                lotsHtml = `<div class="text-xs text-rose-400 text-center py-4">No open built parking lots available! Build the required parking infrastructure first.</div>`;
+            }
+
+            modalContent.innerHTML = `
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2">
+                        <span>${item.icon}</span>
+                        <span>Deploy ${item.name}</span>
+                    </h3>
+                    <button onclick="window.closeModal()" class="text-slate-400 hover:text-white text-sm">✕</button>
+                </div>
+                <p class="text-xs text-slate-300 mb-2.5">Choose an open built property lot on your board:</p>
+                <div class="space-y-2 mb-3 max-h-56 overflow-y-auto custom-scroll">
+                    ${lotsHtml}
+                </div>
+                <button onclick="window.closeModal()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2 rounded-xl text-xs">Cancel</button>
+            `;
+
+            modalOverlay.classList.remove('hidden');
+        };
+
+        window.removePropertyItem = function(lotId) {
+            const lot = gameState.propertyLots.find(l => l.id === lotId);
+            if (!lot.item) return;
+
+            const refund = Math.floor(lot.item.cost * 0.6);
+            gameState.cash += refund;
+            logActivity(`Sold ${lot.item.name} from ${lot.name} for $${refund.toLocaleString()} (60% refund).`);
+            lot.item = null;
+            playSound('buy');
+            updateUI();
+        };
+
+        function logActivity(text) {
+            const logContainer = document.getElementById('activity-log');
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            logContainer.innerHTML = `<div>[${time}] ${text}</div>` + logContainer.innerHTML;
+        }
+
+        window.openRulesModal = function() {
+            const modalOverlay = document.getElementById('modal-overlay');
+            const modalContent = document.getElementById('modal-content');
+
+            modalContent.innerHTML = `
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">📖 Game Rules & Strategy</h3>
+                    <button onclick="window.closeModal()" class="text-slate-400 hover:text-white text-sm">✕</button>
+                </div>
+                <div class="space-y-2.5 text-xs text-slate-300">
+                    <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                        <strong class="text-blue-400">Phase 1: Buy & Acquire</strong><br>
+                        Purchase vehicles into Staging (Max 3 slots).
+                    </div>
+                    <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                        <strong class="text-amber-400">Emergency Buffer</strong><br>
+                        If Staging is full, new purchases spill over to the 1 Temp Buffer safely. If both are full, items are <strong>forfeited</strong>!
+                    </div>
+                    <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                        <strong class="text-emerald-400">Phase 2: Placement & Deploy</strong><br>
+                        Build required parking (Garages, Boat Slips, RV Pads, Hangars, Land Plots) and deploy items to earn passive income every round.
+                    </div>
+                </div>
+                <button onclick="window.closeModal()" class="mt-4 w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded-xl text-xs">Got It</button>
+            `;
+            modalOverlay.classList.remove('hidden');
+        };
+
+        window.showStatsModal = function() {
+            const modalOverlay = document.getElementById('modal-overlay');
+            const modalContent = document.getElementById('modal-content');
+            let netWorth = calculateNetWorth();
+
+            modalContent.innerHTML = `
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">📊 Tycoon Statistics</h3>
+                    <button onclick="window.closeModal()" class="text-slate-400 hover:text-white text-sm">✕</button>
+                </div>
+                <div class="space-y-2 text-xs text-slate-300">
+                    <div class="flex justify-between bg-slate-950 p-2 rounded-xl border border-slate-800"><span>Cash:</span> <span class="font-bold text-emerald-400">$${gameState.cash.toLocaleString()}</span></div>
+                    <div class="flex justify-between bg-slate-950 p-2 rounded-xl border border-slate-800"><span>Net Worth:</span> <span class="font-bold text-blue-400">$${netWorth.toLocaleString()}</span></div>
+                    <div class="flex justify-between bg-slate-950 p-2 rounded-xl border border-slate-800"><span>Total Spent:</span> <span class="font-bold text-rose-400">$${gameState.stats.totalSpent.toLocaleString()}</span></div>
+                    <div class="flex justify-between bg-slate-950 p-2 rounded-xl border border-slate-800"><span>Total Earned:</span> <span class="font-bold text-amber-400">$${gameState.stats.totalEarned.toLocaleString()}</span></div>
+                    <div class="flex justify-between bg-slate-950 p-2 rounded-xl border border-slate-800"><span>Successfully Placed:</span> <span class="font-bold text-white">${gameState.stats.itemsPlaced}</span></div>
+                    <div class="flex justify-between bg-slate-950 p-2 rounded-xl border border-slate-800"><span>Forfeited / Lost:</span> <span class="font-bold text-rose-400">${gameState.stats.itemsLost}</span></div>
+                </div>
+                <button onclick="window.closeModal()" class="mt-4 w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded-xl text-xs">Close</button>
+            `;
+            modalOverlay.classList.remove('hidden');
+        };
+
+        function showGameOverModal(isWin) {
+            const modalOverlay = document.getElementById('modal-overlay');
+            const modalContent = document.getElementById('modal-content');
+            let netWorth = calculateNetWorth();
+
+            modalContent.innerHTML = `
+                <div class="text-center py-3">
+                    <div class="text-3xl mb-1">${isWin ? '🏆' : '💼'}</div>
+                    <h3 class="text-sm font-extrabold text-white uppercase tracking-wider mb-1">${isWin ? 'Tycoon Victory!' : 'Game Over'}</h3>
+                    <p class="text-xs text-slate-300 mb-3">${isWin ? 'You reached the $75,000 net worth goal!' : 'Round 10 reached. Final net worth calculated.'}</p>
+                    <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 mb-3 text-xs space-y-1">
+                        <div>Final Net Worth: <strong class="text-emerald-400">$${netWorth.toLocaleString()}</strong></div>
+                    </div>
+                    <button onclick="location.reload()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold py-2.5 rounded-xl text-xs shadow-lg">Play Again ➔</button>
+                </div>
+            `;
+            modalOverlay.classList.remove('hidden');
+        }
+
+        window.closeModal = function() {
+            document.getElementById('modal-overlay').classList.add('hidden');
+        };
+    </script>
+</body>
+</html>
