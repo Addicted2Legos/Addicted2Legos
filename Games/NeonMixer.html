@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Mixer - Advanced Club Generator</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Tone.js for Audio Synthesis -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Syncopate:wght@700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Syncopate', 'sans-serif'],
+                    },
+                    colors: {
+                        neon: {
+                            pink: '#ff00a0',
+                            green: '#8bce24',
+                            cyan: '#00e5ff',
+                            purple: '#b500ff'
+                        },
+                        dark: {
+                            900: '#0a0a0c',
+                            800: '#141418',
+                            700: '#222228'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #050507;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        /* Fullscreen Canvas Visualizer */
+        #bg-visualizer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            pointer-events: none; /* Let clicks pass through to UI */
+        }
+
+        /* Make UI sit on top and slightly translucent */
+        .ui-layer {
+            position: relative;
+            z-index: 10;
+        }
+
+        .glass-panel {
+            background: rgba(20, 20, 24, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            height: 6px;
+            border-radius: 4px;
+            outline: none;
+        }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+            margin-top: -7px;
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+            transition: transform 0.1s;
+        }
+
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+        }
+
+        /* Themed Tracks */
+        .slider-pink::-webkit-slider-runnable-track { background: linear-gradient(90deg, #ff00a0 0%, rgba(255,255,255,0.1) 100%); }
+        .slider-green::-webkit-slider-runnable-track { background: linear-gradient(90deg, #8bce24 0%, rgba(255,255,255,0.1) 100%); }
+        .slider-cyan::-webkit-slider-runnable-track { background: linear-gradient(90deg, #00e5ff 0%, rgba(255,255,255,0.1) 100%); }
+        .slider-purple::-webkit-slider-runnable-track { background: linear-gradient(90deg, #b500ff 0%, rgba(255,255,255,0.1) 100%); }
+
+        /* Glowing Effects */
+        .glow-pink { box-shadow: 0 0 15px rgba(255, 0, 160, 0.2); border-color: rgba(255, 0, 160, 0.4); }
+        .glow-green { box-shadow: 0 0 15px rgba(139, 206, 36, 0.2); border-color: rgba(139, 206, 36, 0.4); }
+        .glow-cyan { box-shadow: 0 0 15px rgba(0, 229, 255, 0.2); border-color: rgba(0, 229, 255, 0.4); }
+        .glow-purple { box-shadow: 0 0 15px rgba(181, 0, 255, 0.2); border-color: rgba(181, 0, 255, 0.4); }
+
+        /* Structure Button Active States */
+        .struct-btn.active {
+            background-color: white;
+            color: black;
+            box-shadow: 0 0 15px rgba(255,255,255,0.5);
+        }
+
+        /* Pattern Button active states */
+        .pat-btn { transition: all 0.2s; }
+        .pat-btn-pink.active { background: #ff00a0; color: white; box-shadow: 0 0 10px #ff00a0; border-color: #ff00a0; }
+        .pat-btn-green.active { background: #8bce24; color: black; box-shadow: 0 0 10px #8bce24; border-color: #8bce24; }
+        .pat-btn-cyan.active { background: #00e5ff; color: black; box-shadow: 0 0 10px #00e5ff; border-color: #00e5ff; }
+        .pat-btn-purple.active { background: #b500ff; color: white; box-shadow: 0 0 10px #b500ff; border-color: #b500ff; }
+
+        /* Mini CSS Visualizers inside cards */
+        .vis-bar {
+            width: 8px;
+            background: currentColor;
+            border-radius: 4px;
+            transition: height 0.1s ease;
+            height: 10%;
+        }
+
+        @keyframes bounce1 { 0%, 100% { height: 20%; } 50% { height: 90%; } }
+        @keyframes bounce2 { 0%, 100% { height: 30%; } 50% { height: 70%; } }
+        @keyframes bounce3 { 0%, 100% { height: 10%; } 50% { height: 100%; } }
+        @keyframes bounce4 { 0%, 100% { height: 40%; } 50% { height: 60%; } }
+
+        .playing-vis .vis-bar:nth-child(1) { animation: bounce1 0.4s infinite alternate; }
+        .playing-vis .vis-bar:nth-child(2) { animation: bounce3 0.3s infinite alternate 0.1s; }
+        .playing-vis .vis-bar:nth-child(3) { animation: bounce2 0.5s infinite alternate 0.2s; }
+        .playing-vis .vis-bar:nth-child(4) { animation: bounce4 0.35s infinite alternate 0.05s; }
+        .playing-vis .vis-bar:nth-child(5) { animation: bounce1 0.45s infinite alternate 0.15s; }
+        
+        .muted-vis .vis-bar {
+            height: 10% !important;
+            animation: none !important;
+            opacity: 0.3;
+        }
+
+        .toggle-btn.active { opacity: 1; }
+        .toggle-btn.inactive { opacity: 0.4; text-decoration: line-through; }
+    </style>
+</head>
+<body class="antialiased flex flex-col min-h-screen">
+
+    <!-- Background Canvas Visualizer -->
+    <canvas id="bg-visualizer"></canvas>
+
+    <!-- Top Header & Global Controls -->
+    <header class="w-full p-4 md:p-6 flex flex-col lg:flex-row justify-between items-center glass-panel border-b border-gray-800 ui-layer shadow-lg gap-4">
+        <div class="text-center lg:text-left flex-shrink-0">
+            <h1 class="font-display text-2xl tracking-widest text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">NEON MIXER</h1>
+            <p class="text-xs text-gray-400 uppercase tracking-widest mt-1">Advanced Pattern Studio</p>
+        </div>
+
+        <!-- Song Structure Controls -->
+        <div class="flex items-center gap-2 bg-dark-900/80 p-1.5 rounded-full border border-gray-700 shadow-inner">
+            <button class="struct-btn active px-4 py-2 rounded-full text-xs font-bold tracking-wide transition-all text-gray-400 hover:text-white" data-struct="verse">VERSE</button>
+            <button class="struct-btn px-4 py-2 rounded-full text-xs font-bold tracking-wide transition-all text-gray-400 hover:text-white" data-struct="chorus">CHORUS</button>
+            <button class="struct-btn px-4 py-2 rounded-full text-xs font-bold tracking-wide transition-all text-gray-400 hover:text-white" data-struct="bridge">BRIDGE</button>
+        </div>
+
+        <!-- Transport Controls -->
+        <div class="flex items-center gap-6 bg-dark-900/80 p-2 md:p-3 rounded-full border border-gray-700 shadow-inner flex-shrink-0">
+            <button id="playBtn" class="w-12 h-12 flex items-center justify-center rounded-full bg-white text-black hover:bg-neon-green transition-all duration-300 transform hover:scale-105 shadow-[0_0_15px_rgba(255,255,255,0.2)]">
+                <i class="fas fa-play text-xl ml-1" id="playIcon"></i>
+            </button>
+            
+            <div class="flex flex-col px-4 border-l border-gray-700">
+                <div class="flex justify-between items-center mb-1 w-24 md:w-32">
+                    <span class="text-xs font-bold text-gray-400">TEMPO</span>
+                    <span id="bpmValue" class="text-sm font-bold text-white">128</span>
+                </div>
+                <input type="range" id="bpmSlider" min="110" max="150" value="128" class="w-24 md:w-32">
+            </div>
+        </div>
+    </header>
+
+    <!-- Mixer Board -->
+    <main class="flex-grow p-4 md:p-8 flex items-center justify-center ui-layer w-full">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 w-full max-w-7xl">
+            
+            <!-- Stem 1: Drums -->
+            <div class="glass-panel rounded-2xl p-5 border border-gray-700 flex flex-col transition-all duration-300 glow-pink">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="font-display text-lg text-neon-pink tracking-wider">DRUMS</h2>
+                    <button id="mute-drums" class="toggle-btn active text-white hover:text-neon-pink transition-colors w-8 h-8 rounded-full bg-dark-700 flex items-center justify-center">
+                        <i class="fas fa-volume-up"></i>
+                    </button>
+                </div>
+                
+                <!-- Pattern Selector -->
+                <div class="mb-4">
+                    <div class="text-[10px] text-gray-400 uppercase tracking-widest mb-2 font-bold">Select Pattern</div>
+                    <div class="flex justify-between gap-2" id="pat-drums">
+                        <button class="pat-btn pat-btn-pink active w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="1">1</button>
+                        <button class="pat-btn pat-btn-pink w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="2">2</button>
+                        <button class="pat-btn pat-btn-pink w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="3">3</button>
+                        <button class="pat-btn pat-btn-pink w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="4">4</button>
+                        <button class="pat-btn pat-btn-pink w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="5">5</button>
+                    </div>
+                </div>
+
+                <div class="flex-grow flex flex-col justify-end relative h-24 mb-6 bg-dark-900/50 rounded-lg overflow-hidden border border-gray-800 p-2">
+                    <div id="vis-drums" class="w-full h-full flex items-end justify-between px-2 text-neon-pink muted-vis">
+                        <div class="vis-bar"></div><div class="vis-bar"></div><div class="vis-bar"></div><div class="vis-bar"></div><div class="vis-bar"></div>
+                    </div>
+                </div>
+
+                <div class="mt-auto">
+                    <div class="flex justify-between text-[10px] text-gray-500 mb-2 font-bold tracking-widest">
+                        <span>MIN</span><span>MAX</span>
+                    </div>
+                    <input type="range" id="vol-drums" class="slider-pink" min="0" max="100" value="80">
+                </div>
+            </div>
+
+            <!-- Stem 2: Bass -->
+            <div class="glass-panel rounded-2xl p-5 border border-gray-700 flex flex-col transition-all duration-300 glow-green">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="font-display text-lg text-neon-green tracking-wider">BASS</h2>
+                    <button id="mute-bass" class="toggle-btn active text-white hover:text-neon-green transition-colors w-8 h-8 rounded-full bg-dark-700 flex items-center justify-center">
+                        <i class="fas fa-volume-up"></i>
+                    </button>
+                </div>
+                
+                <div class="mb-4">
+                    <div class="text-[10px] text-gray-400 uppercase tracking-widest mb-2 font-bold">Select Pattern</div>
+                    <div class="flex justify-between gap-2" id="pat-bass">
+                        <button class="pat-btn pat-btn-green active w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="1">1</button>
+                        <button class="pat-btn pat-btn-green w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="2">2</button>
+                        <button class="pat-btn pat-btn-green w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="3">3</button>
+                        <button class="pat-btn pat-btn-green w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="4">4</button>
+                        <button class="pat-btn pat-btn-green w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="5">5</button>
+                    </div>
+                </div>
+
+                <div class="flex-grow flex flex-col justify-end relative h-24 mb-6 bg-dark-900/50 rounded-lg overflow-hidden border border-gray-800 p-2">
+                    <div id="vis-bass" class="w-full h-full flex items-end justify-between px-2 text-neon-green muted-vis">
+                        <div class="vis-bar"></div><div class="vis-bar"></div><div class="vis-bar"></div><div class="vis-bar"></div><div class="vis-bar"></div>
+                    </div>
+                </div>
+
+                <div class="mt-auto">
+                    <div class="flex justify-between text-[10px] text-gray-500 mb-2 font-bold tracking-widest">
+                        <span>MIN</span><span>MAX</span>
+                    </div>
+                    <input type="range" id="vol-bass" class="slider-green" min="0" max="100" value="85">
+                </div>
+            </div>
+
+            <!-- Stem 3: Midrange -->
+            <div class="glass-panel rounded-2xl p-5 border border-gray-700 flex flex-col transition-all duration-300 glow-cyan">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="font-display text-lg text-neon-cyan tracking-wider">MIDRANGE</h2>
+                    <button id="mute-mid" class="toggle-btn active text-white hover:text-neon-cyan transition-colors w-8 h-8 rounded-full bg-dark-700 flex items-center justify-center">
+                        <i class="fas fa-volume-up"></i>
+                    </button>
+                </div>
+                
+                <div class="mb-4">
+                    <div class="text-[10px] text-gray-400 uppercase tracking-widest mb-2 font-bold">Select Pattern</div>
+                    <div class="flex justify-between gap-2" id="pat-mid">
+                        <button class="pat-btn pat-btn-cyan active w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="1">1</button>
+                        <button class="pat-btn pat-btn-cyan w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="2">2</button>
+                        <button class="pat-btn pat-btn-cyan w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="3">3</button>
+                        <button class="pat-btn pat-btn-cyan w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="4">4</button>
+                        <button class="pat-btn pat-btn-cyan w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="5">5</button>
+                    </div>
+                </div>
+
+                <div class="flex-grow flex flex-col justify-end relative h-24 mb-6 bg-dark-900/50 rounded-lg overflow-hidden border border-gray-800 p-2">
+                    <div id="vis-mid" class="w-full h-full flex items-end justify-between px-2 text-neon-cyan muted-vis">
+                        <div class="vis-bar"></div><div class="vis-bar"></div><div class="vis-bar"></div><div class="vis-bar"></div><div class="vis-bar"></div>
+                    </div>
+                </div>
+
+                <div class="mt-auto">
+                    <div class="flex justify-between text-[10px] text-gray-500 mb-2 font-bold tracking-widest">
+                        <span>MIN</span><span>MAX</span>
+                    </div>
+                    <input type="range" id="vol-mid" class="slider-cyan" min="0" max="100" value="70">
+                </div>
+            </div>
+
+            <!-- Stem 4: Treble/FX -->
+            <div class="glass-panel rounded-2xl p-5 border border-gray-700 flex flex-col transition-all duration-300 glow-purple">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="font-display text-lg text-neon-purple tracking-wider">TREBLE/FX</h2>
+                    <button id="mute-fx" class="toggle-btn active text-white hover:text-neon-purple transition-colors w-8 h-8 rounded-full bg-dark-700 flex items-center justify-center">
+                        <i class="fas fa-volume-up"></i>
+                    </button>
+                </div>
+                
+                <div class="mb-4">
+                    <div class="text-[10px] text-gray-400 uppercase tracking-widest mb-2 font-bold">Select Pattern</div>
+                    <div class="flex justify-between gap-2" id="pat-fx">
+                        <button class="pat-btn pat-btn-purple active w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="1">1</button>
+                        <button class="pat-btn pat-btn-purple w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="2">2</button>
+                        <button class="pat-btn pat-btn-purple w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="3">3</button>
+                        <button class="pat-btn pat-btn-purple w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="4">4</button>
+                        <button class="pat-btn pat-btn-purple w-8 h-8 rounded border border-gray-600 text-xs font-bold bg-dark-900 text-gray-300" data-val="5">5</button>
+                    </div>
+                </div>
+
+                <div class="flex-grow flex flex-col justify-end relative h-24 mb-6 bg-dark-900/50 rounded-lg overflow-hidden border border-gray-800 p-2">
+                    <div id="vis-fx" class="w-full h-full flex items-end justify-between px-2 text-neon-purple muted-vis">
+                        <div class="vis-bar"></div><div class="vis-bar"></div><div class="vis-bar"></div><div class="vis-bar"></div><div class="vis-bar"></div>
+                    </div>
+                </div>
+
+                <div class="mt-auto">
+                    <div class="flex justify-between text-[10px] text-gray-500 mb-2 font-bold tracking-widest">
+                        <span>MIN</span><span>MAX</span>
+                    </div>
+                    <input type="range" id="vol-fx" class="slider-purple" min="0" max="100" value="65">
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- App Logic -->
+    <script>
+        // --- STATE ---
+        let isPlaying = false;
+        let isInitialized = false;
+        let globalStep = 0; // 0 to 63 (4 bars of 16th notes)
+        
+        let activeStructure = 'verse';
+        const activePatterns = { drums: 1, bass: 1, mid: 1, fx: 1 };
+
+        // --- MUSICAL STRUCTURES (Chords & Bass notes for 4 bars) ---
+        // Format: 4 arrays (one per bar)
+        const songStructures = {
+            verse: { 
+                chords: [["G3", "Bb3", "D4"], ["F3", "A3", "C4"], ["Eb3", "G3", "Bb3"], ["Eb3", "G3", "Bb3"]], 
+                bass: ["G1", "F1", "Eb1", "Eb1"],
+                energy: 0.6 // Influences filter cutoffs later
+            },
+            chorus: { 
+                chords: [["Eb3", "G3", "Bb3"], ["Bb3", "D4", "F4"], ["F3", "A3", "C4"], ["G3", "Bb3", "D4"]], 
+                bass: ["Eb1", "Bb0", "F1", "G1"],
+                energy: 1.0
+            },
+            bridge: { 
+                chords: [["C3", "Eb3", "G3"], ["G3", "Bb3", "D4"], ["D3", "F3", "A3"], ["D3", "F3", "A3"]], 
+                bass: ["C1", "G1", "D1", "D1"],
+                energy: 0.4
+            }
+        };
+
+        const stems = {
+            drums: { volNode: null, meter: null, muted: false, vol: 80, visId: 'vis-drums', color: '#ff00a0' },
+            bass: { volNode: null, meter: null, muted: false, vol: 85, visId: 'vis-bass', color: '#8bce24' },
+            mid: { volNode: null, meter: null, muted: false, vol: 70, visId: 'vis-mid', color: '#00e5ff' },
+            fx: { volNode: null, meter: null, muted: false, vol: 65, visId: 'vis-fx', color: '#b500ff' }
+        };
+
+        // UI Elements
+        const playBtn = document.getElementById('playBtn');
+        const playIcon = document.getElementById('playIcon');
+        const bpmSlider = document.getElementById('bpmSlider');
+        const bpmValue = document.getElementById('bpmValue');
+
+        // Helper: linear slider (0-100) to Decibels
+        function linToDb(val) {
+            if (val <= 0) return -Infinity;
+            return 20 * Math.log10(val / 100);
+        }
+
+        // --- SYNTHS ---
+        let kick, clap, hat, bassSynth, midSynth, fxSynth;
+        let midFilter, bassFilter;
+
+        async function initAudio() {
+            if (isInitialized) return;
+            await Tone.start();
+            
+            // Set up Nodes & Meters per stem
+            Object.keys(stems).forEach(key => {
+                const s = stems[key];
+                s.volNode = new Tone.Volume(linToDb(s.vol)).toDestination();
+                s.meter = new Tone.Meter({ normalRange: true }); // Returns 0 to 1
+                s.volNode.connect(s.meter);
+            });
+
+            // --- DRUMS ---
+            kick = new Tone.MembraneSynth({
+                pitchDecay: 0.05, octaves: 4, oscillator: { type: "sine" },
+                envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4 }
+            }).connect(stems.drums.volNode);
+            
+            clap = new Tone.NoiseSynth({
+                noise: { type: "pink" }, envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.1 }
+            });
+            const clapFilter = new Tone.Filter(1500, "highpass").connect(stems.drums.volNode);
+            clap.connect(clapFilter);
+
+            hat = new Tone.NoiseSynth({
+                noise: { type: "white" }, envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 }
+            });
+            const hatFilter = new Tone.Filter(5000, "highpass").connect(stems.drums.volNode);
+            hat.connect(hatFilter);
+
+            // --- BASS ---
+            bassSynth = new Tone.FMSynth({
+                harmonicity: 1, modulationIndex: 2, oscillator: { type: "square" },
+                envelope: { attack: 0.01, decay: 0.2, sustain: 0.2, release: 0.5 },
+                modulation: { type: "sine" }, modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.2 }
+            });
+            bassFilter = new Tone.Filter(800, "lowpass").connect(stems.bass.volNode);
+            bassSynth.connect(bassFilter);
+
+            // --- MIDRANGE ---
+            midSynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: "sawtooth" }, envelope: { attack: 0.01, decay: 0.3, sustain: 0.1, release: 1 }
+            });
+            midFilter = new Tone.Filter(2500, "lowpass").connect(stems.mid.volNode);
+            midSynth.connect(midFilter);
+
+            // --- FX ---
+            fxSynth = new Tone.Synth({
+                oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.0, release: 0.1 }
+            });
+            const delay = new Tone.PingPongDelay("8n", 0.4).connect(stems.fx.volNode);
+            fxSynth.connect(delay);
+            fxSynth.connect(stems.fx.volNode);
+
+            // --- SEQUENCER ---
+            Tone.Transport.scheduleRepeat((time) => {
+                const barStep = globalStep % 16; // 0-15 position within current bar
+                const barIndex = Math.floor(globalStep / 16); // 0-3 current bar
+                const struct = songStructures[activeStructure];
+                const currentChord = struct.chords[barIndex];
+                const currentBassNote = struct.bass[barIndex];
+                
+                // Adjust global energy (filters) based on structure
+                const energy = struct.energy;
+                bassFilter.frequency.rampTo(400 + (energy * 1000), 0.1);
+                midFilter.frequency.rampTo(1000 + (energy * 3000), 0.1);
+
+                // --- SCHEDULE DRUMS (Patterns 1-5) ---
+                const dPat = activePatterns.drums;
+                if (dPat === 1) { // Standard House
+                    if (barStep % 4 === 0) kick.triggerAttackRelease("G1", "8n", time);
+                    if (barStep === 4 || barStep === 12) clap.triggerAttackRelease("16n", time);
+                    if ([2, 6, 10, 14].includes(barStep)) hat.triggerAttackRelease("16n", time, 0.5);
+                } else if (dPat === 2) { // Garage / 2-Step
+                    if ([0, 7].includes(barStep)) kick.triggerAttackRelease("G1", "8n", time);
+                    if ([4, 12].includes(barStep)) clap.triggerAttackRelease("16n", time);
+                    if ([2, 6, 10, 14, 15].includes(barStep)) hat.triggerAttackRelease("16n", time, 0.4);
+                } else if (dPat === 3) { // Techno (Heavy)
+                    if (barStep % 4 === 0) kick.triggerAttackRelease("G1", "8n", time, 1.2);
+                    if ([2, 6, 10, 14].includes(barStep)) hat.triggerAttackRelease("16n", time, 0.8);
+                } else if (dPat === 4) { // Breakbeat
+                    if ([0, 5, 8].includes(barStep)) kick.triggerAttackRelease("G1", "8n", time);
+                    if ([4, 12].includes(barStep)) clap.triggerAttackRelease("16n", time);
+                    if (barStep % 2 === 0) hat.triggerAttackRelease("32n", time, 0.2); // Soft rolling hats
+                } else if (dPat === 5) { // Sparse
+                    if (barStep === 0) kick.triggerAttackRelease("G1", "8n", time);
+                    if (barStep === 12) clap.triggerAttackRelease("16n", time);
+                    if ([8, 10].includes(barStep)) hat.triggerAttackRelease("16n", time, 0.6);
+                }
+
+                // --- SCHEDULE BASS (Patterns 1-5) ---
+                const bPat = activePatterns.bass;
+                if (bPat === 1) { // Bouncy Offbeat
+                    if ([2, 6, 10, 14].includes(barStep)) bassSynth.triggerAttackRelease(currentBassNote, "16n", time);
+                } else if (bPat === 2) { // Driving 8ths
+                    if (barStep % 2 === 0) bassSynth.triggerAttackRelease(currentBassNote, "16n", time, 0.8);
+                } else if (bPat === 3) { // Syncopated Groove
+                    if ([0, 3, 8, 11, 14].includes(barStep)) bassSynth.triggerAttackRelease(currentBassNote, "16n", time);
+                } else if (bPat === 4) { // Octave Arp
+                    if (barStep % 2 === 0) {
+                        let note = barStep % 4 === 0 ? currentBassNote : Tone.Frequency(currentBassNote).transpose(12).toNote();
+                        bassSynth.triggerAttackRelease(note, "16n", time);
+                    }
+                } else if (bPat === 5) { // Sustained Sub
+                    if (barStep === 0) bassSynth.triggerAttackRelease(currentBassNote, "1m", time, 0.9); // Full bar
+                }
+
+                // --- SCHEDULE MIDRANGE (Patterns 1-5) ---
+                const mPat = activePatterns.mid;
+                if (mPat === 1) { // House Stabs
+                    if ([2, 8, 11].includes(barStep)) midSynth.triggerAttackRelease(currentChord, "16n", time, 0.8);
+                } else if (mPat === 2) { // Sustained Chords
+                    if (barStep === 0) midSynth.triggerAttackRelease(currentChord, "2n", time, 0.6);
+                } else if (mPat === 3) { // Simple Plucks
+                    if ([0, 3, 7].includes(barStep)) midSynth.triggerAttackRelease(currentChord, "16n", time, 0.7);
+                } else if (mPat === 4) { // Upbeat Chords
+                    if ([2, 6, 10, 14].includes(barStep)) midSynth.triggerAttackRelease(currentChord, "16n", time, 0.7);
+                } else if (mPat === 5) { // Arpeggiator
+                    const arpNote = currentChord[barStep % 3];
+                    if (barStep % 2 === 0) midSynth.triggerAttackRelease(arpNote, "16n", time, 0.6);
+                }
+
+                // --- SCHEDULE FX/TREBLE (Patterns 1-5) ---
+                const fPat = activePatterns.fx;
+                // Base FX note derived from the chord's root to stay in key
+                const rootNote = currentChord[0]; 
+                const fxNote1 = Tone.Frequency(rootNote).transpose(24).toNote(); // 2 octaves up
+                const fxNote2 = Tone.Frequency(rootNote).transpose(31).toNote(); // 2 octaves + perfect 5th
+                
+                if (fPat === 1) { // High Plucks
+                    if ([7, 15].includes(barStep)) fxSynth.triggerAttackRelease(barStep===7?fxNote1:fxNote2, "16n", time, 0.5);
+                } else if (fPat === 2) { // Downward Arp Run
+                    if (barStep >= 12) {
+                        const notes = [fxNote2, Tone.Frequency(rootNote).transpose(28).toNote(), fxNote1, Tone.Frequency(rootNote).transpose(12).toNote()];
+                        fxSynth.triggerAttackRelease(notes[barStep-12], "16n", time, 0.4);
+                    }
+                } else if (fPat === 3) { // Syncopated Lead
+                    if ([1, 4, 9, 12].includes(barStep)) fxSynth.triggerAttackRelease(fxNote1, "16n", time, 0.5);
+                } else if (fPat === 4) { // Sparse Echoes
+                    if (barStep === 0) fxSynth.triggerAttackRelease(fxNote2, "16n", time, 0.6);
+                } else if (fPat === 5) { // Chaos Bleeps
+                    if (barStep % 3 === 0 && Math.random() > 0.3) {
+                        fxSynth.triggerAttackRelease(Math.random() > 0.5 ? fxNote1 : fxNote2, "32n", time, 0.4);
+                    }
+                }
+
+                globalStep = (globalStep + 1) % 64;
+            }, "16n");
+
+            Tone.Transport.bpm.value = parseInt(bpmSlider.value);
+            isInitialized = true;
+            
+            // Start Visualizer Loop
+            startVisualizer();
+        }
+
+        // --- INTERACTION LOGIC ---
+        
+        // Play/Pause
+        playBtn.addEventListener('click', async () => {
+            if (!isInitialized) await initAudio();
+
+            if (isPlaying) {
+                Tone.Transport.pause();
+                playIcon.classList.replace('fa-pause', 'fa-play');
+                playBtn.classList.replace('bg-neon-green', 'bg-white');
+                playBtn.classList.remove('shadow-[0_0_20px_rgba(139,206,36,0.6)]');
+                document.querySelectorAll('.stem-card > div > div').forEach(el => el.classList.remove('playing-vis'));
+            } else {
+                Tone.Transport.start();
+                playIcon.classList.replace('fa-play', 'fa-pause');
+                playBtn.classList.replace('bg-white', 'bg-neon-green');
+                playBtn.classList.add('shadow-[0_0_20px_rgba(139,206,36,0.6)]');
+                updateMiniVisualizers();
+            }
+            isPlaying = !isPlaying;
+        });
+
+        // BPM
+        bpmSlider.addEventListener('input', (e) => {
+            bpmValue.innerText = e.target.value;
+            if (isInitialized) Tone.Transport.bpm.value = parseInt(e.target.value);
+        });
+
+        // Song Structure Setup
+        document.querySelectorAll('.struct-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.struct-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                activeStructure = e.target.dataset.struct;
+            });
+        });
+
+        // Stem Controls Setup (Volume, Mute, Pattern)
+        ['drums', 'bass', 'mid', 'fx'].forEach(stemName => {
+            const stem = stems[stemName];
+            
+            // Volume Slider
+            document.getElementById(`vol-${stemName}`).addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                stem.vol = val;
+                if (isInitialized && stem.volNode) stem.volNode.volume.rampTo(linToDb(val), 0.1);
+                if (val > 0 && stem.muted) toggleMute(stemName, false);
+            });
+
+            // Mute Button
+            document.getElementById(`mute-${stemName}`).addEventListener('click', () => {
+                toggleMute(stemName, !stem.muted);
+            });
+
+            // Pattern Buttons
+            const patContainer = document.getElementById(`pat-${stemName}`);
+            patContainer.querySelectorAll('.pat-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    // Update UI
+                    patContainer.querySelectorAll('.pat-btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    // Update State
+                    activePatterns[stemName] = parseInt(e.target.dataset.val);
+                });
+            });
+        });
+
+        function toggleMute(stemName, forceMuteState) {
+            const stem = stems[stemName];
+            stem.muted = forceMuteState;
+            const btn = document.getElementById(`mute-${stemName}`);
+            const icon = btn.querySelector('i');
+            
+            if (stem.muted) {
+                if(isInitialized) stem.volNode.mute = true;
+                btn.classList.replace('active', 'inactive');
+                icon.classList.replace('fa-volume-up', 'fa-volume-mute');
+                updateMiniVisState(stemName, false);
+            } else {
+                if(isInitialized) stem.volNode.mute = false;
+                btn.classList.replace('inactive', 'active');
+                icon.classList.replace('fa-volume-mute', 'fa-volume-up');
+                if (isPlaying) updateMiniVisState(stemName, true);
+            }
+        }
+
+        // Mini CSS Visualizers
+        function updateMiniVisState(stemName, isActive) {
+            const vis = document.getElementById(stems[stemName].visId);
+            if (isActive && !stems[stemName].muted) {
+                vis.classList.add('playing-vis');
+                vis.classList.remove('muted-vis');
+            } else {
+                vis.classList.remove('playing-vis');
+                vis.classList.add('muted-vis');
+            }
+        }
+        function updateMiniVisualizers() {
+            Object.keys(stems).forEach(name => updateMiniVisState(name, isPlaying));
+        }
+
+        // --- FULLSCREEN CANVAS VISUALIZER ---
+        const canvas = document.getElementById('bg-visualizer');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function startVisualizer() {
+            function draw() {
+                requestAnimationFrame(draw);
+                
+                // Fade out effect for trails
+                ctx.fillStyle = 'rgba(5, 5, 7, 0.2)';
+                ctx.fillRect(0, 0, width, height);
+
+                if (!isPlaying) return;
+
+                // Center of screen
+                const cx = width / 2;
+                const cy = height / 2;
+
+                // Draw circles for each stem based on Meter value
+                Object.keys(stems).forEach((key, index) => {
+                    const stem = stems[key];
+                    if (stem.muted || !stem.meter) return;
+
+                    // Meter value is between 0 and 1
+                    let level = stem.meter.getValue();
+                    // Smooth it a bit, map to size
+                    if(typeof level !== 'number' || !isFinite(level)) level = 0;
+                    
+                    const maxRadius = Math.min(width, height) * 0.45;
+                    // Base size + dynamic size based on volume
+                    const radius = (index + 1) * (maxRadius / 5) + (level * maxRadius * 0.5);
+
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                    
+                    // Create glow
+                    ctx.shadowBlur = 30 + (level * 50);
+                    ctx.shadowColor = stem.color;
+                    ctx.lineWidth = 2 + (level * 10);
+                    ctx.strokeStyle = stem.color;
+                    
+                    // Slightly fill based on level
+                    ctx.fillStyle = stem.color;
+                    ctx.globalAlpha = level * 0.3;
+                    ctx.fill();
+                    
+                    ctx.globalAlpha = 0.8;
+                    ctx.stroke();
+                });
+                
+                // Reset shadows
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 1.0;
+            }
+            draw();
+        }
+    </script>
+</body>
+</html>
