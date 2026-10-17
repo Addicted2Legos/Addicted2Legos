@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Marine Evasion</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #001f3f;
+            overflow: hidden;
+            touch-action: none; /* Prevent browser handling of gestures */
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            font-family: 'Inter', sans-serif;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Virtual Joystick Container */
+        #joystick-zone {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            width: 150px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            z-index: 10;
+            display: none; /* Shown during gameplay */
+        }
+
+        #joystick-knob {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            pointer-events: none;
+        }
+
+        /* UI Overlays */
+        .overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 15, 30, 0.85);
+            z-index: 20;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Floating text animation for damage/xp */
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-30px) scale(1.2); }
+        }
+
+        .upgrade-card {
+            transition: transform 0.1s, background-color 0.2s;
+        }
+        .upgrade-card:active {
+            transform: scale(0.95);
+            background-color: #1e3a8a;
+        }
+
+        /* Progress Bar Striping */
+        .xp-bar-fill {
+            transition: width 0.3s ease-out;
+            background-image: linear-gradient(
+                45deg,
+                rgba(255, 255, 255, 0.2) 25%,
+                transparent 25%,
+                transparent 50%,
+                rgba(255, 255, 255, 0.2) 50%,
+                rgba(255, 255, 255, 0.2) 75%,
+                transparent 75%,
+                transparent
+            );
+            background-size: 1rem 1rem;
+            animation: moveStripes 1s linear infinite;
+        }
+        
+        @keyframes moveStripes {
+            from { background-position: 1rem 0; }
+            to { background-position: 0 0; }
+        }
+    </style>
+</head>
+<body class="text-white">
+
+    <!-- Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD -->
+    <div id="hud" class="absolute top-0 left-0 w-full p-4 pointer-events-none z-10 hidden flex-col gap-2">
+        <!-- XP Bar -->
+        <div class="w-full max-w-md mx-auto bg-slate-800 rounded-full h-4 border border-slate-600 overflow-hidden relative shadow-lg">
+            <div id="xp-bar" class="xp-bar-fill bg-cyan-400 h-full w-0"></div>
+            <span id="level-text" class="absolute inset-0 flex justify-center items-center text-[10px] font-bold text-white shadow-sm">LVL 1</span>
+        </div>
+        
+        <div class="flex justify-between max-w-md mx-auto w-full px-2">
+            <!-- Health -->
+            <div class="flex items-center gap-1 bg-black/50 px-3 py-1 rounded-full border border-red-900/50">
+                <span class="text-red-500 font-bold">♥️</span>
+                <span id="hp-text" class="font-bold text-sm tracking-wider">100/100</span>
+            </div>
+            <!-- Timer -->
+            <div class="flex items-center gap-1 bg-black/50 px-3 py-1 rounded-full border border-slate-700">
+                <span class="text-slate-300">⏱</span>
+                <span id="timer-text" class="font-mono font-bold text-sm">00:00</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Joystick UI -->
+    <div id="joystick-zone">
+        <div id="joystick-knob"></div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="overlay">
+        <h1 class="text-5xl font-extrabold text-cyan-400 mb-2 drop-shadow-[0_0_10px_rgba(34,211,238,0.8)] text-center">Marine<br>Evasion</h1>
+        <p class="text-slate-300 mb-8 max-w-xs text-center text-sm">Survive the deep. Collect XP to upgrade. Your vehicle evolves as you level up!</p>
+        
+        <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-600 mb-8 max-w-sm w-11/12 text-sm text-slate-300">
+            <p class="mb-2"><strong class="text-white">Controls:</strong> Virtual joystick on bottom left (Touch) or Arrow/WASD Keys (Desktop).</p>
+            <p><strong class="text-white">Auto-Fire:</strong> You shoot automatically at the closest enemies.</p>
+        </div>
+
+        <button onclick="startGame()" class="bg-gradient-to-b from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-4 px-12 rounded-full shadow-[0_0_20px_rgba(34,211,238,0.5)] text-xl transition transform active:scale-95">
+            DIVE IN
+        </button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="overlay hidden">
+        <h2 id="game-over-title" class="text-5xl font-extrabold text-red-500 mb-2 drop-shadow-md text-center">WIPED OUT</h2>
+        <p id="game-over-stats" class="text-slate-300 mb-8 text-lg text-center">You survived for 00:00<br>Reached Level 1</p>
+        <button onclick="resetGame()" class="bg-slate-700 hover:bg-slate-600 text-white border border-slate-500 font-bold py-3 px-10 rounded-full shadow-lg text-lg transition transform active:scale-95">
+            TRY AGAIN
+        </button>
+    </div>
+
+    <!-- Notification overlay for vehicle upgrades -->
+    <div id="notification-container" class="absolute top-20 left-1/2 transform -translate-x-1/2 pointer-events-none z-30 flex flex-col items-center gap-2">
+        <p id="evolution-text" class="text-cyan-300 font-bold text-xl drop-shadow-md transition-opacity duration-500 opacity-0"></p>
+    </div>
+
+<script>
+/**
+ * ENGINE & STATE SETUP
+ */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false }); // Optimize performance
+let dpr = window.devicePixelRatio || 1;
+
+let width, height;
+let lastTime = 0;
+let animationId;
+let gameState = 'START'; // START, PLAYING, GAMEOVER, VICTORY
+
+// UI Elements
+const ui = {
+    start: document.getElementById('start-screen'),
+    gameOver: document.getElementById('game-over-screen'),
+    hud: document.getElementById('hud'),
+    joystickZone: document.getElementById('joystick-zone'),
+    joystickKnob: document.getElementById('joystick-knob'),
+    xpBar: document.getElementById('xp-bar'),
+    levelText: document.getElementById('level-text'),
+    hpText: document.getElementById('hp-text'),
+    timerText: document.getElementById('timer-text'),
+    gameOverTitle: document.getElementById('game-over-title'),
+    gameOverStats: document.getElementById('game-over-stats'),
+    evolutionText: document.getElementById('evolution-text')
+};
+
+// Resize handler
+function resize() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.scale(dpr, dpr);
+}
+window.addEventListener('resize', resize);
+resize();
+
+/**
+ * INPUT HANDLING (Joystick + Keyboard fallback)
+ */
+const input = { x: 0, y: 0 };
+let joystickActive = false;
+let joystickCenter = { x: 0, y: 0 };
+let touchId = null;
+const maxJoystickRadius = 45; // Max distance knob can travel
+
+function updateJoystick(clientX, clientY) {
+    const rect = ui.joystickZone.getBoundingClientRect();
+    const zoneCenterX = rect.left + rect.width / 2;
+    const zoneCenterY = rect.top + rect.height / 2;
+    
+    let dx = clientX - zoneCenterX;
+    let dy = clientY - zoneCenterY;
+    const distance = Math.hypot(dx, dy);
+    
+    // Normalize input [-1, 1]
+    if (distance > 0) {
+        input.x = dx / distance;
+        input.y = dy / distance;
+    } else {
+        input.x = 0; input.y = 0;
+    }
+
+    // Move knob visually
+    const visualDist = Math.min(distance, maxJoystickRadius);
+    const knobX = input.x * visualDist;
+    const knobY = input.y * visualDist;
+    ui.joystickKnob.style.transform = `translate(calc(-50% + ${knobX}px), calc(-50% + ${knobY}px))`;
+}
+
+ui.joystickZone.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (!joystickActive) {
+        const touch = e.changedTouches[0];
+        touchId = touch.identifier;
+        joystickActive = true;
+        updateJoystick(touch.clientX, touch.clientY);
+    }
+}, {passive: false});
+
+ui.joystickZone.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (joystickActive) {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === touchId) {
+                updateJoystick(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+                break;
+            }
+        }
+    }
+}, {passive: false});
+
+const endJoystick = (e) => {
+    e.preventDefault();
+    for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === touchId) {
+            joystickActive = false;
+            touchId = null;
+            input.x = 0; input.y = 0;
+            ui.joystickKnob.style.transform = `translate(-50%, -50%)`;
+            break;
+        }
+    }
+};
+
+ui.joystickZone.addEventListener('touchend', endJoystick, {passive: false});
+ui.joystickZone.addEventListener('touchcancel', endJoystick, {passive: false});
+
+// Keyboard fallback for testing on desktop
+const keys = {};
+window.addEventListener('keydown', e => keys[e.code] = true);
+window.addEventListener('keyup', e => keys[e.code] = false);
+
+/**
+ * GAME DATA & ENTITIES
+ */
+const CAMERA = { x: 0, y: 0 };
+let gameTime = 0;
+let nextTimeUpgrade = 30;
+let healthDropTimer = 0;
+let bossSpawned = false;
+let currentStage = 0;
+
+// Phase Configurations for the 10 Levels
+const PHASES = [
+    { bg: '#001f3f', name: "Atlantic", norm: '🐟', fast: '🦈', tank: '🐙', boss: '🦑' },
+    { bg: '#0077b6', name: "Caribbean", norm: '🐠', fast: '🦈', tank: '🦀', boss: '🐋' },
+    { bg: '#48cae4', name: "Tropical", norm: '🐡', fast: '🦭', tank: '🦞', boss: '🐳' },
+    { bg: '#2a9d8f', name: "Blue-Green Sea", norm: '🦐', fast: '🐊', tank: '🐢', boss: '🐉' },
+    { bg: '#03045e', name: "Deep Trench", norm: '🪼', fast: '🦈', tank: '🦪', boss: '👾' },
+    { bg: '#3f37c9', name: "Midnight Zone", norm: '🦠', fast: '🐍', tank: '🦂', boss: '🦇' },
+    { bg: '#118ab2', name: "Coral Reef", norm: '🦢', fast: '🦆', tank: '🐚', boss: '🧜‍♀️' },
+    { bg: '#073b4c', name: "Kelp Forest", norm: '🦦', fast: '🐸', tank: '🐌', boss: '🧜‍♂️' },
+    { bg: '#003049', name: "Abyss", norm: '🪱', fast: '🪳', tank: '🕷️', boss: '🔱' },
+    { bg: '#011627', name: "The Void", norm: '💀', fast: '👻', tank: '👽', boss: '👑' }
+];
+
+// Base (Atoll) Constants
+const BASE_X = 2000;
+const BASE_Y = -2000;
+const BASE_RADIUS = 250;
+
+// Vehicle Progression Milestones
+const VEHICLES = [
+    { lvl: 1, name: "Swimming", emoji: "🏊", radius: 15, baseAccel: 1200, damping: 8, turnSpeed: 0, type: 'direct', angleOffset: 0 },
+    { lvl: 3, name: "Flippers", emoji: "🤿", radius: 15, baseAccel: 1600, damping: 8, turnSpeed: 0, type: 'direct', angleOffset: -Math.PI / 4 },
+    { lvl: 6, name: "Jet Ski", emoji: "🚤", radius: 18, baseAccel: 2200, damping: 6, turnSpeed: 0, type: 'direct', angleOffset: 0 },
+    { lvl: 9, name: "Speedboat", emoji: "🛥️", radius: 22, baseAccel: 2800, damping: 4, turnSpeed: Math.PI * 2.5, type: 'boat', angleOffset: 0 },
+    { lvl: 12, name: "Small Boat", emoji: "⛵", radius: 30, baseAccel: 1800, damping: 3, turnSpeed: Math.PI * 1.5, type: 'boat', angleOffset: 0 },
+    { lvl: 15, name: "Gunboat", emoji: "🛳️", radius: 45, baseAccel: 1200, damping: 1.5, turnSpeed: Math.PI * 0.8, type: 'boat', angleOffset: 0 }
+];
+
+let player = null;
+let enemies = [];
+let projectiles = [];
+let xps = [];
+let floatingTexts = [];
+let healthDrops = [];
+let upgradeDrops = []; // Added for world drops
+
+class Player {
+    constructor() {
+        this.x = 0;
+        this.y = 0;
+        this.vx = 0;
+        this.vy = 0;
+        this.angle = 0; // Direction facing (used for boat physics and rendering)
+        
+        // Progression Stats
+        this.level = 1;
+        this.xp = 0;
+        this.xpNeeded = 30;
+        this.vehicleIndex = 0;
+        this.updateVehicle();
+
+        // Combat Stats
+        this.maxHp = 100;
+        this.hp = 100;
+        this.damage = 1;
+        this.fireRate = 1.0; // shots per second
+        this.fireCooldown = 0;
+        this.projectileSpeed = 400;
+        this.projectileCount = 1;
+        this.piercing = 0;
+        this.pickupRadius = 60;
+        this.speedMultiplier = 1.0;
+
+        this.invulnTimer = 0;
+        this.isSafe = false;
+    }
+
+    updateVehicle() {
+        let bestIndex = 0;
+        for (let i = 0; i < VEHICLES.length; i++) {
+            if (this.level >= VEHICLES[i].lvl) bestIndex = i;
+        }
+        
+        if (this.vehicleIndex !== bestIndex && this.level > 1) {
+            // Reached new milestone!
+            ui.evolutionText.innerText = `Evolved to ${VEHICLES[bestIndex].name}!`;
+            ui.evolutionText.style.opacity = 1;
+            setTimeout(() => ui.evolutionText.style.opacity = 0, 3000);
+        }
+        this.vehicleIndex = bestIndex;
+        this.vStats = VEHICLES[bestIndex];
+    }
+
+    update(dt) {
+        // Resolve Keyboard if touch not active
+        if (!joystickActive) {
+            input.x = (keys['KeyD'] || keys['ArrowRight'] ? 1 : 0) - (keys['KeyA'] || keys['ArrowLeft'] ? 1 : 0);
+            input.y = (keys['KeyS'] || keys['ArrowDown'] ? 1 : 0) - (keys['KeyW'] || keys['ArrowUp'] ? 1 : 0);
+            const len = Math.hypot(input.x, input.y);
+            if (len > 0) { input.x /= len; input.y /= len; }
+        }
+
+        const accel = this.vStats.baseAccel * this.speedMultiplier;
+        const inputActive = (input.x !== 0 || input.y !== 0);
+
+        if (this.vStats.type === 'direct') {
+            // Instant control, high damping
+            if (inputActive) {
+                this.vx += input.x * accel * dt;
+                this.vy += input.y * accel * dt;
+                this.angle = Math.atan2(this.vy, this.vx);
+            }
+        } else if (this.vStats.type === 'boat') {
+            // Boat/Drift physics
+            if (inputActive) {
+                const targetAngle = Math.atan2(input.y, input.x);
+                // Smooth rotate towards target angle
+                let diff = targetAngle - this.angle;
+                // Normalize diff to -PI to PI
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                
+                const turnStep = this.vStats.turnSpeed * dt;
+                if (Math.abs(diff) <= turnStep) {
+                    this.angle = targetAngle;
+                } else {
+                    this.angle += Math.sign(diff) * turnStep;
+                }
+                
+                // Thrust in direction of angle
+                this.vx += Math.cos(this.angle) * accel * dt;
+                this.vy += Math.sin(this.angle) * accel * dt;
+            }
+        }
+
+        // Apply Damping (Friction)
+        this.vx -= this.vx * this.vStats.damping * dt;
+        this.vy -= this.vy * this.vStats.damping * dt;
+
+        // Apply velocity
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+
+        // Check Safe Zone Status
+        const distToBase = Math.hypot(this.x - BASE_X, this.y - BASE_Y);
+        this.isSafe = distToBase < BASE_RADIUS;
+
+        // Timers
+        if (this.invulnTimer > 0) this.invulnTimer -= dt;
+        
+        // Auto Fire Logic
+        this.fireCooldown -= dt;
+        if (this.fireCooldown <= 0) {
+            this.fire();
+        }
+    }
+
+    fire() {
+        if (enemies.length === 0) return;
+        
+        // Find nearest enemy
+        let nearest = null;
+        let minDist = Infinity;
+        for (const e of enemies) {
+            const dist = Math.hypot(e.x - this.x, e.y - this.y);
+            if (dist < minDist && dist < Math.max(width, height)) { // Only shoot things on/near screen
+                minDist = dist;
+                nearest = e;
+            }
+        }
+
+        if (nearest) {
+            this.fireCooldown = 1 / this.fireRate;
+            const baseAngle = Math.atan2(nearest.y - this.y, nearest.x - this.x);
+            
+            // Handle multishot spread
+            const spread = 0.15; // radians
+            const startAngle = baseAngle - (spread * (this.projectileCount - 1) / 2);
+            
+            for (let i = 0; i < this.projectileCount; i++) {
+                const angle = startAngle + i * spread;
+                projectiles.push(new Projectile(this.x, this.y, angle, this.damage, this.projectileSpeed, this.piercing));
+            }
+        }
+    }
+
+    takeDamage(amt) {
+        if (this.invulnTimer > 0) return;
+        this.hp -= amt;
+        this.invulnTimer = 1.0;
+        
+        // Flash red logic in drawing
+        if (this.hp <= 0) {
+            this.hp = 0;
+            endGame();
+        }
+        updateHUD();
+    }
+
+    addXp(amt) {
+        this.xp += amt;
+        if (this.xp >= this.xpNeeded) {
+            this.xp -= this.xpNeeded;
+            this.levelUp();
+        }
+        updateHUD();
+    }
+
+    levelUp() {
+        this.level++;
+        // xpNeeded stays locked at 30
+        this.updateVehicle();
+        
+        spawnWeaponDrop(); // Drop weapon upgrade on screen
+        
+        floatingTexts.push({
+            x: this.x, y: this.y - 50,
+            text: "Weapon Upgrade Dropped!",
+            color: '#fde047',
+            life: 2.0, maxLife: 2.0
+        });
+        updateHUD();
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        
+        // Handle mirroring so right-facing objects aren't upside down, and apply vehicle-specific rotation offsets
+        let facingRight = Math.abs(this.angle) < Math.PI / 2;
+        if (facingRight) {
+            ctx.scale(-1, 1);
+            ctx.rotate(-this.angle);
+        } else {
+            ctx.rotate(this.angle - Math.PI);
+        }
+        
+        if (this.vStats.angleOffset) {
+            ctx.rotate(this.vStats.angleOffset);
+        }
+
+        // Draw selection/hit circle
+        if (this.invulnTimer > 0) {
+            ctx.globalAlpha = 0.3 + Math.abs(Math.sin(Date.now() / 100)) * 0.4; // Blink and semi-transparent
+        }
+
+        ctx.font = `${this.vStats.radius * 2}px Inter`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.vStats.emoji, 0, 0);
+
+        ctx.restore();
+    }
+}
+
+class Enemy {
+    constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.type = type; // 'normal', 'fast', 'tank', 'boss'
+        
+        const phase = PHASES[currentStage];
+        const diffMult = 1 + (currentStage * 0.1); // 10% harder per stage
+        
+        this.radius = 12;
+        this.speed = 80 * diffMult;
+        this.hp = 1;
+        this.damage = 10;
+        this.emoji = phase.norm;
+        this.xpVal = 1;
+
+        if (type === 'fast') {
+            this.emoji = phase.fast;
+            this.speed = ((110 + Math.random() * 40) + gameTime * 0.05) * diffMult; 
+            this.hp = 2;
+            this.radius = 15;
+            this.xpVal = 2;
+        } else if (type === 'tank') {
+            this.emoji = phase.tank;
+            this.speed = 45 * diffMult;
+            this.hp = 3;
+            this.radius = 20;
+            this.damage = 20;
+            this.xpVal = 3;
+        } else if (type === 'boss') {
+            this.emoji = phase.boss;
+            this.speed = 55 * diffMult;
+            this.hp = (300 + gameTime * 1.0) * diffMult;
+            this.radius = 60;
+            this.damage = 30;
+            this.xpVal = 100;
+        }
+        
+        this.maxHp = this.hp;
+    }
+
+    update(dt) {
+        if (this.type !== 'boss' && bossSpawned) {
+            // Panic flee from player when boss arrives
+            const dx = this.x - player.x;
+            const dy = this.y - player.y;
+            const dist = Math.hypot(dx, dy);
+            
+            if (dist > 0) {
+                this.x += (dx / dist) * this.speed * 2.5 * dt; // Flee fast!
+                this.y += (dy / dist) * this.speed * 2.5 * dt;
+            }
+            
+            // If they are far enough off-screen, mark for despawn
+            if (dist > Math.max(width, height) * 1.5) {
+                this.markedForDeletion = true;
+            }
+        } else if (player.isSafe && this.type !== 'boss') {
+            // Flee from Base
+            const dx = this.x - BASE_X;
+            const dy = this.y - BASE_Y;
+            const dist = Math.hypot(dx, dy);
+            
+            if (dist > 0) {
+                this.x += (dx / dist) * this.speed * dt;
+                this.y += (dy / dist) * this.speed * dt;
+            }
+        } else {
+            // Move towards player
+            const dx = player.x - this.x;
+            const dy = player.y - this.y;
+            const dist = Math.hypot(dx, dy);
+            
+            if (dist > 0) {
+                this.x += (dx / dist) * this.speed * dt;
+                this.y += (dy / dist) * this.speed * dt;
+            }
+        }
+
+        // Separation (Boids-lite) to prevent stacking perfectly
+        for (const other of enemies) {
+            if (other === this) continue;
+            const odx = this.x - other.x;
+            const ody = this.y - other.y;
+            const odist = Math.hypot(odx, ody);
+            const minSep = this.radius + other.radius;
+            
+            if (odist < minSep && odist > 0) {
+                const pushStr = (minSep - odist) / minSep;
+                this.x += (odx / odist) * pushStr * 2;
+                this.y += (ody / odist) * pushStr * 2;
+            }
+        }
+    }
+
+    takeDamage(amt) {
+        this.hp -= amt;
+        
+        // Add floating text
+        floatingTexts.push({
+            x: this.x + (Math.random()*20 - 10),
+            y: this.y - this.radius,
+            text: Math.ceil(amt),
+            color: '#fff',
+            life: 0.5,
+            maxLife: 0.5
+        });
+
+        if (this.hp <= 0) {
+            // Drop XP
+            xps.push(new XP(this.x, this.y, this.xpVal));
+            
+            if (this.type === 'boss') {
+                victory();
+            }
+            return true; // died
+        }
+        return false;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        
+        const angle = Math.atan2(player.y - this.y, player.x - this.x);
+        
+        ctx.save();
+        // Emojis natively face left. Flip horizontally if moving right.
+        if (Math.abs(angle) <= Math.PI / 2) {
+            ctx.scale(-1, 1);
+            ctx.rotate(-angle);
+        } else {
+            ctx.rotate(angle - Math.PI);
+        }
+
+        ctx.font = `${this.radius * 2}px Inter`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Boss glow
+        if (this.type === 'boss') {
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = 'red';
+        }
+
+        ctx.fillText(this.emoji, 0, 0);
+        ctx.restore(); // Restore orientation so HP bar doesn't draw upside down/mirrored
+
+        // HP Bar for Boss
+        if (this.type === 'boss') {
+            ctx.fillStyle = 'red';
+            const pct = Math.max(0, this.hp / this.maxHp);
+            ctx.fillRect(-this.radius, this.radius + 10, this.radius * 2 * pct, 4);
+        }
+
+        ctx.restore();
+    }
+}
+
+class Projectile {
+    constructor(x, y, angle, damage, speed, piercing) {
+        this.x = x;
+        this.y = y;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+        this.damage = damage;
+        this.pierceLeft = piercing;
+        this.radius = 4;
+        this.hitEnemies = new Set(); // Prevent hitting same enemy twice per frame
+        this.life = 2.0; // Seconds to live
+    }
+
+    update(dt) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        this.life -= dt;
+    }
+
+    draw(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#0ff';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#0ff';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+}
+
+class HealthDrop {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 8;
+        this.amount = 50;
+    }
+
+    draw(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#22c55e'; // Bright green
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#22c55e';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        
+        // Cross
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(this.x - 4, this.y - 1, 8, 2);
+        ctx.fillRect(this.x - 1, this.y - 4, 2, 8);
+    }
+}
+
+class XP {
+    constructor(x, y, value) {
+        this.x = x;
+        this.y = y;
+        this.value = value;
+        this.radius = 4;
+        this.speed = 350; 
+        this.isMovingToPlayer = false;
+    }
+
+    update(dt) {
+        const dx = player.x - this.x;
+        const dy = player.y - this.y;
+        const dist = Math.hypot(dx, dy);
+
+        // Magnetic pull towards player
+        if (dist < player.pickupRadius || this.isMovingToPlayer) {
+            this.isMovingToPlayer = true; // Continues moving once triggered
+            if (dist > 0) {
+                this.x += (dx / dist) * this.speed * dt;
+                this.y += (dy / dist) * this.speed * dt;
+            }
+        }
+
+        // Check if collected
+        if (dist < player.vStats.radius + this.radius) {
+            player.addXp(this.value);
+            return true; // true means delete me
+        }
+        return false;
+    }
+
+    draw(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#eab308'; // Tailwind yellow-500
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = '#fde047';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+}
+
+class UpgradeDrop {
+    constructor(x, y, type, upgradeDef) {
+        this.x = x;
+        this.y = y;
+        this.type = type; // 'weapon' or 'utility'
+        this.upgradeDef = upgradeDef;
+        this.radius = 16;
+        this.life = 0; // For bobbing animation
+    }
+    
+    draw(ctx) {
+        this.life += 0.05;
+        const bob = Math.sin(this.life) * 5;
+        
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + bob, this.radius + 6, 0, Math.PI * 2);
+        ctx.fillStyle = this.type === 'weapon' ? 'rgba(239, 68, 68, 0.4)' : 'rgba(6, 182, 212, 0.4)';
+        ctx.fill();
+        
+        ctx.font = `${this.radius * 2}px Inter`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.upgradeDef.icon, this.x, this.y + bob);
+    }
+}
+
+/**
+ * UPGRADES SYSTEM
+ */
+const WEAPON_UPGRADES = [
+    { name: "Rapid Trigger", desc: "+20% Fire Rate", action: (p) => p.fireRate *= 1.2, icon: "⚡" },
+    { name: "Extra Barrel", desc: "+1 Projectile", action: (p) => p.projectileCount += 1, icon: "🔫" }
+];
+
+const UTILITY_UPGRADES = [
+    { name: "Engine Tuning", desc: "+15% Move Speed", action: (p) => p.speedMultiplier *= 1.15, icon: "💨" },
+    { name: "Hull Repair", desc: "Heal 50 & +20 Max HP", action: (p) => { p.maxHp += 20; p.hp = Math.min(p.maxHp, p.hp + 50); }, icon: "🛠️" },
+    { name: "Deflector Shield", desc: "Double I-Frames when hit", action: (p) => p.invulnTimer = 2.0, icon: "🛡️" },
+    { name: "Deep Sonar", desc: "+40% Pickup Radius", action: (p) => p.pickupRadius *= 1.4, icon: "📡" }
+];
+
+function spawnWeaponDrop() {
+    const angle = Math.random() * Math.PI * 2;
+    // Drop inside the current screen view, near the edges so player has to swim to it
+    const dist = Math.min(width, height) / 2 * 0.7; 
+    const dropX = player.x + Math.cos(angle) * dist;
+    const dropY = player.y + Math.sin(angle) * dist;
+    
+    const wIdx = Math.floor(Math.random() * WEAPON_UPGRADES.length);
+    upgradeDrops.push(new UpgradeDrop(dropX, dropY, 'weapon', WEAPON_UPGRADES[wIdx]));
+}
+
+function spawnUtilityDrop() {
+    // Random place on the map
+    const dropX = (Math.random() - 0.5) * 4000;
+    const dropY = (Math.random() - 0.5) * 4000;
+    const uIdx = Math.floor(Math.random() * UTILITY_UPGRADES.length);
+    upgradeDrops.push(new UpgradeDrop(dropX, dropY, 'utility', UTILITY_UPGRADES[uIdx]));
+}
+
+
+/**
+ * CORE LOGIC & LOOP
+ */
+
+function formatTime(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+function updateHUD() {
+    ui.hpText.innerText = `${Math.floor(player.hp)}/${Math.floor(player.maxHp)}`;
+    ui.levelText.innerText = `LVL ${player.level}`;
+    const pct = Math.min(100, (player.xp / player.xpNeeded) * 100);
+    ui.xpBar.style.width = `${pct}%`;
+}
+
+function spawnEnemy() {
+    const diffMult = 1 + (currentStage * 0.1);
+    
+    // Dynamic Enemy Cap based on player power, scaled by stage difficulty
+    const maxEnemies = Math.floor((15 + (player.level * 3) + (player.projectileCount * 6) + (player.fireRate * 4) + (player.piercing * 3)) * diffMult);
+    if (enemies.length >= maxEnemies) return; // Cap reached, prevent overwhelming
+
+    // Determine spawn rate based on game time. Increase count instead of HP
+    const spawnChance = (0.05 + (gameTime * 0.0005)) * diffMult; 
+    let numToSpawn = Math.floor((1 + Math.floor(gameTime / 20)) * diffMult); // Spawn more at once as time goes on
+
+    if (Math.random() < spawnChance) {
+        for(let i=0; i < numToSpawn; i++) {
+            // Spawn slightly outside view
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.max(width, height) / 2 + 50 + (Math.random() * 50);
+            const ex = player.x + Math.cos(angle) * dist;
+            const ey = player.y + Math.sin(angle) * dist;
+
+            // Determine type
+            let type = 'normal';
+            const r = Math.random();
+            if (gameTime > 15 && r < 0.2) type = 'fast'; // Reduced spawn chance
+            if (gameTime > 45 && r < 0.1) type = 'tank';
+
+            enemies.push(new Enemy(ex, ey, type));
+        }
+    }
+}
+
+function checkCollisions() {
+    // Player vs Enemies
+    for (const e of enemies) {
+        const dist = Math.hypot(e.x - player.x, e.y - player.y);
+        if (dist < player.vStats.radius + e.radius) {
+            player.takeDamage(e.damage);
+        }
+    }
+
+    // Projectiles vs Enemies
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+        const p = projectiles[i];
+        let deadProjectile = false;
+        
+        for (let j = enemies.length - 1; j >= 0; j--) {
+            const e = enemies[j];
+            if (p.hitEnemies.has(e)) continue;
+
+            const dist = Math.hypot(p.x - e.x, p.y - e.y);
+            if (dist < p.radius + e.radius) {
+                p.hitEnemies.add(e);
+                const killed = e.takeDamage(p.damage);
+                if (killed) {
+                    enemies.splice(j, 1);
+                }
+
+                if (p.pierceLeft > 0) {
+                    p.pierceLeft--;
+                } else {
+                    deadProjectile = true;
+                    break;
+                }
+            }
+        }
+
+        if (deadProjectile || p.life <= 0) {
+            projectiles.splice(i, 1);
+        }
+    }
+}
+
+function update(dt) {
+    if (gameState !== 'PLAYING') return;
+
+    gameTime += dt;
+    ui.timerText.innerText = formatTime(gameTime);
+
+    // Trigger time-based drops (Every 30s)
+    if (gameTime >= nextTimeUpgrade) {
+        nextTimeUpgrade += 30;
+        spawnWeaponDrop();
+        spawnUtilityDrop();
+        floatingTexts.push({
+            x: player.x, y: player.y - 70,
+            text: "Supplies Dropped!",
+            color: '#fff', life: 2.0, maxLife: 2.0
+        });
+    }
+
+    // Spawn Boss
+    if (!bossSpawned && (gameTime >= 180 || player.level >= 15)) {
+        bossSpawned = true;
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.max(width, height) / 2 + 100;
+        enemies.push(new Enemy(player.x + Math.cos(angle)*dist, player.y + Math.sin(angle)*dist, 'boss'));
+        
+        floatingTexts.push({
+            x: player.x, y: player.y - 100,
+            text: "WARNING: APEX PREDATOR APPROACHING!",
+            color: '#ef4444', life: 3.0, maxLife: 3.0
+        });
+    }
+
+    if (!bossSpawned) spawnEnemy();
+
+    player.update(dt);
+    
+    // Camera follow
+    CAMERA.x = player.x - width / 2;
+    CAMERA.y = player.y - height / 2;
+
+    // Update enemies and despawn those marked for deletion
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        enemies[i].update(dt);
+        if (enemies[i].markedForDeletion) {
+            enemies.splice(i, 1);
+        }
+    }
+    
+    // Spawn one health drop exactly every 30 seconds
+    healthDropTimer += dt;
+    if (healthDropTimer >= 30) {
+        healthDropTimer -= 30;
+        healthDrops.push(new HealthDrop((Math.random() - 0.5) * 4000, (Math.random() - 0.5) * 4000));
+    }
+
+    // Update Health Drops
+    for (let i = healthDrops.length - 1; i >= 0; i--) {
+        const hd = healthDrops[i];
+        if (Math.hypot(player.x - hd.x, player.y - hd.y) < player.vStats.radius + hd.radius) {
+            player.hp = Math.min(player.maxHp, player.hp + hd.amount);
+            healthDrops.splice(i, 1);
+            updateHUD();
+        }
+    }
+
+    // Pickup Upgrade Drops
+    for (let i = upgradeDrops.length - 1; i >= 0; i--) {
+        const drop = upgradeDrops[i];
+        if (Math.hypot(player.x - drop.x, player.y - drop.y) < player.vStats.radius + drop.radius) {
+            drop.upgradeDef.action(player);
+            
+            floatingTexts.push({
+                x: player.x, y: player.y - 40,
+                text: drop.upgradeDef.name + "!",
+                color: drop.type === 'weapon' ? '#f87171' : '#22d3ee',
+                life: 2.0, maxLife: 2.0
+            });
+            
+            upgradeDrops.splice(i, 1);
+            updateHUD();
+        }
+    }
+
+    // Update XP
+    for (let i = xps.length - 1; i >= 0; i--) {
+        if (xps[i].update(dt)) xps.splice(i, 1);
+    }
+
+    projectiles.forEach(p => p.update(dt));
+    
+    checkCollisions();
+
+    // Floating text update
+    for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        floatingTexts[i].life -= dt;
+        if (floatingTexts[i].life <= 0) floatingTexts.splice(i, 1);
+    }
+}
+
+function drawGrid() {
+    // Draw moving water effect / grid relative to camera
+    ctx.fillStyle = PHASES[currentStage].bg; // Change color per phase
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 2;
+    const gridSize = 100;
+
+    const offsetX = -(CAMERA.x % gridSize);
+    const offsetY = -(CAMERA.y % gridSize);
+
+    ctx.beginPath();
+    for (let x = offsetX; x < width; x += gridSize) {
+        ctx.moveTo(x, 0); ctx.lineTo(x, height);
+    }
+    for (let y = offsetY; y < height; y += gridSize) {
+        ctx.moveTo(0, y); ctx.lineTo(width, y);
+    }
+    ctx.stroke();
+}
+
+function draw() {
+    // Clear & background
+    drawGrid();
+
+    // Setup world space
+    ctx.save();
+    ctx.translate(-CAMERA.x, -CAMERA.y);
+
+    // Draw Atoll Base
+    ctx.save();
+    ctx.translate(BASE_X, BASE_Y);
+    
+    // Safe zone aura
+    ctx.beginPath();
+    ctx.arc(0, 0, BASE_RADIUS + 20, 0, Math.PI * 2);
+    ctx.fillStyle = player.isSafe ? 'rgba(0, 255, 150, 0.15)' : 'rgba(0, 255, 255, 0.05)';
+    ctx.fill();
+    
+    // Island core
+    ctx.beginPath();
+    ctx.arc(0, 0, BASE_RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = '#4a4e69'; // Rusty metal color
+    ctx.fill();
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = '#22223b';
+    ctx.stroke();
+    
+    // Base label
+    ctx.font = 'bold 30px Inter';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.fillText("🛖 ATOLL", 0, -20);
+    ctx.font = '16px Inter';
+    ctx.fillStyle = 'rgba(0, 255, 150, 0.8)';
+    ctx.fillText("SAFE ZONE", 0, 20);
+    ctx.restore();
+
+    // Draw entities
+    healthDrops.forEach(hd => hd.draw(ctx));
+    upgradeDrops.forEach(ud => ud.draw(ctx)); // Draw upgrades
+    xps.forEach(xp => xp.draw(ctx));
+    enemies.forEach(e => e.draw(ctx));
+    projectiles.forEach(p => p.draw(ctx));
+    player.draw(ctx);
+
+    // Draw floating text
+    floatingTexts.forEach(ft => {
+        const progress = 1 - (ft.life / ft.maxLife);
+        ctx.save();
+        ctx.translate(ft.x, ft.y - (progress * 30)); // Move up
+        ctx.globalAlpha = 1 - progress; // Fade out
+        ctx.font = 'bold 14px Inter';
+        ctx.fillStyle = ft.color;
+        ctx.textAlign = 'center';
+        ctx.fillText(ft.text, 0, 0);
+        ctx.restore();
+    });
+
+    ctx.restore();
+
+    // Draw Minimap (Screen space)
+    drawMinimap();
+}
+
+function drawMinimap() {
+    const size = 100;
+    const margin = 15;
+    // Position top right, below HUD
+    const startX = width - size - margin;
+    const startY = 70; // Push down below XP bar / Timers
+
+    // Minimap Background
+    ctx.fillStyle = 'rgba(0, 15, 30, 0.7)';
+    ctx.fillRect(startX, startY, size, size);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(startX, startY, size, size);
+
+    // Center minimap on player (radar style) mapped to a large view area
+    const radarRange = 6000;
+    const mapScale = size / radarRange;
+    const mapCenterX = startX + size / 2;
+    const mapCenterY = startY + size / 2;
+
+    // Draw Base (Blue Square) - Clamped to the edges of the minimap!
+    // This turns it into a quest compass if you are far away.
+    const dx = BASE_X - player.x;
+    const dy = BASE_Y - player.y;
+    let bx = mapCenterX + dx * mapScale;
+    let by = mapCenterY + dy * mapScale;
+    
+    // Clamp to map bounds
+    if (bx < startX) bx = startX;
+    if (bx > startX + size) bx = startX + size;
+    if (by < startY) by = startY;
+    if (by > startY + size) by = startY + size;
+
+    const baseMinimapSize = Math.max(6, BASE_RADIUS * 2 * mapScale);
+    ctx.fillStyle = '#3b82f6'; // Blue
+    ctx.fillRect(bx - baseMinimapSize/2, by - baseMinimapSize/2, baseMinimapSize, baseMinimapSize);
+    
+    // Draw a pulsing border if it's clamped to the edge (offscreen indicator)
+    if (bx === startX || bx === startX + size || by === startY || by === startY + size) {
+        ctx.strokeStyle = `rgba(59, 130, 246, ${Math.abs(Math.sin(Date.now()/300))})`;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(bx - baseMinimapSize, by - baseMinimapSize, baseMinimapSize*2, baseMinimapSize*2);
+    }
+
+    // Draw Health Drops (Green Dots)
+    ctx.fillStyle = '#22c55e';
+    healthDrops.forEach(hd => {
+        const mx = mapCenterX + (hd.x - player.x) * mapScale;
+        const my = mapCenterY + (hd.y - player.y) * mapScale;
+        if (mx > startX && mx < startX + size && my > startY && my < startY + size) {
+            ctx.beginPath(); ctx.arc(mx, my, 2, 0, Math.PI*2); ctx.fill();
+        }
+    });
+
+    // Draw Utility Drops (Cyan Dots)
+    ctx.fillStyle = '#22d3ee';
+    upgradeDrops.forEach(ud => {
+        if (ud.type === 'utility') {
+            const mx = mapCenterX + (ud.x - player.x) * mapScale;
+            const my = mapCenterY + (ud.y - player.y) * mapScale;
+            if (mx > startX && mx < startX + size && my > startY && my < startY + size) {
+                ctx.beginPath(); ctx.arc(mx, my, 2, 0, Math.PI*2); ctx.fill();
+            }
+        }
+    });
+
+    // Draw Player (White Dot) exactly in center
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(mapCenterX, mapCenterY, 3, 0, Math.PI*2); ctx.fill();
+    
+    // Minimap radar cone indicator showing direction
+    ctx.beginPath();
+    ctx.moveTo(mapCenterX, mapCenterY);
+    ctx.arc(mapCenterX, mapCenterY, 12, player.angle - 0.4, player.angle + 0.4);
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fill();
+}
+
+function loop(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    const dt = Math.min((timestamp - lastTime) / 1000, 0.1); // Cap dt to prevent massive jumps on lag
+    lastTime = timestamp;
+
+    if (gameState === 'PLAYING') {
+        update(dt);
+        draw();
+    }
+
+    animationId = requestAnimationFrame(loop);
+}
+
+/**
+ * GAME FLOW CONTROLS
+ */
+function startGame() {
+    ui.start.classList.add('hidden');
+    ui.hud.classList.remove('hidden');
+    ui.hud.classList.add('flex');
+    ui.joystickZone.style.display = 'block';
+    
+    player = new Player();
+    enemies = [];
+    projectiles = [];
+    xps = [];
+    floatingTexts = [];
+    healthDrops = [];
+    upgradeDrops = [];
+    gameTime = 0;
+    nextTimeUpgrade = 30;
+    healthDropTimer = 0;
+    bossSpawned = false;
+    input.x = 0; input.y = 0;
+    
+    updateHUD();
+
+    // Show phase introduction text
+    floatingTexts.push({
+        x: player.x, y: player.y - 150,
+        text: `PHASE ${currentStage + 1}: ${PHASES[currentStage].name.toUpperCase()}`,
+        color: '#fff', life: 4.0, maxLife: 4.0
+    });
+    
+    gameState = 'PLAYING';
+    lastTime = performance.now();
+    if (!animationId) animationId = requestAnimationFrame(loop);
+}
+
+function endGame() {
+    gameState = 'GAMEOVER';
+    ui.hud.classList.add('hidden');
+    ui.hud.classList.remove('flex');
+    ui.joystickZone.style.display = 'none';
+    
+    ui.gameOverTitle.innerText = "WIPED OUT";
+    ui.gameOverTitle.classList.replace('text-green-400', 'text-red-500');
+    ui.gameOverStats.innerHTML = `You survived for ${formatTime(gameTime)}<br>Reached Level ${player.level}`;
+    document.querySelector('#game-over-screen button').innerText = "TRY AGAIN";
+    ui.gameOver.classList.remove('hidden');
+}
+
+function victory() {
+    gameState = 'VICTORY';
+    ui.hud.classList.add('hidden');
+    ui.hud.classList.remove('flex');
+    ui.joystickZone.style.display = 'none';
+    
+    if (currentStage < PHASES.length - 1) {
+        ui.gameOverTitle.innerText = "PHASE CLEARED";
+        ui.gameOverTitle.classList.replace('text-red-500', 'text-green-400');
+        ui.gameOverStats.innerHTML = `Area secured!<br>Time: ${formatTime(gameTime)}<br>Level: ${player.level}`;
+        document.querySelector('#game-over-screen button').innerText = "NEXT LEVEL";
+    } else {
+        ui.gameOverTitle.innerText = "OCEAN CONQUERED";
+        ui.gameOverTitle.classList.replace('text-red-500', 'text-green-400');
+        ui.gameOverStats.innerHTML = `You defeated all 10 phases!<br>Time: ${formatTime(gameTime)}`;
+        document.querySelector('#game-over-screen button').innerText = "PLAY AGAIN";
+    }
+    ui.gameOver.classList.remove('hidden');
+}
+
+function resetGame() {
+    ui.gameOver.classList.add('hidden');
+    if (gameState === 'VICTORY' && currentStage < PHASES.length - 1) {
+        currentStage++;
+    } else {
+        currentStage = 0; // Send back to phase 1 if they die or beat the entire game
+    }
+    startGame();
+}
+
+// Initial draw to show background behind start screen
+drawGrid();
+
+</script>
+</body>
+</html>
