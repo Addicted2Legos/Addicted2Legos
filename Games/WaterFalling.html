@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Waterfall Flow</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>Waterfall Flow - Realistic Water Simulation</title>
     <style>
         * {
             box-sizing: border-box;
@@ -17,36 +17,352 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #050b07;
+            background-color: #040906;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #ffffff;
         }
         canvas {
             display: block;
             width: 100%;
             height: 100%;
+            touch-action: none;
         }
-        #ui {
+
+        /* Top Notification & Guidance Pill */
+        #ui-header {
             position: absolute;
-            top: 20px;
-            width: 100%;
-            text-align: center;
-            color: rgba(255, 255, 255, 0.9);
-            font-size: 16px;
-            font-weight: 500;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 18px;
+            background: rgba(8, 20, 14, 0.72);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 9999px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.15);
             pointer-events: none;
-            text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+            z-index: 20;
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        #ui-header .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #2dd4bf;
+            box-shadow: 0 0 10px #2dd4bf;
+            animation: pulse-dot 2s infinite;
+        }
+        #ui-header span {
+            font-size: 13.5px;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+            color: rgba(240, 250, 245, 0.95);
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+            white-space: nowrap;
+        }
+
+        /* Floating Modern Control Dock */
+        #dock {
+            position: absolute;
+            bottom: 22px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            background: rgba(10, 22, 16, 0.78);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 9999px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+            z-index: 20;
+        }
+        .dock-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 7px 13px;
+            border-radius: 9999px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            outline: none;
+        }
+        .dock-btn:hover {
+            background: rgba(255, 255, 255, 0.18);
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+        .dock-btn:active {
+            transform: translateY(1px);
+        }
+        .dock-btn.active {
+            background: #0284c7;
+            border-color: #38bdf8;
+            color: #ffffff;
+            box-shadow: 0 0 14px rgba(56, 189, 248, 0.45);
+        }
+
+        .dock-divider {
+            width: 1px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.18);
+            margin: 0 2px;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.85); }
+        }
+
+        @media (max-width: 640px) {
+            #ui-header span { font-size: 12px; }
+            #dock { bottom: 14px; gap: 5px; padding: 6px 8px; }
+            .dock-btn { padding: 6px 10px; font-size: 11px; }
+            .btn-label-desktop { display: none; }
         }
     </style>
 </head>
 <body>
 
-    <div id="ui">Touch to part the flowing river into channels</div>
+    <!-- Top Guidance Banner -->
+    <div id="ui-header">
+        <div class="status-dot"></div>
+        <span id="ui-text">Touch or drag across the falls to part the rushing water</span>
+    </div>
+
+    <!-- Main Canvas -->
     <canvas id="canvas"></canvas>
 
+    <!-- Bottom Controls Dock -->
+    <div id="dock">
+        <button id="btn-sound" class="dock-btn" title="Toggle Waterfall Sound">
+            <span id="sound-icon">🔊</span>
+            <span class="btn-label-desktop" id="sound-text">Sound</span>
+        </button>
+        <div class="dock-divider"></div>
+        <button id="btn-theme" class="dock-btn" title="Cycle Atmosphere">
+            <span id="theme-icon">☀️</span>
+            <span class="btn-label-desktop" id="theme-text">Daylight</span>
+        </button>
+        <button id="btn-flow" class="dock-btn" title="Adjust Water Flow Rate">
+            <span>🌊</span>
+            <span class="btn-label-desktop" id="flow-text">Torrential</span>
+        </button>
+        <div class="dock-divider"></div>
+        <button id="btn-clear" class="dock-btn" title="Clear Obstacles & Ripples">
+            <span>✨</span>
+            <span class="btn-label-desktop">Clear</span>
+        </button>
+    </div>
+
     <script>
+        // --- WEB AUDIO PROCEDURAL REALISTIC WATERFALL SOUND ENGINE ---
+        class WaterfallAudio {
+            constructor() {
+                this.ctx = null;
+                this.isRunning = false;
+                this.isMuted = true;
+                this.noiseNode = null;
+                this.lowRumbleFilter = null;
+                this.midCascadeFilter = null;
+                this.highMistFilter = null;
+                this.splashGain = null;
+                this.masterGain = null;
+            }
+
+            init() {
+                if (this.ctx) return;
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                this.ctx = new AudioCtx();
+
+                // Master output
+                this.masterGain = this.ctx.createGain();
+                this.masterGain.gain.setValueAtTime(0, this.ctx.currentTime);
+                this.masterGain.connect(this.ctx.destination);
+
+                // Continuous Brown/Pink Noise Buffer for organic rushing water
+                const bufferSize = this.ctx.sampleRate * 2;
+                const noiseBuffer = this.ctx.createBuffer(2, bufferSize, this.ctx.sampleRate);
+                for (let ch = 0; ch < 2; ch++) {
+                    const data = noiseBuffer.getChannelData(ch);
+                    let lastOut = 0.0;
+                    for (let i = 0; i < bufferSize; i++) {
+                        const white = Math.random() * 2 - 1;
+                        // 1-pole filter to generate pink-brown noise (authentic rushing cascade sound)
+                        lastOut = (lastOut * 0.94) + (white * 0.06);
+                        data[i] = lastOut * 3.5;
+                    }
+                }
+
+                this.noiseNode = this.ctx.createBufferSource();
+                this.noiseNode.buffer = noiseBuffer;
+                this.noiseNode.loop = true;
+
+                // 1. Low Plunge Pool Rumble (Deep resonant mass impact: 60Hz - 140Hz)
+                this.lowRumbleFilter = this.ctx.createBiquadFilter();
+                this.lowRumbleFilter.type = 'lowpass';
+                this.lowRumbleFilter.frequency.value = 110;
+                this.lowRumbleFilter.Q.value = 2.0;
+
+                const rumbleGain = this.ctx.createGain();
+                rumbleGain.gain.value = 1.3;
+                this.noiseNode.connect(this.lowRumbleFilter);
+                this.lowRumbleFilter.connect(rumbleGain);
+                rumbleGain.connect(this.masterGain);
+
+                // 2. Mid Cascade Rushing Water Body (350Hz - 1400Hz band)
+                this.midCascadeFilter = this.ctx.createBiquadFilter();
+                this.midCascadeFilter.type = 'bandpass';
+                this.midCascadeFilter.frequency.value = 750;
+                this.midCascadeFilter.Q.value = 0.85;
+
+                const midGain = this.ctx.createGain();
+                midGain.gain.value = 0.9;
+                this.noiseNode.connect(this.midCascadeFilter);
+                this.midCascadeFilter.connect(midGain);
+                midGain.connect(this.masterGain);
+
+                // 3. High Froth Sizzle & Spray Veil (3.5kHz - 8kHz)
+                this.highMistFilter = this.ctx.createBiquadFilter();
+                this.highMistFilter.type = 'highpass';
+                this.highMistFilter.frequency.value = 3200;
+                this.highMistFilter.Q.value = 0.7;
+
+                const highGain = this.ctx.createGain();
+                highGain.gain.value = 0.35;
+                this.noiseNode.connect(this.highMistFilter);
+                this.highMistFilter.connect(highGain);
+                highGain.connect(this.masterGain);
+
+                // 4. Dynamic Touch Splash Modifier Channel
+                this.splashGain = this.ctx.createGain();
+                this.splashGain.gain.value = 0;
+                const splashFilter = this.ctx.createBiquadFilter();
+                splashFilter.type = 'bandpass';
+                splashFilter.frequency.value = 1800;
+                splashFilter.Q.value = 1.5;
+
+                this.noiseNode.connect(splashFilter);
+                splashFilter.connect(this.splashGain);
+                this.splashGain.connect(this.masterGain);
+
+                this.noiseNode.start(0);
+                this.isRunning = true;
+            }
+
+            toggle() {
+                this.init();
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+                this.isMuted = !this.isMuted;
+                const targetGain = this.isMuted ? 0 : 0.45;
+                if (this.masterGain && this.ctx) {
+                    this.masterGain.gain.cancelScheduledValues(this.ctx.currentTime);
+                    this.masterGain.gain.linearRampToValueAtTime(targetGain, this.ctx.currentTime + 0.35);
+                }
+                return !this.isMuted;
+            }
+
+            // Real-time acoustic modulation when hand touches the stream
+            updateTouchModulation(activeTouchCount, totalSpeed) {
+                if (!this.isRunning || this.isMuted || !this.ctx) return;
+                const targetSplash = Math.min(activeTouchCount * 0.45 + (totalSpeed * 0.02), 0.85);
+                this.splashGain.gain.setTargetAtTime(targetSplash, this.ctx.currentTime, 0.08);
+            }
+        }
+
+        const audio = new WaterfallAudio();
+
+        // --- ATMOSPHERIC THEMES ---
+        const THEMES = [
+            {
+                name: 'Daylight',
+                icon: '☀️',
+                skyTop: '#081e13',
+                skyBottom: '#103723',
+                cliffBase: '#131815',
+                cliffHighlight: '#222923',
+                canyonWall: '#1f2721',
+                canyonShadow: '#090e0b',
+                canyonMoss: '#2a482b',
+                waterDeep: '12, 70, 85',
+                waterMid: '30, 135, 175',
+                waterHighlight: '215, 245, 255',
+                foamBase: '240, 252, 255',
+                mistColor: '255, 255, 255',
+                poolTop: '#0d281e',
+                poolBottom: '#030c08',
+                hasRainbow: true,
+                sunGlint: true
+            },
+            {
+                name: 'Twilight',
+                icon: '🌙',
+                skyTop: '#090d1e',
+                skyBottom: '#111b38',
+                cliffBase: '#101420',
+                cliffHighlight: '#1d2335',
+                canyonWall: '#1a1f30',
+                canyonShadow: '#070912',
+                canyonMoss: '#192b3a',
+                waterDeep: '15, 45, 95',
+                waterMid: '38, 105, 195',
+                waterHighlight: '200, 235, 255',
+                foamBase: '225, 245, 255',
+                mistColor: '210, 235, 255',
+                poolTop: '#0c1630',
+                poolBottom: '#040712',
+                hasRainbow: false,
+                sunGlint: true
+            },
+            {
+                name: 'Bioluminescent',
+                icon: '✨',
+                skyTop: '#050314',
+                skyBottom: '#0f092b',
+                cliffBase: '#0c0a1a',
+                cliffHighlight: '#181230',
+                canyonWall: '#120d24',
+                canyonShadow: '#04020a',
+                canyonMoss: '#00ffaa',
+                waterDeep: '20, 10, 55',
+                waterMid: '0, 185, 215',
+                waterHighlight: '130, 255, 240',
+                foamBase: '180, 255, 245',
+                mistColor: '80, 240, 210',
+                poolTop: '#0a1028',
+                poolBottom: '#020512',
+                hasRainbow: false,
+                sunGlint: false
+            }
+        ];
+        let currentThemeIndex = 0;
+
+        // --- FLOW RATES ---
+        const FLOW_RATES = [
+            { label: 'Gentle', multiplier: 0.65, count: 55, sprayRate: 0.3 },
+            { label: 'Classic', multiplier: 1.0, count: 85, sprayRate: 0.65 },
+            { label: 'Torrential', multiplier: 1.45, count: 120, sprayRate: 1.0 }
+        ];
+        let currentFlowIndex = 2; // Default: Torrential for lush fullness
+
+        // Canvas & Geometry
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-
         let width, height;
         let damTop, damBottom, damLeft, damWidth, archDepth;
 
@@ -54,136 +370,252 @@
             width = canvas.width = window.innerWidth;
             height = canvas.height = window.innerHeight;
 
-            damTop = height * 0.15;
-            damBottom = height * 0.82;
-            damWidth = Math.min(width * 0.88, 900);
+            damTop = height * 0.16;
+            damBottom = height * 0.79;
+            damWidth = Math.min(width * 0.88, 980);
             damLeft = (width - damWidth) / 2;
-            archDepth = Math.min(60, height * 0.055); // how deep the crest arcs downstream at its center
+            archDepth = Math.min(55, height * 0.05);
+
+            initRockGeometry();
+            if (typeof rebuildStrands === 'function') rebuildStrands();
+            if (typeof rebuildDroplets === 'function') rebuildDroplets();
         }
         window.addEventListener('resize', resize);
-        resize();
 
-        // The spillway crest isn't a flat line - it arcs, dipping lowest at the
-        // center of the dam and rising to meet the canyon walls at the edges.
+        // Curved spillway crest
         function crestY(x) {
-            let t = Math.min(Math.max((x - damLeft) / damWidth, 0), 1);
+            const t = Math.min(Math.max((x - damLeft) / damWidth, 0), 1);
             return damTop + archDepth * Math.sin(Math.PI * t);
         }
 
-        // Pointer Tracking
-        const activeTouches = [];
-
-        function handlePointer(e) {
-            e.preventDefault();
-            activeTouches.length = 0;
-            const rect = canvas.getBoundingClientRect();
-
-            if (e.touches) {
-                for (let i = 0; i < e.touches.length; i++) {
-                    activeTouches.push({
-                        x: e.touches[i].clientX - rect.left,
-                        y: e.touches[i].clientY - rect.top,
-                        r: 35 // Finger radius
-                    });
-                }
-            } else if (isMouseDown) {
-                activeTouches.push({
-                    x: e.clientX - rect.left,
-                    y: e.clientY - rect.top,
-                    r: 35
-                });
-            }
-        }
-
+        // --- MULTI-TOUCH & POINTER TRACKING ---
+        const touches = new Map();
         let isMouseDown = false;
-        canvas.addEventListener('touchstart', handlePointer, { passive: false });
-        canvas.addEventListener('touchmove', handlePointer, { passive: false });
-        canvas.addEventListener('touchend', handlePointer, { passive: false });
-        canvas.addEventListener('mousedown', (e) => { isMouseDown = true; handlePointer(e); });
-        canvas.addEventListener('mousemove', (e) => { if(isMouseDown) handlePointer(e); });
-        canvas.addEventListener('mouseup', () => { isMouseDown = false; activeTouches.length = 0; });
+        let lastMousePos = { x: 0, y: 0 };
 
-        // River Flow: continuous wavy strands instead of discrete droplets, so the
-        // water reads as one connected sheet flowing down rather than individual streaks.
-        // Wide, overlapping, low-amplitude strands moving at a slow uniform speed read as
-        // one even sheet; it's high speed + high-frequency wobble that reads as separate
-        // fast-moving streams, so both are kept low here.
-        const NUM_BODY_STRANDS = 55;
-        const NUM_HIGHLIGHT_STRANDS = 60;
-        const NUM_FOAM_PATCHES = 70;
-        const NUM_MIST_CLOUDS = 16;
-        const SAMPLE_STEP = 12; // px between path samples along each strand
-        const GRAVITY = 0.35;
-        let flowTime = 0;
-        const splashes = [];
+        function updateTouch(id, x, y, radius = 38) {
+            const prev = touches.get(id);
+            const vx = prev ? (x - prev.x) * 0.4 + prev.vx * 0.6 : 0;
+            const vy = prev ? (y - prev.y) * 0.4 + prev.vy * 0.6 : 0;
 
-        class Strand {
-            constructor(kind) {
-                this.kind = kind; // 'body' = wide opaque foam mass, 'highlight' = thin bright streak
-                this.frac = Math.random(); // horizontal position as a fraction of damWidth (resize-safe)
+            touches.set(id, {
+                id,
+                x,
+                y,
+                r: radius,
+                vx,
+                vy,
+                speed: Math.hypot(vx, vy),
+                life: 1.0
+            });
 
-                const isBody = kind === 'body';
-                this.freq1 = 0.004 + Math.random() * 0.006;
-                this.freq2 = 0.012 + Math.random() * 0.012;
-                this.freq3 = 0.025 + Math.random() * 0.02; // gentle boil, not a fast jitter
-                this.phase = Math.random() * Math.PI * 2;
-                this.amp1 = isBody ? 3 + Math.random() * 4 : 2 + Math.random() * 3;
-                this.amp2 = isBody ? 1.5 + Math.random() * 2 : 1 + Math.random() * 1.5;
-                this.amp3 = isBody ? 0.5 + Math.random() * 1 : 0.5 + Math.random() * 1;
-                this.speed = isBody ? 6 + Math.random() * 5 : 10 + Math.random() * 8;
-                this.width = isBody ? 16 + Math.random() * 18 : 2 + Math.random() * 2.5;
-                this.alpha = isBody ? 0.18 + Math.random() * 0.10 : 0.12 + Math.random() * 0.14;
-                this.color = isBody ? '25, 75, 115' : '55, 115, 160';
+            // If touching plunge pool, spawn circular water waves
+            if (y >= damBottom - 20) {
+                spawnPoolRipple(x, y, radius * 0.6, 2.5);
             }
         }
 
-        const bodyStrands = [];
-        const highlightStrands = [];
-        for (let i = 0; i < NUM_BODY_STRANDS; i++) bodyStrands.push(new Strand('body'));
-        for (let i = 0; i < NUM_HIGHLIGHT_STRANDS; i++) highlightStrands.push(new Strand('highlight'));
+        function removeTouch(id) {
+            touches.delete(id);
+        }
 
-        // Push a sample point around any active touch: left untouched above the
-        // fingertip (water hasn't reached it yet), eased smoothly into a straight side
-        // channel as it passes through the fingertip's height, then held in that
-        // channel indefinitely below it - so directly beneath the finger stays dry and
-        // both channels fall straight rather than snapping back to the wavy path.
-        function deflect(x, y, halfWidth = 6) {
-            for (let touch of activeTouches) {
+        // Touch Listeners
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            audio.init();
+            const rect = canvas.getBoundingClientRect();
+            for (let i = 0; i < e.touches.length; i++) {
+                const t = e.touches[i];
+                updateTouch(t.identifier, t.clientX - rect.left, t.clientY - rect.top, 38);
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            for (let i = 0; i < e.touches.length; i++) {
+                const t = e.touches[i];
+                updateTouch(t.identifier, t.clientX - rect.left, t.clientY - rect.top, 38);
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            const currentIds = new Set();
+            for (let i = 0; i < e.touches.length; i++) currentIds.add(e.touches[i].identifier);
+            for (let id of touches.keys()) {
+                if (typeof id === 'number' && !currentIds.has(id)) removeTouch(id);
+            }
+        }, { passive: false });
+
+        // Mouse Listeners
+        canvas.addEventListener('mousedown', (e) => {
+            isMouseDown = true;
+            audio.init();
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            lastMousePos = { x, y };
+            updateTouch('mouse', x, y, 42);
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isMouseDown) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            updateTouch('mouse', x, y, 42);
+            lastMousePos = { x, y };
+        });
+
+        window.addEventListener('mouseup', () => {
+            isMouseDown = false;
+            removeTouch('mouse');
+        });
+
+        // --- FLUID DYNAMICS DEFLECTION & WAKE RECONNECTION ---
+        // Accurately simulates fluid potential flow around cylinders + viscous wake closure:
+        // 1. Upstream stagnation bow-wave deflection
+        // 2. Tangential wrapping around obstacle perimeter
+        // 3. Teardrop wake closure downstream (water reunites naturally rather than leaving an infinite cut)
+        // 4. Momentum drag from moving finger
+        function calculateDeflection(x, y, halfWidth = 8) {
+            let totalDx = 0;
+
+            for (let touch of touches.values()) {
+                const dx = x - touch.x;
                 const dy = y - touch.y;
-                if (dy < -touch.r) continue; // above the fingertip: leave it alone
+                const rEff = touch.r + halfWidth + 5;
+                const distSq = dx * dx + dy * dy;
 
-                const side = x >= touch.x ? 1 : -1;
-                // Inner edge of the strand lands at touch.r + 6 regardless of the
-                // strand's own width, so every strand leaves the same dry gap
-                const channelX = touch.x + side * (touch.r + halfWidth + 6);
+                // 1. Upstream Stagnation Zone (Fluid slowing down and bowing outward ahead of obstacle)
+                if (dy < 0 && dy > -rEff * 1.6) {
+                    const t = 1 - Math.abs(dy) / (rEff * 1.6);
+                    const push = Math.sign(dx || 0.001) * (rEff - Math.abs(dx)) * t * t * 0.85;
+                    if (Math.abs(dx) < rEff) {
+                        totalDx += push;
+                    }
+                    continue;
+                }
 
-                if (dy <= touch.r) {
-                    const t = Math.min(Math.max((dy + touch.r) / (touch.r * 2), 0), 1);
-                    const eased = t * t * (3 - 2 * t); // smoothstep - no hard jump
-                    x = x + (channelX - x) * eased;
-                } else {
-                    x = channelX;
+                // 2. Obstacle Wrap-Around Zone (-rEff <= dy <= rEff)
+                if (dy >= -rEff && dy <= rEff) {
+                    if (distSq < rEff * rEff) {
+                        const targetX = Math.sqrt(Math.max(0, rEff * rEff - dy * dy));
+                        const side = dx >= 0 ? 1 : -1;
+                        const neededOffset = (touch.x + side * targetX) - x;
+                        totalDx += neededOffset;
+                        // Add finger drag velocity momentum
+                        totalDx += touch.vx * 0.45;
+                    }
+                    continue;
+                }
+
+                // 3. Downstream Wake & Cavity Reconnection (dy > rEff)
+                // Real water converges back into the center under gravity and surface tension!
+                if (dy > rEff) {
+                    const wakeLength = touch.r * 4.2; // Distance downstream until full closure
+                    const wakeProgress = (dy - rEff) / wakeLength;
+
+                    if (wakeProgress < 1.0) {
+                        // Teardrop wake boundary narrows with distance downstream
+                        const currentWakeHalfWidth = rEff * Math.pow(1 - wakeProgress, 1.35);
+                        if (Math.abs(dx) < currentWakeHalfWidth) {
+                            const side = dx >= 0 ? 1 : -1;
+                            const neededOffset = (touch.x + side * currentWakeHalfWidth) - x;
+                            totalDx += neededOffset * (1 - wakeProgress * 0.3);
+                        }
+                        // Finger lateral sweep influence
+                        totalDx += touch.vx * (1 - wakeProgress) * 0.35;
+                    }
                 }
             }
-            return x;
+
+            return x + totalDx;
         }
 
-        // Traveling sine waves (phase shifts with flowTime) make the ripple pattern
-        // visibly migrate downward each frame, which is what sells the "flowing" look.
-        // The high-frequency third term adds the chaotic boil of real whitewater.
-        function strandX(strand, y) {
-            let baseX = damLeft + strand.frac * damWidth;
-            let wave = Math.sin(strand.freq1 * y - flowTime * strand.speed * 0.01 + strand.phase) * strand.amp1
-                     + Math.sin(strand.freq2 * y - flowTime * strand.speed * 0.02 + strand.phase * 1.7) * strand.amp2
-                     + Math.sin(strand.freq3 * y - flowTime * strand.speed * 0.05 + strand.phase * 2.3) * strand.amp3;
-            return deflect(baseX + wave, y, strand.width / 2);
+        // --- WATERFALL FLOW STRAND ENGINE ---
+        let flowTime = 0;
+        const SAMPLE_STEP = 10;
+
+        class WaterStrand {
+            constructor(type) {
+                this.type = type; // 'core', 'highlight', 'foam'
+                this.frac = Math.random();
+                this.initParams();
+            }
+
+            initParams() {
+                const isCore = this.type === 'core';
+                const isHighlight = this.type === 'highlight';
+
+                // Spatial frequency wave counts along vertical fall length
+                this.k1 = 9 + Math.random() * 4;    // Broad serpentine sway (~1.5 - 2 cycles)
+                this.k2 = 24 + Math.random() * 8;   // Water strand ripple (~4 - 5 cycles)
+                this.k3 = 54 + Math.random() * 16;  // Fine whitewater aeration (~8 - 11 cycles)
+                this.phase = Math.random() * Math.PI * 2;
+
+                // Lateral wave displacement amplitudes
+                this.amp1 = isCore ? 3.5 + Math.random() * 3.5 : 2 + Math.random() * 2.5;
+                this.amp2 = isCore ? 2 + Math.random() * 1.5 : 1.2 + Math.random() * 1.2;
+                this.amp3 = 0.6 + Math.random() * 0.8;
+
+                // Speed factor
+                this.speed = isCore ? 0.9 + Math.random() * 0.25 : 1.1 + Math.random() * 0.4;
+                this.width = isCore ? 14 + Math.random() * 16 : isHighlight ? 2 + Math.random() * 3 : 5 + Math.random() * 7;
+                this.alpha = isCore ? 0.24 + Math.random() * 0.12 : isHighlight ? 0.45 + Math.random() * 0.3 : 0.32 + Math.random() * 0.2;
+
+                // Downward streaming foam dashes along the strand
+                this.dashLen = isHighlight ? 18 + Math.random() * 22 : 12 + Math.random() * 18;
+                this.gapLen = isHighlight ? 14 + Math.random() * 18 : 18 + Math.random() * 24;
+                this.streamVelocity = 6.5 + Math.random() * 4.0;
+            }
         }
 
-        function drawStrand(strand) {
-            const points = [];
+        let strands = [];
+        function rebuildStrands() {
+            strands = [];
+            const flow = FLOW_RATES[currentFlowIndex];
+            const coreCount = Math.floor(flow.count * 0.42);
+            const highlightCount = Math.floor(flow.count * 0.45);
+            const foamCount = Math.floor(flow.count * 0.25);
+
+            for (let i = 0; i < coreCount; i++) strands.push(new WaterStrand('core'));
+            for (let i = 0; i < highlightCount; i++) strands.push(new WaterStrand('highlight'));
+            for (let i = 0; i < foamCount; i++) strands.push(new WaterStrand('foam'));
+        }
+
+        // Calculates X coordinate for a strand at height Y with downward-propagating gravity flow
+        function getStrandX(strand, y, flowSpeedMult) {
+            const baseX = damLeft + strand.frac * damWidth;
+            const H = Math.max(1, damBottom - damTop);
+            const u = Math.max(0, Math.min(1.2, (y - damTop) / H));
+
+            // Strictly increasing gravity-accelerated vertical progress:
+            // xi is 0 at top crest, 1 at plunge pool
+            const xi = (Math.sqrt(1 + 2.5 * u) - 1) / (Math.sqrt(3.5) - 1);
+
+            // Phase = k * xi - velocity * flowTime + phase
+            // Since xi increases with y, and flowTime increases over time:
+            // To maintain constant phase (crest/trough), xi MUST increase over time -> STRICT DOWNWARD MOTION!
+            const velocity = 0.014 * strand.speed * flowSpeedMult;
+            const t1 = strand.k1 * velocity * flowTime;
+            const t2 = strand.k2 * velocity * flowTime;
+            const t3 = strand.k3 * velocity * flowTime;
+
+            const wave = Math.sin(strand.k1 * xi - t1 + strand.phase) * strand.amp1
+                       + Math.sin(strand.k2 * xi - t2 + strand.phase * 1.5) * strand.amp2
+                       + Math.sin(strand.k3 * xi - t3 + strand.phase * 2.3) * strand.amp3;
+
+            return calculateDeflection(baseX + wave, y, strand.width / 2);
+        }
+
+        function drawStrand(strand, theme, flowSpeedMult) {
             const topY = crestY(damLeft + strand.frac * damWidth);
+            const points = [];
+
             for (let y = topY; y <= damBottom; y += SAMPLE_STEP) {
-                points.push({ x: strandX(strand, y), y });
+                points.push({ x: getStrandX(strand, y, flowSpeedMult), y });
             }
             if (points.length < 2) return;
 
@@ -197,90 +629,213 @@
             const last = points[points.length - 1];
             path.lineTo(last.x, last.y);
 
-            // Fade in/out at the crest and pool so the strand doesn't cut off abruptly
             const midX = points[Math.floor(points.length / 2)].x;
             const fade = ctx.createLinearGradient(midX, topY, midX, damBottom);
-            fade.addColorStop(0, `rgba(${strand.color}, 0)`);
-            fade.addColorStop(0.15, `rgba(${strand.color}, ${strand.alpha})`);
-            fade.addColorStop(0.85, `rgba(${strand.color}, ${strand.alpha})`);
-            fade.addColorStop(1, `rgba(${strand.color}, 0)`);
+
+            let colorStr;
+            if (strand.type === 'core') colorStr = theme.waterMid;
+            else if (strand.type === 'highlight') colorStr = theme.waterHighlight;
+            else colorStr = theme.foamBase;
+
+            fade.addColorStop(0, `rgba(${colorStr}, 0)`);
+            fade.addColorStop(0.12, `rgba(${colorStr}, ${strand.alpha})`);
+            fade.addColorStop(0.85, `rgba(${colorStr}, ${strand.alpha})`);
+            fade.addColorStop(1, `rgba(${colorStr}, 0.05)`);
 
             ctx.lineCap = 'round';
             ctx.strokeStyle = fade;
 
-            // Wide, half-opacity outer pass feathers the sideways edge, then a
-            // narrower core pass keeps a touch of definition in the middle
-            ctx.lineWidth = strand.width * 1.9;
-            ctx.globalAlpha = 0.45;
-            ctx.stroke(path);
+            if (strand.type === 'core') {
+                ctx.setLineDash([]);
+                ctx.lineWidth = strand.width * 1.8;
+                ctx.globalAlpha = 0.4;
+                ctx.stroke(path);
 
-            ctx.lineWidth = strand.width;
-            ctx.globalAlpha = 1;
-            ctx.stroke(path);
+                ctx.lineWidth = strand.width;
+                ctx.globalAlpha = 0.9;
+                ctx.stroke(path);
+            } else {
+                // Downward streaming foam dashes along the strand
+                ctx.setLineDash([strand.dashLen, strand.gapLen]);
+                // Negative lineDashOffset moves forward along path (downward in Y)
+                ctx.lineDashOffset = -flowTime * strand.streamVelocity * flowSpeedMult;
+                ctx.lineWidth = strand.width;
+                ctx.globalAlpha = 0.85;
+                ctx.stroke(path);
+                ctx.setLineDash([]);
+            }
         }
 
-        // Soft drifting foam blobs layered over the strands break up the clean
-        // parallel lines into the broken, frothy texture of real cascading whitewater.
-        class FoamPatch {
-            constructor() { this.reset(true); }
+        // --- CASCADING WATER DROPLETS & FOAM GLOBULES ---
+        class WaterDroplet {
+            constructor() {
+                this.reset(true);
+            }
 
-            reset(randomStart) {
-                this.frac = Math.random();
+            reset(initial = false) {
+                this.frac = 0.02 + Math.random() * 0.96;
+                const topY = crestY(damLeft + this.frac * damWidth);
+                this.y = initial ? topY + Math.random() * (damBottom - topY) : topY;
+                this.vy = 4 + Math.random() * 3.5;
+                this.size = 1.3 + Math.random() * 2.0;
+                this.length = 8 + Math.random() * 14;
+                this.alpha = 0.4 + Math.random() * 0.5;
+                this.wobble = Math.random() * Math.PI * 2;
+            }
+
+            update(flowSpeedMult) {
+                // Gravity acceleration
+                this.vy += 0.45 * flowSpeedMult;
+                if (this.vy > 25) this.vy = 25;
+                this.y += this.vy;
+
+                // Follow flow and deflection around active touches
                 const baseX = damLeft + this.frac * damWidth;
-                const topY = crestY(baseX);
-                this.y = randomStart ? topY + Math.random() * (damBottom - topY) : topY - Math.random() * 20;
-                this.vy = 1 + Math.random() * 1;
-                this.radius = 10 + Math.random() * 22;
-                this.alpha = 0.12 + Math.random() * 0.18;
-                this.wobbleSeed = Math.random() * Math.PI * 2;
-                this.wobbleSpeed = 0.3 + Math.random() * 0.8;
+                const wave = Math.sin(this.y * 0.025 + this.wobble) * 3;
+                this.x = calculateDeflection(baseX + wave, this.y, 4);
+
+                // Reached plunge pool
+                if (this.y >= damBottom) {
+                    if (Math.random() < 0.25) {
+                        spawnPoolRipple(this.x, damBottom + 2, 20 + Math.random() * 20, 0.5);
+                    }
+                    this.reset(false);
+                }
+            }
+
+            draw(theme) {
+                const tailY = Math.max(damTop, this.y - this.length);
+                const grad = ctx.createLinearGradient(this.x, tailY, this.x, this.y);
+                grad.addColorStop(0, `rgba(${theme.foamBase}, 0)`);
+                grad.addColorStop(1, `rgba(${theme.foamBase}, ${this.alpha})`);
+
+                ctx.beginPath();
+                ctx.moveTo(this.x, tailY);
+                ctx.lineTo(this.x, this.y);
+                ctx.strokeStyle = grad;
+                ctx.lineWidth = this.size;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+            }
+        }
+
+        const droplets = [];
+        function rebuildDroplets() {
+            droplets.length = 0;
+            const flow = FLOW_RATES[currentFlowIndex];
+            const count = Math.floor(flow.count * 1.1);
+            for (let i = 0; i < count; i++) {
+                droplets.push(new WaterDroplet());
+            }
+        }
+
+        // --- REALISTIC PARTICLES: SPLASH SPRAY, FOAM & BILLOWING MIST ---
+        const splashParticles = [];
+        const poolRipples = [];
+        const mistClouds = [];
+
+        class SplashParticle {
+            constructor(x, y, vx, vy, size, alpha, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.size = size;
+                this.alpha = alpha;
+                this.maxAlpha = alpha;
+                this.life = 1.0;
+                this.decay = 0.02 + Math.random() * 0.035;
+                this.color = color;
             }
 
             update() {
-                this.vy = Math.min(this.vy + GRAVITY * 0.12, 4.5);
+                this.vy += 0.38; // Gravity
+                this.vx *= 0.98; // Air drag
+                this.x += this.vx;
                 this.y += this.vy;
-                const baseX = damLeft + this.frac * damWidth;
-                const wobble = Math.sin(this.y * 0.03 + this.wobbleSeed + flowTime * 0.02 * this.wobbleSpeed) * 6;
-                this.x = deflect(baseX + wobble, this.y, this.radius * 0.5);
-
-                if (this.y >= damBottom) this.reset(false);
+                this.life -= this.decay;
+                this.alpha = this.maxAlpha * Math.max(0, this.life);
+                return this.life > 0 && this.y < damBottom + 45;
             }
 
             draw() {
-                const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
-                grad.addColorStop(0, `rgba(120, 175, 205, ${this.alpha})`);
-                grad.addColorStop(1, 'rgba(120, 175, 205, 0)');
-                ctx.fillStyle = grad;
                 ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.arc(this.x, this.y, this.size * this.life, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${this.color}, ${this.alpha})`;
                 ctx.fill();
             }
         }
 
-        const foamPatches = [];
-        for (let i = 0; i < NUM_FOAM_PATCHES; i++) foamPatches.push(new FoamPatch());
-
-        // Ambient billowing mist clouds hovering where the falls hit the pool
-        const mistClouds = [];
-        for (let i = 0; i < NUM_MIST_CLOUDS; i++) {
-            mistClouds.push({
-                frac: Math.random(),
-                radius: 30 + Math.random() * 50,
-                phase: Math.random() * Math.PI * 2,
-                speed: 0.3 + Math.random() * 0.6,
-                bob: 8 + Math.random() * 14,
-                alphaBase: 0.15 + Math.random() * 0.15
-            });
+        function spawnSplashBurst(x, y, count, baseSpeed, angleCenter = -Math.PI / 2, spread = 1.6, color = '225, 250, 255') {
+            if (splashParticles.length > 320) return;
+            for (let i = 0; i < count; i++) {
+                const angle = angleCenter + (Math.random() - 0.5) * spread;
+                const speed = baseSpeed * (0.5 + Math.random() * 0.8);
+                const vx = Math.cos(angle) * speed;
+                const vy = Math.sin(angle) * speed;
+                const size = 1.2 + Math.random() * 2.2;
+                const alpha = 0.7 + Math.random() * 0.3;
+                splashParticles.push(new SplashParticle(x, y, vx, vy, size, alpha, color));
+            }
         }
 
-        function drawMist() {
+        class PoolRipple {
+            constructor(x, y, maxR, strength) {
+                this.x = x;
+                this.y = y;
+                this.r = 3;
+                this.maxR = maxR;
+                this.strength = strength;
+                this.alpha = 0.75;
+            }
+
+            update() {
+                this.r += 1.4;
+                this.alpha = (1 - (this.r / this.maxR)) * 0.75;
+                return this.r < this.maxR && this.alpha > 0.01;
+            }
+
+            draw(theme) {
+                ctx.beginPath();
+                ctx.ellipse(this.x, this.y, this.r, this.r * 0.36, 0, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(${theme.waterHighlight}, ${this.alpha})`;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+        }
+
+        function spawnPoolRipple(x, y, maxR = 40, strength = 1.0) {
+            if (poolRipples.length > 60) return;
+            poolRipples.push(new PoolRipple(x, y, maxR, strength));
+        }
+
+        // Ambient Plunge Pool Mist Clouds
+        function initMist() {
+            mistClouds.length = 0;
+            for (let i = 0; i < 22; i++) {
+                mistClouds.push({
+                    frac: Math.random(),
+                    radius: 40 + Math.random() * 65,
+                    phase: Math.random() * Math.PI * 2,
+                    speed: 0.25 + Math.random() * 0.5,
+                    bob: 10 + Math.random() * 18,
+                    drift: (Math.random() - 0.5) * 20,
+                    alphaBase: 0.12 + Math.random() * 0.16
+                });
+            }
+        }
+
+        function drawMist(theme) {
             for (let c of mistClouds) {
-                const x = damLeft + c.frac * damWidth;
-                const y = damBottom + Math.sin(flowTime * 0.02 * c.speed + c.phase) * c.bob;
-                const alpha = c.alphaBase + Math.sin(flowTime * 0.03 * c.speed + c.phase * 1.3) * 0.05;
+                const x = damLeft + c.frac * damWidth + Math.sin(flowTime * 0.01 * c.speed + c.phase) * c.drift;
+                const y = damBottom + Math.sin(flowTime * 0.02 * c.speed + c.phase) * c.bob - 12;
+                const alpha = Math.max(0, c.alphaBase + Math.sin(flowTime * 0.03 * c.speed + c.phase * 1.5) * 0.05);
+
                 const grad = ctx.createRadialGradient(x, y, 0, x, y, c.radius);
-                grad.addColorStop(0, `rgba(255, 255, 255, ${Math.max(alpha, 0)})`);
-                grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                grad.addColorStop(0, `rgba(${theme.mistColor}, ${alpha})`);
+                grad.addColorStop(0.55, `rgba(${theme.mistColor}, ${alpha * 0.45})`);
+                grad.addColorStop(1, `rgba(${theme.mistColor}, 0)`);
+
                 ctx.fillStyle = grad;
                 ctx.beginPath();
                 ctx.arc(x, y, c.radius, 0, Math.PI * 2);
@@ -288,185 +843,407 @@
             }
         }
 
-        function spawnSplash(x, y, impactSpeed) {
-            if (splashes.length > 220) return; // Cap for performance
-            const dropletCount = 2 + Math.floor(Math.random() * 3);
-            for (let i = 0; i < dropletCount; i++) {
-                const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.8; // Mostly upward spray
-                const speed = (impactSpeed * 0.18) + Math.random() * 2.5;
-                splashes.push({
-                    x, y,
-                    vx: Math.cos(angle) * speed,
-                    vy: Math.sin(angle) * speed,
-                    radius: 1 + Math.random() * 1.5,
-                    alpha: 0.6 + Math.random() * 0.3,
-                    isRing: false
-                });
+        // --- NATURAL ROCKY CANYON & CLIFF ENVIRONMENT ---
+        let rockGeometry = null;
+
+        function initRockGeometry() {
+            // Procedural natural cliff strata so it looks like weathered canyon rock
+            const leftSegments = [];
+            const rightSegments = [];
+            const steps = 18;
+
+            for (let i = 0; i <= steps; i++) {
+                const y = (height / steps) * i;
+                const jagL = Math.sin(i * 1.7) * 16 + Math.cos(i * 3.1) * 8;
+                const jagR = Math.cos(i * 1.9) * 16 + Math.sin(i * 2.8) * 8;
+                leftSegments.push({ x: damLeft + jagL, y });
+                rightSegments.push({ x: damLeft + damWidth + jagR, y });
             }
-            splashes.push({
-                x, y,
-                radius: 2,
-                maxRadius: 10 + Math.random() * 10,
-                alpha: 0.5,
-                isRing: true
-            });
+            rockGeometry = { left: leftSegments, right: rightSegments };
         }
 
-        function updateSplashes() {
-            for (let i = splashes.length - 1; i >= 0; i--) {
-                const s = splashes[i];
-                if (s.isRing) {
-                    s.radius += 0.9;
-                    s.alpha -= 0.03;
-                    if (s.alpha <= 0 || s.radius >= s.maxRadius) splashes.splice(i, 1);
-                } else {
-                    s.vy += GRAVITY * 0.6;
-                    s.x += s.vx;
-                    s.y += s.vy;
-                    s.alpha -= 0.025;
-                    if (s.alpha <= 0 || s.y > damBottom + 30) splashes.splice(i, 1);
-                }
-            }
-        }
-
-        function drawSplashes() {
-            for (let s of splashes) {
-                ctx.beginPath();
-                if (s.isRing) {
-                    ctx.strokeStyle = `rgba(220, 250, 255, ${Math.max(s.alpha, 0)})`;
-                    ctx.lineWidth = 1.5;
-                    ctx.ellipse(s.x, s.y, s.radius, s.radius * 0.35, 0, 0, Math.PI * 2);
-                    ctx.stroke();
-                } else {
-                    ctx.fillStyle = `rgba(210, 245, 255, ${Math.max(s.alpha, 0)})`;
-                    ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
-        }
-
-        function drawEnvironment() {
-            ctx.fillStyle = '#060f09';
+        function drawEnvironment(theme, flowSpeedMult = 1.0) {
+            // 1. Far Sky / Gorge Background
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, damTop);
+            skyGrad.addColorStop(0, theme.skyTop);
+            skyGrad.addColorStop(1, theme.skyBottom);
+            ctx.fillStyle = skyGrad;
             ctx.fillRect(0, 0, width, height);
 
-            // Wall/fall background behind the dam channel, from the deepest point of the
-            // curved crest down to the pool
-            let wallGrad = ctx.createLinearGradient(0, damTop, 0, damBottom);
-            wallGrad.addColorStop(0, '#121415');
-            wallGrad.addColorStop(1, '#070809');
-            ctx.fillStyle = wallGrad;
-            ctx.fillRect(damLeft, damTop, damWidth, damBottom - damTop);
+            // 2. Wet Rock Face Behind Waterfall
+            const cliffGrad = ctx.createLinearGradient(0, damTop, 0, damBottom);
+            cliffGrad.addColorStop(0, theme.cliffHighlight);
+            cliffGrad.addColorStop(0.35, theme.cliffBase);
+            cliffGrad.addColorStop(0.8, '#080c09');
+            cliffGrad.addColorStop(1, '#040705');
+            ctx.fillStyle = cliffGrad;
+            ctx.fillRect(damLeft - 20, damTop, damWidth + 40, damBottom - damTop);
 
-            // Reservoir - fills everything above the arced spillway crest
-            let topGrad = ctx.createLinearGradient(0, 0, 0, damTop + archDepth);
-            topGrad.addColorStop(0, '#0a2116');
-            topGrad.addColorStop(1, '#184732');
+            // Subtle vertical wet rock grooves/crevices behind water
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+            ctx.lineWidth = 3;
+            for (let i = 1; i <= 6; i++) {
+                const gx = damLeft + (damWidth / 7) * i + Math.sin(i * 9) * 20;
+                ctx.beginPath();
+                ctx.moveTo(gx, damTop);
+                ctx.lineTo(gx + Math.sin(i * 3) * 15, damBottom);
+                ctx.stroke();
+            }
+
+            // 3. Top River Reservoir (Source Water Rushing to the Lip)
+            const topGrad = ctx.createLinearGradient(0, 0, 0, damTop + archDepth);
+            topGrad.addColorStop(0, `rgba(${theme.waterDeep}, 0.95)`);
+            topGrad.addColorStop(0.65, `rgba(${theme.waterMid}, 0.85)`);
+            topGrad.addColorStop(1, `rgba(${theme.waterHighlight}, 0.6)`);
             ctx.fillStyle = topGrad;
+
             ctx.beginPath();
             ctx.moveTo(0, 0);
             ctx.lineTo(width, 0);
             ctx.lineTo(width, crestY(width));
-            for (let x = damLeft + damWidth; x >= damLeft; x -= 8) {
+            for (let x = damLeft + damWidth + 20; x >= damLeft - 20; x -= 10) {
                 ctx.lineTo(x, crestY(x));
             }
             ctx.lineTo(0, crestY(0));
             ctx.closePath();
             ctx.fill();
 
-            // Concrete Side Walls (canyon)
-            ctx.fillStyle = '#26282a';
-            ctx.fillRect(0, 0, damLeft, height);
-            ctx.fillRect(damLeft + damWidth, 0, damLeft, height);
-
-            // Concrete Dam Lip - follows the curved crest
-            ctx.beginPath();
-            ctx.moveTo(damLeft - 4, crestY(damLeft) - 3);
-            for (let x = damLeft; x <= damLeft + damWidth; x += 8) {
-                ctx.lineTo(x, crestY(x) - 3);
+            // Rushing ripples in top river flowing forward to the lip
+            const riverSpeed = 1.2 * flowSpeedMult;
+            const riverSpacing = 20;
+            const riverPhase = (flowTime * riverSpeed) % riverSpacing;
+            ctx.strokeStyle = `rgba(${theme.waterHighlight}, 0.32)`;
+            ctx.lineWidth = 2;
+            for (let y = 10 + riverPhase; y < damTop + 8; y += riverSpacing) {
+                if (y < 8) continue;
+                ctx.beginPath();
+                const waveShift = Math.sin(y * 0.06 + flowTime * 0.04) * 8;
+                ctx.moveTo(damLeft + 6 + waveShift, y);
+                ctx.lineTo(damLeft + damWidth - 6 + waveShift, y);
+                ctx.stroke();
             }
-            ctx.lineTo(damLeft + damWidth + 4, crestY(damLeft + damWidth) - 3);
-            ctx.strokeStyle = '#4d5256';
-            ctx.lineWidth = 7;
+
+            // 4. Natural Weathered Canyon Walls (Left & Right)
+            if (rockGeometry) {
+                ctx.fillStyle = theme.canyonWall;
+
+                // Left Canyon Wall
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                for (let pt of rockGeometry.left) ctx.lineTo(pt.x, pt.y);
+                ctx.lineTo(0, height);
+                ctx.closePath();
+                ctx.fill();
+
+                // Left Canyon Shadow & Moss Accent
+                ctx.fillStyle = theme.canyonShadow;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                for (let pt of rockGeometry.left) ctx.lineTo(pt.x - 14, pt.y);
+                ctx.lineTo(0, height);
+                ctx.closePath();
+                ctx.fill();
+
+                // Right Canyon Wall
+                ctx.fillStyle = theme.canyonWall;
+                ctx.beginPath();
+                ctx.moveTo(width, 0);
+                for (let pt of rockGeometry.right) ctx.lineTo(pt.x, pt.y);
+                ctx.lineTo(width, height);
+                ctx.closePath();
+                ctx.fill();
+
+                // Right Canyon Shadow
+                ctx.fillStyle = theme.canyonShadow;
+                ctx.beginPath();
+                ctx.moveTo(width, 0);
+                for (let pt of rockGeometry.right) ctx.lineTo(pt.x + 14, pt.y);
+                ctx.lineTo(width, height);
+                ctx.closePath();
+                ctx.fill();
+
+                // Organic Moss patches on rock edge
+                ctx.fillStyle = theme.canyonMoss;
+                ctx.globalAlpha = 0.45;
+                for (let i = 2; i < rockGeometry.left.length - 2; i += 3) {
+                    const ptL = rockGeometry.left[i];
+                    ctx.beginPath();
+                    ctx.arc(ptL.x - 10, ptL.y, 16, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    const ptR = rockGeometry.right[i];
+                    ctx.beginPath();
+                    ctx.arc(ptR.x + 10, ptR.y, 16, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1.0;
+            }
+
+            // 5. Curved Granite Lip Crest of the Falls
+            ctx.beginPath();
+            ctx.moveTo(damLeft - 8, crestY(damLeft) - 2);
+            for (let x = damLeft; x <= damLeft + damWidth; x += 10) {
+                ctx.lineTo(x, crestY(x) - 2);
+            }
+            ctx.lineTo(damLeft + damWidth + 8, crestY(damLeft + damWidth) - 2);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+            ctx.lineWidth = 4;
             ctx.lineCap = 'round';
             ctx.stroke();
         }
 
-        // A soft, continuous midtone wash across the whole falling-water channel so the
-        // gaps between individual strands read as blended water, not the dark wall behind them
-        function drawWaterWash() {
+        // Base semi-translucent flowing water wash across the whole waterfall channel
+        function drawWaterWash(theme, flowSpeedMult = 1.0) {
             ctx.beginPath();
             ctx.moveTo(damLeft, crestY(damLeft));
-            for (let x = damLeft; x <= damLeft + damWidth; x += 8) {
+            for (let x = damLeft; x <= damLeft + damWidth; x += 10) {
                 ctx.lineTo(x, crestY(x));
             }
             ctx.lineTo(damLeft + damWidth, damBottom);
             ctx.lineTo(damLeft, damBottom);
             ctx.closePath();
 
-            let grad = ctx.createLinearGradient(0, damTop, 0, damBottom);
-            grad.addColorStop(0, 'rgba(30, 90, 130, 0.40)');
-            grad.addColorStop(1, 'rgba(55, 120, 155, 0.55)');
+            const grad = ctx.createLinearGradient(0, damTop, 0, damBottom);
+            grad.addColorStop(0, `rgba(${theme.waterMid}, 0.35)`);
+            grad.addColorStop(0.5, `rgba(${theme.waterDeep}, 0.55)`);
+            grad.addColorStop(1, `rgba(${theme.waterMid}, 0.70)`);
             ctx.fillStyle = grad;
             ctx.fill();
+
+            // Downward-scrolling subtle current striations for authentic fluid motion
+            ctx.save();
+            ctx.clip();
+            const bandSpacing = 64;
+            const bandOffset = (flowTime * 6.5 * flowSpeedMult) % bandSpacing;
+            ctx.fillStyle = `rgba(${theme.waterHighlight}, 0.05)`;
+            for (let y = damTop + bandOffset - bandSpacing; y < damBottom + bandSpacing; y += bandSpacing) {
+                ctx.fillRect(damLeft, y, damWidth, 22);
+            }
+            ctx.restore();
         }
 
-        function drawBottomPool() {
-            let poolGrad = ctx.createLinearGradient(0, damBottom, 0, height);
-            poolGrad.addColorStop(0, '#11291e');
-            poolGrad.addColorStop(1, '#040a07');
+        // Deep Bottom Plunge Pool with Wave Reflections
+        function drawPlungePool(theme) {
+            const poolGrad = ctx.createLinearGradient(0, damBottom - 10, 0, height);
+            poolGrad.addColorStop(0, theme.poolTop);
+            poolGrad.addColorStop(0.3, theme.poolBottom);
+            poolGrad.addColorStop(1, '#020403');
             ctx.fillStyle = poolGrad;
-            ctx.fillRect(0, damBottom, width, height - damBottom);
+            ctx.fillRect(0, damBottom - 10, width, height - damBottom + 10);
 
-            // Billowing mist where the falls hit the pool
-            drawMist();
+            // Churning Whitewater Boiling Zone where falls strike pool
+            const boilGrad = ctx.createLinearGradient(0, damBottom - 12, 0, damBottom + 35);
+            boilGrad.addColorStop(0, `rgba(${theme.foamBase}, 0.85)`);
+            boilGrad.addColorStop(0.45, `rgba(${theme.waterHighlight}, 0.55)`);
+            boilGrad.addColorStop(1, `rgba(${theme.waterDeep}, 0)`);
+            ctx.fillStyle = boilGrad;
+            ctx.fillRect(damLeft - 10, damBottom - 12, damWidth + 20, 48);
 
-            // Touch Indicators
-            for (let touch of activeTouches) {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            // Shimmering Foam Tendrils in the plunge pool
+            ctx.fillStyle = `rgba(${theme.foamBase}, 0.35)`;
+            for (let x = damLeft; x <= damLeft + damWidth; x += 28) {
+                const waveY = damBottom + Math.sin(flowTime * 0.08 + x * 0.04) * 6;
                 ctx.beginPath();
-                ctx.arc(touch.x, touch.y, touch.r, 0, Math.PI * 2);
+                ctx.ellipse(x, waveY, 18, 5, 0, 0, Math.PI * 2);
                 ctx.fill();
+            }
 
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-                ctx.lineWidth = 2;
-                ctx.stroke();
+            // Draw expanding wave ripples
+            for (let i = poolRipples.length - 1; i >= 0; i--) {
+                const rip = poolRipples[i];
+                if (rip.update()) rip.draw(theme);
+                else poolRipples.splice(i, 1);
+            }
+
+            // Draw billowing plunge pool mist
+            drawMist(theme);
+
+            // Sunlight atmospheric rainbow prism (when in Daylight theme)
+            if (theme.hasRainbow) {
+                drawRainbow();
             }
         }
 
+        // Atmospheric Sunlight God Rays & Rainbow Prism in the Mist
+        function drawRainbow() {
+            ctx.save();
+            ctx.globalAlpha = 0.22;
+            const rx = damLeft + damWidth * 0.55;
+            const ry = damBottom + 15;
+            const rainbowColors = [
+                'rgba(255, 60, 60, 0.4)',
+                'rgba(255, 175, 40, 0.4)',
+                'rgba(255, 255, 60, 0.4)',
+                'rgba(60, 240, 100, 0.4)',
+                'rgba(60, 180, 255, 0.4)',
+                'rgba(180, 80, 255, 0.4)'
+            ];
+
+            for (let i = 0; i < rainbowColors.length; i++) {
+                ctx.beginPath();
+                ctx.arc(rx, ry, 70 + i * 7, Math.PI * 1.15, Math.PI * 1.85);
+                ctx.strokeStyle = rainbowColors[i];
+                ctx.lineWidth = 7;
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        // --- INTERACTIVE TOUCH AURA & OBSTACLE VISUALS ---
+        function drawTouchAuras(theme) {
+            let totalVelocity = 0;
+
+            for (let touch of touches.values()) {
+                totalVelocity += touch.speed;
+
+                // 1. Water Splashes Spawning on Obstacle Impact (Water hitting the top rim of finger)
+                if (Math.random() < 0.75) {
+                    const impactX = touch.x + (Math.random() - 0.5) * touch.r * 1.3;
+                    const impactY = touch.y - touch.r * 0.85;
+                    spawnSplashBurst(impactX, impactY, 2, 4 + Math.random() * 3, -Math.PI / 2, 1.4, theme.foamBase);
+                }
+
+                // 2. Translucent Deflection Aura under touch
+                const auraGrad = ctx.createRadialGradient(touch.x, touch.y, 0, touch.x, touch.y, touch.r * 1.35);
+                auraGrad.addColorStop(0, `rgba(${theme.waterHighlight}, 0.25)`);
+                auraGrad.addColorStop(0.7, `rgba(${theme.waterMid}, 0.35)`);
+                auraGrad.addColorStop(1, `rgba(${theme.waterDeep}, 0)`);
+
+                ctx.fillStyle = auraGrad;
+                ctx.beginPath();
+                ctx.arc(touch.x, touch.y, touch.r * 1.35, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 3. Frothy Bow Wave Spray Arc along top edge of finger
+                ctx.beginPath();
+                ctx.arc(touch.x, touch.y, touch.r + 3, Math.PI * 1.05, Math.PI * 1.95);
+                ctx.strokeStyle = `rgba(${theme.foamBase}, 0.95)`;
+                ctx.lineWidth = 4.5;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+
+                // Inner refraction highlight ring
+                ctx.beginPath();
+                ctx.arc(touch.x, touch.y, touch.r - 2, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(${theme.waterHighlight}, 0.65)`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // 4. Whitewater Froth in Wake Downstream where separated flows rejoin
+                const wakeY = touch.y + touch.r * 2.8;
+                if (wakeY < damBottom) {
+                    ctx.fillStyle = `rgba(${theme.foamBase}, 0.45)`;
+                    ctx.beginPath();
+                    ctx.ellipse(touch.x, wakeY, 12, 5, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Update real-time audio modulation based on active touches
+            audio.updateTouchModulation(touches.size, totalVelocity);
+        }
+
+        // --- MAIN ANIMATION & SIMULATION LOOP ---
         function animate() {
             ctx.clearRect(0, 0, width, height);
 
-            drawEnvironment();
-            drawWaterWash();
+            const theme = THEMES[currentThemeIndex];
+            const flow = FLOW_RATES[currentFlowIndex];
 
             flowTime += 1;
 
-            ctx.save();
-            ctx.filter = 'blur(7px)';
-            for (let s of bodyStrands) drawStrand(s);
-            ctx.restore();
+            // 1. Natural Environment & Canyon
+            drawEnvironment(theme, flow.multiplier);
 
-            ctx.save();
-            ctx.filter = 'blur(4px)';
-            for (let s of highlightStrands) drawStrand(s);
-            ctx.restore();
+            // 2. Base Translucent Water Sheet Wash
+            drawWaterWash(theme, flow.multiplier);
 
-            for (let f of foamPatches) { f.update(); f.draw(); }
-
-            // Continuous foam spray where the river hits the pool, instead of
-            // per-droplet impact events (there are no discrete droplets anymore)
-            if (Math.random() < 0.6) {
-                spawnSplash(damLeft + Math.random() * damWidth, damBottom, 5 + Math.random() * 4);
+            // 3. Falling Whitewater Strands & Cascades
+            for (let s of strands) {
+                drawStrand(s, theme, flow.multiplier);
             }
-            updateSplashes();
-            drawBottomPool();
-            drawSplashes();
+
+            // 4. Cascading High-Speed Droplets & Foam Globules
+            for (let d of droplets) {
+                d.update(flow.multiplier);
+                d.draw(theme);
+            }
+
+            // 5. Active Touch Obstacles, Deflection Auras & Wake Froth
+            drawTouchAuras(theme);
+
+            // 6. Continuous Plunge Pool Impact Droplets
+            if (Math.random() < flow.sprayRate) {
+                const impactX = damLeft + Math.random() * damWidth;
+                spawnSplashBurst(impactX, damBottom - 2, 2, 3.5 + Math.random() * 3, -Math.PI / 2, 1.2, theme.foamBase);
+                if (Math.random() < 0.25) {
+                    spawnPoolRipple(impactX, damBottom + 5, 30 + Math.random() * 25, 0.8);
+                }
+            }
+
+            // 7. Update and Render Splash Droplets
+            for (let i = splashParticles.length - 1; i >= 0; i--) {
+                const p = splashParticles[i];
+                if (p.update()) p.draw();
+                else splashParticles.splice(i, 1);
+            }
+
+            // 8. Plunge Pool, Impact Boil, Expanding Ripples & Billowing Mist
+            drawPlungePool(theme);
 
             requestAnimationFrame(animate);
         }
 
-        animate();
+        // --- DOCK CONTROLS & EVENT LISTENERS ---
+        const btnSound = document.getElementById('btn-sound');
+        const soundIcon = document.getElementById('sound-icon');
+        const soundText = document.getElementById('sound-text');
+
+        btnSound.addEventListener('click', () => {
+            const isPlaying = audio.toggle();
+            soundIcon.textContent = isPlaying ? '🔊' : '🔇';
+            soundText.textContent = isPlaying ? 'Sound On' : 'Muted';
+            btnSound.classList.toggle('active', isPlaying);
+        });
+
+        const btnTheme = document.getElementById('btn-theme');
+        const themeIcon = document.getElementById('theme-icon');
+        const themeText = document.getElementById('theme-text');
+
+        btnTheme.addEventListener('click', () => {
+            currentThemeIndex = (currentThemeIndex + 1) % THEMES.length;
+            const t = THEMES[currentThemeIndex];
+            themeIcon.textContent = t.icon;
+            themeText.textContent = t.name;
+        });
+
+        const btnFlow = document.getElementById('btn-flow');
+        const flowText = document.getElementById('flow-text');
+
+        btnFlow.addEventListener('click', () => {
+            currentFlowIndex = (currentFlowIndex + 1) % FLOW_RATES.length;
+            const f = FLOW_RATES[currentFlowIndex];
+            flowText.textContent = f.label;
+            rebuildStrands();
+            rebuildDroplets();
+        });
+
+        const btnClear = document.getElementById('btn-clear');
+        btnClear.addEventListener('click', () => {
+            touches.clear();
+            splashParticles.length = 0;
+            poolRipples.length = 0;
+        });
+
+        // Initialize and Start
+        resize();
+        rebuildStrands();
+        rebuildDroplets();
+        initMist();
+        requestAnimationFrame(animate);
     </script>
+
+    <!-- Site Analytics Tracking -->
     <script>window.GAME_NAME = "Water Falling";</script>
     <script src="analytics.js" defer></script>
 </body>
