@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Co-Op Rover Survival</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="preload" href="assets/sprites/military_truck_sheet_8.png?v=8way2" as="image">
+  <!-- WebRTC Library for P2P -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body>
+  <div id="ui-layer">
+    <!-- SCREEN 1: MODE SELECT -->
+    <div id="lobby-main" class="lobby-screen">
+      <h2>Symbiotic Treads</h2>
+      <p class="lobby-sub">Base Fortification & Wasteland Co-Op</p>
+      <button id="btn-menu-single" class="primary-btn">👤 Single Player</button>
+      <br><br>
+      <button id="btn-menu-multi" class="secondary-btn">👥 Multiplayer (P2P)</button>
+    </div>
+
+    <!-- SCREEN 2A: SINGLE PLAYER ROLE SELECT -->
+    <div id="lobby-single" class="lobby-screen" style="display: none;">
+      <h2>Select Your Role</h2>
+      <p class="lobby-sub">Choose your starting focus (toggle anytime with Tab)</p>
+      
+      <button id="btn-select-rover" class="role-card">
+        <div class="role-title">🚜 The Rover (Scavenger)</div>
+        <div class="role-desc">Explore the dark wasteland. Mine scrap nodes, collect energy cells, retrieve tech cores, and return to base.</div>
+      </button>
+
+      <button id="btn-select-base" class="role-card" style="margin-top: 8px;">
+        <div class="role-title">🏰 The Base (Commander)</div>
+        <div class="role-desc">Command the central fortress. Build walls and fences, place sentry turrets, route power, and hold the perimeter.</div>
+      </button>
+
+      <button id="btn-back-single" class="secondary-btn" style="margin-top: 14px;">⬅ Back to Menu</button>
+    </div>
+
+    <!-- SCREEN 2B: MULTIPLAYER OPTIONS -->
+    <div id="lobby-multi" class="lobby-screen" style="display: none;">
+      <h2>Multiplayer Co-Op</h2>
+      <p class="lobby-sub">Peer-to-peer browser connection</p>
+
+      <div id="host-panel">
+        <button id="btn-host-action" class="primary-btn">🚀 Host Game (Base Commander)</button>
+        <div id="host-code-display" style="display: none; margin-top: 8px; background: #0f172a; padding: 10px; border-radius: 6px; border: 1px solid #38bdf8; text-align: center;">
+          <div style="font-size: 11px; color: #94a3b8;">Share this Room Code with Partner:</div>
+          <div id="room-code-badge" style="font-size: 17px; font-weight: bold; color: #38bdf8; letter-spacing: 2px; margin: 6px 0; font-family: monospace;">Generating...</div>
+          <button id="btn-copy-code" class="secondary-btn" style="padding: 4px 10px; font-size: 11px; width: auto; display: inline-block;">📋 Copy Code</button>
+          <div id="host-status" style="font-size: 11px; color: #f59e0b; margin-top: 6px;">Waiting for Scavenger to join...</div>
+        </div>
+      </div>
+
+      <div style="margin: 14px 0; border-top: 1px solid #334155; padding-top: 12px;">
+        <input type="text" id="input-join-code" placeholder="Enter Room Code (e.g. base-abc12)">
+        <button id="btn-join-action">🔗 Join Game (Rover Scavenger)</button>
+      </div>
+
+      <button id="btn-back-multi" class="secondary-btn">⬅ Back to Menu</button>
+    </div>
+
+  </div>
+
+  <!-- SURGE ALERT BANNER -->
+  <div id="surge-alert-banner" style="display: none;">
+    <div class="surge-icon">🚨</div>
+    <div class="surge-content">
+      <div id="surge-title" class="surge-title">SURGE ALERT: INCOMING HORDE</div>
+      <div id="surge-sub" class="surge-sub">Massive swarm detected. Time until breach: <span id="surge-timer-txt">25s</span></div>
+    </div>
+  </div>
+
+  
+  <canvas id="gameCanvas" width="1280" height="720"></canvas>
+  
+  <!-- Classic script runs everywhere without file:// CORS restrictions -->
+  <script src="js/game.js"></script>
+  <script>window.GAME_NAME = "Symbiotic Treads";</script>
+  <script src="../analytics.js" defer></script>
+</body>
+</html>
