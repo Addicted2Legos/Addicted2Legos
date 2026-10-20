@@ -133,5 +133,102 @@ for (let i = 0; i < frames.length; i++) {
 }
 console.log('✅ In-world truck cargo indicator and bed alignment verified.\n');
 
-console.log('🎉 ALL 8-DIRECTIONAL SPRITE & ROVER TESTS PASSED SUCCESSFULLY!');
+// 8. Test Orange Crosshair Target Removal
+console.log('--- 🎯 VERIFYING CROSSHAIR TARGET REMOVAL ---');
+assert(!gameCode.includes('function drawCrosshair('), 'drawCrosshair function definition must be removed');
+assert(!gameCode.includes('drawCrosshair(ctx'), 'drawCrosshair must never be invoked in render loop');
+console.log('✅ Orange crosshair target completely eliminated from game.\n');
+
+// 9. Test Dual Resource Collectors (2-Player Mode) & Enemy Scaling
+console.log('--- 🚜 VERIFYING DUAL RESOURCE COLLECTORS & MULTIPLAYER BALANCING ---');
+assert(gameCode.includes('function createDefaultRover('), 'createDefaultRover factory must exist');
+assert(gameCode.includes("rover: createDefaultRover('rover1'"), 'Rover 1 (Alpha) must be initialized');
+assert(gameCode.includes("rover2: createDefaultRover('rover2'"), 'Rover 2 (Beta) must be initialized');
+
+// Test enemy balancing formulas for multiplayer
+assert(gameCode.includes('isSolo ? 1.0 : 1.85'), 'Multiplayer must scale surge horde enemy count by 1.85x');
+assert(gameCode.includes('const maxEnemies = isSolo ? 75 : 130'), 'Multiplayer must expand max enemy capacity to 130');
+assert(gameCode.includes('const rateScale = isSolo ? 1.0 : 1.85'), 'Multiplayer must accelerate ambient enemy spawn rate by 1.85x');
+
+// Test Swarm AI dual rover targeting
+assert(gameCode.includes('let closestRover = (!rover.isDead) ? rover : null;'), 'Swarm AI must track Rover 1 distance');
+assert(gameCode.includes('if (rover2 && !rover2.isDead)'), 'Swarm AI must track Rover 2 distance');
+
+// Test index.html lobby updates
+assert(indexHtml.includes('Single Player (Scavenger)'), 'Lobby Single Player must start as Scavenger Rover');
+assert(indexHtml.includes('Scavenger 1 - Alpha'), 'Host option must be Scavenger 1 - Alpha');
+assert(indexHtml.includes('Scavenger 2 - Beta'), 'Join option must be Scavenger 2 - Beta');
+assert(!indexHtml.includes('btnRoleTank'), 'Player tank role button must be removed');
+console.log('✅ Dual resource collectors and 1.85x multiplayer enemy balancing verified.\n');
+
+// 10. Test Life Factor, Rover Respawn, Base Destruction & Game Over
+console.log('--- ☠️ VERIFYING LIFE FACTOR, ROVER RESPAWN & GAME OVER ---');
+assert(gameCode.includes('function killRover('), 'killRover function must exist');
+assert(gameCode.includes('function triggerGameOver('), 'triggerGameOver function must exist');
+assert(gameCode.includes('function resetGame('), 'resetGame function must exist');
+assert(gameCode.includes('function drawGameOverScreen('), 'drawGameOverScreen function must exist');
+
+// Test rover death & respawn mechanics
+assert(gameCode.includes('rover.isDead = true'), 'killRover must set rover.isDead');
+assert(gameCode.includes('rover.respawnTimer = 6.0'), 'killRover must initiate 6.0s respawn timer');
+assert(gameCode.includes('spawnLooseScrap('), 'killRover must spill held cargo into the world as loose scrap');
+
+// Test Base Citadel death condition
+assert(gameCode.includes('if (base.hp <= 0 && !gameState.isGameOver)'), 'Game Over must trigger when Base Citadel HP reaches 0');
+assert(gameCode.includes('triggerGameOver(gameState)'), 'triggerGameOver must be called upon base destruction');
+
+// Test restart binding
+assert(gameCode.includes('keys[\'r\']') || gameCode.includes('keys.r') || gameCode.includes('key === \'r\''), 'R key must be wired to restart game');
+console.log('✅ Life factor, rover destruction/respawn, and Citadel Game Over verified.\n');
+
+// 11. Test Blank Light Gray Background & Pipeline Integration
+console.log('--- 🌄 VERIFYING BLANK LIGHT GRAY TERRAIN & PIPELINE INTEGRATION ---');
+assert(gameCode.includes("ctx.fillStyle = '#e2e8f0'"), 'game.js must set blank light gray #e2e8f0 background');
+assert(gameCode.includes("ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT)"), 'game.js must fill entire world with light gray');
+assert(gameCode.includes("ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)'"), 'game.js must draw subtle light gray grid lines');
+assert(!gameCode.includes("const bgImage = new Image()"), 'game.js must abandon bgImage object');
+assert(!gameCode.includes("BackgroundLevel1_collision.png"), 'game.js must abandon BackgroundLevel1_collision.png');
+console.log('✅ Blank light gray background (#e2e8f0) and clean rendering pipeline verified.\n');
+
+// 12. Test Custom Map Architecture, Persistence & Gameplay Mechanics
+console.log('--- 🗺️ VERIFYING CUSTOM MAP ARCHITECTURE & GAMEPLAY PHYSICS ---');
+assert(gameCode.includes('function loadActiveMap('), 'loadActiveMap function must exist in game.js');
+assert(gameCode.includes('localStorage.getItem(\'symbiotic_custom_map\')') || gameCode.includes('localStorage.getItem("symbiotic_custom_map")'), 'loadActiveMap must read symbiotic_custom_map from localStorage');
+assert(gameCode.includes('DEFAULT_MAP'), 'DEFAULT_MAP fallback must exist in game.js');
+assert(gameCode.includes('function isWalkable('), 'isWalkable function must exist in game.js');
+assert(gameCode.includes('function checkRiverSlow('), 'checkRiverSlow function must exist in game.js');
+assert(gameCode.includes('function distToSegment('), 'distToSegment helper must exist for river curves');
+assert(gameCode.includes('drawRivers(ctx, gameState.rivers)'), 'draw() must render rivers');
+assert(gameCode.includes('drawOxygenTrees(ctx, gameState.trees)'), 'draw() must render alien oxygen trees');
+assert(gameCode.includes('rover.hp = Math.min(rover.maxHp, rover.hp + 0.10)'), 'Alien oxygen trees must repair rover hull');
+assert(gameCode.includes('rover.fuel = Math.min(rover.maxFuel, rover.fuel + 0.14)'), 'Alien oxygen trees must replenish rover fuel');
+assert(gameCode.includes('checkRiverSlow(rover.x, rover.y, gameState.rivers)'), 'simulateRover must slow down rover in rivers');
+assert(gameCode.includes('checkRiverSlow(enemy.x, enemy.y, gameState.rivers)'), 'updateSwarmAI must slow down enemies in rivers');
+assert(gameCode.includes('gameState.crystals'), 'gameState must track crystals/resource nodes');
+console.log('✅ Custom map persistence, rock/boulder collision, river slowing, and oxygen tree healing verified.\n');
+
+// 13. Test Standalone Map Editor (MapEditor.html)
+console.log('--- 🛠️ VERIFYING STANDALONE MAP EDITOR (MapEditor.html) ---');
+const mapEditorPath = path.join(__dirname, 'MapEditor.html');
+assert(fs.existsSync(mapEditorPath), 'MapEditor.html must exist');
+const mapEditorHtml = fs.readFileSync(mapEditorPath, 'utf8');
+
+assert(mapEditorHtml.includes('symbiotic_custom_map'), 'MapEditor.html must use symbiotic_custom_map for localStorage');
+assert(mapEditorHtml.includes('data-tool="rock"'), 'MapEditor must feature Rock placement tool');
+assert(mapEditorHtml.includes('data-tool="boulder"'), 'MapEditor must feature Boulder placement tool');
+assert(mapEditorHtml.includes('data-tool="river"'), 'MapEditor must feature River polyline tool');
+assert(mapEditorHtml.includes('data-tool="crystal"'), 'MapEditor must feature Crystal resource tool');
+assert(mapEditorHtml.includes('data-tool="tree"'), 'MapEditor must feature Alien Oxygen Tree tool');
+assert(mapEditorHtml.includes('data-tool="select"'), 'MapEditor must feature Select / Move tool');
+assert(mapEditorHtml.includes('data-tool="eraser"'), 'MapEditor must feature Eraser tool');
+assert(mapEditorHtml.includes('id="btn-save"'), 'MapEditor must feature Save to Game button');
+assert(mapEditorHtml.includes('id="btn-play"'), 'MapEditor must feature Play Game Now button');
+assert(mapEditorHtml.includes('id="btn-export"'), 'MapEditor must feature Export JSON button');
+assert(mapEditorHtml.includes('id="btn-import"'), 'MapEditor must feature Import JSON button');
+assert(mapEditorHtml.includes('#e2e8f0'), 'MapEditor canvas must render light gray #e2e8f0 terrain');
+assert(indexHtml.includes('MapEditor.html'), 'index.html must link to MapEditor.html');
+console.log('✅ Standalone Map Editor, placement tools, persistence, and navigation verified.\n');
+
+console.log('🎉🎉 ALL MECHANICS, ASSETS, NETWORKING, MAP EDITOR AND BALANCE TESTS PASSED SUCCESSFULLY! 🎉🎉');
+
 

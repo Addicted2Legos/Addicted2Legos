@@ -14,48 +14,32 @@
     <!-- SCREEN 1: MODE SELECT -->
     <div id="lobby-main" class="lobby-screen">
       <h2>Symbiotic Treads</h2>
-      <p class="lobby-sub">Base Fortification & Wasteland Co-Op</p>
-      <button id="btn-menu-single" class="primary-btn">👤 Single Player</button>
+      <p class="lobby-sub">Wasteland Fortification & Scavenger Survival</p>
+      <button id="btn-menu-single" class="primary-btn">🚜 Single Player (Scavenger)</button>
       <br><br>
-      <button id="btn-menu-multi" class="secondary-btn">👥 Multiplayer (P2P)</button>
+      <button id="btn-menu-multi" class="secondary-btn">👥 2-Player Co-Op (Dual Scavengers)</button>
+      <br><br>
+      <button onclick="window.location.href='MapEditor.html'" class="secondary-btn" style="border-color: #38bdf8; color: #38bdf8;">🗺️ Open Map Editor</button>
     </div>
 
-    <!-- SCREEN 2A: SINGLE PLAYER ROLE SELECT -->
-    <div id="lobby-single" class="lobby-screen" style="display: none;">
-      <h2>Select Your Role</h2>
-      <p class="lobby-sub">Choose your starting focus (toggle anytime with Tab)</p>
-      
-      <button id="btn-select-rover" class="role-card">
-        <div class="role-title">🚜 The Rover (Scavenger)</div>
-        <div class="role-desc">Explore the dark wasteland. Mine scrap nodes, collect energy cells, retrieve tech cores, and return to base.</div>
-      </button>
-
-      <button id="btn-select-base" class="role-card" style="margin-top: 8px;">
-        <div class="role-title">🏰 The Base (Commander)</div>
-        <div class="role-desc">Command the central fortress. Build walls and fences, place sentry turrets, route power, and hold the perimeter.</div>
-      </button>
-
-      <button id="btn-back-single" class="secondary-btn" style="margin-top: 14px;">⬅ Back to Menu</button>
-    </div>
-
-    <!-- SCREEN 2B: MULTIPLAYER OPTIONS -->
+    <!-- SCREEN 2: MULTIPLAYER OPTIONS -->
     <div id="lobby-multi" class="lobby-screen" style="display: none;">
-      <h2>Multiplayer Co-Op</h2>
-      <p class="lobby-sub">Peer-to-peer browser connection</p>
+      <h2>2-Player Co-Op</h2>
+      <p class="lobby-sub">Double the gatherers, 2x build speed, scaled bug swarms!</p>
 
       <div id="host-panel">
-        <button id="btn-host-action" class="primary-btn">🚀 Host Game (Base Commander)</button>
+        <button id="btn-host-action" class="primary-btn">🚀 Host Game (Scavenger 1 - Alpha)</button>
         <div id="host-code-display" style="display: none; margin-top: 8px; background: #0f172a; padding: 10px; border-radius: 6px; border: 1px solid #38bdf8; text-align: center;">
           <div style="font-size: 11px; color: #94a3b8;">Share this Room Code with Partner:</div>
           <div id="room-code-badge" style="font-size: 17px; font-weight: bold; color: #38bdf8; letter-spacing: 2px; margin: 6px 0; font-family: monospace;">Generating...</div>
           <button id="btn-copy-code" class="secondary-btn" style="padding: 4px 10px; font-size: 11px; width: auto; display: inline-block;">📋 Copy Code</button>
-          <div id="host-status" style="font-size: 11px; color: #f59e0b; margin-top: 6px;">Waiting for Scavenger to join...</div>
+          <div id="host-status" style="font-size: 11px; color: #f59e0b; margin-top: 6px;">Waiting for Scavenger 2 to join...</div>
         </div>
       </div>
 
       <div style="margin: 14px 0; border-top: 1px solid #334155; padding-top: 12px;">
         <input type="text" id="input-join-code" placeholder="Enter Room Code (e.g. base-abc12)">
-        <button id="btn-join-action">🔗 Join Game (Rover Scavenger)</button>
+        <button id="btn-join-action">🔗 Join Game (Scavenger 2 - Beta)</button>
       </div>
 
       <button id="btn-back-multi" class="secondary-btn">⬅ Back to Menu</button>

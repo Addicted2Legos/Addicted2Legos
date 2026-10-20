@@ -1,0 +1,1779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Symbiotic Treads — Wasteland Map Editor</title>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --bg-panel: #1e293b;
+      --bg-header: #0b1120;
+      --border-color: #334155;
+      --accent-blue: #38bdf8;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-purple: #ec4899;
+      --accent-red: #ef4444;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* TOP HEADER */
+    header {
+      background: var(--bg-header);
+      border-bottom: 1px solid var(--border-color);
+      height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      z-index: 20;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand h1 {
+      font-size: 17px;
+      letter-spacing: 1px;
+      color: var(--accent-blue);
+      text-transform: uppercase;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .stats-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      font-family: monospace;
+      background: rgba(30, 41, 59, 0.6);
+      padding: 4px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+    }
+
+    .stat-pill {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--text-muted);
+    }
+
+    .stat-pill span {
+      color: var(--accent-blue);
+      font-weight: bold;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button {
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    button:hover {
+      background: #334155;
+      border-color: #64748b;
+    }
+
+    button.btn-primary {
+      background: #0284c7;
+      border-color: var(--accent-blue);
+      color: #ffffff;
+    }
+
+    button.btn-primary:hover {
+      background: #0369a1;
+      border-color: #7dd3fc;
+    }
+
+    button.btn-save {
+      background: #059669;
+      border-color: #34d399;
+      color: #ffffff;
+    }
+
+    button.btn-save:hover {
+      background: #047857;
+    }
+
+    button.btn-danger {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+    }
+
+    button.btn-danger:hover {
+      background: rgba(239, 68, 68, 0.35);
+      color: #ffffff;
+    }
+
+    /* MAIN WORKSPACE */
+    .workspace {
+      display: flex;
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* LEFT SIDEBAR TOOLBOX */
+    .sidebar {
+      width: 290px;
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      padding: 14px;
+      gap: 14px;
+      overflow-y: auto;
+      z-index: 10;
+    }
+
+    .panel-section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .tool-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .tool-btn {
+      padding: 10px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-main);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      transition: all 0.15s ease;
+      text-align: center;
+    }
+
+    .tool-btn .icon {
+      font-size: 20px;
+    }
+
+    .tool-btn:hover {
+      background: #1e293b;
+      border-color: #64748b;
+    }
+
+    .tool-btn.active {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+    }
+
+    /* TOOL OPTIONS PANEL */
+    .options-box {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .option-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .option-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      font-family: monospace;
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent-blue);
+      cursor: pointer;
+    }
+
+    .val-display {
+      font-size: 12px;
+      font-family: monospace;
+      color: var(--accent-blue);
+      min-width: 42px;
+      text-align: right;
+    }
+
+    .tier-select-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .tier-btn {
+      padding: 6px 4px;
+      font-size: 10px;
+      text-align: center;
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+
+    .tier-btn.active.common {
+      background: rgba(245, 158, 11, 0.2);
+      border-color: var(--accent-amber);
+      color: var(--accent-amber);
+    }
+
+    .tier-btn.active.uncommon {
+      background: rgba(6, 182, 212, 0.2);
+      border-color: #06b6d4;
+      color: #06b6d4;
+    }
+
+    .tier-btn.active.rare {
+      background: rgba(236, 72, 153, 0.2);
+      border-color: var(--accent-purple);
+      color: var(--accent-purple);
+    }
+
+    /* GAMEPLAY GUIDE CARD */
+    .guide-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(51, 65, 85, 0.5);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+
+    .guide-card b {
+      color: #e2e8f0;
+    }
+
+    .guide-item {
+      margin-top: 6px;
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+
+    /* CANVAS VIEWPORT CONTAINER */
+    .canvas-container {
+      flex: 1;
+      position: relative;
+      background: #090d16;
+      overflow: hidden;
+      cursor: crosshair;
+    }
+
+    canvas#editorCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      display: block;
+    }
+
+    /* FLOATING VIEWPORT HUD */
+    .viewport-hud {
+      position: absolute;
+      bottom: 14px;
+      right: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(6px);
+      border: 1px solid var(--border-color);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-family: monospace;
+      color: var(--text-muted);
+      z-index: 10;
+    }
+
+    .viewport-hud span {
+      color: var(--accent-blue);
+      font-weight: bold;
+    }
+
+    /* MINIMAP RADAR IN TOP-RIGHT */
+    .radar-box {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 170px;
+      height: 170px;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(6px);
+      border: 1px solid var(--accent-blue);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+      z-index: 10;
+    }
+
+    canvas#radarCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* INSTRUCTIONS PILL */
+    .instructions-pill {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid var(--border-color);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: monospace;
+      z-index: 10;
+    }
+
+    .instructions-pill kbd {
+      background: #1e293b;
+      padding: 2px 5px;
+      border-radius: 4px;
+      border: 1px solid #475569;
+      color: #e2e8f0;
+    }
+
+    /* TOAST NOTIFICATION */
+    #toast {
+      position: fixed;
+      top: 68px;
+      right: 20px;
+      background: #065f46;
+      border: 1px solid #34d399;
+      color: #ecfdf5;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(-10px);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div class="brand">
+      <h1>🗺️ Wasteland Map Editor</h1>
+      <div class="stats-bar">
+        <div class="stat-pill">🪨 Rocks: <span id="stat-rocks">0</span></div>
+        <div class="stat-pill">🗿 Boulders: <span id="stat-boulders">0</span></div>
+        <div class="stat-pill">🌊 Rivers: <span id="stat-rivers">0</span></div>
+        <div class="stat-pill">💎 Crystals: <span id="stat-crystals">0</span></div>
+        <div class="stat-pill">🌳 Trees: <span id="stat-trees">0</span></div>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button id="btn-save" class="btn-save">💾 Save to Game</button>
+      <button id="btn-play" class="btn-primary">▶ Play Game Now</button>
+      <button id="btn-export">📥 Export JSON</button>
+      <button id="btn-import">📤 Import JSON</button>
+      <input type="file" id="file-import-input" accept=".json" style="display: none;">
+      <button id="btn-reset" class="btn-danger">🔄 Reset Default</button>
+      <button id="btn-clear" class="btn-danger">🗑️ Clear Map</button>
+    </div>
+  </header>
+
+  <!-- WORKSPACE -->
+  <div class="workspace">
+    <!-- LEFT TOOLBOX -->
+    <div class="sidebar">
+      <div>
+        <div class="panel-section-title">Placement Tools</div>
+        <div class="tool-grid">
+          <button class="tool-btn active" data-tool="rock">
+            <span class="icon">🪨</span>
+            <span>Rock</span>
+          </button>
+          <button class="tool-btn" data-tool="boulder">
+            <span class="icon">🗿</span>
+            <span>Boulder</span>
+          </button>
+          <button class="tool-btn" data-tool="river">
+            <span class="icon">🌊</span>
+            <span>River</span>
+          </button>
+          <button class="tool-btn" data-tool="crystal">
+            <span class="icon">💎</span>
+            <span>Crystal</span>
+          </button>
+          <button class="tool-btn" data-tool="tree">
+            <span class="icon">🌳</span>
+            <span>Oxygen Tree</span>
+          </button>
+          <button class="tool-btn" data-tool="select">
+            <span class="icon">↖️</span>
+            <span>Select / Move</span>
+          </button>
+          <button class="tool-btn" data-tool="eraser" style="grid-column: span 2;">
+            <span class="icon">❌</span>
+            <span>Eraser / Delete</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- DYNAMIC TOOL OPTIONS -->
+      <div>
+        <div class="panel-section-title" id="options-title">Rock Properties</div>
+        <div class="options-box" id="options-box">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+
+      <!-- GAMEPLAY EFFECTS CARD -->
+      <div class="guide-card">
+        <div style="font-weight: 700; color: var(--accent-blue); margin-bottom: 4px;">🎮 Tactical Elements Guide</div>
+        <div class="guide-item">
+          <span>🪨</span>
+          <div><b>Rocks & Boulders:</b> Impassable barriers. Units slide along edges; blocks enemy passage and projectiles.</div>
+        </div>
+        <div class="guide-item">
+          <span>🌊</span>
+          <div><b>Rivers:</b> Slows rovers & swarm creatures by 40% with water splashing. Ideal natural killzones.</div>
+        </div>
+        <div class="guide-item">
+          <span>💎</span>
+          <div><b>Crystals (Resources):</b> Minable nodes harvested by rovers to produce construction scrap for fortifications.</div>
+        </div>
+        <div class="guide-item">
+          <span>🌳</span>
+          <div><b>Alien Oxygen Trees:</b> Emits a restorative bio-aura that repairs vehicle hull (+6 HP/s) and refuels engines.</div>
+        </div>
+        <div class="guide-item">
+          <span>🏰</span>
+          <div><b>Citadel Base:</b> Located at center (1500, 1500). Maintain open access routes for harvesting.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CANVAS VIEWPORT -->
+    <div class="canvas-container" id="canvas-container">
+      <canvas id="editorCanvas"></canvas>
+
+      <!-- RADAR OVERVIEW -->
+      <div class="radar-box">
+        <canvas id="radarCanvas" width="170" height="170"></canvas>
+      </div>
+
+      <!-- INSTRUCTIONS HELPER -->
+      <div class="instructions-pill">
+        <kbd>Space + Drag</kbd> or <kbd>Middle Drag</kbd> Pan &nbsp;|&nbsp; <kbd>Wheel</kbd> Zoom &nbsp;|&nbsp; <kbd>Del</kbd> Delete &nbsp;|&nbsp; <kbd>Enter</kbd> Finish River
+      </div>
+
+      <!-- HUD STATS -->
+      <div class="viewport-hud">
+        <div>World: <span id="hud-coords">1500, 1500</span></div>
+        &bull;
+        <div>Zoom: <span id="hud-zoom">100%</span></div>
+        <button id="btn-zoom-fit" style="padding: 2px 6px; font-size: 10px;">Fit Map</button>
+        <button id="btn-zoom-100" style="padding: 2px 6px; font-size: 10px;">1:1</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast">
+    <span id="toast-icon">✅</span>
+    <span id="toast-msg">Map Saved Successfully!</span>
+  </div>
+
+  <script>
+    // --- 1. DEFAULT MAP DEFINITION (FALLBACK) ---
+    const DEFAULT_MAP = {
+      version: 1,
+      name: 'Wasteland Basin',
+      worldWidth: 3000,
+      worldHeight: 3000,
+      rocks: [
+        { id: 'rock-w-mid', x: 1140, y: 1500, radius: 55, name: 'West Ridge Rock' },
+        { id: 'rock-w-n1',  x: 1150, y: 1330, radius: 50, name: 'Northwest Outcrop' },
+        { id: 'rock-w-s1',  x: 1150, y: 1670, radius: 50, name: 'Southwest Outcrop' },
+        { id: 'rock-w-n2',  x: 1130, y: 1180, radius: 45, name: 'Northwest Buttress' },
+        { id: 'rock-w-s2',  x: 1130, y: 1820, radius: 45, name: 'Southwest Buttress' },
+        { id: 'rock-n-west', x: 1400, y: 1090, radius: 55, name: 'North Pass West' },
+        { id: 'rock-n-east', x: 1600, y: 1090, radius: 55, name: 'North Pass East' },
+        { id: 'rock-s-west', x: 1400, y: 1910, radius: 55, name: 'South Pass West' },
+        { id: 'rock-s-east', x: 1600, y: 1910, radius: 55, name: 'South Pass East' },
+        { id: 'rock-ne-1',   x: 1720, y: 1140, radius: 50, name: 'Northeast Crag' },
+        { id: 'rock-se-1',   x: 1720, y: 1860, radius: 50, name: 'Southeast Crag' }
+      ],
+      boulders: [
+        { id: 'boulder-w1', x: 620,  y: 1450, radius: 95, name: 'Western Monolith' },
+        { id: 'boulder-e1', x: 2380, y: 1200, radius: 90, name: 'Eastern Plateau A' },
+        { id: 'boulder-e2', x: 2380, y: 1800, radius: 90, name: 'Eastern Plateau B' },
+        { id: 'boulder-nw', x: 1290, y: 1130, radius: 85, name: 'Northwest Mesa' },
+        { id: 'boulder-sw', x: 1290, y: 1870, radius: 85, name: 'Southwest Mesa' }
+      ],
+      rivers: [
+        {
+          id: 'river-main',
+          width: 85,
+          points: [
+            { x: 250, y: 700 },
+            { x: 800, y: 900 },
+            { x: 1350, y: 1020 },
+            { x: 1800, y: 980 },
+            { x: 2300, y: 800 },
+            { x: 2800, y: 750 }
+          ]
+        }
+      ],
+      crystals: [
+        { id: 'crys-1', x: 1320, y: 1400, tier: 'common' },
+        { id: 'crys-2', x: 1320, y: 1600, tier: 'common' },
+        { id: 'crys-3', x: 1680, y: 1400, tier: 'common' },
+        { id: 'crys-4', x: 1680, y: 1600, tier: 'common' },
+        { id: 'crys-5', x: 1050, y: 1200, tier: 'uncommon' },
+        { id: 'crys-6', x: 1950, y: 1200, tier: 'uncommon' },
+        { id: 'crys-7', x: 1050, y: 1800, tier: 'uncommon' },
+        { id: 'crys-8', x: 1950, y: 1800, tier: 'uncommon' },
+        { id: 'crys-9', x: 750,  y: 1500, tier: 'rare' },
+        { id: 'crys-10', x: 2250, y: 1500, tier: 'rare' }
+      ],
+      trees: [
+        { id: 'tree-1', x: 1380, y: 1380, radius: 36, auraRadius: 135 },
+        { id: 'tree-2', x: 1620, y: 1380, radius: 36, auraRadius: 135 },
+        { id: 'tree-3', x: 1380, y: 1620, radius: 36, auraRadius: 135 },
+        { id: 'tree-4', x: 1620, y: 1620, radius: 36, auraRadius: 135 }
+      ]
+    };
+
+    // --- 2. EDITOR STATE & DATA STORAGE ---
+    const STORAGE_KEY = 'symbiotic_custom_map';
+    let mapData = loadMapFromStorage();
+
+    function loadMapFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && (Array.isArray(parsed.rocks) || Array.isArray(parsed.boulders) || Array.isArray(parsed.rivers))) {
+            return {
+              version: 1,
+              name: parsed.name || 'Custom Wasteland',
+              worldWidth: 3000,
+              worldHeight: 3000,
+              rocks: parsed.rocks || [],
+              boulders: parsed.boulders || [],
+              rivers: parsed.rivers || [],
+              crystals: parsed.crystals || [],
+              trees: parsed.trees || []
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('Error reading from storage:', e);
+      }
+      return JSON.parse(JSON.stringify(DEFAULT_MAP));
+    }
+
+    function saveMapToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(mapData));
+        showToast('✅ Map Saved! Changes will take effect when playing.', 'success');
+      } catch (e) {
+        showToast('❌ Failed to save to local storage: ' + e.message, 'error');
+      }
+    }
+
+    // --- 3. CANVAS & VIEWPORT ENGINE ---
+    const container = document.getElementById('canvas-container');
+    const canvas = document.getElementById('editorCanvas');
+    const ctx = canvas.getContext('2d');
+    const radarCanvas = document.getElementById('radarCanvas');
+    const radarCtx = radarCanvas.getContext('2d');
+
+    const WORLD_W = 3000;
+    const WORLD_H = 3000;
+
+    let cameraX = 1500;
+    let cameraY = 1500;
+    let zoom = 0.55;
+
+    let activeTool = 'rock';
+    let toolSettings = {
+      rockRadius: 50,
+      boulderRadius: 90,
+      riverWidth: 85,
+      crystalTier: 'common',
+      treeRadius: 36,
+      treeAura: 135
+    };
+
+    // Active river being constructed
+    let activeRiverPoints = null;
+
+    // Selection
+    let selectedObject = null;
+    let isDraggingObject = false;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+
+    // Pan state
+    let isPanning = false;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+    let spacePressed = false;
+    let mouseWorldPos = { x: 1500, y: 1500 };
+
+    // Resize canvas
+    function resizeCanvas() {
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+      render();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    function worldToScreen(wx, wy) {
+      return {
+        x: (wx - cameraX) * zoom + canvas.width / 2,
+        y: (wy - cameraY) * zoom + canvas.height / 2
+      };
+    }
+
+    function screenToWorld(sx, sy) {
+      return {
+        x: (sx - canvas.width / 2) / zoom + cameraX,
+        y: (sy - canvas.height / 2) / zoom + cameraY
+      };
+    }
+
+    // --- 4. TOOL UI & OPTIONS MANAGEMENT ---
+    const toolBtns = document.querySelectorAll('.tool-btn');
+    toolBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        toolBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeTool = btn.dataset.tool;
+        if (activeRiverPoints && activeTool !== 'river') {
+          activeRiverPoints = null;
+        }
+        if (activeTool !== 'select') {
+          selectedObject = null;
+        }
+        updateOptionsPanel();
+        render();
+      });
+    });
+
+    const optionsBox = document.getElementById('options-box');
+    const optionsTitle = document.getElementById('options-title');
+
+    function updateOptionsPanel() {
+      optionsBox.innerHTML = '';
+
+      if (activeTool === 'rock') {
+        optionsTitle.textContent = 'Rock Properties';
+        optionsBox.innerHTML = `
+          <div class="option-row">
+            <div class="option-label"><span>Radius:</span><span id="opt-rock-val">${toolSettings.rockRadius}px</span></div>
+            <div class="slider-row">
+              <input type="range" id="opt-rock-slider" min="30" max="75" value="${toolSettings.rockRadius}">
+            </div>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted);">Click anywhere on the map to place a defensive rock.</div>
+        `;
+        document.getElementById('opt-rock-slider').oninput = (e) => {
+          toolSettings.rockRadius = parseInt(e.target.value);
+          document.getElementById('opt-rock-val').textContent = toolSettings.rockRadius + 'px';
+        };
+      }
+      else if (activeTool === 'boulder') {
+        optionsTitle.textContent = 'Boulder Properties';
+        optionsBox.innerHTML = `
+          <div class="option-row">
+            <div class="option-label"><span>Radius:</span><span id="opt-boulder-val">${toolSettings.boulderRadius}px</span></div>
+            <div class="slider-row">
+              <input type="range" id="opt-boulder-slider" min="70" max="130" value="${toolSettings.boulderRadius}">
+            </div>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted);">Large monolith obstacle for funneling and choke points.</div>
+        `;
+        document.getElementById('opt-boulder-slider').oninput = (e) => {
+          toolSettings.boulderRadius = parseInt(e.target.value);
+          document.getElementById('opt-boulder-val').textContent = toolSettings.boulderRadius + 'px';
+        };
+      }
+      else if (activeTool === 'river') {
+        optionsTitle.textContent = 'River Polyline Tool';
+        const numPts = activeRiverPoints ? activeRiverPoints.length : 0;
+        optionsBox.innerHTML = `
+          <div class="option-row">
+            <div class="option-label"><span>River Width:</span><span id="opt-river-val">${toolSettings.riverWidth}px</span></div>
+            <div class="slider-row">
+              <input type="range" id="opt-river-slider" min="45" max="160" value="${toolSettings.riverWidth}">
+            </div>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted);">
+            Waypoints placed: <b id="river-pt-count" style="color: var(--accent-blue);">${numPts}</b><br>
+            • Click map to add waypoints<br>
+            • Double-click or click "Finish" to complete<br>
+            • Esc to cancel
+          </div>
+          <div style="display: flex; gap: 6px; margin-top: 4px;">
+            <button id="btn-finish-river" class="btn-primary" style="flex: 1;" ${numPts < 2 ? 'disabled' : ''}>Finish River</button>
+            <button id="btn-cancel-river" class="btn-danger">Cancel</button>
+          </div>
+        `;
+        document.getElementById('opt-river-slider').oninput = (e) => {
+          toolSettings.riverWidth = parseInt(e.target.value);
+          document.getElementById('opt-river-val').textContent = toolSettings.riverWidth + 'px';
+        };
+        const finishBtn = document.getElementById('btn-finish-river');
+        if (finishBtn) {
+          finishBtn.onclick = finishActiveRiver;
+        }
+        const cancelBtn = document.getElementById('btn-cancel-river');
+        if (cancelBtn) {
+          cancelBtn.onclick = () => {
+            activeRiverPoints = null;
+            updateOptionsPanel();
+            render();
+          };
+        }
+      }
+      else if (activeTool === 'crystal') {
+        optionsTitle.textContent = 'Crystal Resource Tier';
+        optionsBox.innerHTML = `
+          <div class="option-row">
+            <div class="option-label"><span>Resource Tier:</span></div>
+            <div class="tier-select-grid">
+              <div class="tier-btn common ${toolSettings.crystalTier === 'common' ? 'active' : ''}" data-tier="common">
+                <b>Common</b><br><span style="font-size: 9px;">Salvage (40)</span>
+              </div>
+              <div class="tier-btn uncommon ${toolSettings.crystalTier === 'uncommon' ? 'active' : ''}" data-tier="uncommon">
+                <b>Uncommon</b><br><span style="font-size: 9px;">Titanium (80)</span>
+              </div>
+              <div class="tier-btn rare ${toolSettings.crystalTier === 'rare' ? 'active' : ''}" data-tier="rare">
+                <b>Rare</b><br><span style="font-size: 9px;">Plasma (140)</span>
+              </div>
+            </div>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted);">Place minable crystal nodes for rovers to scavenge.</div>
+        `;
+        document.querySelectorAll('.tier-btn').forEach(tb => {
+          tb.onclick = () => {
+            toolSettings.crystalTier = tb.dataset.tier;
+            updateOptionsPanel();
+          };
+        });
+      }
+      else if (activeTool === 'tree') {
+        optionsTitle.textContent = 'Alien Oxygen Tree';
+        optionsBox.innerHTML = `
+          <div class="option-row">
+            <div class="option-label"><span>Canopy Radius:</span><span id="opt-tree-r-val">${toolSettings.treeRadius}px</span></div>
+            <div class="slider-row">
+              <input type="range" id="opt-tree-r-slider" min="25" max="55" value="${toolSettings.treeRadius}">
+            </div>
+          </div>
+          <div class="option-row">
+            <div class="option-label"><span>Oxygen Aura Field:</span><span id="opt-tree-aura-val">${toolSettings.treeAura}px</span></div>
+            <div class="slider-row">
+              <input type="range" id="opt-tree-aura-slider" min="80" max="240" value="${toolSettings.treeAura}">
+            </div>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted);">Generates healing & refueling oxygen field for rovers.</div>
+        `;
+        document.getElementById('opt-tree-r-slider').oninput = (e) => {
+          toolSettings.treeRadius = parseInt(e.target.value);
+          document.getElementById('opt-tree-r-val').textContent = toolSettings.treeRadius + 'px';
+        };
+        document.getElementById('opt-tree-aura-slider').oninput = (e) => {
+          toolSettings.treeAura = parseInt(e.target.value);
+          document.getElementById('opt-tree-aura-val').textContent = toolSettings.treeAura + 'px';
+        };
+      }
+      else if (activeTool === 'select') {
+        optionsTitle.textContent = 'Inspect / Move';
+        if (selectedObject) {
+          optionsBox.innerHTML = `
+            <div style="font-size: 12px; font-weight: bold; color: var(--accent-blue);">
+              ${selectedObject.type.toUpperCase()}: ${selectedObject.item.id || selectedObject.item.name || 'Object'}
+            </div>
+            <div class="option-row">
+              <div class="option-label"><span>Coords:</span><span>(${Math.round(selectedObject.item.x || 0)}, ${Math.round(selectedObject.item.y || 0)})</span></div>
+            </div>
+            ${selectedObject.item.radius !== undefined ? `
+            <div class="option-row">
+              <div class="option-label"><span>Radius:</span><span id="sel-radius-val">${selectedObject.item.radius}px</span></div>
+              <div class="slider-row">
+                <input type="range" id="sel-radius-slider" min="20" max="140" value="${selectedObject.item.radius}">
+              </div>
+            </div>` : ''}
+            <div style="display: flex; gap: 6px; margin-top: 6px;">
+              <button id="btn-del-selected" class="btn-danger" style="flex: 1;">🗑️ Delete Object</button>
+            </div>
+          `;
+          const rSlider = document.getElementById('sel-radius-slider');
+          if (rSlider) {
+            rSlider.oninput = (e) => {
+              selectedObject.item.radius = parseInt(e.target.value);
+              document.getElementById('sel-radius-val').textContent = selectedObject.item.radius + 'px';
+              render();
+            };
+          }
+          document.getElementById('btn-del-selected').onclick = () => {
+            deleteObject(selectedObject);
+            selectedObject = null;
+            updateOptionsPanel();
+            render();
+          };
+        } else {
+          optionsBox.innerHTML = `
+            <div style="font-size: 11px; color: var(--text-muted);">
+              Click any placed rock, boulder, crystal, tree, or river to inspect, resize, drag, or delete it.
+            </div>
+          `;
+        }
+      }
+      else if (activeTool === 'eraser') {
+        optionsTitle.textContent = 'Eraser Mode';
+        optionsBox.innerHTML = `
+          <div style="font-size: 11px; color: var(--accent-red);">
+            Click any rock, boulder, river waypoint, crystal, or tree to remove it from the map.
+          </div>
+        `;
+      }
+    }
+
+    // --- 5. OBJECT HIT-TESTING & DELETION ---
+    function findObjectAt(wx, wy) {
+      // 1. Check Trees
+      for (let t of mapData.trees) {
+        if (Math.hypot(wx - t.x, wy - t.y) <= (t.radius || 36) + 6) {
+          return { type: 'tree', item: t, list: mapData.trees };
+        }
+      }
+      // 2. Check Crystals
+      for (let c of mapData.crystals) {
+        if (Math.hypot(wx - c.x, wy - c.y) <= 28) {
+          return { type: 'crystal', item: c, list: mapData.crystals };
+        }
+      }
+      // 3. Check Rocks
+      for (let r of mapData.rocks) {
+        if (Math.hypot(wx - r.x, wy - r.y) <= r.radius) {
+          return { type: 'rock', item: r, list: mapData.rocks };
+        }
+      }
+      // 4. Check Boulders
+      for (let b of mapData.boulders) {
+        if (Math.hypot(wx - b.x, wy - b.y) <= b.radius) {
+          return { type: 'boulder', item: b, list: mapData.boulders };
+        }
+      }
+      // 5. Check Rivers (distance to segment)
+      for (let riv of mapData.rivers) {
+        const pts = riv.points;
+        if (!pts || pts.length < 2) continue;
+        const rHalf = (riv.width || 80) / 2 + 10;
+        for (let i = 0; i < pts.length - 1; i++) {
+          if (distToSegment(wx, wy, pts[i].x, pts[i].y, pts[i+1].x, pts[i+1].y) <= rHalf) {
+            return { type: 'river', item: riv, list: mapData.rivers };
+          }
+        }
+      }
+      return null;
+    }
+
+    function deleteObject(obj) {
+      if (!obj || !obj.list) return;
+      const idx = obj.list.indexOf(obj.item);
+      if (idx !== -1) {
+        obj.list.splice(idx, 1);
+        updateStats();
+      }
+    }
+
+    function distToSegment(px, py, x1, y1, x2, y2) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const l2 = dx * dx + dy * dy;
+      if (l2 === 0) return Math.hypot(px - x1, py - y1);
+      let t = ((px - x1) * dx + (py - y1) * dy) / l2;
+      t = Math.max(0, Math.min(1, t));
+      return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+    }
+
+    function finishActiveRiver() {
+      if (activeRiverPoints && activeRiverPoints.length >= 2) {
+        const id = 'river-' + Math.random().toString(36).substring(2, 8);
+        mapData.rivers.push({
+          id,
+          width: toolSettings.riverWidth,
+          points: activeRiverPoints
+        });
+        activeRiverPoints = null;
+        updateStats();
+        updateOptionsPanel();
+        render();
+        showToast('🌊 River segment added!', 'success');
+      }
+    }
+
+    // --- 6. MOUSE & KEYBOARD INPUT HANDLERS ---
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+    canvas.addEventListener('mousedown', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      const worldPos = screenToWorld(sx, sy);
+
+      // Pan with Middle Click, Space + Left Click, or Right Click
+      if (e.button === 1 || e.button === 2 || (e.button === 0 && spacePressed)) {
+        isPanning = true;
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+        return;
+      }
+
+      if (e.button === 0) {
+        const wx = Math.round(worldPos.x);
+        const wy = Math.round(worldPos.y);
+
+        // Guard against placing directly over Citadel Core (1500, 1500) within 120px
+        const distFromCenter = Math.hypot(wx - 1500, wy - 1500);
+
+        if (activeTool === 'rock') {
+          if (distFromCenter < 140) {
+            showToast('⚠️ Citadel Core Zone: Keep starting base clear!', 'error');
+            return;
+          }
+          const id = 'rock-' + Math.random().toString(36).substring(2, 8);
+          mapData.rocks.push({
+            id,
+            x: wx,
+            y: wy,
+            radius: toolSettings.rockRadius,
+            name: 'Wasteland Rock'
+          });
+          updateStats();
+          render();
+        }
+        else if (activeTool === 'boulder') {
+          if (distFromCenter < 160) {
+            showToast('⚠️ Citadel Core Zone: Keep starting base clear!', 'error');
+            return;
+          }
+          const id = 'boulder-' + Math.random().toString(36).substring(2, 8);
+          mapData.boulders.push({
+            id,
+            x: wx,
+            y: wy,
+            radius: toolSettings.boulderRadius,
+            name: 'Monolith Boulder'
+          });
+          updateStats();
+          render();
+        }
+        else if (activeTool === 'river') {
+          if (!activeRiverPoints) {
+            activeRiverPoints = [{ x: wx, y: wy }];
+          } else {
+            activeRiverPoints.push({ x: wx, y: wy });
+          }
+          updateOptionsPanel();
+          render();
+        }
+        else if (activeTool === 'crystal') {
+          const id = 'crys-' + Math.random().toString(36).substring(2, 8);
+          mapData.crystals.push({
+            id,
+            x: wx,
+            y: wy,
+            tier: toolSettings.crystalTier
+          });
+          updateStats();
+          render();
+        }
+        else if (activeTool === 'tree') {
+          const id = 'tree-' + Math.random().toString(36).substring(2, 8);
+          mapData.trees.push({
+            id,
+            x: wx,
+            y: wy,
+            radius: toolSettings.treeRadius,
+            auraRadius: toolSettings.treeAura
+          });
+          updateStats();
+          render();
+        }
+        else if (activeTool === 'eraser') {
+          const hit = findObjectAt(wx, wy);
+          if (hit) {
+            deleteObject(hit);
+            render();
+          }
+        }
+        else if (activeTool === 'select') {
+          const hit = findObjectAt(wx, wy);
+          if (hit) {
+            selectedObject = hit;
+            if (hit.item.x !== undefined && hit.item.y !== undefined) {
+              isDraggingObject = true;
+              dragOffsetX = hit.item.x - wx;
+              dragOffsetY = hit.item.y - wy;
+            }
+          } else {
+            selectedObject = null;
+          }
+          updateOptionsPanel();
+          render();
+        }
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      mouseWorldPos = screenToWorld(sx, sy);
+
+      document.getElementById('hud-coords').textContent = `${Math.round(mouseWorldPos.x)}, ${Math.round(mouseWorldPos.y)}`;
+
+      if (isPanning) {
+        const dx = e.clientX - lastMouseX;
+        const dy = e.clientY - lastMouseY;
+        cameraX -= dx / zoom;
+        cameraY -= dy / zoom;
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+        render();
+        return;
+      }
+
+      if (isDraggingObject && selectedObject && selectedObject.item.x !== undefined) {
+        selectedObject.item.x = Math.round(Math.max(50, Math.min(WORLD_W - 50, mouseWorldPos.x + dragOffsetX)));
+        selectedObject.item.y = Math.round(Math.max(50, Math.min(WORLD_H - 50, mouseWorldPos.y + dragOffsetY)));
+        render();
+      } else if (activeTool === 'river' && activeRiverPoints && activeRiverPoints.length > 0) {
+        render();
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      isPanning = false;
+      isDraggingObject = false;
+    });
+
+    canvas.addEventListener('dblclick', () => {
+      if (activeTool === 'river' && activeRiverPoints && activeRiverPoints.length >= 2) {
+        finishActiveRiver();
+      }
+    });
+
+    // Zoom
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const worldBefore = screenToWorld(mouseX, mouseY);
+      zoom = Math.max(0.18, Math.min(2.5, zoom * zoomFactor));
+      const worldAfter = screenToWorld(mouseX, mouseY);
+
+      cameraX += worldBefore.x - worldAfter.x;
+      cameraY += worldBefore.y - worldAfter.y;
+
+      document.getElementById('hud-zoom').textContent = Math.round(zoom * 100) + '%';
+      render();
+    }, { passive: false });
+
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        spacePressed = true;
+      }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedObject) {
+          deleteObject(selectedObject);
+          selectedObject = null;
+          updateOptionsPanel();
+          render();
+        }
+      }
+      if (e.key === 'Escape') {
+        if (activeRiverPoints) {
+          activeRiverPoints = null;
+          updateOptionsPanel();
+          render();
+        } else if (selectedObject) {
+          selectedObject = null;
+          updateOptionsPanel();
+          render();
+        }
+      }
+      if (e.key === 'Enter') {
+        if (activeTool === 'river' && activeRiverPoints && activeRiverPoints.length >= 2) {
+          finishActiveRiver();
+        }
+      }
+      // Hotkeys 1-7 for tools
+      if (e.key === '1') selectToolByName('rock');
+      if (e.key === '2') selectToolByName('boulder');
+      if (e.key === '3') selectToolByName('river');
+      if (e.key === '4') selectToolByName('crystal');
+      if (e.key === '5') selectToolByName('tree');
+      if (e.key === '6') selectToolByName('select');
+      if (e.key === '7') selectToolByName('eraser');
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'Space') {
+        spacePressed = false;
+      }
+    });
+
+    function selectToolByName(name) {
+      const btn = document.querySelector(`.tool-btn[data-tool="${name}"]`);
+      if (btn) btn.click();
+    }
+
+    // --- 7. BUTTON ACTIONS & IMPORT/EXPORT ---
+    document.getElementById('btn-save').onclick = () => {
+      saveMapToStorage();
+    };
+
+    document.getElementById('btn-play').onclick = () => {
+      saveMapToStorage();
+      window.location.href = 'index.html';
+    };
+
+    document.getElementById('btn-export').onclick = () => {
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(mapData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute('download', 'symbiotic_map.json');
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('📥 Exported symbiotic_map.json', 'success');
+    };
+
+    const importInput = document.getElementById('file-import-input');
+    document.getElementById('btn-import').onclick = () => {
+      importInput.click();
+    };
+
+    importInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const parsed = JSON.parse(event.target.result);
+          if (parsed && (Array.isArray(parsed.rocks) || Array.isArray(parsed.boulders) || Array.isArray(parsed.rivers))) {
+            mapData = {
+              version: 1,
+              name: parsed.name || 'Imported Map',
+              worldWidth: 3000,
+              worldHeight: 3000,
+              rocks: parsed.rocks || [],
+              boulders: parsed.boulders || [],
+              rivers: parsed.rivers || [],
+              crystals: parsed.crystals || [],
+              trees: parsed.trees || []
+            };
+            updateStats();
+            render();
+            showToast('📤 Successfully imported map!', 'success');
+          } else {
+            showToast('❌ Invalid map format JSON', 'error');
+          }
+        } catch (err) {
+          showToast('❌ JSON parse error: ' + err.message, 'error');
+        }
+      };
+      reader.readAsText(file);
+      importInput.value = '';
+    };
+
+    document.getElementById('btn-reset').onclick = () => {
+      if (confirm('Reset entire map to default layout?')) {
+        mapData = JSON.parse(JSON.stringify(DEFAULT_MAP));
+        selectedObject = null;
+        activeRiverPoints = null;
+        updateStats();
+        updateOptionsPanel();
+        render();
+        showToast('🔄 Map reset to default balanced layout.', 'success');
+      }
+    };
+
+    document.getElementById('btn-clear').onclick = () => {
+      if (confirm('Clear all rocks, boulders, rivers, crystals, and trees from the map?')) {
+        mapData.rocks = [];
+        mapData.boulders = [];
+        mapData.rivers = [];
+        mapData.crystals = [];
+        mapData.trees = [];
+        selectedObject = null;
+        activeRiverPoints = null;
+        updateStats();
+        updateOptionsPanel();
+        render();
+        showToast('🗑️ All terrain objects cleared.', 'success');
+      }
+    };
+
+    document.getElementById('btn-zoom-fit').onclick = () => {
+      cameraX = 1500;
+      cameraY = 1500;
+      zoom = Math.min(canvas.width / 3100, canvas.height / 3100);
+      document.getElementById('hud-zoom').textContent = Math.round(zoom * 100) + '%';
+      render();
+    };
+
+    document.getElementById('btn-zoom-100').onclick = () => {
+      zoom = 1.0;
+      document.getElementById('hud-zoom').textContent = '100%';
+      render();
+    };
+
+    function updateStats() {
+      document.getElementById('stat-rocks').textContent = mapData.rocks.length;
+      document.getElementById('stat-boulders').textContent = mapData.boulders.length;
+      document.getElementById('stat-rivers').textContent = mapData.rivers.length;
+      document.getElementById('stat-crystals').textContent = mapData.crystals.length;
+      document.getElementById('stat-trees').textContent = mapData.trees.length;
+    }
+
+    function showToast(msg, type = 'success') {
+      const toast = document.getElementById('toast');
+      const msgSpan = document.getElementById('toast-msg');
+      const iconSpan = document.getElementById('toast-icon');
+
+      msgSpan.textContent = msg;
+      iconSpan.textContent = type === 'success' ? '✅' : '⚠️';
+      toast.style.background = type === 'success' ? '#065f46' : '#7f1d1d';
+      toast.style.borderColor = type === 'success' ? '#34d399' : '#ef4444';
+
+      toast.classList.add('show');
+      clearTimeout(toast._timer);
+      toast._timer = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2600);
+    }
+
+    // --- 8. RENDER PIPELINE ---
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      // Apply Camera Transform
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.scale(zoom, zoom);
+      ctx.translate(-cameraX, -cameraY);
+
+      // 1. Light Gray Blank Terrain (Exact match to game request)
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+
+      // 2. Subtle Grid Lines
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
+      ctx.lineWidth = 1;
+      const gridSize = 120;
+      for (let x = 0; x <= WORLD_W; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, WORLD_H);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= WORLD_H; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(WORLD_W, y);
+        ctx.stroke();
+      }
+
+      // 3. Central Base Citadel Footprint & Safe Zone
+      ctx.fillStyle = 'rgba(34, 197, 94, 0.08)';
+      ctx.beginPath();
+      ctx.arc(1500, 1500, 150, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(34, 197, 94, 0.55)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 8]);
+      ctx.beginPath();
+      ctx.arc(1500, 1500, 150, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Base Structure Icon
+      ctx.fillStyle = '#1e293b';
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(1440, 1440, 120, 120);
+      ctx.fillRect(1440, 1440, 120, 120);
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = 'bold 16px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('CITADEL CORE', 1500, 1505);
+
+      // 4. Render Rivers
+      drawRivers(ctx, mapData.rivers);
+
+      // Active River Polyline preview in progress
+      if (activeRiverPoints && activeRiverPoints.length > 0) {
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = toolSettings.riverWidth;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(activeRiverPoints[0].x, activeRiverPoints[0].y);
+        for (let i = 1; i < activeRiverPoints.length; i++) {
+          ctx.lineTo(activeRiverPoints[i].x, activeRiverPoints[i].y);
+        }
+        ctx.lineTo(mouseWorldPos.x, mouseWorldPos.y);
+        ctx.stroke();
+        ctx.globalAlpha = 1.0;
+
+        // Waypoints dots
+        for (let pt of activeRiverPoints) {
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#0284c7';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+      }
+
+      // 5. Render Rocks & Boulders (Layered Mesas)
+      const allRocks = [...mapData.rocks, ...mapData.boulders];
+      drawRocks(ctx, allRocks);
+
+      // 6. Render Crystals (Minable Scrap Nodes)
+      drawCrystals(ctx, mapData.crystals);
+
+      // 7. Render Alien Oxygen Trees
+      drawOxygenTrees(ctx, mapData.trees);
+
+      // 8. World Border (Bold perimeter)
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 10;
+      ctx.strokeRect(0, 0, WORLD_W, WORLD_H);
+
+      // 9. Selected Object Highlight Ring
+      if (selectedObject && selectedObject.item) {
+        const item = selectedObject.item;
+        ctx.save();
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 6]);
+        if (item.radius !== undefined) {
+          ctx.beginPath();
+          ctx.arc(item.x, item.y, item.radius + 8, 0, Math.PI * 2);
+          ctx.stroke();
+        } else if (item.points) {
+          // River highlight
+          ctx.lineWidth = (item.width || 80) + 16;
+          ctx.beginPath();
+          ctx.moveTo(item.points[0].x, item.points[0].y);
+          for (let p of item.points) ctx.lineTo(p.x, p.y);
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.arc(item.x, item.y, 30, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      ctx.restore();
+
+      // Render Minimap Radar
+      renderRadar();
+    }
+
+    // --- RENDER HELPERS ---
+    function drawRivers(ctx, rivers) {
+      if (!rivers || !rivers.length) return;
+      for (let r of rivers) {
+        const pts = r.points;
+        if (!pts || pts.length < 2) continue;
+        const width = r.width || 80;
+
+        // Sand shore
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+        ctx.lineWidth = width + 22;
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.55)';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+
+        // Water depth border
+        ctx.lineWidth = width + 8;
+        ctx.strokeStyle = '#0284c7';
+        ctx.stroke();
+
+        // Water core
+        ctx.lineWidth = width;
+        ctx.strokeStyle = '#0ea5e9';
+        ctx.stroke();
+
+        // Glint ribbon
+        ctx.lineWidth = width * 0.45;
+        ctx.strokeStyle = 'rgba(186, 230, 253, 0.65)';
+        ctx.stroke();
+      }
+    }
+
+    function drawRocks(ctx, rocks) {
+      for (let rock of rocks) {
+        ctx.save();
+        ctx.translate(rock.x, rock.y);
+
+        // Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+        ctx.beginPath();
+        ctx.ellipse(rock.radius * 0.18, rock.radius * 0.22, rock.radius * 1.05, rock.radius * 0.95, 0.3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Base gradient
+        const baseGrad = ctx.createRadialGradient(-rock.radius * 0.3, -rock.radius * 0.3, rock.radius * 0.2, 0, 0, rock.radius);
+        baseGrad.addColorStop(0, '#57534e');
+        baseGrad.addColorStop(0.55, '#44403c');
+        baseGrad.addColorStop(0.88, '#292524');
+        baseGrad.addColorStop(1, '#1c1917');
+        ctx.fillStyle = baseGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, rock.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Strata
+        ctx.strokeStyle = 'rgba(28, 25, 23, 0.7)';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, rock.radius - 8, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Plateau
+        const platGrad = ctx.createRadialGradient(-rock.radius * 0.25, -rock.radius * 0.25, rock.radius * 0.1, 0, 0, rock.radius * 0.68);
+        platGrad.addColorStop(0, '#78716c');
+        platGrad.addColorStop(0.7, '#57534e');
+        platGrad.addColorStop(1, '#44403c');
+        ctx.fillStyle = platGrad;
+        ctx.beginPath();
+        ctx.arc(-2, -3, rock.radius * 0.68, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Sunlit rim
+        ctx.strokeStyle = 'rgba(254, 215, 170, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(-2, -3, rock.radius * 0.68, Math.PI * 0.95, Math.PI * 1.85);
+        ctx.stroke();
+
+        // Monolith label
+        if (rock.radius >= 80) {
+          ctx.font = 'bold 10px monospace';
+          ctx.fillStyle = 'rgba(241, 245, 249, 0.7)';
+          ctx.textAlign = 'center';
+          ctx.fillText((rock.name || 'BOULDER').toUpperCase(), 0, 4);
+        }
+
+        ctx.restore();
+      }
+    }
+
+    function drawCrystals(ctx, crystals) {
+      for (let c of crystals) {
+        ctx.save();
+        ctx.translate(c.x, c.y);
+
+        let color = '#f59e0b';
+        let glow = 'rgba(245, 158, 11, 0.45)';
+        let rad = 20;
+        if (c.tier === 'uncommon') {
+          color = '#06b6d4';
+          glow = 'rgba(6, 182, 212, 0.5)';
+          rad = 25;
+        } else if (c.tier === 'rare') {
+          color = '#ec4899';
+          glow = 'rgba(236, 72, 153, 0.55)';
+          rad = 30;
+        }
+
+        // Glow
+        const grad = ctx.createRadialGradient(0, 0, 4, 0, 0, rad * 1.5);
+        grad.addColorStop(0, glow);
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, rad * 1.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Facets
+        ctx.fillStyle = color;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < 4; i++) {
+          const ang = (i / 4) * Math.PI * 2;
+          const dist = rad * 0.45;
+          ctx.beginPath();
+          ctx.ellipse(Math.cos(ang) * dist, Math.sin(ang) * dist, rad * 0.35, rad * 0.2, ang, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(0, 0, rad * 0.22, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
+    }
+
+    function drawOxygenTrees(ctx, trees) {
+      for (let tree of trees) {
+        const radius = tree.radius || 36;
+        const aura = tree.auraRadius || 135;
+
+        // Aura
+        const auraGrad = ctx.createRadialGradient(tree.x, tree.y, radius, tree.x, tree.y, aura);
+        auraGrad.addColorStop(0, 'rgba(16, 185, 129, 0.25)');
+        auraGrad.addColorStop(0.7, 'rgba(52, 211, 153, 0.09)');
+        auraGrad.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+        ctx.fillStyle = auraGrad;
+        ctx.beginPath();
+        ctx.arc(tree.x, tree.y, aura, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(52, 211, 153, 0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 6]);
+        ctx.beginPath();
+        ctx.arc(tree.x, tree.y, aura, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+        ctx.beginPath();
+        ctx.ellipse(tree.x + 8, tree.y + 12, radius * 1.1, radius * 0.75, 0.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Trunk roots
+        ctx.strokeStyle = '#065f46';
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
+          ctx.beginPath();
+          ctx.moveTo(tree.x, tree.y);
+          ctx.lineTo(tree.x + Math.cos(a) * (radius * 0.9), tree.y + Math.sin(a) * (radius * 0.9));
+          ctx.stroke();
+        }
+
+        // Canopy
+        const canopyGrad = ctx.createRadialGradient(tree.x - 6, tree.y - 8, 4, tree.x, tree.y, radius);
+        canopyGrad.addColorStop(0, '#6ee7b7');
+        canopyGrad.addColorStop(0.4, '#10b981');
+        canopyGrad.addColorStop(0.85, '#047857');
+        canopyGrad.addColorStop(1, '#064e3b');
+        ctx.fillStyle = canopyGrad;
+        ctx.beginPath();
+        ctx.arc(tree.x, tree.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Bioluminescent Spores
+        for (let s = 0; s < 5; s++) {
+          const sAngle = (s / 5) * Math.PI * 2;
+          const sx = tree.x + Math.cos(sAngle) * (radius * 0.55);
+          const sy = tree.y + Math.sin(sAngle) * (radius * 0.55);
+          ctx.fillStyle = '#a7f3d0';
+          ctx.beginPath();
+          ctx.arc(sx, sy, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.fillStyle = '#10b981';
+        ctx.font = 'bold 11px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('O₂ BIO-TREE', tree.x, tree.y - radius - 6);
+      }
+    }
+
+    // --- 9. MINIMAP RADAR RENDERING ---
+    function renderRadar() {
+      const rw = radarCanvas.width;
+      const rh = radarCanvas.height;
+      radarCtx.clearRect(0, 0, rw, rh);
+
+      radarCtx.fillStyle = '#0f172a';
+      radarCtx.fillRect(0, 0, rw, rh);
+
+      const toRadX = (wx) => (wx / WORLD_W) * rw;
+      const toRadY = (wy) => (wy / WORLD_H) * rh;
+
+      // Rivers
+      radarCtx.strokeStyle = '#0284c7';
+      radarCtx.lineWidth = 3;
+      radarCtx.lineCap = 'round';
+      radarCtx.lineJoin = 'round';
+      for (let riv of mapData.rivers) {
+        if (!riv.points || riv.points.length < 2) continue;
+        radarCtx.beginPath();
+        radarCtx.moveTo(toRadX(riv.points[0].x), toRadY(riv.points[0].y));
+        for (let i = 1; i < riv.points.length; i++) {
+          radarCtx.lineTo(toRadX(riv.points[i].x), toRadY(riv.points[i].y));
+        }
+        radarCtx.stroke();
+      }
+
+      // Rocks and Boulders
+      radarCtx.fillStyle = '#78716c';
+      for (let r of [...mapData.rocks, ...mapData.boulders]) {
+        radarCtx.beginPath();
+        radarCtx.arc(toRadX(r.x), toRadY(r.y), Math.max(1.5, (r.radius / WORLD_W) * rw), 0, Math.PI * 2);
+        radarCtx.fill();
+      }
+
+      // Trees
+      radarCtx.fillStyle = '#10b981';
+      for (let t of mapData.trees) {
+        radarCtx.beginPath();
+        radarCtx.arc(toRadX(t.x), toRadY(t.y), 3, 0, Math.PI * 2);
+        radarCtx.fill();
+      }
+
+      // Crystals
+      for (let c of mapData.crystals) {
+        radarCtx.fillStyle = c.tier === 'rare' ? '#ec4899' : (c.tier === 'uncommon' ? '#06b6d4' : '#f59e0b');
+        radarCtx.beginPath();
+        radarCtx.arc(toRadX(c.x), toRadY(c.y), 2, 0, Math.PI * 2);
+        radarCtx.fill();
+      }
+
+      // Base Citadel
+      radarCtx.fillStyle = '#38bdf8';
+      radarCtx.fillRect(toRadX(1440), toRadY(1440), (120 / WORLD_W) * rw, (120 / WORLD_H) * rh);
+
+      // Frustum Box (Camera Viewport)
+      const topLeft = screenToWorld(0, 0);
+      const botRight = screenToWorld(canvas.width, canvas.height);
+      const fx = toRadX(topLeft.x);
+      const fy = toRadY(topLeft.y);
+      const fw = toRadX(botRight.x) - fx;
+      const fh = toRadY(botRight.y) - fy;
+
+      radarCtx.strokeStyle = '#ffffff';
+      radarCtx.lineWidth = 1.2;
+      radarCtx.strokeRect(fx, fy, fw, fh);
+    }
+
+    // Click radar to jump
+    radarCanvas.addEventListener('mousedown', (e) => {
+      const rect = radarCanvas.getBoundingClientRect();
+      const rx = e.clientX - rect.left;
+      const ry = e.clientY - rect.top;
+      cameraX = (rx / radarCanvas.width) * WORLD_W;
+      cameraY = (ry / radarCanvas.height) * WORLD_H;
+      render();
+    });
+
+    // --- INITIALIZATION ---
+    resizeCanvas();
+    updateStats();
+    updateOptionsPanel();
+    render();
+  </script>
+</body>
+</html>
+

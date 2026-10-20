@@ -86,11 +86,12 @@
   const keys = {
     w: false, a: false, s: false, d: false,
     ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false,
-    Space: false, e: false,
+    Space: false, e: false, r: false, c: false, x: false,
     '1': false, '2': false, '3': false, '4': false, '5': false, '6': false,
     Escape: false,
     justPressed: {
-      e: false, Tab: false, Escape: false,
+      e: false, r: false, c: false, x: false, Tab: false, Escape: false,
+      '[': false, ']': false,
       '1': false, '2': false, '3': false, '4': false, '5': false, '6': false
     },
     mouse: { x: 0, y: 0, isDown: false, rightDown: false, clicked: false }
@@ -115,6 +116,21 @@
       if (k === 'e') {
         if (!keys.e) keys.justPressed.e = true;
         keys.e = true;
+      }
+      if (k === 'r') {
+        if (!keys.r) keys.justPressed.r = true;
+        keys.r = true;
+      }
+      if (k === 'c') {
+        if (!keys.c) keys.justPressed.c = true;
+        keys.c = true;
+      }
+      if (k === 'x') {
+        if (!keys.x) keys.justPressed.x = true;
+        keys.x = true;
+      }
+      if (e.key === '[' || e.key === ']') {
+        keys.justPressed[e.key] = true;
       }
       if (e.key === 'Tab') {
         e.preventDefault();
@@ -144,11 +160,22 @@
       if (e.key === 'ArrowRight') keys.ArrowRight = false;
       if (e.key === ' ' || e.code === 'Space') keys.Space = false;
       if (k === 'e') keys.e = false;
+      if (k === 'r') keys.r = false;
+      if (k === 'c') keys.c = false;
+      if (k === 'x') keys.x = false;
 
       for (let i = 1; i <= 6; i++) {
         if (e.key === String(i)) keys[String(i)] = false;
       }
     });
+
+    // Mouse wheel controls brush size in collision editor
+    window.addEventListener('wheel', (e) => {
+      if (collisionEditorActive) {
+        brushRadius = Math.max(10, Math.min(180, brushRadius - Math.sign(e.deltaY) * 5));
+        e.preventDefault();
+      }
+    }, { passive: false });
 
     if (canvas) {
       canvas.addEventListener('mousemove', (e) => {
@@ -170,6 +197,8 @@
       window.addEventListener('mouseup', (e) => {
         if (e.button === 0) keys.mouse.isDown = false;
         if (e.button === 2) keys.mouse.rightDown = false;
+        lastPaintWorldX = null;
+        lastPaintWorldY = null;
       });
 
       canvas.addEventListener('contextmenu', (e) => {
@@ -180,6 +209,11 @@
 
   function clearJustPressed() {
     keys.justPressed.e = false;
+    keys.justPressed.r = false;
+    keys.justPressed.c = false;
+    keys.justPressed.x = false;
+    keys.justPressed['['] = false;
+    keys.justPressed[']'] = false;
     keys.justPressed.Tab = false;
     keys.justPressed.Escape = false;
     keys.justPressed.Space = false;
@@ -189,7 +223,158 @@
     }
   }
 
-  // --- 2.5 SPRITE ASSETS ---
+  // --- 2.5 CUSTOM MAP SYSTEM & GEOMETRY (SAVED VIA MapEditor.html) ---
+  const DEFAULT_MAP = {
+    version: 1,
+    name: 'Wasteland Basin',
+    worldWidth: 3000,
+    worldHeight: 3000,
+    rocks: [
+      { id: 'rock-w-mid', x: 1140, y: 1500, radius: 55, name: 'West Ridge Rock' },
+      { id: 'rock-w-n1',  x: 1150, y: 1330, radius: 50, name: 'Northwest Outcrop' },
+      { id: 'rock-w-s1',  x: 1150, y: 1670, radius: 50, name: 'Southwest Outcrop' },
+      { id: 'rock-w-n2',  x: 1130, y: 1180, radius: 45, name: 'Northwest Buttress' },
+      { id: 'rock-w-s2',  x: 1130, y: 1820, radius: 45, name: 'Southwest Buttress' },
+      { id: 'rock-n-west', x: 1400, y: 1090, radius: 55, name: 'North Pass West' },
+      { id: 'rock-n-east', x: 1600, y: 1090, radius: 55, name: 'North Pass East' },
+      { id: 'rock-s-west', x: 1400, y: 1910, radius: 55, name: 'South Pass West' },
+      { id: 'rock-s-east', x: 1600, y: 1910, radius: 55, name: 'South Pass East' },
+      { id: 'rock-ne-1',   x: 1720, y: 1140, radius: 50, name: 'Northeast Crag' },
+      { id: 'rock-se-1',   x: 1720, y: 1860, radius: 50, name: 'Southeast Crag' }
+    ],
+    boulders: [
+      { id: 'boulder-w1', x: 620,  y: 1450, radius: 95, name: 'Western Monolith' },
+      { id: 'boulder-e1', x: 2380, y: 1200, radius: 90, name: 'Eastern Plateau A' },
+      { id: 'boulder-e2', x: 2380, y: 1800, radius: 90, name: 'Eastern Plateau B' },
+      { id: 'boulder-nw', x: 1290, y: 1130, radius: 85, name: 'Northwest Mesa' },
+      { id: 'boulder-sw', x: 1290, y: 1870, radius: 85, name: 'Southwest Mesa' }
+    ],
+    rivers: [
+      {
+        id: 'river-main',
+        width: 85,
+        points: [
+          { x: 250, y: 700 },
+          { x: 800, y: 900 },
+          { x: 1350, y: 1020 },
+          { x: 1800, y: 980 },
+          { x: 2300, y: 800 },
+          { x: 2800, y: 750 }
+        ]
+      }
+    ],
+    crystals: [
+      { id: 'crys-1', x: 1320, y: 1400, tier: 'common' },
+      { id: 'crys-2', x: 1320, y: 1600, tier: 'common' },
+      { id: 'crys-3', x: 1680, y: 1400, tier: 'common' },
+      { id: 'crys-4', x: 1680, y: 1600, tier: 'common' },
+      { id: 'crys-5', x: 1050, y: 1200, tier: 'uncommon' },
+      { id: 'crys-6', x: 1950, y: 1200, tier: 'uncommon' },
+      { id: 'crys-7', x: 1050, y: 1800, tier: 'uncommon' },
+      { id: 'crys-8', x: 1950, y: 1800, tier: 'uncommon' },
+      { id: 'crys-9', x: 750,  y: 1500, tier: 'rare' },
+      { id: 'crys-10', x: 2250, y: 1500, tier: 'rare' }
+    ],
+    trees: [
+      { id: 'tree-1', x: 1380, y: 1380, radius: 36, auraRadius: 135 },
+      { id: 'tree-2', x: 1620, y: 1380, radius: 36, auraRadius: 135 },
+      { id: 'tree-3', x: 1380, y: 1620, radius: 36, auraRadius: 135 },
+      { id: 'tree-4', x: 1620, y: 1620, radius: 36, auraRadius: 135 }
+    ]
+  };
+
+  function loadActiveMap() {
+    let map = DEFAULT_MAP;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem('symbiotic_custom_map');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && (Array.isArray(parsed.rocks) || Array.isArray(parsed.boulders) || Array.isArray(parsed.rivers))) {
+            map = parsed;
+            console.log('[Map] Loaded custom map from localStorage:', map.name || 'Custom Map');
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Map] Could not load custom map from localStorage:', e);
+    }
+    return map;
+  }
+
+  const activeMap = loadActiveMap();
+
+  function distToSegment(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const l2 = dx * dx + dy * dy;
+    if (l2 === 0) return Math.hypot(px - x1, py - y1);
+    let t = ((px - x1) * dx + (py - y1) * dy) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+  }
+
+  function checkRiverSlow(px, py, rivers) {
+    if (!rivers || !rivers.length) return false;
+    for (let r of rivers) {
+      const pts = r.points;
+      if (!pts || pts.length < 2) continue;
+      const rHalf = (r.width || 80) / 2;
+      for (let i = 0; i < pts.length - 1; i++) {
+        if (distToSegment(px, py, pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y) <= rHalf) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function isWalkable(worldX, worldY, padding = 45) {
+    if (worldX < padding || worldX > WORLD_WIDTH - padding || worldY < padding || worldY > WORLD_HEIGHT - padding) {
+      return false;
+    }
+    const obstacles = (typeof gameState !== 'undefined' && gameState && gameState.landscape)
+      ? gameState.landscape
+      : (activeMap ? [...(activeMap.rocks || []), ...(activeMap.boulders || [])] : []);
+    for (let obs of obstacles) {
+      if (Math.hypot(worldX - obs.x, worldY - obs.y) < obs.radius + 15) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function spawnWaterSplash(x, y) {
+    for (let i = 0; i < 3; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.5 + Math.random() * 1.8;
+      PARTICLES.push({
+        type: 'blood',
+        x: x + (Math.random() - 0.5) * 12,
+        y: y + (Math.random() - 0.5) * 12,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: 2 + Math.random() * 2,
+        color: Math.random() > 0.4 ? '#38bdf8' : '#e0f2fe',
+        alpha: 0.8,
+        decay: 0.04
+      });
+    }
+  }
+
+  function spawnOxygenMote(x, y) {
+    PARTICLES.push({
+      type: 'blood',
+      x, y,
+      vx: (Math.random() - 0.5) * 0.8,
+      vy: -1.2 - Math.random() * 1.5,
+      radius: 2 + Math.random() * 2.5,
+      color: Math.random() > 0.5 ? '#34d399' : '#6ee7b7',
+      alpha: 0.9,
+      decay: 0.02
+    });
+  }
+
   const truckSprite = new Image();
   truckSprite.src = 'assets/sprites/military_truck_sheet_8.png?v=8way2';
   let truckSpriteLoaded = false;
@@ -682,7 +867,8 @@
   }
 
   function spawnAmbientEnemy(gameState, worldWidth, worldHeight) {
-    if (gameState.enemies.length >= 65) return;
+    const maxEnemies = isSolo ? 65 : 120;
+    if (gameState.enemies.length >= maxEnemies) return;
     const t = (gameState.gameTime || 0) / 60.0;
 
     // Pick off-screen spawn anchor along perimeter
@@ -720,13 +906,15 @@
   function spawnSurgeHorde(gameState, worldWidth, worldHeight) {
     const W = gameState.surgeWave || 1;
     const t = (gameState.gameTime || 0) / 60.0;
-    const count = Math.floor(8 + 4 * W + 1.2 * Math.pow(W, 1.3));
+    const hordeMult = isSolo ? 1.0 : 1.85;
+    const count = Math.floor((8 + 4 * W + 1.2 * Math.pow(W, 1.3)) * hordeMult);
+    const maxEnemies = isSolo ? 75 : 130;
 
     const clusterSpawns = [
-      { name: 'Eastern Valley', x: 2350, y: 1500 },
-      { name: 'North Gorge',    x: 1500, y: 850 },
-      { name: 'South Gorge',    x: 1500, y: 2150 },
-      { name: 'Western Crags',  x: 750,  y: 1500 }
+      { name: 'Eastern Valley', x: 2400, y: 1600 },
+      { name: 'North Gorge',    x: 1350, y: 350 },
+      { name: 'South Gorge',    x: 1450, y: 2650 },
+      { name: 'Western Crags',  x: 650,  y: 1100 }
     ];
     const spawnAnchor = clusterSpawns[Math.floor(Math.random() * clusterSpawns.length)];
 
@@ -734,14 +922,14 @@
     spawnExplosion(spawnAnchor.x, spawnAnchor.y, 20);
 
     for (let i = 0; i < count; i++) {
-      if (gameState.enemies.length >= 75) break;
+      if (gameState.enemies.length >= maxEnemies) break;
       const offsetX = (Math.random() - 0.5) * 200;
       const offsetY = (Math.random() - 0.5) * 200;
       const x = Math.max(50, Math.min(worldWidth - 50, spawnAnchor.x + offsetX));
       const y = Math.max(50, Math.min(worldHeight - 50, spawnAnchor.y + offsetY));
 
       let type = 'scuttler';
-      const isLeader = (i === 0);
+      const isLeader = isSolo ? (i === 0) : (i === 0 || i === 1);
       if (isLeader) {
         type = 'crusher';
       } else {
@@ -757,7 +945,7 @@
     }
   }
 
-  function updateSwarmAI(enemies, base, rover, structures, projectiles, isHost, landscape = null, hazards = null, buildSites = null) {
+  function updateSwarmAI(enemies, base, rover, structures, projectiles, isHost, landscape = null, hazards = null, buildSites = null, rover2 = null) {
     if (!isHost) return;
 
     for (let i = 0; i < enemies.length; i++) {
@@ -765,11 +953,23 @@
 
       // Targeting: Sprinters love chasing the fast rover or diving at base; Crushers target the fortress; Scuttlers attack nearest
       const distBase = Math.hypot(base.x - enemy.x, base.y - enemy.y);
-      const distRover = Math.hypot(rover.x - enemy.x, rover.y - enemy.y);
+      let closestRover = (!rover.isDead) ? rover : null;
+      let distRover = closestRover ? Math.hypot(rover.x - enemy.x, rover.y - enemy.y) : Infinity;
 
-      let target = distBase < distRover * 1.2 ? base : rover;
-      if (enemy.type === 'crusher') target = base;
-      if (enemy.type === 'sprinter') target = distRover < 380 ? rover : base;
+      if (rover2 && !rover2.isDead) {
+        const d2 = Math.hypot(rover2.x - enemy.x, rover2.y - enemy.y);
+        if (d2 < distRover) {
+          closestRover = rover2;
+          distRover = d2;
+        }
+      }
+
+      let target = base;
+      if (closestRover) {
+        target = distBase < distRover * 1.2 ? base : closestRover;
+        if (enemy.type === 'crusher') target = base;
+        if (enemy.type === 'sprinter') target = distRover < 380 ? closestRover : base;
+      }
 
       let dx = target.x - enemy.x;
       let dy = target.y - enemy.y;
@@ -852,7 +1052,8 @@
         spawnBloodSplat(enemy.x, enemy.y, 1, '#1e293b');
       }
 
-      // 2. Check collision & sliding with Landscape Rocks (tangent sliding around canyon cliffs)
+      // 2. Check collision & sliding with Landscape Rocks (active only in procedural fallback mode)
+      if (gameState && gameState.rivers && checkRiverSlow(enemy.x, enemy.y, gameState.rivers)) { enemySpeed *= 0.6; }
       if (landscape) {
         for (let rock of landscape) {
           const testX = enemy.x + moveX * enemySpeed;
@@ -933,9 +1134,40 @@
           }
         }
       } else {
-        enemy.x += moveX * enemySpeed;
-        enemy.y += moveY * enemySpeed;
-        enemy.angle = Math.atan2(moveY, moveX);
+        // Canyon Cliff & Chasm Prevention: enforce walkable ground & funnel towards passes
+        const testX = enemy.x + moveX * enemySpeed;
+        const testY = enemy.y + moveY * enemySpeed;
+
+        if (isWalkable(testX, testY)) {
+          enemy.x = testX;
+          enemy.y = testY;
+          enemy.angle = Math.atan2(moveY, moveX);
+        } else {
+          // Reached canyon rim or cliff face: test sliding or steering along rim towards bridges
+          let guided = false;
+          if (isWalkable(testX, enemy.y)) {
+            enemy.x = testX;
+            guided = true;
+          } else if (isWalkable(enemy.x, testY)) {
+            enemy.y = testY;
+            guided = true;
+          }
+          if (!guided) {
+            const baseA = Math.atan2(moveY, moveX);
+            for (let probe of [0.4, -0.4, 0.8, -0.8, 1.2, -1.2, 1.6, -1.6]) {
+              const probeA = baseA + probe;
+              const px = enemy.x + Math.cos(probeA) * enemySpeed;
+              const py = enemy.y + Math.sin(probeA) * enemySpeed;
+              if (isWalkable(px, py)) {
+                enemy.x = px;
+                enemy.y = py;
+                enemy.angle = probeA;
+                guided = true;
+                break;
+              }
+            }
+          }
+        }
       }
 
       enemy.legAnim += enemy.speed * 0.2;
@@ -1001,8 +1233,11 @@
     spawnExplosion(x, y, 8);
   }
 
-  function updateLooseScraps(gameState, rover, base) {
+  function updateLooseScraps(gameState, rover, base, rover2 = null) {
     if (!gameState.looseScraps) return;
+    const activeRovers = [rover];
+    if (rover2 && !isSolo) activeRovers.push(rover2);
+
     for (let i = gameState.looseScraps.length - 1; i >= 0; i--) {
       const s = gameState.looseScraps[i];
       s.x += s.vx;
@@ -1017,26 +1252,38 @@
         continue;
       }
 
-      // Vacuum magnet attraction when Rover is near
-      const dRover = Math.hypot(rover.x - s.x, rover.y - s.y);
-      if (!rover.isBoarded && dRover <= 90) {
-        const pull = ((90 - dRover) / 90) * 4.0;
-        s.vx += ((rover.x - s.x) / dRover) * pull;
-        s.vy += ((rover.y - s.y) / dRover) * pull;
-      }
+      let collected = false;
+      for (let r of activeRovers) {
+        if (r.isDead || r.isBoarded) continue;
+        const dRover = Math.hypot(r.x - s.x, r.y - s.y);
 
-      // Proximity collection
-      if (!rover.isBoarded && dRover <= rover.radius + s.radius + 6) {
-        if (rover.cargo < rover.maxCargo) {
-          const gain = Math.min(s.value, rover.maxCargo - rover.cargo);
-          rover.cargo += gain;
-          addFloatingText(s.x, s.y - 10, `+${gain} SCRAP`, '#facc15');
-          spawnSparkArc(s.x, s.y, rover.x, rover.y, '#facc15');
-          gameState.looseScraps.splice(i, 1);
-        } else if (Math.random() < 0.02) {
-          addFloatingText(rover.x, rover.y - 25, 'CARGO FULL!', '#f97316');
+        // Vacuum magnet attraction when Rover is near (only if rover has cargo capacity)
+        if (dRover <= 90 && r.cargo < r.maxCargo) {
+          const pull = ((90 - dRover) / 90) * 4.0;
+          s.vx += ((r.x - s.x) / dRover) * pull;
+          s.vy += ((r.y - s.y) / dRover) * pull;
+        }
+
+        // Proximity collection
+        if (dRover <= r.radius + s.radius + 6) {
+          if (r.cargo < r.maxCargo) {
+            const gain = Math.min(s.value, r.maxCargo - r.cargo);
+            r.cargo += gain;
+            addFloatingText(s.x, s.y - 10, `+${gain} SCRAP`, '#facc15');
+            spawnSparkArc(s.x, s.y, r.x, r.y, '#facc15');
+            gameState.looseScraps.splice(i, 1);
+            collected = true;
+            break;
+          } else {
+            // Throttled warning: at most once every 3.5 seconds
+            if (Date.now() - (r.lastFullWarnTime || 0) > 3500) {
+              r.lastFullWarnTime = Date.now();
+              addFloatingText(r.x, r.y - 25, `${r.name || 'ROVER'} CARGO FULL`, '#f97316');
+            }
+          }
         }
       }
+      if (collected) continue;
     }
   }
   function createScrapNode(id, x, y, tier = 'common') {
@@ -1139,32 +1386,36 @@
     ];
   }
 
-  function initScrapNodes(worldWidth, worldHeight, count = 22, landscape = []) {
+  function initScrapNodes(worldWidth, worldHeight, customCrystals = null) {
     const nodes = [];
+    if (customCrystals && customCrystals.length > 0) {
+      for (let c of customCrystals) {
+        nodes.push(createScrapNode(c.id || ('scrap-' + Math.random().toString(36).substring(2, 8)), c.x, c.y, c.tier || 'common'));
+      }
+      return nodes;
+    }
+    const count = 22;
     const tiers = ['common', 'common', 'common', 'uncommon', 'uncommon', 'rare'];
-
     for (let i = 0; i < count; i++) {
       const tier = tiers[i % tiers.length];
-      const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
-      const dist = 380 + Math.random() * (worldWidth * 0.42);
-
-      let x = Math.max(120, Math.min(worldWidth - 120, 1500 + Math.cos(angle) * dist));
-      let y = Math.max(120, Math.min(worldHeight - 120, 1500 + Math.sin(angle) * dist));
-
-      // Avoid spawning inside landscape rock mesas
-      if (landscape) {
-        for (let rock of landscape) {
-          const d = Math.hypot(x - rock.x, y - rock.y);
-          if (d < rock.radius + 35) {
-            const pushAngle = Math.atan2(y - rock.y, x - rock.x);
-            x = rock.x + Math.cos(pushAngle) * (rock.radius + 45);
-            y = rock.y + Math.sin(pushAngle) * (rock.radius + 45);
-          }
+      let x = 1500, y = 1500;
+      let valid = false;
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+        const dist = 320 + Math.random() * (worldWidth * 0.40);
+        const testX = Math.max(120, Math.min(worldWidth - 120, 1500 + Math.cos(angle) * dist));
+        const testY = Math.max(120, Math.min(worldHeight - 120, 1500 + Math.sin(angle) * dist));
+        if (isWalkable(testX, testY)) {
+          x = testX;
+          y = testY;
+          valid = true;
+          break;
         }
       }
-
-      const id = 'scrap-' + Math.random().toString(36).substring(2, 9);
-      nodes.push(createScrapNode(id, x, y, tier));
+      if (valid) {
+        const id = 'scrap-' + Math.random().toString(36).substring(2, 9);
+        nodes.push(createScrapNode(id, x, y, tier));
+      }
     }
     return nodes;
   }
@@ -1270,35 +1521,45 @@
 
   function updateEconomy(gameState, isHost) {
     const { base, rover, scrapNodes } = gameState;
+    const activeRovers = [rover];
+    if (gameState.rover2 && !isSolo) activeRovers.push(gameState.rover2);
 
-    if (typeof rover.cargo !== 'number') rover.cargo = 0;
-    if (typeof rover.maxCargo !== 'number') rover.maxCargo = 50;
+    for (let r of activeRovers) {
+      if (typeof r.cargo !== 'number') r.cargo = 0;
+      if (typeof r.maxCargo !== 'number') r.maxCargo = 50;
+    }
     if (typeof gameState.baseScrap !== 'number') gameState.baseScrap = 0;
 
-    // 1. Scrap node harvesting by Rover
+    // 1. Scrap node harvesting by active Rovers
     for (let i = scrapNodes.length - 1; i >= 0; i--) {
       const node = scrapNodes[i];
       node.pulse = (node.pulse || 0) + 0.05;
       node.rotation = (node.rotation || 0) + 0.008;
 
-      const dist = Math.hypot(rover.x - node.x, rover.y - node.y);
-      const harvestRange = node.radius + rover.radius + 40;
+      let beingHarvested = false;
+      for (let r of activeRovers) {
+        if (r.isDead || r.isBoarded) continue;
+        const dist = Math.hypot(r.x - node.x, r.y - node.y);
+        const harvestRange = node.radius + r.radius + 40;
 
-      if (!rover.isBoarded && dist <= harvestRange) {
-        node.beingHarvested = true;
-        if (rover.cargo < rover.maxCargo) {
-          if (Math.random() < 0.45) {
-            const transfer = Math.min(1, node.amount, rover.maxCargo - rover.cargo);
-            node.amount -= transfer;
-            rover.cargo += transfer;
-            spawnScrapShard(node.x, node.y, rover.x, rover.y, node.color);
+        if (dist <= harvestRange) {
+          beingHarvested = true;
+          if (r.cargo < r.maxCargo) {
+            if (Math.random() < 0.45) {
+              const transfer = Math.min(1, node.amount, r.maxCargo - r.cargo);
+              node.amount -= transfer;
+              r.cargo += transfer;
+              spawnScrapShard(node.x, node.y, r.x, r.y, node.color);
+            }
+          } else {
+            if (Date.now() - (r.lastFullWarnTime || 0) > 3500) {
+              r.lastFullWarnTime = Date.now();
+              addFloatingText(r.x, r.y - 25, `${r.name || 'ROVER'} CARGO FULL`, '#f97316');
+            }
           }
-        } else if (Math.random() < 0.03) {
-          addFloatingText(rover.x, rover.y - 24, 'ROVER CARGO FULL!', '#f97316');
         }
-      } else {
-        node.beingHarvested = false;
       }
+      node.beingHarvested = beingHarvested;
 
       if (node.amount <= 0) {
         addFloatingText(node.x, node.y, 'DEPLETED!', '#94a3b8');
@@ -1306,27 +1567,31 @@
       }
     }
 
-    // 2. Depositing scrap into Base Fortress
-    const distToBase = Math.hypot(rover.x - base.x, rover.y - base.y);
-    if ((distToBase <= 130 || rover.isBoarded) && rover.cargo > 0) {
-      const unloadRate = rover.isBoarded ? rover.cargo : Math.min(2, rover.cargo);
-      rover.cargo -= unloadRate;
-      gameState.baseScrap += unloadRate;
+    // 2. Depositing scrap into Base Fortress & Base repairing rovers
+    for (let r of activeRovers) {
+      const distToBase = Math.hypot(r.x - base.x, r.y - base.y);
+      if ((distToBase <= 130 || r.isBoarded) && r.cargo > 0) {
+        const unloadRate = r.isBoarded ? r.cargo : Math.min(2, r.cargo);
+        r.cargo -= unloadRate;
+        gameState.baseScrap += unloadRate;
 
-      if (Math.random() < 0.6) {
-        spawnScrapShard(rover.x, rover.y, base.x, base.y, '#22c55e');
+        if (Math.random() < 0.6) {
+          spawnScrapShard(r.x, r.y, base.x, base.y, '#22c55e');
+        }
+
+        if (r.cargo === 0) {
+          addFloatingText(base.x, base.y - 55, `+ SCRAP STORED BY ${r.name || 'ROVER'}!`, '#22c55e');
+        }
       }
 
       // Base slowly repairs Rover and refuels while close
-      if (rover.hp < rover.maxHp) {
-        rover.hp = Math.min(rover.maxHp, rover.hp + 0.15);
-      }
-      if (rover.fuel < rover.maxFuel) {
-        rover.fuel = Math.min(rover.maxFuel, rover.fuel + 0.2);
-      }
-
-      if (rover.cargo === 0) {
-        addFloatingText(base.x, base.y - 55, '+ SCRAP STORED IN BASE VAULT!', '#22c55e');
+      if (distToBase <= 130 || r.isBoarded) {
+        if (r.hp < r.maxHp && !r.isDead) {
+          r.hp = Math.min(r.maxHp, r.hp + 0.15);
+        }
+        if (r.fuel < r.maxFuel) {
+          r.fuel = Math.min(r.maxFuel, r.fuel + 0.2);
+        }
       }
     }
 
@@ -1342,18 +1607,25 @@
           continue;
         }
 
-        const distR = Math.hypot(rover.x - cell.x, rover.y - cell.y);
         const distB = Math.hypot(base.x - cell.x, base.y - cell.y);
+        let pickedUp = false;
 
-        if (distR <= rover.radius + 24 || distB <= 90) {
-          const addFuel = cell.value || 15;
-          base.fuel = Math.min(base.maxFuel, base.fuel + addFuel);
-          rover.fuel = Math.min(rover.maxFuel, rover.fuel + addFuel);
+        for (let r of activeRovers) {
+          if (r.isDead || r.isBoarded) continue;
+          const distR = Math.hypot(r.x - cell.x, r.y - cell.y);
+          if (distR <= r.radius + 24 || distB <= 90) {
+            const addFuel = cell.value || 15;
+            base.fuel = Math.min(base.maxFuel, base.fuel + addFuel);
+            r.fuel = Math.min(r.maxFuel, r.fuel + addFuel);
 
-          addFloatingText(cell.x, cell.y - 12, `+${addFuel} FUEL`, '#38bdf8');
-          spawnScrapShard(cell.x, cell.y, base.x, base.y, '#38bdf8');
-          gameState.energyCells.splice(cIdx, 1);
+            addFloatingText(cell.x, cell.y - 12, `+${addFuel} FUEL`, '#38bdf8');
+            spawnScrapShard(cell.x, cell.y, base.x, base.y, '#38bdf8');
+            gameState.energyCells.splice(cIdx, 1);
+            pickedUp = true;
+            break;
+          }
         }
+        if (pickedUp) continue;
       }
     }
 
@@ -1361,29 +1633,34 @@
     if (gameState.ruins) {
       for (let ruin of gameState.ruins) {
         ruin.pulse = (ruin.pulse || 0) + 0.05;
-        const distR = Math.hypot(rover.x - ruin.x, rover.y - ruin.y);
+        let beingHarvested = false;
 
-        if (!rover.isBoarded && distR <= ruin.radius + 35 && ruin.hasCore) {
-          ruin.beingHarvested = true;
-          ruin.harvestProgress = (ruin.harvestProgress || 0) + 0.75;
+        for (let r of activeRovers) {
+          if (r.isDead || r.isBoarded) continue;
+          const distR = Math.hypot(r.x - ruin.x, r.y - ruin.y);
 
-          if (Math.random() < 0.35) {
-            spawnScrapShard(ruin.x, ruin.y, rover.x, rover.y, '#ec4899');
-          }
+          if (distR <= ruin.radius + 35 && ruin.hasCore) {
+            beingHarvested = true;
+            ruin.harvestProgress = (ruin.harvestProgress || 0) + 0.75;
 
-          if (ruin.harvestProgress >= 100) {
-            ruin.hasCore = false;
-            ruin.beingHarvested = false;
-            gameState.techCores = (gameState.techCores || 0) + 1;
-            addFloatingText(ruin.x, ruin.y - 35, 'TECH CORE EXTRACTED!', '#ec4899');
-            addFloatingText(ruin.x, ruin.y - 55, 'DEFENSE SWARM DETECTED!', '#ef4444');
-            spawnSurgeHorde(gameState, 3000, 3000);
+            if (Math.random() < 0.35) {
+              spawnScrapShard(ruin.x, ruin.y, r.x, r.y, '#ec4899');
+            }
+
+            if (ruin.harvestProgress >= 100) {
+              ruin.hasCore = false;
+              beingHarvested = false;
+              gameState.techCores = (gameState.techCores || 0) + 1;
+              addFloatingText(ruin.x, ruin.y - 35, 'TECH CORE EXTRACTED!', '#ec4899');
+              addFloatingText(ruin.x, ruin.y - 55, 'DEFENSE SWARM DETECTED!', '#ef4444');
+              spawnSurgeHorde(gameState, 3000, 3000);
+            }
+            break;
           }
-        } else {
-          ruin.beingHarvested = false;
-          if (ruin.hasCore && ruin.harvestProgress > 0) {
-            ruin.harvestProgress = Math.max(0, ruin.harvestProgress - 0.25);
-          }
+        }
+        ruin.beingHarvested = beingHarvested;
+        if (!beingHarvested && ruin.hasCore && ruin.harvestProgress > 0) {
+          ruin.harvestProgress = Math.max(0, ruin.harvestProgress - 0.25);
         }
       }
     }
@@ -1405,20 +1682,24 @@
     if (gameState.weaponCaches) {
       for (let cache of gameState.weaponCaches) {
         if (!cache.isCollected) {
-          const distToRover = Math.hypot(rover.x - cache.x, rover.y - cache.y);
-          if (distToRover <= 55 || (distToRover <= 80 && keys.justPressed.e && localTarget === rover)) {
-            cache.isCollected = true;
-            rover.weapon = cache.type;
-            spawnExplosion(cache.x, cache.y, 22);
-            addFloatingText(rover.x, rover.y - 35, `⚔️ ${cache.title} ACQUIRED!`, '#fbbf24');
-            addFloatingText(rover.x, rover.y - 55, 'AUTO-DEFENSE ACTIVE WHILE GATHERING!', '#22c55e');
+          for (let r of activeRovers) {
+            if (r.isDead || r.isBoarded) continue;
+            const distToRover = Math.hypot(r.x - cache.x, r.y - cache.y);
+            if (distToRover <= 55) {
+              cache.isCollected = true;
+              r.weapon = cache.type;
+              spawnExplosion(cache.x, cache.y, 22);
+              addFloatingText(r.x, r.y - 35, `⚔️ ${cache.title} ACQUIRED!`, '#fbbf24');
+              addFloatingText(r.x, r.y - 55, 'AUTO-DEFENSE ACTIVE WHILE GATHERING!', '#22c55e');
+              break;
+            }
           }
         }
       }
     }
 
     updateFloatingTexts();
-    updateScrapShards(rover);
+    updateScrapShards(localTarget || rover);
   }
 
   // --- 6. INITIALIZE GAME STATE & SETUP ---
@@ -1428,28 +1709,13 @@
   const WORLD_WIDTH = 3000;
   const WORLD_HEIGHT = 3000;
 
-  const gameState = {
-    // 1. Central Base Fortress Tank
-    base: {
-      x: 1500,
-      y: 1500,
-      width: 150,
-      height: 95,
-      hp: 250,
-      maxHp: 250,
-      fuel: 100,
-      maxFuel: 100,
-      powerMode: 'engines', // engines, shields, turrets
-      shieldPulse: 0,
-      cannonAngle: 0,
-      cannonCooldown: 0,
-      turretRecoil: 0,
-      muzzleFlash: 0
-    },
-    // 2. Rover Scout Vehicle
-    rover: {
-      x: 1640,
-      y: 1500,
+  function createDefaultRover(id, x, y, name = 'P1 ALPHA', colorTheme = '#f97316') {
+    return {
+      id: id,
+      name: name,
+      colorTheme: colorTheme,
+      x: x,
+      y: y,
       vx: 0,
       vy: 0,
       width: 72,
@@ -1474,8 +1740,35 @@
       weaponTier: 1,
       autoWeaponCooldown: 0,
       autoWeaponAngle: 0,
-      autoWeaponFlash: 0
+      autoWeaponFlash: 0,
+      isDead: false,
+      respawnTimer: 0,
+      lastFullWarnTime: 0
+    };
+  }
+
+  const gameState = {
+    // 1. Central Base Fortress Tank
+    base: {
+      x: 1500,
+      y: 1500,
+      width: 150,
+      height: 95,
+      hp: 250,
+      maxHp: 250,
+      fuel: 100,
+      maxFuel: 100,
+      powerMode: 'engines', // engines, shields, turrets
+      shieldPulse: 0,
+      cannonAngle: 0,
+      cannonCooldown: 0,
+      turretRecoil: 0,
+      muzzleFlash: 0
     },
+    // 2. Dual Rover Scavenger Vehicles (P1 Alpha & P2 Beta)
+    rover: createDefaultRover('rover1', 1640, 1470, 'P1 ALPHA', '#f97316'),
+    rover2: createDefaultRover('rover2', 1640, 1530, 'P2 BETA', '#38bdf8'),
+    isGameOver: false,
     weaponStats: Object.assign({}, WEAPON_TIER_CONFIG[1]),
     buildSites: initBuildSites(),
     activeBatchIndex: 0,
@@ -1487,11 +1780,17 @@
     surgeWave: 1,
     weaponCaches: initWeaponCaches(WORLD_WIDTH, WORLD_HEIGHT),
     structures: [],
-    landscape: initLandscape(WORLD_WIDTH, WORLD_HEIGHT),
+    activeMap: activeMap,
+    rocks: activeMap.rocks || [],
+    boulders: activeMap.boulders || [],
+    rivers: activeMap.rivers || [],
+    crystals: activeMap.crystals || [],
+    trees: activeMap.trees || [],
+    landscape: [...(activeMap.rocks || []), ...(activeMap.boulders || [])],
     hazards: initHazards(WORLD_WIDTH, WORLD_HEIGHT),
     enemies: [],
     projectiles: [],
-    scrapNodes: initScrapNodes(WORLD_WIDTH, WORLD_HEIGHT, 22, initLandscape(WORLD_WIDTH, WORLD_HEIGHT)),
+    scrapNodes: initScrapNodes(WORLD_WIDTH, WORLD_HEIGHT, activeMap.crystals),
     energyCells: [],
     ruins: initRuins(WORLD_WIDTH, WORLD_HEIGHT),
     techCores: 0,
@@ -1501,9 +1800,86 @@
     wave: 1
   };
 
+  function killRover(rover, gs) {
+    if (rover.isDead) return;
+    rover.hp = 0;
+    rover.isDead = true;
+    rover.respawnTimer = 6.0;
+    rover.vx = 0;
+    rover.vy = 0;
+    spawnExplosion(rover.x, rover.y, 35);
+    addFloatingText(rover.x, rover.y - 35, `🚨 ${rover.name || 'ROVER'} DESTROYED!`, '#ef4444');
 
-  let localTarget = gameState.base;
-  let playerRole = 'base'; // 'base' or 'rover'
+    // Drop all cargo as physical loose scrap
+    if (rover.cargo > 0) {
+      const dropAmount = rover.cargo;
+      rover.cargo = 0;
+      const drops = Math.min(15, dropAmount);
+      const perDrop = Math.max(1, Math.floor(dropAmount / drops));
+      for (let s = 0; s < drops; s++) {
+        spawnLooseScrap(gs, rover.x + (Math.random() - 0.5) * 32, rover.y + (Math.random() - 0.5) * 32, perDrop);
+      }
+    }
+  }
+
+  function triggerGameOver(gs) {
+    if (gs.isGameOver) return;
+    gs.isGameOver = true;
+    gs.base.hp = 0;
+    spawnExplosion(gs.base.x, gs.base.y, 65);
+    addFloatingText(gs.base.x, gs.base.y - 70, '☠️ CITADEL OVERRUN - MISSION FAILED!', '#ef4444');
+  }
+
+  function resetGame() {
+    gameState.isGameOver = false;
+    gameState.gameTime = 0;
+    gameState.ambientSpawnTimer = 0;
+    gameState.surgeCycleTimer = 0;
+    gameState.surgeAlertTimer = 0;
+    gameState.surgeWave = 1;
+    gameState.wave = 1;
+    gameState.kills = 0;
+    gameState.baseScrap = 35;
+    gameState.techCores = 0;
+    gameState.enemies = [];
+    gameState.projectiles = [];
+    gameState.looseScraps = [];
+
+    // Reset base
+    gameState.base.hp = gameState.base.maxHp;
+    gameState.base.fuel = gameState.base.maxFuel;
+    gameState.base.cannonCooldown = 0;
+    gameState.base.powerMode = 'engines';
+
+    // Reset rovers
+    gameState.rover = createDefaultRover('rover1', 1640, 1470, 'P1 ALPHA', '#f97316');
+    gameState.rover2 = createDefaultRover('rover2', 1640, 1530, 'P2 BETA', '#38bdf8');
+    localTarget = (playerRole === 'rover2') ? gameState.rover2 : gameState.rover;
+
+    // Reset weapon stats and build sites
+    gameState.weaponStats = Object.assign({}, WEAPON_TIER_CONFIG[1]);
+    gameState.buildSites = initBuildSites();
+    gameState.activeBatchIndex = 0;
+    gameState.structures = [];
+
+    // Reload active map from localStorage if user made changes in MapEditor.html
+    const reloadedMap = loadActiveMap();
+    gameState.activeMap = reloadedMap;
+    gameState.rocks = reloadedMap.rocks || [];
+    gameState.boulders = reloadedMap.boulders || [];
+    gameState.rivers = reloadedMap.rivers || [];
+    gameState.crystals = reloadedMap.crystals || [];
+    gameState.trees = reloadedMap.trees || [];
+    gameState.landscape = [...(reloadedMap.rocks || []), ...(reloadedMap.boulders || [])];
+
+    // Reset nodes and ruins
+    gameState.scrapNodes = initScrapNodes(WORLD_WIDTH, WORLD_HEIGHT, reloadedMap.crystals);
+    gameState.weaponCaches = initWeaponCaches(WORLD_WIDTH, WORLD_HEIGHT);
+    gameState.energyCells = [];
+  }
+
+  let localTarget = gameState.rover;
+  let playerRole = 'rover'; // 'rover', 'rover1', 'rover2', or 'base'
   let network = null;
   let isHost = true;
   let isSolo = true;
@@ -1532,32 +1908,33 @@
     addFloatingText(gameState.base.x, gameState.base.y - 60, `BASE POWER: ${mode.toUpperCase()}`, colors[mode] || '#ffffff');
   }
 
-  function toggleBoarding() {
-    const rover = gameState.rover;
+  function toggleBoarding(rover = gameState.rover) {
     const base = gameState.base;
     const d = Math.hypot(rover.x - base.x, rover.y - base.y);
 
     if (rover.isBoarded) {
       rover.isBoarded = false;
-      rover.x = base.x + 95;
+      rover.x = base.x + (rover.id === 'rover2' ? -95 : 95);
       rover.y = base.y;
-      addFloatingText(rover.x, rover.y - 25, 'ROVER DEPLOYED', '#38bdf8');
+      addFloatingText(rover.x, rover.y - 25, `${rover.name || 'ROVER'} DEPLOYED`, '#38bdf8');
     } else if (d <= 140) {
       rover.isBoarded = true;
       if (rover.cargo > 0) {
         gameState.baseScrap += rover.cargo;
         rover.cargo = 0;
       }
-      addFloatingText(base.x, base.y - 60, 'ROVER DOCKED IN BASE', '#22c55e');
+      addFloatingText(base.x, base.y - 60, `${rover.name || 'ROVER'} DOCKED IN BASE`, '#22c55e');
     } else {
       addFloatingText(rover.x, rover.y - 25, 'TOO FAR FROM BASE TO DOCK', '#ef4444');
     }
   }
 
   // --- IN-WORLD PROXIMITY INTERACTION & BUILD SITES UPDATE ("KINGDOM" SYSTEM) ---
-  function updateBuildSites(gameState, rover, base, keys) {
+  function updateBuildSites(gameState, rover, base, keys, rover2 = null) {
     if (!gameState.buildSites) return;
     const activeSites = gameState.buildSites.filter(s => s.active);
+    const activeRovers = [rover];
+    if (rover2 && !isSolo) activeRovers.push(rover2);
 
     for (let site of activeSites) {
       site.pulse = (site.pulse || 0) + 0.05;
@@ -1566,58 +1943,64 @@
 
       // 1. Proximity interaction for UNBUILT active sites
       if (!site.built) {
-        const distRover = Math.hypot(rover.x - site.x, rover.y - site.y);
-        const distBase = Math.hypot(base.x - site.x, base.y - site.y);
-        site.playerNear = distRover <= 45;
+        site.playerNear = false;
+        for (let r of activeRovers) {
+          if (r.isDead || r.isBoarded) continue;
+          const distRover = Math.hypot(r.x - site.x, r.y - site.y);
+          const distBase = Math.hypot(base.x - site.x, base.y - site.y);
 
-        if (site.playerNear) {
-          if (site.depositCooldown === undefined) site.depositCooldown = 0;
-          site.depositCooldown++;
-          const interval = keys.e ? 2 : 5; // Faster deposit if holding E
+          if (distRover <= 45) {
+            site.playerNear = true;
+            if (site.depositCooldown === undefined) site.depositCooldown = 0;
+            site.depositCooldown++;
+            const interval = 4; // continuous auto-deposit while in zone
 
-          if (site.depositCooldown >= interval) {
-            site.depositCooldown = 0;
+            if (site.depositCooldown >= interval) {
+              site.depositCooldown = 0;
 
-            // Deposit Scrap: from Rover cargo or Base vault
-            if (site.currentScrap < site.costScrap) {
-              if (rover.cargo > 0) {
-                rover.cargo -= 1;
-                site.currentScrap += 1;
-                spawnScrapShard(rover.x, rover.y, site.x, site.y, '#facc15');
-              } else if (distBase <= 160 && gameState.baseScrap > 0) {
-                gameState.baseScrap -= 1;
-                site.currentScrap += 1;
-                spawnScrapShard(base.x, base.y, site.x, site.y, '#38bdf8');
-              }
-            }
-
-            // Deposit Tech Cores if required
-            if (site.costCores > 0 && site.currentCores < site.costCores && gameState.techCores > 0) {
-              gameState.techCores -= 1;
-              site.currentCores += 1;
-              spawnScrapShard(rover.x, rover.y, site.x, site.y, '#ec4899');
-              addFloatingText(site.x, site.y - 20, '+1 TECH CORE DEPOSITED', '#ec4899');
-            }
-
-            // Construction completion check
-            if (site.currentScrap >= site.costScrap && site.currentCores >= site.costCores) {
-              site.built = true;
-              site.tier = Math.max(1, (site.tier || 0) + 1);
-              site.hp = site.maxHp;
-
-              spawnExplosion(site.x, site.y, 18);
-              spawnRepairPulseWave(site.x, site.y, 110);
-              addFloatingText(site.x, site.y - 35, `+${site.name.toUpperCase()} COMPLETE!`, '#22c55e');
-
-              // If weapon forge, upgrade Rover weapon tier!
-              if (site.type === 'weapon_forge') {
-                rover.weaponTier = Math.min(4, (rover.weaponTier || 1) + 1);
-                gameState.weaponStats = Object.assign({}, WEAPON_TIER_CONFIG[rover.weaponTier]);
-                spawnExplosion(rover.x, rover.y, 14);
-                addFloatingText(rover.x, rover.y - 45, `⚔️ WEAPON UPGRADED: ${gameState.weaponStats.name.toUpperCase()}!`, '#ec4899');
+              // Deposit Scrap: from Rover cargo or Base vault
+              if (site.currentScrap < site.costScrap) {
+                if (r.cargo > 0) {
+                  r.cargo -= 1;
+                  site.currentScrap += 1;
+                  spawnScrapShard(r.x, r.y, site.x, site.y, '#facc15');
+                } else if (distBase <= 160 && gameState.baseScrap > 0) {
+                  gameState.baseScrap -= 1;
+                  site.currentScrap += 1;
+                  spawnScrapShard(base.x, base.y, site.x, site.y, '#38bdf8');
+                }
               }
 
-              checkBatchProgression(gameState);
+              // Deposit Tech Cores if required
+              if (site.costCores > 0 && site.currentCores < site.costCores && gameState.techCores > 0) {
+                gameState.techCores -= 1;
+                site.currentCores += 1;
+                spawnScrapShard(r.x, r.y, site.x, site.y, '#ec4899');
+                addFloatingText(site.x, site.y - 20, '+1 TECH CORE DEPOSITED', '#ec4899');
+              }
+
+              // Construction completion check
+              if (site.currentScrap >= site.costScrap && site.currentCores >= site.costCores) {
+                site.built = true;
+                site.tier = Math.max(1, (site.tier || 0) + 1);
+                site.hp = site.maxHp;
+
+                spawnExplosion(site.x, site.y, 18);
+                spawnRepairPulseWave(site.x, site.y, 110);
+                addFloatingText(site.x, site.y - 35, `+${site.name.toUpperCase()} COMPLETE!`, '#22c55e');
+
+                // If weapon forge, upgrade both rovers weapon tier!
+                if (site.type === 'weapon_forge') {
+                  const nextTier = Math.min(4, ((rover.weaponTier || 1) + 1));
+                  rover.weaponTier = nextTier;
+                  if (rover2) rover2.weaponTier = nextTier;
+                  gameState.weaponStats = Object.assign({}, WEAPON_TIER_CONFIG[nextTier]);
+                  spawnExplosion(r.x, r.y, 14);
+                  addFloatingText(r.x, r.y - 45, `⚔️ WEAPON UPGRADED: ${gameState.weaponStats.name.toUpperCase()}!`, '#ec4899');
+                }
+
+                checkBatchProgression(gameState);
+              }
             }
           }
         }
@@ -1625,10 +2008,9 @@
 
       // 2. Active Defense behavior for BUILT sites
       if (site.built) {
-        // WALLS with Gate: open when rover is close
+        // WALLS with Gate: open when ANY rover is close
         if (site.type === 'wall') {
-          const dR = Math.hypot(rover.x - site.x, rover.y - site.y);
-          site.isOpen = dR < 70;
+          site.isOpen = activeRovers.some(r => !r.isDead && Math.hypot(r.x - site.x, r.y - site.y) < 70);
         }
 
         // TOWERS: autonomous targeting and firing
@@ -1713,8 +2095,10 @@
             if (Math.hypot(base.x - site.x, base.y - site.y) <= 240) {
               base.hp = Math.min(base.maxHp, base.hp + 10);
             }
-            if (Math.hypot(rover.x - site.x, rover.y - site.y) <= 240) {
-              rover.hp = Math.min(rover.maxHp, rover.hp + 10);
+            for (let r of activeRovers) {
+              if (!r.isDead && Math.hypot(r.x - site.x, r.y - site.y) <= 240) {
+                r.hp = Math.min(r.maxHp, r.hp + 10);
+              }
             }
           }
         }
@@ -1726,7 +2110,7 @@
   function handleNetworkData(data) {
     if (data.type === 'INPUT') {
       remoteKeys = data.keys || {};
-      if (remoteKeys.toggleBoard) toggleBoarding();
+      if (remoteKeys.toggleBoard && gameState.rover2) toggleBoarding(gameState.rover2);
     } else if (data.type === 'POWER_MODE') {
       setPowerMode(data.mode);
     } else if (data.type === 'BUILD_DEPOSIT') {
@@ -1746,6 +2130,8 @@
       const s = data.state;
       if (s.base) Object.assign(gameState.base, s.base);
       if (s.rover) Object.assign(gameState.rover, s.rover);
+      if (s.rover2 && gameState.rover2) Object.assign(gameState.rover2, s.rover2);
+      if (typeof s.isGameOver === 'boolean') gameState.isGameOver = s.isGameOver;
       if (s.structures) gameState.structures = s.structures;
       if (s.enemies) gameState.enemies = s.enemies;
       if (s.projectiles) gameState.projectiles = s.projectiles;
@@ -1754,13 +2140,15 @@
       if (s.ruins) gameState.ruins = s.ruins;
       if (typeof s.techCores === 'number') gameState.techCores = s.techCores;
       if (typeof s.baseScrap === 'number') gameState.baseScrap = s.baseScrap;
-      if (Array.isArray(s.sectorsBuilt)) gameState.sectorsBuilt = s.sectorsBuilt;
-      if (typeof s.reinforceLevel === 'number') gameState.reinforceLevel = s.reinforceLevel;
+      if (s.buildSites) gameState.buildSites = s.buildSites;
+      if (s.looseScraps) gameState.looseScraps = s.looseScraps;
+      if (s.weaponStats) gameState.weaponStats = s.weaponStats;
       if (s.upgrades) gameState.upgrades = s.upgrades;
       if (s.weaponCaches) gameState.weaponCaches = s.weaponCaches;
-      if (s.rover && s.rover.weapon) gameState.rover.weapon = s.rover.weapon;
       if (typeof s.kills === 'number') gameState.kills = s.kills;
       if (typeof s.wave === 'number') gameState.wave = s.wave;
+      if (typeof s.surgeWave === 'number') gameState.surgeWave = s.surgeWave;
+      if (typeof s.gameTime === 'number') gameState.gameTime = s.gameTime;
     }
   }
 
@@ -1773,45 +2161,40 @@
   const hudRoleEl = document.getElementById('hud-role');
   const hudRoomEl = document.getElementById('hud-room-display');
 
-  // Single Player flow
+  function startSinglePlayer(role = 'rover') {
+    isSolo = true;
+    isHost = true;
+    gameStarted = true;
+    playerRole = 'rover';
+    localTarget = gameState.rover;
+
+    if (lobbyMain) lobbyMain.style.display = 'none';
+    if (lobbySingle) lobbySingle.style.display = 'none';
+    const uiLayer = document.getElementById('ui-layer');
+    if (uiLayer) uiLayer.style.display = 'none';
+    if (hudEl) hudEl.style.display = 'none';
+
+    if (hudRoleEl) {
+      hudRoleEl.textContent = 'ROVER SCOUT (ALPHA)';
+      hudRoleEl.className = 'badge badge-scavenger';
+    }
+    if (hudRoomEl) hudRoomEl.textContent = 'Solo (Scavenger)';
+  }
+
+  // Single Player flow: Click button to start directly as Scavenger Rover!
   const btnMenuSingle = document.getElementById('btn-menu-single');
   if (btnMenuSingle) {
     btnMenuSingle.addEventListener('click', () => {
-      lobbyMain.style.display = 'none';
-      lobbySingle.style.display = 'flex';
+      startSinglePlayer('rover');
     });
   }
 
   const btnBackSingle = document.getElementById('btn-back-single');
   if (btnBackSingle) {
     btnBackSingle.addEventListener('click', () => {
-      lobbySingle.style.display = 'none';
-      lobbyMain.style.display = 'flex';
+      if (lobbySingle) lobbySingle.style.display = 'none';
+      if (lobbyMain) lobbyMain.style.display = 'flex';
     });
-  }
-
-  function startSinglePlayer(role) {
-    isSolo = true;
-    isHost = true;
-    gameStarted = true;
-    playerRole = role;
-    localTarget = role === 'rover' ? gameState.rover : gameState.base;
-
-    lobbySingle.style.display = 'none';
-    const uiLayer = document.getElementById('ui-layer');
-    if (uiLayer) uiLayer.style.display = 'none';
-    if (hudEl) hudEl.style.display = 'none';
-
-    if (hudRoleEl) {
-      if (role === 'rover') {
-        hudRoleEl.textContent = 'ROVER SCOUT';
-        hudRoleEl.className = 'badge badge-scavenger';
-      } else {
-        hudRoleEl.textContent = 'BASE COMMANDER';
-        hudRoleEl.className = 'badge badge-commander';
-      }
-    }
-    if (hudRoomEl) hudRoomEl.textContent = 'Solo (Tab to switch)';
   }
 
   const btnSelectRover = document.getElementById('btn-select-rover');
@@ -1821,23 +2204,23 @@
 
   const btnSelectBase = document.getElementById('btn-select-base');
   if (btnSelectBase) {
-    btnSelectBase.addEventListener('click', () => startSinglePlayer('base'));
+    btnSelectBase.addEventListener('click', () => startSinglePlayer('rover'));
   }
 
   // Multiplayer flow
   const btnMenuMulti = document.getElementById('btn-menu-multi');
   if (btnMenuMulti) {
     btnMenuMulti.addEventListener('click', () => {
-      lobbyMain.style.display = 'none';
-      lobbyMulti.style.display = 'flex';
+      if (lobbyMain) lobbyMain.style.display = 'none';
+      if (lobbyMulti) lobbyMulti.style.display = 'flex';
     });
   }
 
   const btnBackMulti = document.getElementById('btn-back-multi');
   if (btnBackMulti) {
     btnBackMulti.addEventListener('click', () => {
-      lobbyMulti.style.display = 'none';
-      lobbyMain.style.display = 'flex';
+      if (lobbyMulti) lobbyMulti.style.display = 'none';
+      if (lobbyMain) lobbyMain.style.display = 'flex';
     });
   }
 
@@ -1850,31 +2233,31 @@
     btnHostAction.addEventListener('click', () => {
       isHost = true;
       isSolo = false;
-      playerRole = 'base';
-      localTarget = gameState.base;
-      hostCodeDisplay.style.display = 'block';
+      playerRole = 'rover1';
+      localTarget = gameState.rover;
+      if (hostCodeDisplay) hostCodeDisplay.style.display = 'block';
 
       network = new PeerManager(true, null, handleNetworkData, (id) => {
-        roomCodeBadge.textContent = id;
-        hudRoomEl.textContent = `Room: ${id}`;
+        if (roomCodeBadge) roomCodeBadge.textContent = id;
+        if (hudRoomEl) hudRoomEl.textContent = `Room: ${id}`;
       });
 
-      // Start game immediately so Commander can fortify while waiting for partner
+      // Start game immediately as Scavenger 1 (Alpha)
       gameStarted = true;
-      lobbyMulti.style.display = 'none';
+      if (lobbyMulti) lobbyMulti.style.display = 'none';
       const uiLayer = document.getElementById('ui-layer');
       if (uiLayer) uiLayer.style.display = 'none';
       if (hudEl) hudEl.style.display = 'none';
       if (hudRoleEl) {
-        hudRoleEl.textContent = 'BASE COMMANDER (HOST)';
-        hudRoleEl.className = 'badge badge-commander';
+        hudRoleEl.textContent = 'SCAVENGER 1 - ALPHA (HOST)';
+        hudRoleEl.className = 'badge badge-scavenger';
       }
     });
   }
 
   if (btnCopyCode) {
     btnCopyCode.addEventListener('click', () => {
-      const code = roomCodeBadge.textContent;
+      const code = roomCodeBadge ? roomCodeBadge.textContent : '';
       if (code && code !== 'Generating...') {
         navigator.clipboard.writeText(code).then(() => {
           btnCopyCode.textContent = '✅ Copied!';
@@ -1888,7 +2271,7 @@
   const inputJoinCode = document.getElementById('input-join-code');
   if (btnJoinAction) {
     btnJoinAction.addEventListener('click', () => {
-      const code = inputJoinCode.value.trim();
+      const code = inputJoinCode ? inputJoinCode.value.trim() : '';
       if (!code) {
         alert('Please enter a Room Code first!');
         return;
@@ -1896,17 +2279,17 @@
 
       isHost = false;
       isSolo = false;
-      playerRole = 'rover';
-      localTarget = gameState.rover;
+      playerRole = 'rover2';
+      localTarget = gameState.rover2;
       gameStarted = true;
 
-      lobbyMulti.style.display = 'none';
+      if (lobbyMulti) lobbyMulti.style.display = 'none';
       const uiLayer = document.getElementById('ui-layer');
       if (uiLayer) uiLayer.style.display = 'none';
       if (hudEl) hudEl.style.display = 'none';
       if (hudRoleEl) {
-        hudRoleEl.textContent = 'ROVER SCOUT (CLIENT)';
-        hudRoleEl.className = 'badge badge-scavenger';
+        hudRoleEl.textContent = 'SCAVENGER 2 - BETA (CLIENT)';
+        hudRoleEl.className = 'badge badge-commander';
       }
       if (hudRoomEl) hudRoomEl.textContent = `Connecting: ${code}...`;
 
@@ -1928,26 +2311,387 @@
   if (btnBoard) btnBoard.addEventListener('click', () => toggleBoarding());
 
   // --- 8. SIMULATION UPDATE ---
+  function simulateRover(rover, roverInputs, isDirectControl, mouseWorldX, mouseWorldY, dt) {
+    if (!rover) return;
+
+    if (rover.isDead) {
+      rover.vx = 0;
+      rover.vy = 0;
+      rover.respawnTimer -= dt;
+      if (rover.respawnTimer <= 0) {
+        rover.isDead = false;
+        rover.hp = rover.maxHp;
+        rover.fuel = rover.maxFuel;
+        rover.cargo = 0;
+        rover.x = gameState.base.x + (rover.id === 'rover2' ? -95 : 95);
+        rover.y = gameState.base.y;
+        rover.vx = 0;
+        rover.vy = 0;
+        spawnRepairPulseWave(rover.x, rover.y, 85);
+        addFloatingText(rover.x, rover.y - 35, `${rover.name || 'ROVER'} REBUILT & REDEPLOYED!`, '#22c55e');
+      }
+      return;
+    }
+
+    if (rover.fireCooldown > 0) rover.fireCooldown--;
+    if (rover.muzzleFlash > 0) rover.muzzleFlash--;
+
+    if (rover.isBoarded) {
+      rover.x = gameState.base.x;
+      rover.y = gameState.base.y;
+      rover.vx = 0;
+      rover.vy = 0;
+      rover.angle = 0;
+      if (isDirectControl) {
+        rover.aimAngle = Math.atan2(mouseWorldY - rover.y, mouseWorldX - rover.x);
+      } else if (typeof roverInputs.aimAngle === 'number') {
+        rover.aimAngle = roverInputs.aimAngle;
+      }
+      return;
+    }
+
+    // Movement Inputs
+    let moveX = 0, moveY = 0;
+    if (roverInputs.w || roverInputs.ArrowUp) moveY -= 1;
+    if (roverInputs.s || roverInputs.ArrowDown) moveY += 1;
+    if (roverInputs.a || roverInputs.ArrowLeft) moveX -= 1;
+    if (roverInputs.d || roverInputs.ArrowRight) moveX += 1;
+
+    const mLen = Math.hypot(moveX, moveY);
+    if (mLen > 0) {
+      rover.vx = (moveX / mLen) * rover.speed;
+      rover.vy = (moveY / mLen) * rover.speed;
+      rover.angle = Math.atan2(rover.vy, rover.vx);
+      rover.lastDirIndex = getDirection8Index(rover.vx, rover.vy, rover.lastDirIndex);
+      rover.treadAnim += rover.speed * 0.4;
+    } else {
+      rover.vx *= 0.8;
+      rover.vy *= 0.8;
+    }
+
+    // Cliff & Canyon Chasm Collision Prevention
+    const testRoverX = rover.x + rover.vx;
+    const testRoverY = rover.y + rover.vy;
+
+    if (isWalkable(testRoverX, testRoverY)) {
+      rover.x = testRoverX;
+      rover.y = testRoverY;
+    } else {
+      // Near canyon rim or cliff face: test smooth sliding along edge
+      let slid = false;
+      if (isWalkable(testRoverX, rover.y)) {
+        rover.x = testRoverX;
+        rover.vy *= 0.5;
+        slid = true;
+      } else if (isWalkable(rover.x, testRoverY)) {
+        rover.y = testRoverY;
+        rover.vx *= 0.5;
+        slid = true;
+      }
+      if (!slid) {
+        rover.vx = 0;
+        rover.vy = 0;
+      }
+      // Canyon rim tire dirt puff
+      if (Math.random() < 0.2) {
+        spawnBloodSplat(rover.x, rover.y, 1, '#78716c');
+      }
+    }
+
+    // Landscape rock & boulder collisions & sliding
+    if (gameState.landscape) {
+      for (let rock of gameState.landscape) {
+        const dx = rover.x - rock.x;
+        const dy = rover.y - rock.y;
+        const dist = Math.hypot(dx, dy);
+        const minDist = rover.radius + rock.radius;
+        if (dist < minDist && dist > 0) {
+          const overlap = minDist - dist;
+          rover.x += (dx / dist) * overlap;
+          rover.y += (dy / dist) * overlap;
+          const dot = rover.vx * (dx / dist) + rover.vy * (dy / dist);
+          if (dot < 0) {
+            rover.vx -= (dx / dist) * dot;
+            rover.vy -= (dy / dist) * dot;
+          }
+        }
+      }
+    }
+
+    // River wading slow & splashes
+    if (gameState.rivers && checkRiverSlow(rover.x, rover.y, gameState.rivers)) {
+      rover.vx *= 0.88;
+      rover.vy *= 0.88;
+      if (Math.hypot(rover.vx, rover.vy) > 0.5 && Math.random() < 0.25) {
+        spawnWaterSplash(rover.x, rover.y);
+      }
+    }
+
+    // Alien Oxygen Tree Healing & Fuel Replenishment Aura
+    if (gameState.trees) {
+      for (let tree of gameState.trees) {
+        const d = Math.hypot(rover.x - tree.x, rover.y - tree.y);
+        const aura = tree.auraRadius || 135;
+        if (d < aura) {
+          rover.hp = Math.min(rover.maxHp, rover.hp + 0.10); // ~6 HP/sec
+          rover.fuel = Math.min(rover.maxFuel, rover.fuel + 0.14); // ~8.4 fuel/sec
+          if (Math.random() < 0.15) {
+            spawnOxygenMote(rover.x + (Math.random() - 0.5) * 20, rover.y - 10 + (Math.random() - 0.5) * 20);
+          }
+        }
+      }
+    }
+
+    // Hazard Tar Pits
+    if (gameState.hazards) {
+      for (let h of gameState.hazards) {
+        if (Math.hypot(rover.x - h.x, rover.y - h.y) < h.radius + rover.radius) {
+          rover.vx *= 0.88;
+          rover.vy *= 0.88;
+          if (Math.random() < 0.22) {
+            spawnBloodSplat(rover.x, rover.y, 2, '#1e293b');
+          }
+          break;
+        }
+      }
+    }
+
+    // Auto-aim tracks nearest approaching enemy within 330px
+    let closestEnemyToRover = null;
+    let closestDistToRover = 330;
+    for (let e of gameState.enemies) {
+      const d = Math.hypot(e.x - rover.x, e.y - rover.y);
+      if (d < closestDistToRover) {
+        closestDistToRover = d;
+        closestEnemyToRover = e;
+      }
+    }
+
+    if (closestEnemyToRover) {
+      rover.aimAngle = Math.atan2(closestEnemyToRover.y - rover.y, closestEnemyToRover.x - rover.x);
+    } else if (isDirectControl) {
+      rover.aimAngle = Math.atan2(mouseWorldY - rover.y, mouseWorldX - rover.x);
+    } else if (typeof roverInputs.aimAngle === 'number') {
+      rover.aimAngle = roverInputs.aimAngle;
+    }
+
+    // Autonomous Weapon Point-Defense
+    if (rover.weapon && !rover.isBoarded) {
+      if (!rover.autoWeaponCooldown) rover.autoWeaponCooldown = 0;
+      if (rover.autoWeaponCooldown > 0) rover.autoWeaponCooldown--;
+      if (rover.autoWeaponFlash > 0) rover.autoWeaponFlash--;
+
+      if (rover.weapon === 'vulcan_sentry') {
+        if (rover.autoWeaponCooldown <= 0 && gameState.enemies.length > 0) {
+          let nearE = null, nearD = 340;
+          for (let e of gameState.enemies) {
+            const d = Math.hypot(e.x - rover.x, e.y - rover.y);
+            if (d < nearD) { nearD = d; nearE = e; }
+          }
+
+          if (nearE) {
+            rover.autoWeaponCooldown = 8;
+            rover.autoWeaponAngle = Math.atan2(nearE.y - rover.y, nearE.x - rover.x);
+            rover.autoWeaponFlash = 3;
+
+            const bX = rover.x + Math.cos(rover.autoWeaponAngle) * 20;
+            const bY = rover.y + Math.sin(rover.autoWeaponAngle) * 20;
+            gameState.projectiles.push({
+              type: 'vulcan_bullet',
+              x: bX, y: bY,
+              vx: Math.cos(rover.autoWeaponAngle) * 19,
+              vy: Math.sin(rover.autoWeaponAngle) * 19,
+              radius: 3,
+              damage: 16,
+              dist: 0,
+              maxDist: 380,
+              color: '#fbbf24'
+            });
+          }
+        }
+      } else if (rover.weapon === 'swarm_missiles') {
+        if (rover.autoWeaponCooldown <= 0 && gameState.enemies.length > 0) {
+          let targetEnemy = null;
+          let closestDist = 420;
+          for (let e of gameState.enemies) {
+            const d = Math.hypot(e.x - rover.x, e.y - rover.y);
+            if (d < closestDist) { closestDist = d; targetEnemy = e; }
+          }
+
+          if (targetEnemy) {
+            rover.autoWeaponCooldown = 32;
+            rover.autoWeaponFlash = 4;
+            const launchAngle = Math.atan2(targetEnemy.y - rover.y, targetEnemy.x - rover.x);
+
+            for (let side = -1; side <= 1; side += 2) {
+              gameState.projectiles.push({
+                type: 'homing_missile',
+                x: rover.x + Math.cos(launchAngle + (Math.PI / 2) * side) * 16,
+                y: rover.y + Math.sin(launchAngle + (Math.PI / 2) * side) * 16,
+                vx: Math.cos(launchAngle + (Math.random() - 0.5) * 0.4) * 6,
+                vy: Math.sin(launchAngle + (Math.random() - 0.5) * 0.4) * 6,
+                speed: 10.5,
+                target: targetEnemy,
+                targetId: targetEnemy.id,
+                radius: 4.5,
+                damage: 38,
+                splashRadius: 50,
+                dist: 0,
+                maxDist: 500,
+                color: '#ec4899'
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // Rover main armament: AUTO-FIRES when enemies get closer, or when player holds shoot
+    const roverManualShoot = isDirectControl ? keys.mouse.isDown : (roverInputs.isMouseDown);
+    const roverShouldShoot = (closestEnemyToRover !== null || roverManualShoot) && !rover.isBoarded;
+
+    if (roverShouldShoot && rover.fireCooldown <= 0) {
+      if (rover.weapon === 'vulcan_sentry') {
+        rover.fireCooldown = 8;
+        rover.muzzleFlash = 4;
+        const barrelLen = 22;
+        const pSpeed = 16;
+        for (let aOffset of [-0.14, 0, 0.14]) {
+          const a = rover.aimAngle + aOffset;
+          gameState.projectiles.push({
+            type: 'rover_blaster',
+            x: rover.x + Math.cos(a) * barrelLen,
+            y: rover.y + Math.sin(a) * barrelLen,
+            vx: Math.cos(a) * pSpeed,
+            vy: Math.sin(a) * pSpeed,
+            radius: 4,
+            damage: 28,
+            pierceCount: 0,
+            knockback: 6,
+            dist: 0,
+            maxDist: 650,
+            color: '#f59e0b'
+          });
+        }
+      } else if (rover.weapon === 'swarm_missiles') {
+        rover.fireCooldown = 16;
+        rover.muzzleFlash = 5;
+        const barrelLen = 24;
+        const pSpeed = 14;
+        gameState.projectiles.push({
+          type: 'rover_blaster',
+          x: rover.x + Math.cos(rover.aimAngle) * barrelLen,
+          y: rover.y + Math.sin(rover.aimAngle) * barrelLen,
+          vx: Math.cos(rover.aimAngle) * pSpeed,
+          vy: Math.sin(rover.aimAngle) * pSpeed,
+          radius: 6,
+          damage: 70,
+          pierceCount: 1,
+          knockback: 14,
+          dist: 0,
+          maxDist: 720,
+          color: '#ec4899',
+          splashRadius: 40
+        });
+      } else {
+        const wCfg = gameState.weaponStats || WEAPON_TIER_CONFIG[1];
+        rover.fireCooldown = wCfg.fireRate;
+        rover.muzzleFlash = 4;
+        const barrelLen = 22;
+        const pSpeed = wCfg.speed || 16;
+        const count = wCfg.projectileCount || 1;
+
+        if (count === 1) {
+          const bX = rover.x + Math.cos(rover.aimAngle) * barrelLen;
+          const bY = rover.y + Math.sin(rover.aimAngle) * barrelLen;
+          gameState.projectiles.push({
+            type: 'rover_blaster',
+            x: bX, y: bY,
+            vx: Math.cos(rover.aimAngle) * pSpeed,
+            vy: Math.sin(rover.aimAngle) * pSpeed,
+            radius: wCfg.radius || 4,
+            damage: wCfg.damage,
+            pierceCount: wCfg.pierceCount || 0,
+            knockback: wCfg.knockback || 0,
+            dist: 0,
+            maxDist: 680,
+            color: wCfg.color || '#38bdf8'
+          });
+        } else {
+          const spread = wCfg.spreadAngle || 0.24;
+          const offsets = [-spread, 0, spread];
+          for (let off of offsets) {
+            const a = rover.aimAngle + off;
+            gameState.projectiles.push({
+              type: 'rover_blaster',
+              x: rover.x + Math.cos(a) * barrelLen,
+              y: rover.y + Math.sin(a) * barrelLen,
+              vx: Math.cos(a) * pSpeed,
+              vy: Math.sin(a) * pSpeed,
+              radius: wCfg.radius || 4,
+              damage: wCfg.damage,
+              pierceCount: wCfg.pierceCount || 0,
+              knockback: wCfg.knockback || 10,
+              dist: 0,
+              maxDist: 620,
+              color: wCfg.color || '#f59e0b'
+            });
+          }
+        }
+
+        if (wCfg.hasMissiles && closestEnemyToRover) {
+          gameState.projectiles.push({
+            type: 'homing_missile',
+            x: rover.x + Math.cos(rover.aimAngle + Math.PI / 2) * 14,
+            y: rover.y + Math.sin(rover.aimAngle + Math.PI / 2) * 14,
+            vx: Math.cos(rover.aimAngle) * 5,
+            vy: Math.sin(rover.aimAngle) * 5,
+            speed: wCfg.homingSpeed || 11,
+            target: closestEnemyToRover,
+            targetId: closestEnemyToRover.id,
+            radius: 4.5,
+            damage: 38,
+            splashRadius: 45,
+            dist: 0,
+            maxDist: 520,
+            color: '#ec4899'
+          });
+        }
+      }
+    }
+
+    // World boundary clamping
+    rover.x = Math.max(30, Math.min(rover.x, WORLD_WIDTH - 30));
+    rover.y = Math.max(30, Math.min(rover.y, WORLD_HEIGHT - 30));
+  }
+
   function update() {
     if (!gameStarted) return;
 
+    // Check for Game Over restart
+    if (gameState.isGameOver) {
+      if (keys.justPressed.r || keys.mouse.clicked) {
+        resetGame();
+      }
+      return;
+    }
+
     const base = gameState.base;
     const rover = gameState.rover;
+    const rover2 = gameState.rover2;
+    const activeRovers = [rover];
+    if (rover2 && !isSolo) activeRovers.push(rover2);
+    const activeLocalRover = (localTarget === rover2) ? rover2 : rover;
 
     const camX = canvas.width / 2 - localTarget.x;
     const camY = canvas.height / 2 - localTarget.y;
     const mouseWorldX = keys.mouse.x - camX;
     const mouseWorldY = keys.mouse.y - camY;
 
-    // Hotkeys
+    // Hotkeys: Tab toggles camera between local rover and base citadel
     if (keys.justPressed.Tab) {
-      localTarget = localTarget === base ? rover : base;
-      playerRole = localTarget === rover ? 'rover' : 'base';
-      const targetRoleName = localTarget === rover ? 'ROVER SCOUT' : 'BASE COMMANDER';
-      if (hudRoleEl) {
-        hudRoleEl.textContent = targetRoleName;
-        hudRoleEl.className = localTarget === rover ? 'badge badge-scavenger' : 'badge badge-commander';
-      }
+      localTarget = (localTarget === activeLocalRover) ? base : activeLocalRover;
+      const targetRoleName = (localTarget === base) ? 'BASE CITADEL' : (activeLocalRover.name || 'ROVER');
       addFloatingText(localTarget.x, localTarget.y - 45, `FOCUS: ${targetRoleName}`, '#38bdf8');
     }
 
@@ -1958,18 +2702,27 @@
 
     // Docking / Boarding Toggle
     if (keys.justPressed.e) {
-      const d = Math.hypot(rover.x - base.x, rover.y - base.y);
-      if (rover.isBoarded || d <= 140) {
-        toggleBoarding();
+      const d = Math.hypot(activeLocalRover.x - base.x, activeLocalRover.y - base.y);
+      if (activeLocalRover.isBoarded || d <= 140) {
+        toggleBoarding(activeLocalRover);
       }
+    }
+
+    // Quick Hotkey [M] to open Map Editor in new tab
+    if (keys.justPressed.m) {
+      window.open('MapEditor.html', '_blank');
     }
 
     // Quantum upgrade passive regen
     if (gameState.upgrades && gameState.upgrades.quantumTier > 0) {
       base.fuel = Math.min(base.maxFuel, base.fuel + 0.04);
       if (base.hp < base.maxHp) base.hp = Math.min(base.maxHp, base.hp + 0.02);
-      rover.fuel = Math.min(rover.maxFuel, rover.fuel + 0.04);
-      if (rover.hp < rover.maxHp) rover.hp = Math.min(rover.maxHp, rover.hp + 0.02);
+      for (let r of activeRovers) {
+        if (!r.isDead) {
+          r.fuel = Math.min(r.maxFuel, r.fuel + 0.04);
+          if (r.hp < r.maxHp) r.hp = Math.min(r.maxHp, r.hp + 0.02);
+        }
+      }
     }
 
     if (base.cannonCooldown > 0) base.cannonCooldown--;
@@ -1977,13 +2730,12 @@
     if (base.muzzleFlash > 0) base.muzzleFlash--;
     if (base.shieldPulse > 0) base.shieldPulse--;
 
-    if (rover.fireCooldown > 0) rover.fireCooldown--;
-    if (rover.muzzleFlash > 0) rover.muzzleFlash--;
-
     // ==========================================
     // HOST / AUTHORITATIVE SIMULATION
     // ==========================================
     if (isHost) {
+      const dt = 1 / 60;
+
       // 1. BASE TANK AUTO-FIRING CANNON
       let closestEnemy = null;
       let closestDist = 440;
@@ -2059,298 +2811,11 @@
         }
       }
 
-      // 3. ROVER MOVEMENT & SHOOTING
-      const roverInputs = (isSolo && localTarget === rover) ? keys : (isSolo ? {} : remoteKeys);
-
-      if (rover.isBoarded) {
-        rover.x = base.x;
-        rover.y = base.y;
-        rover.vx = 0;
-        rover.vy = 0;
-        rover.angle = 0;
-        if (isSolo && localTarget === rover) {
-          rover.aimAngle = Math.atan2(mouseWorldY - rover.y, mouseWorldX - rover.x);
-        } else if (typeof remoteKeys.aimAngle === 'number') {
-          rover.aimAngle = remoteKeys.aimAngle;
-        }
-      } else {
-        let moveX = 0, moveY = 0;
-        if (roverInputs.w || roverInputs.ArrowUp) moveY -= 1;
-        if (roverInputs.s || roverInputs.ArrowDown) moveY += 1;
-        if (roverInputs.a || roverInputs.ArrowLeft) moveX -= 1;
-        if (roverInputs.d || roverInputs.ArrowRight) moveX += 1;
-
-        const mLen = Math.hypot(moveX, moveY);
-        if (mLen > 0) {
-          rover.vx = (moveX / mLen) * rover.speed;
-          rover.vy = (moveY / mLen) * rover.speed;
-          rover.angle = Math.atan2(rover.vy, rover.vx);
-          rover.lastDirIndex = getDirection8Index(rover.vx, rover.vy, rover.lastDirIndex);
-          rover.treadAnim += rover.speed * 0.4;
-        } else {
-          rover.vx *= 0.8;
-          rover.vy *= 0.8;
-        }
-
-        rover.x += rover.vx;
-        rover.y += rover.vy;
-
-        // Rover collision & sliding with Landscape Rocks
-        if (gameState.landscape) {
-          for (let rock of gameState.landscape) {
-            const dx = rover.x - rock.x;
-            const dy = rover.y - rock.y;
-            const dist = Math.hypot(dx, dy);
-            const minDist = rover.radius + rock.radius;
-            if (dist < minDist && dist > 0) {
-              const overlap = minDist - dist;
-              rover.x += (dx / dist) * overlap;
-              rover.y += (dy / dist) * overlap;
-              const dot = rover.vx * (dx / dist) + rover.vy * (dy / dist);
-              if (dot < 0) {
-                rover.vx -= (dx / dist) * dot;
-                rover.vy -= (dy / dist) * dot;
-              }
-            }
-          }
-        }
-
-        // Rover driving in Hazard Tar Pits: slight drag & churned mud particles
-        if (gameState.hazards) {
-          for (let h of gameState.hazards) {
-            if (Math.hypot(rover.x - h.x, rover.y - h.y) < h.radius + rover.radius) {
-              rover.vx *= 0.88;
-              rover.vy *= 0.88;
-              if (Math.random() < 0.22) {
-                spawnBloodSplat(rover.x, rover.y, 2, '#1e293b');
-              }
-              break;
-            }
-          }
-        }
-
-        // Rover auto-aim: tracks nearest approaching enemy within 330px
-        let closestEnemyToRover = null;
-        let closestDistToRover = 330;
-        for (let e of gameState.enemies) {
-          const d = Math.hypot(e.x - rover.x, e.y - rover.y);
-          if (d < closestDistToRover) {
-            closestDistToRover = d;
-            closestEnemyToRover = e;
-          }
-        }
-
-        if (closestEnemyToRover) {
-          rover.aimAngle = Math.atan2(closestEnemyToRover.y - rover.y, closestEnemyToRover.x - rover.x);
-        } else if (isSolo) {
-          if (localTarget === rover) {
-            rover.aimAngle = Math.atan2(mouseWorldY - rover.y, mouseWorldX - rover.x);
-          }
-        } else if (typeof remoteKeys.aimAngle === 'number') {
-          rover.aimAngle = remoteKeys.aimAngle;
-        }
-
-        // Autonomous Weapon Point-Defense (Fires automatically to protect Rover while gathering or driving)
-        if (rover.weapon && !rover.isBoarded) {
-          if (!rover.autoWeaponCooldown) rover.autoWeaponCooldown = 0;
-          if (rover.autoWeaponCooldown > 0) rover.autoWeaponCooldown--;
-          if (rover.autoWeaponFlash > 0) rover.autoWeaponFlash--;
-
-          if (rover.weapon === 'vulcan_sentry') {
-            if (rover.autoWeaponCooldown <= 0 && gameState.enemies.length > 0) {
-              let closestEnemy = null;
-              let closestDist = 340;
-              for (let e of gameState.enemies) {
-                const d = Math.hypot(e.x - rover.x, e.y - rover.y);
-                if (d < closestDist) {
-                  closestDist = d;
-                  closestEnemy = e;
-                }
-              }
-
-              if (closestEnemy) {
-                rover.autoWeaponCooldown = 8; // Rapid auto-fire
-                rover.autoWeaponAngle = Math.atan2(closestEnemy.y - rover.y, closestEnemy.x - rover.x);
-                rover.autoWeaponFlash = 3;
-
-                const bX = rover.x + Math.cos(rover.autoWeaponAngle) * 20;
-                const bY = rover.y + Math.sin(rover.autoWeaponAngle) * 20;
-                gameState.projectiles.push({
-                  type: 'vulcan_bullet',
-                  x: bX, y: bY,
-                  vx: Math.cos(rover.autoWeaponAngle) * 19,
-                  vy: Math.sin(rover.autoWeaponAngle) * 19,
-                  radius: 3,
-                  damage: 16,
-                  dist: 0,
-                  maxDist: 380,
-                  color: '#fbbf24'
-                });
-              }
-            }
-          } else if (rover.weapon === 'swarm_missiles') {
-            if (rover.autoWeaponCooldown <= 0 && gameState.enemies.length > 0) {
-              let targetEnemy = null;
-              let closestDist = 420;
-              for (let e of gameState.enemies) {
-                const d = Math.hypot(e.x - rover.x, e.y - rover.y);
-                if (d < closestDist) {
-                  closestDist = d;
-                  targetEnemy = e;
-                }
-              }
-
-              if (targetEnemy) {
-                rover.autoWeaponCooldown = 32;
-                rover.autoWeaponFlash = 4;
-                const launchAngle = Math.atan2(targetEnemy.y - rover.y, targetEnemy.x - rover.x);
-
-                for (let side = -1; side <= 1; side += 2) {
-                  gameState.projectiles.push({
-                    type: 'homing_missile',
-                    x: rover.x + Math.cos(launchAngle + (Math.PI / 2) * side) * 16,
-                    y: rover.y + Math.sin(launchAngle + (Math.PI / 2) * side) * 16,
-                    vx: Math.cos(launchAngle + (Math.random() - 0.5) * 0.4) * 6,
-                    vy: Math.sin(launchAngle + (Math.random() - 0.5) * 0.4) * 6,
-                    speed: 10.5,
-                    target: targetEnemy,
-                    targetId: targetEnemy.id,
-                    radius: 4.5,
-                    damage: 38,
-                    splashRadius: 50,
-                    dist: 0,
-                    maxDist: 500,
-                    color: '#ec4899'
-                  });
-                }
-              }
-            }
-          }
-        }
-
-        // Rover main armament: AUTO-FIRES when enemies get closer, or when player holds shoot
-        const roverManualShoot = isSolo
-          ? (localTarget === rover ? keys.mouse.isDown : false)
-          : (roverInputs.isMouseDown);
-        const roverShouldShoot = (closestEnemyToRover !== null || roverManualShoot) && !rover.isBoarded;
-
-        if (roverShouldShoot && rover.fireCooldown <= 0) {
-          if (rover.weapon === 'vulcan_sentry') {
-            rover.fireCooldown = 8;
-            rover.muzzleFlash = 4;
-            const barrelLen = 22;
-            const pSpeed = 16;
-            for (let aOffset of [-0.14, 0, 0.14]) {
-              const a = rover.aimAngle + aOffset;
-              gameState.projectiles.push({
-                type: 'rover_blaster',
-                x: rover.x + Math.cos(a) * barrelLen,
-                y: rover.y + Math.sin(a) * barrelLen,
-                vx: Math.cos(a) * pSpeed,
-                vy: Math.sin(a) * pSpeed,
-                radius: 4,
-                damage: 28,
-                pierceCount: 0,
-                knockback: 6,
-                dist: 0,
-                maxDist: 650,
-                color: '#f59e0b'
-              });
-            }
-          } else if (rover.weapon === 'swarm_missiles') {
-            rover.fireCooldown = 16;
-            rover.muzzleFlash = 5;
-            const barrelLen = 24;
-            const pSpeed = 14;
-            gameState.projectiles.push({
-              type: 'rover_blaster',
-              x: rover.x + Math.cos(rover.aimAngle) * barrelLen,
-              y: rover.y + Math.sin(rover.aimAngle) * barrelLen,
-              vx: Math.cos(rover.aimAngle) * pSpeed,
-              vy: Math.sin(rover.aimAngle) * pSpeed,
-              radius: 6,
-              damage: 70,
-              pierceCount: 1,
-              knockback: 14,
-              dist: 0,
-              maxDist: 720,
-              color: '#ec4899',
-              splashRadius: 40
-            });
-          } else {
-            // In-World Scavenger Weapon Progression (Tiers 1-4)
-            const wCfg = gameState.weaponStats || WEAPON_TIER_CONFIG[1];
-            rover.fireCooldown = wCfg.fireRate;
-            rover.muzzleFlash = 4;
-            const barrelLen = 22;
-            const pSpeed = wCfg.speed || 16;
-            const count = wCfg.projectileCount || 1;
-
-            if (count === 1) {
-              const bX = rover.x + Math.cos(rover.aimAngle) * barrelLen;
-              const bY = rover.y + Math.sin(rover.aimAngle) * barrelLen;
-              gameState.projectiles.push({
-                type: 'rover_blaster',
-                x: bX, y: bY,
-                vx: Math.cos(rover.aimAngle) * pSpeed,
-                vy: Math.sin(rover.aimAngle) * pSpeed,
-                radius: wCfg.radius || 4,
-                damage: wCfg.damage,
-                pierceCount: wCfg.pierceCount || 0,
-                knockback: wCfg.knockback || 0,
-                dist: 0,
-                maxDist: 680,
-                color: wCfg.color || '#38bdf8'
-              });
-            } else {
-              // Tier 2: 3-pellet scatter shot with knockback
-              const spread = wCfg.spreadAngle || 0.24;
-              const offsets = [-spread, 0, spread];
-              for (let off of offsets) {
-                const a = rover.aimAngle + off;
-                gameState.projectiles.push({
-                  type: 'rover_blaster',
-                  x: rover.x + Math.cos(a) * barrelLen,
-                  y: rover.y + Math.sin(a) * barrelLen,
-                  vx: Math.cos(a) * pSpeed,
-                  vy: Math.sin(a) * pSpeed,
-                  radius: wCfg.radius || 4,
-                  damage: wCfg.damage,
-                  pierceCount: wCfg.pierceCount || 0,
-                  knockback: wCfg.knockback || 10,
-                  dist: 0,
-                  maxDist: 620,
-                  color: wCfg.color || '#f59e0b'
-                });
-              }
-            }
-
-            // Tier 4: Primary rounds + seeking micro-missile!
-            if (wCfg.hasMissiles && closestEnemyToRover) {
-              gameState.projectiles.push({
-                type: 'homing_missile',
-                x: rover.x + Math.cos(rover.aimAngle + Math.PI / 2) * 14,
-                y: rover.y + Math.sin(rover.aimAngle + Math.PI / 2) * 14,
-                vx: Math.cos(rover.aimAngle) * 5,
-                vy: Math.sin(rover.aimAngle) * 5,
-                speed: wCfg.homingSpeed || 11,
-                target: closestEnemyToRover,
-                targetId: closestEnemyToRover.id,
-                radius: 4.5,
-                damage: 38,
-                splashRadius: 45,
-                dist: 0,
-                maxDist: 520,
-                color: '#ec4899'
-              });
-            }
-          }
-        }
+      // 3. SIMULATE ROVERS (P1 Alpha & P2 Beta)
+      simulateRover(rover, (isSolo || localTarget === rover) ? keys : {}, true, mouseWorldX, mouseWorldY, dt);
+      if (!isSolo && rover2) {
+        simulateRover(rover2, remoteKeys, false, 0, 0, dt);
       }
-
-      // World boundary clamping
-      rover.x = Math.max(30, Math.min(rover.x, WORLD_WIDTH - 30));
-      rover.y = Math.max(30, Math.min(rover.y, WORLD_HEIGHT - 30));
 
       // 5. SIMULATE STRUCTURES (Towers, Gates, Pylons)
       for (let sIdx = gameState.structures.length - 1; sIdx >= 0; sIdx--) {
@@ -2359,10 +2824,9 @@
         if (struct.hitFlash > 0) struct.hitFlash--;
         struct.pulse = (struct.pulse || 0) + 0.05;
 
-        // BLAST GATE: Auto-opens for Rover, closed against bugs
+        // BLAST GATE: Auto-opens for any alive Rover, closed against bugs
         if (struct.type === 'gate') {
-          const distToRover = Math.hypot(rover.x - struct.x, rover.y - struct.y);
-          struct.isOpen = distToRover < 75;
+          struct.isOpen = activeRovers.some(r => !r.isDead && Math.hypot(r.x - struct.x, r.y - struct.y) < 75);
         }
 
         // GATLING SENTRY: Rapid anti-swarm fire
@@ -2442,7 +2906,7 @@
           }
         }
 
-        // REPAIR PYLON: Emits healing wave for walls and structures
+        // REPAIR PYLON: Emits healing wave for walls, rovers, and citadel
         if (struct.type === 'repair_pylon' && struct.cooldown <= 0) {
           struct.cooldown = STRUCTURE_CONFIG.repair_pylon.cooldownMax;
           spawnRepairPulseWave(struct.x, struct.y, STRUCTURE_CONFIG.repair_pylon.range);
@@ -2456,8 +2920,10 @@
           if (Math.hypot(base.x - struct.x, base.y - struct.y) <= STRUCTURE_CONFIG.repair_pylon.range) {
             base.hp = Math.min(base.maxHp, base.hp + 8);
           }
-          if (Math.hypot(rover.x - struct.x, rover.y - struct.y) <= STRUCTURE_CONFIG.repair_pylon.range) {
-            rover.hp = Math.min(rover.maxHp, rover.hp + 8);
+          for (let r of activeRovers) {
+            if (!r.isDead && Math.hypot(r.x - struct.x, r.y - struct.y) <= STRUCTURE_CONFIG.repair_pylon.range) {
+              r.hp = Math.min(r.maxHp, r.hp + 8);
+            }
           }
         }
 
@@ -2475,7 +2941,6 @@
         p.dist += Math.hypot(p.vx, p.vy);
 
         if (p.type === 'homing_missile') {
-          // Steer towards target enemy if alive
           if (p.target && p.target.hp > 0) {
             const desiredAngle = Math.atan2(p.target.y - p.y, p.target.x - p.x);
             let curAngle = Math.atan2(p.vy, p.vx);
@@ -2504,7 +2969,6 @@
         const maxDist = p.maxDist || 750;
         let reachedEnd = p.dist >= maxDist;
 
-        // Projectiles collision with Landscape Rocks (Mortar shells and homing missiles arc over)
         if (p.type !== 'plasma_shell' && p.type !== 'homing_missile' && gameState.landscape) {
           let hitRock = false;
           for (let rock of gameState.landscape) {
@@ -2521,20 +2985,31 @@
         }
 
         if (p.type === 'acid_glob') {
-
-          // Acid hits base, walls, or rover
           let hitPlayer = false;
           const dBase = Math.hypot(base.x - p.x, base.y - p.y);
           if (dBase < 65) {
             base.hp = Math.max(0, base.hp - p.damage);
             hitPlayer = true;
             spawnBloodSplat(p.x, p.y, 4, '#22c55e');
+            if (base.hp <= 0 && !gameState.isGameOver) {
+              triggerGameOver(gameState);
+            }
           }
-          const dRover = Math.hypot(rover.x - p.x, rover.y - p.y);
-          if (!hitPlayer && !rover.isBoarded && dRover < rover.radius + 6) {
-            rover.hp = Math.max(0, rover.hp - p.damage);
-            hitPlayer = true;
-            spawnBloodSplat(p.x, p.y, 4, '#22c55e');
+          if (!hitPlayer) {
+            for (let r of activeRovers) {
+              if (!r.isDead && !r.isBoarded) {
+                const dRover = Math.hypot(r.x - p.x, r.y - p.y);
+                if (dRover < r.radius + 6) {
+                  r.hp = Math.max(0, r.hp - p.damage);
+                  hitPlayer = true;
+                  spawnBloodSplat(p.x, p.y, 4, '#22c55e');
+                  if (r.hp <= 0) {
+                    killRover(r, gameState);
+                  }
+                  break;
+                }
+              }
+            }
           }
           if (hitPlayer || reachedEnd) {
             gameState.projectiles.splice(pIdx, 1);
@@ -2554,7 +3029,6 @@
             p.hitEnemyIds.push(enemy.id);
 
             if (p.splashRadius) {
-              // AoE damage
               spawnExplosion(p.x, p.y, 14);
               for (let other of gameState.enemies) {
                 const sDist = Math.hypot(other.x - p.x, other.y - p.y);
@@ -2577,7 +3051,6 @@
               hit = true;
               break;
             } else {
-              // Direct hit
               enemy.hp -= p.damage;
               enemy.hitFlash = 6;
               spawnBloodSplat(enemy.x, enemy.y, 4, enemy.color);
@@ -2593,7 +3066,6 @@
 
               if (typeof p.pierceCount === 'number' && p.pierceCount > 0) {
                 p.pierceCount--;
-                // Bullet pierces through and continues
               } else {
                 hit = true;
                 break;
@@ -2616,13 +3088,13 @@
       }
 
       // 7. HYBRID SPAWNING ENGINE (Ambient Flow + Periodic Surge Waves)
-      const dt = 1 / 60;
       gameState.gameTime = (gameState.gameTime || 0) + dt;
       const tMinutes = gameState.gameTime / 60.0;
 
-      // Ambient constant flow: Interval = max(0.8, 4.0 * e^(-0.045 * t))
+      // Ambient constant flow with 2-player scaling
       gameState.ambientSpawnTimer = (gameState.ambientSpawnTimer || 0) + dt;
-      const ambientInterval = Math.max(0.8, 4.0 * Math.exp(-0.045 * tMinutes));
+      const rateScale = isSolo ? 1.0 : 1.85;
+      const ambientInterval = Math.max(0.45, (4.0 * Math.exp(-0.045 * tMinutes)) / rateScale);
       if (gameState.ambientSpawnTimer >= ambientInterval) {
         gameState.ambientSpawnTimer = 0;
         spawnAmbientEnemy(gameState, WORLD_WIDTH, WORLD_HEIGHT);
@@ -2643,7 +3115,7 @@
         spawnSurgeHorde(gameState, WORLD_WIDTH, WORLD_HEIGHT);
       }
 
-      // AI update with terrain, hazards, and build sites
+      // AI update with terrain, hazards, build sites, and dual rovers
       updateSwarmAI(
         gameState.enemies,
         base,
@@ -2653,14 +3125,15 @@
         true,
         gameState.landscape,
         gameState.hazards,
-        gameState.buildSites
+        gameState.buildSites,
+        !isSolo ? rover2 : null
       );
 
       // In-World Build Sites & Physical Loose Scrap simulation
-      updateBuildSites(gameState, rover, base, keys);
-      updateLooseScraps(gameState, rover, base);
+      updateBuildSites(gameState, rover, base, keys, !isSolo ? rover2 : null);
+      updateLooseScraps(gameState, rover, base, !isSolo ? rover2 : null);
 
-      // 8. DAMAGE TO BASE & ROVER FROM BUGS
+      // 8. DAMAGE TO BASE & ROVERS FROM BUGS
       for (let enemy of gameState.enemies) {
         // Attack Base
         const dBase = Math.hypot(base.x - enemy.x, base.y - enemy.y);
@@ -2672,20 +3145,28 @@
             base.hp = Math.max(0, base.hp - enemy.damage * 0.5);
             enemy.attackCooldown = 32;
             spawnBloodSplat(base.x, base.y, 4, '#94a3b8');
+            if (base.hp <= 0 && !gameState.isGameOver) {
+              triggerGameOver(gameState);
+            }
           }
         }
 
-        // Attack Rover (if outside base)
-        if (!rover.isBoarded) {
-          const dRover = Math.hypot(rover.x - enemy.x, rover.y - enemy.y);
-          if (dRover < rover.radius + enemy.radius) {
-            if (enemy.attackCooldown <= 0) {
-              rover.hp = Math.max(0, rover.hp - enemy.damage);
-              enemy.attackCooldown = 28;
-              spawnBloodSplat(rover.x, rover.y, 5, '#f97316');
-              const kbAngle = Math.atan2(rover.y - enemy.y, rover.x - enemy.x);
-              rover.x += Math.cos(kbAngle) * 12;
-              rover.y += Math.sin(kbAngle) * 12;
+        // Attack Rovers (if outside base)
+        for (let r of activeRovers) {
+          if (!r.isDead && !r.isBoarded) {
+            const dRover = Math.hypot(r.x - enemy.x, r.y - enemy.y);
+            if (dRover < r.radius + enemy.radius) {
+              if (enemy.attackCooldown <= 0) {
+                r.hp = Math.max(0, r.hp - enemy.damage);
+                enemy.attackCooldown = 28;
+                spawnBloodSplat(r.x, r.y, 5, r.colorTheme || '#f97316');
+                const kbAngle = Math.atan2(r.y - enemy.y, r.x - enemy.x);
+                r.x += Math.cos(kbAngle) * 12;
+                r.y += Math.sin(kbAngle) * 12;
+                if (r.hp <= 0) {
+                  killRover(r, gameState);
+                }
+              }
             }
           }
         }
@@ -2716,8 +3197,24 @@
               muzzleFlash: rover.muzzleFlash,
               weapon: rover.weapon,
               autoWeaponAngle: rover.autoWeaponAngle,
-              autoWeaponFlash: rover.autoWeaponFlash
+              autoWeaponFlash: rover.autoWeaponFlash,
+              isDead: rover.isDead,
+              respawnTimer: rover.respawnTimer
             },
+            rover2: rover2 ? {
+              x: rover2.x, y: rover2.y, vx: rover2.vx, vy: rover2.vy,
+              lastDirIndex: rover2.lastDirIndex,
+              hp: rover2.hp, maxHp: rover2.maxHp, fuel: rover2.fuel, maxFuel: rover2.maxFuel,
+              cargo: rover2.cargo, maxCargo: rover2.maxCargo,
+              isBoarded: rover2.isBoarded, angle: rover2.angle, aimAngle: rover2.aimAngle,
+              muzzleFlash: rover2.muzzleFlash,
+              weapon: rover2.weapon,
+              autoWeaponAngle: rover2.autoWeaponAngle,
+              autoWeaponFlash: rover2.autoWeaponFlash,
+              isDead: rover2.isDead,
+              respawnTimer: rover2.respawnTimer
+            } : null,
+            isGameOver: gameState.isGameOver,
             weaponCaches: gameState.weaponCaches,
             structures: gameState.structures.map(s => ({
               id: s.id, type: s.type, x: Math.round(s.x), y: Math.round(s.y),
@@ -2741,11 +3238,14 @@
             ruins: gameState.ruins,
             techCores: gameState.techCores,
             baseScrap: gameState.baseScrap,
-            sectorsBuilt: gameState.sectorsBuilt || [],
-            reinforceLevel: gameState.reinforceLevel || 0,
+            buildSites: gameState.buildSites,
+            looseScraps: gameState.looseScraps,
+            weaponStats: gameState.weaponStats,
             upgrades: gameState.upgrades,
             kills: gameState.kills,
-            wave: gameState.wave
+            wave: gameState.wave,
+            surgeWave: gameState.surgeWave,
+            gameTime: gameState.gameTime
           }
         });
       }
@@ -2789,8 +3289,8 @@
     const roverHpBar = document.getElementById('rover-hp-bar');
     const roverHpTxt = document.getElementById('rover-hp-txt');
     if (roverHpBar && roverHpTxt) {
-      roverHpTxt.textContent = `${Math.ceil(rover.hp)}/${rover.maxHp}`;
-      roverHpBar.style.width = `${Math.max(0, (rover.hp / rover.maxHp) * 100)}%`;
+      roverHpTxt.textContent = `${Math.ceil(activeLocalRover.hp)}/${activeLocalRover.maxHp}`;
+      roverHpBar.style.width = `${Math.max(0, (activeLocalRover.hp / activeLocalRover.maxHp) * 100)}%`;
     }
 
     const baseFuelBar = document.getElementById('base-fuel-bar');
@@ -2809,8 +3309,8 @@
     const scavCargoTxt = document.getElementById('scav-cargo-txt');
     const scavCargoBar = document.getElementById('scav-cargo-bar');
     if (scavCargoTxt && scavCargoBar) {
-      scavCargoTxt.textContent = `${Math.floor(rover.cargo)}/${rover.maxCargo}`;
-      scavCargoBar.style.width = `${Math.min(100, (rover.cargo / rover.maxCargo) * 100)}%`;
+      scavCargoTxt.textContent = `${Math.floor(activeLocalRover.cargo)}/${activeLocalRover.maxCargo}`;
+      scavCargoBar.style.width = `${Math.min(100, (activeLocalRover.cargo / activeLocalRover.maxCargo) * 100)}%`;
     }
 
     const hudWave = document.getElementById('hud-wave');
@@ -2904,11 +3404,12 @@
     const camY = canvas.height / 2 - localTarget.y;
     ctx.translate(camX, camY);
 
-    // Terrain grid
-    ctx.fillStyle = '#111827';
+    // Wasteland Background: clean blank light gray as requested
+    ctx.fillStyle = '#e2e8f0';
     ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
-    ctx.strokeStyle = '#1f2937';
+    // Light gray terrain grid lines
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
     ctx.lineWidth = 1;
     const gridSize = 120;
     for (let x = 0; x <= WORLD_WIDTH; x += gridSize) {
@@ -2925,13 +3426,15 @@
     }
 
     // World border
-    ctx.strokeStyle = '#ef4444';
+    ctx.strokeStyle = '#94a3b8';
     ctx.lineWidth = 8;
     ctx.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
-    // Wasteland elements
+    // Wasteland terrain layers: Rivers -> Hazards -> Rocks/Boulders -> Alien Oxygen Trees
+    drawRivers(ctx, gameState.rivers);
     drawHazards(ctx, gameState.hazards);
     drawLandscape(ctx, gameState.landscape);
+    drawOxygenTrees(ctx, gameState.trees);
     drawRuins(ctx, gameState.ruins);
     drawWeaponCaches(ctx, gameState.weaponCaches);
     drawEnergyCells(ctx, gameState.energyCells);
@@ -2941,10 +3444,16 @@
     }
 
     drawLooseScrap(ctx, gameState.looseScraps);
-    drawBuildSites(ctx, gameState.buildSites, gameState.rover);
+    drawBuildSites(ctx, gameState.buildSites, localTarget || gameState.rover);
 
-    drawHarvestBeam(ctx, gameState.rover, gameState.scrapNodes);
-    drawDepositConduit(ctx, gameState.rover, gameState.base);
+    const visibleRovers = [gameState.rover];
+    if (gameState.rover2 && !isSolo) visibleRovers.push(gameState.rover2);
+    for (let r of visibleRovers) {
+      if (!r.isDead && !r.isBoarded) {
+        drawHarvestBeam(ctx, r, gameState.scrapNodes);
+        drawDepositConduit(ctx, r, gameState.base);
+      }
+    }
     drawScrapShards(ctx);
     drawParticles(ctx);
 
@@ -3049,19 +3558,103 @@
     // Central Base Fortress
     drawBase(ctx, gameState.base, gameState.upgrades);
 
-    // Rover Scout (if not docked inside base)
+    // Rover 1 (Scavenger Alpha)
     if (!gameState.rover.isBoarded) {
       drawRover(ctx, gameState.rover, gameState.upgrades);
+    }
+
+    // Rover 2 (Scavenger Beta - in 2-player mode)
+    if (!isSolo && gameState.rover2 && !gameState.rover2.isBoarded) {
+      drawRover(ctx, gameState.rover2, gameState.upgrades);
     }
 
     drawFloatingTextsList(ctx);
     ctx.restore();
 
     if (gameStarted) {
-      drawOffScreenWeaponBeacon(ctx, gameState.rover, gameState.weaponCaches);
-      drawCrosshair(ctx, keys.mouse.x, keys.mouse.y, localTarget);
+      drawOffScreenWeaponBeacon(ctx, localTarget || gameState.rover, gameState.weaponCaches);
+      // REMOVED: drawCrosshair (reticle removed per user instruction)
       drawRadar(ctx);
+
+      // Map Editor shortcut pill in bottom-left corner
+      const pillW = 180;
+      const pillH = 26;
+      const pillX = 20;
+      const pillY = canvas.height - 42;
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.fillRect(pillX, pillY, pillW, pillH);
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.55)';
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(pillX, pillY, pillW, pillH);
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('🗺️ Open Map Editor [M]', pillX + pillW / 2, pillY + 17);
+      ctx.restore();
+
+      if (keys.mouse.clicked &&
+          keys.mouse.x >= pillX && keys.mouse.x <= pillX + pillW &&
+          keys.mouse.y >= pillY && keys.mouse.y <= pillY + pillH) {
+        window.open('MapEditor.html', '_blank');
+      }
     }
+
+    if (gameState.isGameOver) {
+      drawGameOverScreen(ctx);
+    }
+  }
+
+  function drawGameOverScreen(ctx) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.90)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+
+    // Red accent alert box
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.12)';
+    ctx.fillRect(cx - 250, cy - 160, 500, 320);
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(cx - 250, cy - 160, 500, 320);
+
+    // Title
+    ctx.fillStyle = '#ef4444';
+    ctx.font = 'bold 30px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('☠️ CITADEL OVERRUN', cx, cy - 90);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '14px monospace';
+    ctx.fillText('The central fortress was destroyed by the alien swarm.', cx, cy - 60);
+
+    // Survival Statistics
+    const mins = Math.floor((gameState.gameTime || 0) / 60);
+    const secs = Math.floor((gameState.gameTime || 0) % 60);
+    const timeStr = `${mins}m ${secs}s`;
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = '15px monospace';
+    ctx.fillText(`⏱️ Survived: ${timeStr}`, cx, cy - 15);
+    ctx.fillText(`🌊 Surge Wave: ${gameState.surgeWave || 1}`, cx, cy + 15);
+    ctx.fillText(`👾 Bugs Defeated: ${gameState.kills || 0}`, cx, cy + 45);
+
+    // Restart button
+    ctx.fillStyle = '#22c55e';
+    ctx.fillRect(cx - 150, cy + 85, 300, 42);
+    ctx.strokeStyle = '#86efac';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cx - 150, cy + 85, 300, 42);
+
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 14px monospace';
+    ctx.fillText('PRESS [R] OR CLICK TO RESTART', cx, cy + 111);
+
+    ctx.restore();
   }
 
 
@@ -3177,6 +3770,67 @@
 
   // --- DRAWING: ROVER SCOUT (8-DIRECTIONAL MILITARY TRUCK SPRITE) ---
   function drawRover(ctx, rover, upgrades) {
+    if (!rover) return;
+
+    // Destroyed / Respawning Wreckage State
+    if (rover.isDead) {
+      ctx.save();
+      ctx.translate(rover.x, rover.y);
+
+      // Scorched ground circle
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 36, 22, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Charred twisted metal chassis wreckage
+      ctx.fillStyle = '#1e1b18';
+      ctx.fillRect(-22, -14, 44, 28);
+      ctx.strokeStyle = '#44403c';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(-22, -14, 44, 28);
+
+      // Broken loose tread pieces
+      ctx.fillStyle = '#0f0e0d';
+      ctx.fillRect(-26, -18, 14, 6);
+      ctx.fillRect(10, 12, 16, 6);
+
+      // Sputtering flames & smoke particles
+      const flamePulse = Math.sin(Date.now() * 0.015);
+      const flameH = 14 + flamePulse * 5;
+      const grad = ctx.createRadialGradient(0, -4, 2, 0, -4, 18);
+      grad.addColorStop(0, '#fef08a');
+      grad.addColorStop(0.3, '#f97316');
+      grad.addColorStop(0.7, '#ef4444');
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(-4, -6, flameH, 0, Math.PI * 2);
+      ctx.arc(8, -2, flameH * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Overhead Respawn Countdown Gauge
+      const respawnSecs = Math.max(0, (rover.respawnTimer || 0)).toFixed(1);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+      ctx.fillRect(-55, -48, 110, 22);
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(-55, -48, 110, 22);
+
+      ctx.fillStyle = '#f87171';
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`🚨 REBUILDING: ${respawnSecs}s`, 0, -34);
+
+      // Callsign tag above
+      ctx.fillStyle = rover.colorTheme || '#f97316';
+      ctx.font = 'bold 9px monospace';
+      ctx.fillText(rover.name || 'ROVER WRECKAGE', 0, -54);
+
+      ctx.restore();
+      return;
+    }
+
     const speed = Math.hypot(rover.vx, rover.vy);
     const isMoving = speed > 0.25;
     const isLoaded = (rover.cargo || 0) > 0;
@@ -3573,6 +4227,15 @@
 
       ctx.restore();
     }
+
+    // 3. Overhead Callsign Badge (Distinguishes P1 Alpha & P2 Beta)
+    ctx.save();
+    ctx.font = 'bold 9px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = rover.colorTheme || '#f97316';
+    const callsignY = (showHp || showCargo) ? (Math.min(hpY, cargoY) - 13) : -44;
+    ctx.fillText(rover.name || 'ROVER', 0, callsignY);
+    ctx.restore();
 
     ctx.restore();
   }
@@ -4293,6 +4956,141 @@
     }
   }
 
+  function drawRivers(ctx, rivers) {
+    if (!rivers || !rivers.length) return;
+    const time = Date.now() * 0.0015;
+
+    for (let river of rivers) {
+      const pts = river.points;
+      if (!pts || pts.length < 2) continue;
+      const width = river.width || 80;
+
+      // 1. Wet Riverbank sand bed
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) {
+        ctx.lineTo(pts[i].x, pts[i].y);
+      }
+      ctx.lineWidth = width + 24;
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.5)';
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      // 2. River Bank Depth
+      ctx.lineWidth = width + 8;
+      ctx.strokeStyle = '#0284c7';
+      ctx.stroke();
+
+      // 3. Water Core (Bright flowing azure stream)
+      ctx.lineWidth = width;
+      ctx.strokeStyle = '#0ea5e9';
+      ctx.stroke();
+
+      // 4. Moving Glint Ribbon
+      ctx.lineWidth = width * 0.45;
+      ctx.strokeStyle = 'rgba(186, 230, 253, 0.65)';
+      ctx.stroke();
+
+      // 5. Water wavelets & foam
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.beginPath();
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p1 = pts[i];
+        const p2 = pts[i + 1];
+        const midX = (p1.x + p2.x) / 2;
+        const midY = (p1.y + p2.y) / 2;
+        const waveOffset = Math.sin(time * 3 + i * 1.5) * (width * 0.22);
+        const normAngle = Math.atan2(p2.y - p1.y, p2.x - p1.x) + Math.PI / 2;
+        const wx = midX + Math.cos(normAngle) * waveOffset;
+        const wy = midY + Math.sin(normAngle) * waveOffset;
+        ctx.moveTo(wx - 8, wy);
+        ctx.lineTo(wx + 8, wy);
+      }
+      ctx.stroke();
+    }
+  }
+
+  function drawOxygenTrees(ctx, trees) {
+    if (!trees || !trees.length) return;
+    const time = Date.now() * 0.002;
+
+    for (let tree of trees) {
+      const radius = tree.radius || 36;
+      const aura = tree.auraRadius || 135;
+      const pulse = Math.sin(time * 2 + (tree.x * 0.01)) * 4;
+      const currentAura = aura + pulse;
+
+      // 1. Oxygen Aura Field (Healing & Fuel Area)
+      const auraGrad = ctx.createRadialGradient(tree.x, tree.y, radius, tree.x, tree.y, currentAura);
+      auraGrad.addColorStop(0, 'rgba(16, 185, 129, 0.22)');
+      auraGrad.addColorStop(0.7, 'rgba(52, 211, 153, 0.08)');
+      auraGrad.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+      ctx.fillStyle = auraGrad;
+      ctx.beginPath();
+      ctx.arc(tree.x, tree.y, currentAura, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Oxygen Aura Ring Border
+      ctx.strokeStyle = 'rgba(52, 211, 153, 0.35)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      ctx.arc(tree.x, tree.y, currentAura, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 2. Tree Drop Shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.beginPath();
+      ctx.ellipse(tree.x + 8, tree.y + 12, radius * 1.1, radius * 0.75, 0.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 3. Alien Trunk & Roots
+      ctx.strokeStyle = '#065f46';
+      ctx.lineWidth = 7;
+      ctx.lineCap = 'round';
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
+        ctx.beginPath();
+        ctx.moveTo(tree.x, tree.y);
+        ctx.lineTo(tree.x + Math.cos(a) * (radius * 0.9), tree.y + Math.sin(a) * (radius * 0.9));
+        ctx.stroke();
+      }
+
+      // 4. Bioluminescent Canopy Bulbs
+      const canopyGrad = ctx.createRadialGradient(tree.x - 6, tree.y - 8, 4, tree.x, tree.y, radius);
+      canopyGrad.addColorStop(0, '#6ee7b7'); // Luminous mint
+      canopyGrad.addColorStop(0.4, '#10b981'); // Emerald
+      canopyGrad.addColorStop(0.85, '#047857'); // Dark alien foliage
+      canopyGrad.addColorStop(1, '#064e3b'); // Root ring
+
+      ctx.fillStyle = canopyGrad;
+      ctx.beginPath();
+      ctx.arc(tree.x, tree.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 5. Bioluminescent Spores / Nodes
+      for (let s = 0; s < 5; s++) {
+        const sAngle = (s / 5) * Math.PI * 2 + time;
+        const sDist = radius * 0.55;
+        const sx = tree.x + Math.cos(sAngle) * sDist;
+        const sy = tree.y + Math.sin(sAngle) * sDist;
+        ctx.fillStyle = '#a7f3d0';
+        ctx.beginPath();
+        ctx.arc(sx, sy, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 6. Oxygen Icon / Indicator Above Tree
+      ctx.fillStyle = '#10b981';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('O₂ BIO-TREE', tree.x, tree.y - radius - 8);
+    }
+  }
+
   function drawLandscape(ctx, landscape) {
     if (!landscape) return;
     for (let rock of landscape) {
@@ -4543,38 +5341,7 @@
     ctx.restore();
   }
 
-  function drawCrosshair(ctx, mx, my, target) {
-    if (mx < 0 || mx > canvas.width || my < 0 || my > canvas.height) return;
-
-    ctx.save();
-    ctx.translate(mx, my);
-    const color = target === gameState.rover ? '#f97316' : '#38bdf8';
-
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(0, 0, 14, 0, Math.PI * 2);
-    ctx.stroke();
-
-    const tickDist = 18;
-    const tickLen = 6;
-    ctx.beginPath();
-    ctx.moveTo(0, -tickDist);
-    ctx.lineTo(0, -tickDist - tickLen);
-    ctx.moveTo(0, tickDist);
-    ctx.lineTo(0, tickDist + tickLen);
-    ctx.moveTo(-tickDist, 0);
-    ctx.lineTo(-tickDist - tickLen, 0);
-    ctx.moveTo(tickDist, 0);
-    ctx.lineTo(tickDist + tickLen, 0);
-    ctx.stroke();
-    ctx.restore();
-  }
+  // Crosshair reticle removed (auto-targeting / point defense active)
 
   function drawRadar(ctx) {
     const radarSize = 135;
@@ -4592,7 +5359,24 @@
     const toRadarX = (wx) => rx + (wx / WORLD_WIDTH) * radarSize;
     const toRadarY = (wy) => ry + (wy / WORLD_HEIGHT) * radarSize;
 
-    // 1. Landscape rock mesas on radar (Brown-stone tactical choke points)
+    // 0. Rivers on radar
+    if (gameState.rivers) {
+      ctx.strokeStyle = '#0284c7';
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      for (let river of gameState.rivers) {
+        if (!river.points || river.points.length < 2) continue;
+        ctx.lineWidth = Math.max(2, ((river.width || 80) / WORLD_WIDTH) * radarSize);
+        ctx.beginPath();
+        ctx.moveTo(toRadarX(river.points[0].x), toRadarY(river.points[0].y));
+        for (let i = 1; i < river.points.length; i++) {
+          ctx.lineTo(toRadarX(river.points[i].x), toRadarY(river.points[i].y));
+        }
+        ctx.stroke();
+      }
+    }
+
+    // 1. Landscape rocks & boulders on radar
     if (gameState.landscape) {
       ctx.fillStyle = 'rgba(120, 113, 108, 0.75)';
       ctx.strokeStyle = 'rgba(68, 64, 60, 0.9)';
@@ -4618,6 +5402,23 @@
         ctx.beginPath();
         ctx.arc(hx, hy, hr, 0, Math.PI * 2);
         ctx.fill();
+      }
+    }
+
+    // 2.5 Alien Oxygen Trees on radar
+    if (gameState.trees) {
+      for (let tree of gameState.trees) {
+        const tx = toRadarX(tree.x);
+        const ty = toRadarY(tree.y);
+        ctx.fillStyle = '#10b981';
+        ctx.beginPath();
+        ctx.arc(tx, ty, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(52, 211, 153, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(tx, ty, Math.max(4, ((tree.auraRadius || 135) / WORLD_WIDTH) * radarSize), 0, Math.PI * 2);
+        ctx.stroke();
       }
     }
 
@@ -4655,11 +5456,17 @@
     ctx.fillStyle = '#38bdf8';
     ctx.fillRect(toRadarX(gameState.base.x) - 4, toRadarY(gameState.base.y) - 3, 8, 6);
 
-    // 5. Rover icon
-    if (!gameState.rover.isBoarded) {
-      ctx.fillStyle = '#f97316';
+    // 5. Dual Rover icons on radar (P1 Alpha & P2 Beta)
+    if (gameState.rover && !gameState.rover.isBoarded) {
+      ctx.fillStyle = gameState.rover.isDead ? '#ef4444' : (gameState.rover.colorTheme || '#f97316');
       ctx.beginPath();
-      ctx.arc(toRadarX(gameState.rover.x), toRadarY(gameState.rover.y), 2.5, 0, Math.PI * 2);
+      ctx.arc(toRadarX(gameState.rover.x), toRadarY(gameState.rover.y), 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (gameState.rover2 && !gameState.rover2.isBoarded) {
+      ctx.fillStyle = gameState.rover2.isDead ? '#ef4444' : (gameState.rover2.colorTheme || '#38bdf8');
+      ctx.beginPath();
+      ctx.arc(toRadarX(gameState.rover2.x), toRadarY(gameState.rover2.y), 3, 0, Math.PI * 2);
       ctx.fill();
     }
 
