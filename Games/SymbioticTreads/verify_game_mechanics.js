@@ -229,6 +229,45 @@ assert(mapEditorHtml.includes('#e2e8f0'), 'MapEditor canvas must render light gr
 assert(indexHtml.includes('MapEditor.html'), 'index.html must link to MapEditor.html');
 console.log('✅ Standalone Map Editor, placement tools, persistence, and navigation verified.\n');
 
-console.log('🎉🎉 ALL MECHANICS, ASSETS, NETWORKING, MAP EDITOR AND BALANCE TESTS PASSED SUCCESSFULLY! 🎉🎉');
+// 14. Test Touchscreen Joystick Controls & iPhone Safari Optimization
+console.log('--- 📱 VERIFYING TOUCHSCREEN JOYSTICK & IPHONE SAFARI OPTIMIZATION ---');
+// Read fresh files
+const freshIndex = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+const freshGameCode = fs.readFileSync(path.join(__dirname, 'js/game.js'), 'utf8');
+const freshCss = fs.readFileSync(path.join(__dirname, 'css/style.css'), 'utf8');
+
+// Viewport & iOS Safari meta tags
+assert(freshIndex.includes('viewport-fit=cover'), 'index.html must specify viewport-fit=cover for iPhone notches and safe areas');
+assert(freshIndex.includes('user-scalable=no'), 'index.html must disable user pinch/double-tap scaling for arcade control');
+assert(freshIndex.includes('apple-mobile-web-app-capable'), 'index.html must include apple-mobile-web-app-capable');
+
+// Touch DOM elements in index.html
+assert(freshIndex.includes('id="touch-controls"'), 'index.html must include touch-controls container');
+assert(freshIndex.includes('id="joystick-zone"'), 'index.html must include joystick-zone');
+assert(freshIndex.includes('id="joystick-knob"'), 'index.html must include joystick-knob');
+assert(freshIndex.includes('id="btn-touch-fire"'), 'index.html must include manual fire action button');
+assert(freshIndex.includes('id="btn-touch-dock"'), 'index.html must include touch docking button');
+assert(freshIndex.includes('id="btn-touch-focus"'), 'index.html must include camera focus toggle button');
+assert(freshIndex.includes('id="touch-power-modes"'), 'index.html must include power mode quick selection pills');
+
+// CSS styling for touch & joystick
+assert(freshCss.includes('touch-action: none'), 'css/style.css must enforce touch-action: none to prevent iOS Safari gestures');
+assert(freshCss.includes('#joystick-zone'), 'css/style.css must style joystick-zone');
+assert(freshCss.includes('#joystick-knob'), 'css/style.css must style joystick-knob');
+assert(freshCss.includes('.touch-btn-fire'), 'css/style.css must style touch-btn-fire');
+
+// Touch engine & joystick implementation in js/game.js
+assert(freshGameCode.includes('initTouchControls'), 'game.js must contain initTouchControls()');
+assert(freshGameCode.includes('resizeGameCanvas'), 'game.js must contain resizeGameCanvas() for dynamic iPhone screens');
+assert(freshGameCode.includes('joystickX'), 'game.js must track analog joystickX in input state');
+assert(freshGameCode.includes('joystickY'), 'game.js must track analog joystickY in input state');
+assert(freshGameCode.includes('updateJoystickPosition'), 'game.js must compute joystick vector from client coordinates');
+assert(freshGameCode.includes('roverInputs.joystickX'), 'simulateRover must support analog joystick velocity');
+assert(freshGameCode.includes('touchstart'), 'game.js must handle touchstart events');
+assert(freshGameCode.includes('touchmove'), 'game.js must handle touchmove events');
+assert(freshGameCode.includes('touchend'), 'game.js must handle touchend events');
+console.log('✅ Touchscreen joystick, action buttons, analog steering, and iOS Safari viewport verified.\n');
+
+console.log('🎉🎉 ALL MECHANICS, ASSETS, NETWORKING, MAP EDITOR, AND IPHONE TOUCH CONTROLS PASSED SUCCESSFULLY! 🎉🎉');
 
 

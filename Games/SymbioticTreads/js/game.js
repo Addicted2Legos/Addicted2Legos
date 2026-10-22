@@ -89,6 +89,8 @@
     Space: false, e: false, r: false, c: false, x: false,
     '1': false, '2': false, '3': false, '4': false, '5': false, '6': false,
     Escape: false,
+    joystickX: 0,
+    joystickY: 0,
     justPressed: {
       e: false, r: false, c: false, x: false, Tab: false, Escape: false,
       '[': false, ']': false,
@@ -169,15 +171,35 @@
       }
     });
 
-    // Mouse wheel controls brush size in collision editor
-    window.addEventListener('wheel', (e) => {
-      if (collisionEditorActive) {
-        brushRadius = Math.max(10, Math.min(180, brushRadius - Math.sign(e.deltaY) * 5));
-        e.preventDefault();
-      }
-    }, { passive: false });
-
     if (canvas) {
+      const updateMouseFromTouch = (touch) => {
+        const rect = canvas.getBoundingClientRect();
+        keys.mouse.x = touch.clientX - rect.left;
+        keys.mouse.y = touch.clientY - rect.top;
+      };
+
+      // Direct Canvas Touch Handling for mobile tap/shoot
+      canvas.addEventListener('touchstart', (e) => {
+        if (e.changedTouches.length > 0) {
+          updateMouseFromTouch(e.changedTouches[0]);
+          keys.mouse.isDown = true;
+          keys.mouse.clicked = true;
+          if (gameState && gameState.isGameOver) {
+            resetGame();
+          }
+        }
+      }, { passive: false });
+
+      canvas.addEventListener('touchmove', (e) => {
+        if (e.changedTouches.length > 0) {
+          updateMouseFromTouch(e.changedTouches[0]);
+        }
+      }, { passive: false });
+
+      canvas.addEventListener('touchend', (e) => {
+        keys.mouse.isDown = false;
+      }, { passive: false });
+
       canvas.addEventListener('mousemove', (e) => {
         const rect = canvas.getBoundingClientRect();
         keys.mouse.x = e.clientX - rect.left;
@@ -197,8 +219,6 @@
       window.addEventListener('mouseup', (e) => {
         if (e.button === 0) keys.mouse.isDown = false;
         if (e.button === 2) keys.mouse.rightDown = false;
-        lastPaintWorldX = null;
-        lastPaintWorldY = null;
       });
 
       canvas.addEventListener('contextmenu', (e) => {
@@ -221,6 +241,217 @@
     for (let i = 1; i <= 6; i++) {
       keys.justPressed[String(i)] = false;
     }
+  }
+
+  // --- 2.2 TOUCHSCREEN JOYSTICK & MOBILE CONTROLS (IPHONE SAFARI) ---
+  function resizeGameCanvas() {
+    if (!canvas) return;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resizeGameCanvas);
+  window.addEventListener('orientationchange', () => {
+    setTimeout(resizeGameCanvas, 150);
+  });
+
+  function initTouchControls() {
+    const touchControls = document.getElementById('touch-controls');
+    const joystickZone = document.getElementById('joystick-zone');
+    const joystickKnob = document.getElementById('joystick-knob');
+    if (!joystickZone || !joystickKnob) return;
+
+    let joystickActive = false;
+    let joystickTouchId = null;
+    const maxRadius = 45; // Match standard travel distance from other games
+
+    function updateJoystickPosition(clientX, clientY) {
+      const rect = joystickZone.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      let dx = clientX - centerX;
+      let dy = clientY - centerY;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist > 0) {
+        const normX = dx / dist;
+        const normY = dy / dist;
+        const visualDist = Math.min(dist, maxRadius);
+        const knobX = normX * visualDist;
+        const knobY = normY * visualDist;
+
+        joystickKnob.style.transform = `translate(calc(-50% + ${knobX}px), calc(-50% + ${knobY}px))`;
+
+        // Analog throttle vector [0..1]
+        const mag = visualDist / maxRadius;
+        keys.joystickX = normX * mag;
+        keys.joystickY = normY * mag;
+
+        // Directional thresholds for discrete keyboard emulation
+        const threshold = 12;
+        keys.w = dy < -threshold;
+        keys.s = dy > threshold;
+        keys.a = dx < -threshold;
+        keys.d = dx > threshold;
+      } else {
+        resetJoystick();
+      }
+    }
+
+    function resetJoystick() {
+      joystickActive = false;
+      joystickTouchId = null;
+      joystickKnob.style.transform = 'translate(-50%, -50%)';
+      keys.joystickX = 0;
+      keys.joystickY = 0;
+      keys.w = false;
+      keys.s = false;
+      keys.a = false;
+      keys.d = false;
+    }
+
+    // Touch handlers for virtual joystick
+    joystickZone.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!joystickActive && e.changedTouches.length > 0) {
+        const touch = e.changedTouches[0];
+        joystickTouchId = touch.identifier;
+        joystickActive = true;
+        updateJoystickPosition(touch.clientX, touch.clientY);
+      }
+    }, { passive: false });
+
+    // Comfort steering: catch touches starting in lower-left 42% of the screen
+    window.addEventListener('touchstart', (e) => {
+      if (!gameStarted || joystickActive) return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.clientX < window.innerWidth * 0.42 && touch.clientY > window.innerHeight * 0.38) {
+          joystickTouchId = touch.identifier;
+          joystickActive = true;
+          updateJoystickPosition(touch.clientX, touch.clientY);
+          break;
+        }
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!joystickActive) return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier === joystickTouchId) {
+          updateJoystickPosition(touch.clientX, touch.clientY);
+          break;
+        }
+      }
+    }, { passive: false });
+
+    const handleTouchEnd = (e) => {
+      if (!joystickActive) return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier === joystickTouchId) {
+          resetJoystick();
+          break;
+        }
+      }
+    };
+
+    window.addEventListener('touchend', handleTouchEnd, { passive: false });
+    window.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+    // Mouse fallback for testing joystick on desktop
+    let isMouseDown = false;
+    joystickZone.addEventListener('mousedown', (e) => {
+      if (e.button === 0) {
+        isMouseDown = true;
+        updateJoystickPosition(e.clientX, e.clientY);
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (isMouseDown) {
+        updateJoystickPosition(e.clientX, e.clientY);
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isMouseDown) {
+        isMouseDown = false;
+        resetJoystick();
+      }
+    });
+
+    // Touch Action: Manual Fire Button (💥)
+    const btnTouchFire = document.getElementById('btn-touch-fire');
+    if (btnTouchFire) {
+      const startFire = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        keys.mouse.isDown = true;
+        keys.mouse.clicked = true;
+        btnTouchFire.classList.add('active');
+      };
+      const endFire = (e) => {
+        e.preventDefault();
+        keys.mouse.isDown = false;
+        btnTouchFire.classList.remove('active');
+      };
+      btnTouchFire.addEventListener('touchstart', startFire, { passive: false });
+      btnTouchFire.addEventListener('touchend', endFire, { passive: false });
+      btnTouchFire.addEventListener('touchcancel', endFire, { passive: false });
+      btnTouchFire.addEventListener('mousedown', startFire);
+      btnTouchFire.addEventListener('mouseup', endFire);
+    }
+
+    // Touch Action: Dock / Board Base (🚪)
+    const btnTouchDock = document.getElementById('btn-touch-dock');
+    if (btnTouchDock) {
+      const triggerDock = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const activeLocal = (localTarget === gameState.rover2) ? gameState.rover2 : gameState.rover;
+        const d = Math.hypot(activeLocal.x - gameState.base.x, activeLocal.y - gameState.base.y);
+        if (activeLocal.isBoarded || d <= 140) {
+          toggleBoarding(activeLocal);
+        } else {
+          addFloatingText(activeLocal.x, activeLocal.y - 35, `CITADEL ${Math.round(d)}m AWAY`, '#38bdf8');
+        }
+      };
+      btnTouchDock.addEventListener('click', triggerDock);
+      btnTouchDock.addEventListener('touchstart', triggerDock, { passive: false });
+    }
+
+    // Touch Action: Camera Focus (🔄)
+    const btnTouchFocus = document.getElementById('btn-touch-focus');
+    if (btnTouchFocus) {
+      const triggerFocus = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const activeLocal = (localTarget === gameState.rover2) ? gameState.rover2 : gameState.rover;
+        localTarget = (localTarget === activeLocal) ? gameState.base : activeLocal;
+        const targetRoleName = (localTarget === gameState.base) ? 'BASE CITADEL' : (activeLocal.name || 'ROVER');
+        addFloatingText(localTarget.x, localTarget.y - 45, `FOCUS: ${targetRoleName}`, '#38bdf8');
+      };
+      btnTouchFocus.addEventListener('click', triggerFocus);
+      btnTouchFocus.addEventListener('touchstart', triggerFocus, { passive: false });
+    }
+
+    // Touch Power Mode Routing Pills (⚡ ENG / 🛡️ SHD / ⚔️ TUR)
+    const powerBtns = document.querySelectorAll('.touch-pwr-btn');
+    powerBtns.forEach(pbtn => {
+      const activateMode = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const mode = pbtn.dataset.mode;
+        setPowerMode(mode);
+        powerBtns.forEach(b => b.classList.remove('active'));
+        pbtn.classList.add('active');
+      };
+      pbtn.addEventListener('click', activateMode);
+      pbtn.addEventListener('touchstart', activateMode, { passive: false });
+    });
   }
 
   // --- 2.5 CUSTOM MAP SYSTEM & GEOMETRY (SAVED VIA MapEditor.html) ---
@@ -2179,6 +2410,8 @@
       hudRoleEl.className = 'badge badge-scavenger';
     }
     if (hudRoomEl) hudRoomEl.textContent = 'Solo (Scavenger)';
+    const touchControls = document.getElementById('touch-controls');
+    if (touchControls) touchControls.style.display = 'block';
   }
 
   // Single Player flow: Click button to start directly as Scavenger Rover!
@@ -2252,6 +2485,8 @@
         hudRoleEl.textContent = 'SCAVENGER 1 - ALPHA (HOST)';
         hudRoleEl.className = 'badge badge-scavenger';
       }
+      const touchControls = document.getElementById('touch-controls');
+      if (touchControls) touchControls.style.display = 'block';
     });
   }
 
@@ -2292,6 +2527,8 @@
         hudRoleEl.className = 'badge badge-commander';
       }
       if (hudRoomEl) hudRoomEl.textContent = `Connecting: ${code}...`;
+      const touchControls = document.getElementById('touch-controls');
+      if (touchControls) touchControls.style.display = 'block';
 
       network = new PeerManager(false, code, handleNetworkData, () => {
         if (hudRoomEl) hudRoomEl.textContent = `Connected: ${code}`;
@@ -2357,13 +2594,22 @@
     if (roverInputs.a || roverInputs.ArrowLeft) moveX -= 1;
     if (roverInputs.d || roverInputs.ArrowRight) moveX += 1;
 
+    // Analog Joystick Input
+    if (typeof roverInputs.joystickX === 'number' && (Math.abs(roverInputs.joystickX) > 0.05 || Math.abs(roverInputs.joystickY) > 0.05)) {
+      moveX = roverInputs.joystickX;
+      moveY = roverInputs.joystickY;
+    }
+
     const mLen = Math.hypot(moveX, moveY);
     if (mLen > 0) {
-      rover.vx = (moveX / mLen) * rover.speed;
-      rover.vy = (moveY / mLen) * rover.speed;
+      const currentSpeed = (typeof roverInputs.joystickX === 'number' && Math.hypot(roverInputs.joystickX, roverInputs.joystickY) > 0.05)
+        ? rover.speed * Math.min(1, Math.hypot(roverInputs.joystickX, roverInputs.joystickY))
+        : rover.speed;
+      rover.vx = (moveX / mLen) * currentSpeed;
+      rover.vy = (moveY / mLen) * currentSpeed;
       rover.angle = Math.atan2(rover.vy, rover.vx);
       rover.lastDirIndex = getDirection8Index(rover.vx, rover.vy, rover.lastDirIndex);
-      rover.treadAnim += rover.speed * 0.4;
+      rover.treadAnim += currentSpeed * 0.4;
     } else {
       rover.vx *= 0.8;
       rover.vy *= 0.8;
@@ -2469,6 +2715,8 @@
 
     if (closestEnemyToRover) {
       rover.aimAngle = Math.atan2(closestEnemyToRover.y - rover.y, closestEnemyToRover.x - rover.x);
+    } else if (typeof roverInputs.joystickX === 'number' && Math.hypot(roverInputs.joystickX, roverInputs.joystickY) > 0.1) {
+      rover.aimAngle = Math.atan2(roverInputs.joystickY, roverInputs.joystickX);
     } else if (isDirectControl) {
       rover.aimAngle = Math.atan2(mouseWorldY - rover.y, mouseWorldX - rover.x);
     } else if (typeof roverInputs.aimAngle === 'number') {
@@ -2711,6 +2959,24 @@
     // Quick Hotkey [M] to open Map Editor in new tab
     if (keys.justPressed.m) {
       window.open('MapEditor.html', '_blank');
+    }
+
+    // Dynamic Touch Dock Button status update
+    const btnTouchDock = document.getElementById('btn-touch-dock');
+    if (btnTouchDock) {
+      const d = Math.hypot(activeLocalRover.x - base.x, activeLocalRover.y - base.y);
+      if (activeLocalRover.isBoarded) {
+        btnTouchDock.classList.add('active');
+        btnTouchDock.classList.remove('in-range');
+        btnTouchDock.innerHTML = '<span class="touch-btn-icon">🚪</span><span class="touch-btn-label">EXIT</span>';
+      } else if (d <= 140) {
+        btnTouchDock.classList.add('in-range');
+        btnTouchDock.classList.remove('active');
+        btnTouchDock.innerHTML = '<span class="touch-btn-icon">🚪</span><span class="touch-btn-label">DOCK</span>';
+      } else {
+        btnTouchDock.classList.remove('active', 'in-range');
+        btnTouchDock.innerHTML = '<span class="touch-btn-icon">🚪</span><span class="touch-btn-label">BASE</span>';
+      }
     }
 
     // Quantum upgrade passive regen
@@ -3264,6 +3530,8 @@
             a: keys.a || keys.ArrowLeft,
             s: keys.s || keys.ArrowDown,
             d: keys.d || keys.ArrowRight,
+            joystickX: keys.joystickX || 0,
+            joystickY: keys.joystickY || 0,
             aimAngle: clientAimAngle,
             isMouseDown: keys.mouse.isDown,
             Space: keys.Space,
@@ -3576,11 +3844,11 @@
       // REMOVED: drawCrosshair (reticle removed per user instruction)
       drawRadar(ctx);
 
-      // Map Editor shortcut pill in bottom-left corner
+      // Map Editor shortcut pill in top-left corner (prevents overlap with mobile joystick)
       const pillW = 180;
       const pillH = 26;
-      const pillX = 20;
-      const pillY = canvas.height - 42;
+      const pillX = 16;
+      const pillY = 16;
 
       ctx.save();
       ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
@@ -5511,6 +5779,8 @@
 
   // --- BOOT UP ---
   initInputHandlers(canvas);
+  initTouchControls();
+  resizeGameCanvas();
 
   function gameLoop() {
     update();

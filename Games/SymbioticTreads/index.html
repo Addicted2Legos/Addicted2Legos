@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Co-Op Rover Survival</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="preload" href="assets/sprites/military_truck_sheet_8.png?v=8way2" as="image">
@@ -57,6 +59,43 @@
   </div>
 
   
+  <!-- TOUCHSCREEN JOYSTICK & CONTROLS FOR MOBILE (IPHONE SAFARI) -->
+  <div id="touch-controls" style="display: none;">
+    <!-- Left: Virtual Joystick Zone -->
+    <div id="joystick-zone">
+      <div id="joystick-knob"></div>
+      <div class="joystick-hint">STEER</div>
+    </div>
+
+    <!-- Right: Touch Action Buttons -->
+    <div id="touch-actions">
+      <!-- Primary Blaster Fire Button -->
+      <button id="btn-touch-fire" class="touch-btn touch-btn-fire" aria-label="Fire Blaster">
+        <span class="touch-btn-icon">💥</span>
+        <span class="touch-btn-label">FIRE</span>
+      </button>
+
+      <!-- Secondary Subgroup: Docking & Camera Focus -->
+      <div class="touch-btn-row">
+        <button id="btn-touch-dock" class="touch-btn touch-btn-dock" aria-label="Dock or Board Base">
+          <span class="touch-btn-icon">🚪</span>
+          <span class="touch-btn-label">DOCK</span>
+        </button>
+        <button id="btn-touch-focus" class="touch-btn touch-btn-focus" aria-label="Toggle Camera Focus">
+          <span class="touch-btn-icon">🔄</span>
+          <span class="touch-btn-label">FOCUS</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Power Mode Routing Pills -->
+    <div id="touch-power-modes" class="touch-power-modes">
+      <button id="touch-pwr-engines" class="touch-pwr-btn active" data-mode="engines">⚡ ENG</button>
+      <button id="touch-pwr-shields" class="touch-pwr-btn" data-mode="shields">🛡️ SHD</button>
+      <button id="touch-pwr-turrets" class="touch-pwr-btn" data-mode="turrets">⚔️ TUR</button>
+    </div>
+  </div>
+
   <canvas id="gameCanvas" width="1280" height="720"></canvas>
   
   <!-- Classic script runs everywhere without file:// CORS restrictions -->
