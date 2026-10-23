@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  web:
+    image: nginx:alpine
+    container_name: html-web-server
+    restart: always
+    volumes:
+      - ./:/usr/share/nginx/html
+    ports:
+      - "8080:80"
+      
