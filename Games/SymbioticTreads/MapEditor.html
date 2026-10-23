@@ -617,10 +617,28 @@
         { id: 'crys-10', x: 2250, y: 1500, tier: 'rare' }
       ],
       trees: [
-        { id: 'tree-1', x: 1380, y: 1380, radius: 36, auraRadius: 135 },
-        { id: 'tree-2', x: 1620, y: 1380, radius: 36, auraRadius: 135 },
-        { id: 'tree-3', x: 1380, y: 1620, radius: 36, auraRadius: 135 },
-        { id: 'tree-4', x: 1620, y: 1620, radius: 36, auraRadius: 135 }
+        // Central Oasis Bio-Grove (North, South, East, West of base courtyard)
+        { id: 'tree-base-n', x: 1500, y: 1020, radius: 42, auraRadius: 150 },
+        { id: 'tree-base-s', x: 1500, y: 1980, radius: 42, auraRadius: 150 },
+        { id: 'tree-base-w', x: 1020, y: 1500, radius: 42, auraRadius: 150 },
+        { id: 'tree-base-e', x: 1980, y: 1500, radius: 42, auraRadius: 150 },
+
+        // Northern Riverbank Sanctuary
+        { id: 'tree-river-1', x: 800,  y: 860,  radius: 38, auraRadius: 140 },
+        { id: 'tree-river-2', x: 1350, y: 940,  radius: 40, auraRadius: 145 },
+        { id: 'tree-river-3', x: 2200, y: 780,  radius: 38, auraRadius: 140 },
+
+        // Eastern Plateau Springs
+        { id: 'tree-east-1',  x: 2200, y: 1350, radius: 38, auraRadius: 140 },
+        { id: 'tree-east-2',  x: 2200, y: 1650, radius: 38, auraRadius: 140 },
+
+        // Western Basin Oasis
+        { id: 'tree-west-1',  x: 800,  y: 1350, radius: 38, auraRadius: 140 },
+        { id: 'tree-west-2',  x: 800,  y: 1650, radius: 38, auraRadius: 140 },
+
+        // Southern Canyon Pass
+        { id: 'tree-south-1', x: 1250, y: 2150, radius: 38, auraRadius: 140 },
+        { id: 'tree-south-2', x: 1750, y: 2150, radius: 38, auraRadius: 140 }
       ]
     };
 
@@ -643,7 +661,7 @@
               boulders: parsed.boulders || [],
               rivers: parsed.rivers || [],
               crystals: parsed.crystals || [],
-              trees: parsed.trees || []
+              trees: (Array.isArray(parsed.trees) && parsed.trees.length > 0) ? parsed.trees : DEFAULT_MAP.trees
             };
           }
         }

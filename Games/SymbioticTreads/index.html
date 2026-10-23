@@ -58,7 +58,52 @@
     </div>
   </div>
 
-  
+  <!-- CITADEL BASE DOCKING ARMORY & FORGE -->
+  <div id="citadel-dock-panel" class="citadel-dock-panel" style="display: none;">
+    <div class="dock-panel-header">
+      <div class="dock-title-group">
+        <span class="dock-icon">🏰</span>
+        <div>
+          <div class="dock-title">CITADEL BASE ARMORY & DOCK</div>
+          <div class="dock-subtitle">Rover Secure & Repaired &bull; Base Scrap: <span id="dock-scrap-txt" class="dock-scrap-highlight">0</span> 📦</div>
+        </div>
+      </div>
+      <button id="btn-dock-close" class="dock-close-btn" aria-label="Close Armory" title="Close">[X]</button>
+    </div>
+
+    <div class="dock-armory-body">
+      <!-- Current Weapon Card -->
+      <div class="armory-card current-weapon-card">
+        <div class="card-label">CURRENT ARSENAL</div>
+        <div id="dock-current-name" class="armory-name">Tier 1: Kinetic Scout Rifle</div>
+        <div id="dock-current-desc" class="armory-desc">Standard kinetic rifle. Moderate fire rate.</div>
+        <div id="dock-current-stats" class="armory-stats">DMG: 26 | ROF: 11 | SPD: 16</div>
+      </div>
+
+      <!-- Upgrade Transition Arrow -->
+      <div class="armory-arrow">➔</div>
+
+      <!-- Next Upgrade Card -->
+      <div class="armory-card next-weapon-card" id="dock-next-card">
+        <div class="card-label">NEXT UPGRADE TIER</div>
+        <div id="dock-next-name" class="armory-name">Tier 2: Scatter-Shot Cannon</div>
+        <div id="dock-next-desc" class="armory-desc">3-pellet cone shot with concussive knockback.</div>
+        <div id="dock-next-cost" class="armory-cost">Cost: 35 Scrap 📦</div>
+      </div>
+    </div>
+
+    <div class="dock-actions">
+      <button id="btn-dock-upgrade" class="dock-upgrade-btn">
+        <span class="btn-icon">⚔️</span>
+        <span id="btn-dock-upgrade-label">FORGE UPGRADE (35 📦) [U]</span>
+      </button>
+      <button id="btn-dock-deploy" class="dock-deploy-btn">
+        <span class="btn-icon">🚀</span>
+        <span>DEPLOY ROVER [E]</span>
+      </button>
+    </div>
+  </div>
+
   <!-- TOUCHSCREEN JOYSTICK & CONTROLS FOR MOBILE (IPHONE SAFARI) -->
   <div id="touch-controls" style="display: none;">
     <!-- Left: Virtual Joystick Zone -->
@@ -75,15 +120,23 @@
         <span class="touch-btn-label">FIRE</span>
       </button>
 
-      <!-- Secondary Subgroup: Docking & Camera Focus -->
+      <!-- Secondary Subgroup: Docking, Armory Upgrade & Camera Focus -->
       <div class="touch-btn-row">
         <button id="btn-touch-dock" class="touch-btn touch-btn-dock" aria-label="Dock or Board Base">
           <span class="touch-btn-icon">🚪</span>
           <span class="touch-btn-label">DOCK</span>
         </button>
+        <button id="btn-touch-upgrade" class="touch-btn touch-btn-upgrade" aria-label="Upgrade Rover Gun" style="display: none;">
+          <span class="touch-btn-icon">⚔️</span>
+          <span class="touch-btn-label" id="touch-upgrade-label">UPG</span>
+        </button>
         <button id="btn-touch-focus" class="touch-btn touch-btn-focus" aria-label="Toggle Camera Focus">
           <span class="touch-btn-icon">🔄</span>
           <span class="touch-btn-label">FOCUS</span>
+        </button>
+        <button id="btn-touch-zoom" class="touch-btn touch-btn-zoom" aria-label="Toggle Camera Zoom">
+          <span class="touch-btn-icon">🔍</span>
+          <span class="touch-btn-label" id="touch-zoom-label">ZOOM</span>
         </button>
       </div>
     </div>

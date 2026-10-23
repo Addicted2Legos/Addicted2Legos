@@ -82,22 +82,78 @@
     }
   }
 
-  // --- 2. INPUT SYSTEM ---
+  // --- 2. INPUT SYSTEM & CAMERA ZOOM CONTROLLER ---
+  let userCameraZoom = null; // null = auto responsive zoom
+
+  function getCameraZoom() {
+    if (typeof userCameraZoom === 'number') {
+      return userCameraZoom;
+    }
+    const screenW = window.innerWidth || (canvas ? canvas.width : 1280);
+    const screenH = window.innerHeight || (canvas ? canvas.height : 720);
+    const minDim = Math.min(screenW, screenH);
+    const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || minDim < 768;
+
+    if (isMobile) {
+      // Mobile / iPhone: zoom out significantly so the player sees much more of the surrounding terrain
+      // iPhone portrait (minDim ~375-430) -> 0.58x (reveals ~175% more terrain)
+      // iPhone landscape (minDim ~375-430 height, or 600-750) -> 0.64x
+      if (minDim <= 430) return 0.58;
+      if (minDim <= 640) return 0.64;
+      return 0.72;
+    }
+    return 1.0;
+  }
+
+  function setCameraZoom(newZoom) {
+    const clamped = Math.max(0.40, Math.min(1.35, Math.round(newZoom * 100) / 100));
+    userCameraZoom = clamped;
+    updateZoomUI();
+    return clamped;
+  }
+
+  function updateZoomUI() {
+    const zoomLabel = document.getElementById('touch-zoom-label');
+    if (zoomLabel) {
+      const z = getCameraZoom();
+      zoomLabel.textContent = `${z.toFixed(2)}x`;
+    }
+  }
+
   const keys = {
     w: false, a: false, s: false, d: false,
     ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false,
-    Space: false, e: false, r: false, c: false, x: false,
+    Space: false, e: false, u: false, r: false, c: false, x: false,
     '1': false, '2': false, '3': false, '4': false, '5': false, '6': false,
     Escape: false,
     joystickX: 0,
     joystickY: 0,
     justPressed: {
-      e: false, r: false, c: false, x: false, Tab: false, Escape: false,
+      e: false, u: false, r: false, c: false, x: false, Tab: false, Escape: false,
       '[': false, ']': false,
       '1': false, '2': false, '3': false, '4': false, '5': false, '6': false
     },
     mouse: { x: 0, y: 0, isDown: false, rightDown: false, clicked: false }
   };
+
+  function safeRoundRect(ctx, x, y, w, h, r = 6) {
+    if (typeof ctx.roundRect === 'function') {
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, r);
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+  }
 
   function initInputHandlers(canvas) {
     window.addEventListener('keydown', (e) => {
@@ -119,6 +175,10 @@
         if (!keys.e) keys.justPressed.e = true;
         keys.e = true;
       }
+      if (k === 'u') {
+        if (!keys.u) keys.justPressed.u = true;
+        keys.u = true;
+      }
       if (k === 'r') {
         if (!keys.r) keys.justPressed.r = true;
         keys.r = true;
@@ -131,8 +191,23 @@
         if (!keys.x) keys.justPressed.x = true;
         keys.x = true;
       }
-      if (e.key === '[' || e.key === ']') {
-        keys.justPressed[e.key] = true;
+      if (e.key === '[' || e.key === '-') {
+        keys.justPressed['['] = true;
+        setCameraZoom(getCameraZoom() - 0.08);
+        const target = localTarget || gameState.rover;
+        if (target) addFloatingText(target.x, target.y - 35, `ZOOM: ${getCameraZoom().toFixed(2)}x`, '#38bdf8');
+      }
+      if (e.key === ']' || e.key === '=' || e.key === '+') {
+        keys.justPressed[']'] = true;
+        setCameraZoom(getCameraZoom() + 0.08);
+        const target = localTarget || gameState.rover;
+        if (target) addFloatingText(target.x, target.y - 35, `ZOOM: ${getCameraZoom().toFixed(2)}x`, '#38bdf8');
+      }
+      if (e.key === '0') {
+        userCameraZoom = null;
+        updateZoomUI();
+        const target = localTarget || gameState.rover;
+        if (target) addFloatingText(target.x, target.y - 35, `ZOOM: AUTO (${getCameraZoom().toFixed(2)}x)`, '#38bdf8');
       }
       if (e.key === 'Tab') {
         e.preventDefault();
@@ -162,6 +237,7 @@
       if (e.key === 'ArrowRight') keys.ArrowRight = false;
       if (e.key === ' ' || e.code === 'Space') keys.Space = false;
       if (k === 'e') keys.e = false;
+      if (k === 'u') keys.u = false;
       if (k === 'r') keys.r = false;
       if (k === 'c') keys.c = false;
       if (k === 'x') keys.x = false;
@@ -178,9 +254,19 @@
         keys.mouse.y = touch.clientY - rect.top;
       };
 
-      // Direct Canvas Touch Handling for mobile tap/shoot
+      let touchInitialDist = 0;
+      let touchInitialZoom = 1.0;
+
+      // Direct Canvas Touch Handling for mobile tap/shoot & pinch-to-zoom
       canvas.addEventListener('touchstart', (e) => {
-        if (e.changedTouches.length > 0) {
+        if (e.touches.length === 2) {
+          touchInitialDist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+          touchInitialZoom = getCameraZoom();
+          keys.mouse.isDown = false;
+        } else if (e.changedTouches.length > 0) {
           updateMouseFromTouch(e.changedTouches[0]);
           keys.mouse.isDown = true;
           keys.mouse.clicked = true;
@@ -191,13 +277,33 @@
       }, { passive: false });
 
       canvas.addEventListener('touchmove', (e) => {
-        if (e.changedTouches.length > 0) {
+        if (e.touches.length === 2 && touchInitialDist > 10) {
+          const currentDist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+          const factor = currentDist / touchInitialDist;
+          setCameraZoom(touchInitialZoom * factor);
+          if (e.cancelable) e.preventDefault();
+        } else if (e.changedTouches.length > 0) {
           updateMouseFromTouch(e.changedTouches[0]);
         }
       }, { passive: false });
 
       canvas.addEventListener('touchend', (e) => {
-        keys.mouse.isDown = false;
+        if (e.touches.length < 2) {
+          touchInitialDist = 0;
+        }
+        if (e.touches.length === 0) {
+          keys.mouse.isDown = false;
+        }
+      }, { passive: false });
+
+      // Wheel Zoom on Canvas
+      canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 0.05 : -0.05;
+        setCameraZoom(getCameraZoom() + delta);
       }, { passive: false });
 
       canvas.addEventListener('mousemove', (e) => {
@@ -229,6 +335,7 @@
 
   function clearJustPressed() {
     keys.justPressed.e = false;
+    keys.justPressed.u = false;
     keys.justPressed.r = false;
     keys.justPressed.c = false;
     keys.justPressed.x = false;
@@ -438,6 +545,82 @@
       btnTouchFocus.addEventListener('touchstart', triggerFocus, { passive: false });
     }
 
+    // Touch Action: Upgrade Weapon (⚔️)
+    const btnTouchUpgrade = document.getElementById('btn-touch-upgrade');
+    if (btnTouchUpgrade) {
+      const triggerUpgrade = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const activeLocal = (localTarget === gameState.rover2) ? gameState.rover2 : gameState.rover;
+        upgradeRoverWeapon(activeLocal);
+      };
+      btnTouchUpgrade.addEventListener('click', triggerUpgrade);
+      btnTouchUpgrade.addEventListener('touchstart', triggerUpgrade, { passive: false });
+    }
+
+    // Touch Action: Camera Zoom Preset Cycle (🔍)
+    const btnTouchZoom = document.getElementById('btn-touch-zoom');
+    if (btnTouchZoom) {
+      const zoomPresets = [0.60, 0.48, 0.78, 1.0];
+      const cycleZoom = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const cur = getCameraZoom();
+        let nextIndex = 0;
+        for (let i = 0; i < zoomPresets.length; i++) {
+          if (Math.abs(cur - zoomPresets[i]) < 0.05) {
+            nextIndex = (i + 1) % zoomPresets.length;
+            break;
+          }
+        }
+        const newZoom = setCameraZoom(zoomPresets[nextIndex]);
+        const target = localTarget || gameState.rover;
+        const labels = {
+          '0.6': 'TACTICAL (0.60x)',
+          '0.48': 'ULTRA-WIDE (0.48x)',
+          '0.78': 'SCOUT (0.78x)',
+          '1': '1:1 FOCUS (1.0x)'
+        };
+        const labelText = labels[String(newZoom)] || `${newZoom.toFixed(2)}x`;
+        if (target) addFloatingText(target.x, target.y - 45, `ZOOM: ${labelText}`, '#a855f7');
+      };
+      btnTouchZoom.addEventListener('click', cycleZoom);
+      btnTouchZoom.addEventListener('touchstart', cycleZoom, { passive: false });
+    }
+
+    updateZoomUI();
+
+    // Citadel Base Dock Panel Button Listeners
+    const btnDockUpgrade = document.getElementById('btn-dock-upgrade');
+    if (btnDockUpgrade) {
+      btnDockUpgrade.addEventListener('click', (e) => {
+        e.preventDefault();
+        const activeLocal = (localTarget === gameState.rover2) ? gameState.rover2 : gameState.rover;
+        upgradeRoverWeapon(activeLocal);
+      });
+    }
+
+    const btnDockDeploy = document.getElementById('btn-dock-deploy');
+    if (btnDockDeploy) {
+      btnDockDeploy.addEventListener('click', (e) => {
+        e.preventDefault();
+        const activeLocal = (localTarget === gameState.rover2) ? gameState.rover2 : gameState.rover;
+        if (activeLocal.isBoarded) {
+          toggleBoarding(activeLocal);
+        } else {
+          showCitadelDockPanel(false);
+        }
+      });
+    }
+
+    const btnDockClose = document.getElementById('btn-dock-close');
+    if (btnDockClose) {
+      btnDockClose.addEventListener('click', (e) => {
+        e.preventDefault();
+        showCitadelDockPanel(false);
+      });
+    }
+
     // Touch Power Mode Routing Pills (⚡ ENG / 🛡️ SHD / ⚔️ TUR)
     const powerBtns = document.querySelectorAll('.touch-pwr-btn');
     powerBtns.forEach(pbtn => {
@@ -507,10 +690,28 @@
       { id: 'crys-10', x: 2250, y: 1500, tier: 'rare' }
     ],
     trees: [
-      { id: 'tree-1', x: 1380, y: 1380, radius: 36, auraRadius: 135 },
-      { id: 'tree-2', x: 1620, y: 1380, radius: 36, auraRadius: 135 },
-      { id: 'tree-3', x: 1380, y: 1620, radius: 36, auraRadius: 135 },
-      { id: 'tree-4', x: 1620, y: 1620, radius: 36, auraRadius: 135 }
+      // Central Oasis Bio-Grove (North, South, East, West of base courtyard)
+      { id: 'tree-base-n', x: 1500, y: 1020, radius: 42, auraRadius: 150 },
+      { id: 'tree-base-s', x: 1500, y: 1980, radius: 42, auraRadius: 150 },
+      { id: 'tree-base-w', x: 1020, y: 1500, radius: 42, auraRadius: 150 },
+      { id: 'tree-base-e', x: 1980, y: 1500, radius: 42, auraRadius: 150 },
+
+      // Northern Riverbank Sanctuary
+      { id: 'tree-river-1', x: 800,  y: 860,  radius: 38, auraRadius: 140 },
+      { id: 'tree-river-2', x: 1350, y: 940,  radius: 40, auraRadius: 145 },
+      { id: 'tree-river-3', x: 2200, y: 780,  radius: 38, auraRadius: 140 },
+
+      // Eastern Plateau Springs
+      { id: 'tree-east-1',  x: 2200, y: 1350, radius: 38, auraRadius: 140 },
+      { id: 'tree-east-2',  x: 2200, y: 1650, radius: 38, auraRadius: 140 },
+
+      // Western Basin Oasis
+      { id: 'tree-west-1',  x: 800,  y: 1350, radius: 38, auraRadius: 140 },
+      { id: 'tree-west-2',  x: 800,  y: 1650, radius: 38, auraRadius: 140 },
+
+      // Southern Canyon Pass
+      { id: 'tree-south-1', x: 1250, y: 2150, radius: 38, auraRadius: 140 },
+      { id: 'tree-south-2', x: 1750, y: 2150, radius: 38, auraRadius: 140 }
     ]
   };
 
@@ -523,6 +724,10 @@
           const parsed = JSON.parse(raw);
           if (parsed && (Array.isArray(parsed.rocks) || Array.isArray(parsed.boulders) || Array.isArray(parsed.rivers))) {
             map = parsed;
+            // Ensure trees array is populated even if previous custom map lacked trees
+            if (!Array.isArray(map.trees) || map.trees.length === 0) {
+              map.trees = DEFAULT_MAP.trees;
+            }
             console.log('[Map] Loaded custom map from localStorage:', map.name || 'Custom Map');
           }
         }
@@ -875,12 +1080,24 @@
     }
   };
 
+  const WEAPON_UPGRADE_COSTS = {
+    2: 35,
+    3: 70,
+    4: 120
+  };
+
   function createBuildSite(data) {
+    const isWall = data.type === 'wall';
+    const orientation = data.orientation || (data.height > data.width ? 'vertical' : 'horizontal');
+    const width = data.width || (isWall ? (orientation === 'vertical' ? 38 : 180) : 36);
+    const height = data.height || (isWall ? (orientation === 'vertical' ? 180 : 38) : 36);
+    const radius = data.radius || Math.round(Math.max(width, height) / 2);
+
     return {
       id: data.id,
       x: data.x,
       y: data.y,
-      type: data.type, // 'wall' | 'tower' | 'weapon_forge'
+      type: data.type, // 'wall' | 'tower'
       towerType: data.towerType || null,
       tier: data.tier || 0,
       name: data.name,
@@ -892,9 +1109,12 @@
       active: !!data.active,
       built: false,
       batchIndex: data.batchIndex || 0,
-      radius: data.radius || (data.type === 'wall' ? 36 : 28),
+      orientation: orientation,
+      width: width,
+      height: height,
+      radius: radius,
       hp: 0,
-      maxHp: data.maxHp || 200,
+      maxHp: data.maxHp || (isWall ? 380 : 200),
       cooldown: 0,
       angle: 0,
       pulse: 0,
@@ -905,92 +1125,93 @@
 
   function initBuildSites() {
     return [
-      // BATCH 0 (Batch 1): 4 Cardinal Perimeter Blast Walls (North, South, East, West)
+      // BATCH 0 (Batch 1): 4 Cardinal Perimeter Blast Ramparts (North, South, East, West)
+      // Substantial 180px fortress barriers with automated gates forming the perimeter courtyard
       createBuildSite({
-        id: 'site-wall-n', x: 1500, y: 1360, type: 'wall', costScrap: 25, costCores: 0,
-        batchIndex: 0, active: true, name: 'North Blast Wall & Gate',
-        desc: 'Reinforced blast barrier with automatic Rover pass.', maxHp: 240
+        id: 'site-wall-n', x: 1500, y: 1260, type: 'wall', orientation: 'horizontal', width: 180, height: 38,
+        costScrap: 25, costCores: 0, batchIndex: 0, active: true, name: 'North Blast Rampart & Gate',
+        desc: 'Heavy 180px reinforced fortress barrier with automatic Rover pass.', maxHp: 380
       }),
       createBuildSite({
-        id: 'site-wall-s', x: 1500, y: 1640, type: 'wall', costScrap: 25, costCores: 0,
-        batchIndex: 0, active: true, name: 'South Blast Wall & Gate',
-        desc: 'Reinforced blast barrier with automatic Rover pass.', maxHp: 240
+        id: 'site-wall-s', x: 1500, y: 1740, type: 'wall', orientation: 'horizontal', width: 180, height: 38,
+        costScrap: 25, costCores: 0, batchIndex: 0, active: true, name: 'South Blast Rampart & Gate',
+        desc: 'Heavy 180px reinforced fortress barrier with automatic Rover pass.', maxHp: 380
       }),
       createBuildSite({
-        id: 'site-wall-e', x: 1660, y: 1500, type: 'wall', costScrap: 25, costCores: 0,
-        batchIndex: 0, active: true, name: 'East Blast Wall & Gate',
-        desc: 'Eastern valley gateway locking swarms out.', maxHp: 240
+        id: 'site-wall-e', x: 1740, y: 1500, type: 'wall', orientation: 'vertical', width: 38, height: 180,
+        costScrap: 25, costCores: 0, batchIndex: 0, active: true, name: 'East Blast Rampart & Gate',
+        desc: 'Heavy 180px reinforced fortress barrier with automatic Rover pass.', maxHp: 380
       }),
       createBuildSite({
-        id: 'site-wall-w', x: 1340, y: 1500, type: 'wall', costScrap: 25, costCores: 0,
-        batchIndex: 0, active: true, name: 'West Blast Wall & Gate',
-        desc: 'Rear mountain pass gateway guarding base core.', maxHp: 240
+        id: 'site-wall-w', x: 1260, y: 1500, type: 'wall', orientation: 'vertical', width: 38, height: 180,
+        costScrap: 25, costCores: 0, batchIndex: 0, active: true, name: 'West Blast Rampart & Gate',
+        desc: 'Heavy 180px reinforced fortress barrier with automatic Rover pass.', maxHp: 380
       }),
 
-      // BATCH 1 (Batch 2): 4 Corner Automated Turrets
+      // BATCH 1 (Batch 2): 4 Corner Automated Turrets (connecting with perimeter rampart corners)
       createBuildSite({
-        id: 'site-turret-ne', x: 1650, y: 1360, type: 'tower', towerType: 'gatling', costScrap: 35, costCores: 0,
+        id: 'site-turret-ne', x: 1740, y: 1260, type: 'tower', towerType: 'gatling', costScrap: 35, costCores: 0,
         batchIndex: 1, active: false, name: 'NE Gatling Sentry',
-        desc: 'Autonomous high-speed anti-swarm tower.', maxHp: 180
+        desc: 'Autonomous high-speed anti-swarm tower.', maxHp: 220
       }),
       createBuildSite({
-        id: 'site-turret-se', x: 1650, y: 1640, type: 'tower', towerType: 'gatling', costScrap: 35, costCores: 0,
+        id: 'site-turret-se', x: 1740, y: 1740, type: 'tower', towerType: 'gatling', costScrap: 35, costCores: 0,
         batchIndex: 1, active: false, name: 'SE Gatling Sentry',
-        desc: 'Autonomous high-speed anti-swarm tower.', maxHp: 180
+        desc: 'Autonomous high-speed anti-swarm tower.', maxHp: 220
       }),
       createBuildSite({
-        id: 'site-turret-nw', x: 1350, y: 1360, type: 'tower', towerType: 'gatling', costScrap: 35, costCores: 0,
+        id: 'site-turret-nw', x: 1260, y: 1260, type: 'tower', towerType: 'gatling', costScrap: 35, costCores: 0,
         batchIndex: 1, active: false, name: 'NW Gatling Sentry',
-        desc: 'Autonomous high-speed anti-swarm tower.', maxHp: 180
+        desc: 'Autonomous high-speed anti-swarm tower.', maxHp: 220
       }),
       createBuildSite({
-        id: 'site-turret-sw', x: 1350, y: 1640, type: 'tower', towerType: 'gatling', costScrap: 35, costCores: 0,
+        id: 'site-turret-sw', x: 1260, y: 1740, type: 'tower', towerType: 'gatling', costScrap: 35, costCores: 0,
         batchIndex: 1, active: false, name: 'SW Gatling Sentry',
-        desc: 'Autonomous high-speed anti-swarm tower.', maxHp: 180
+        desc: 'Autonomous high-speed anti-swarm tower.', maxHp: 220
       }),
 
-      // BATCH 2 (Batch 3): Scavenger Weapon Forge & Choke Fortifications
+      // BATCH 2 (Batch 3): Outer Frontier Choke Fortifications (East, West, North, South)
       createBuildSite({
-        id: 'site-weapon-forge', x: 1500, y: 1440, type: 'weapon_forge', costScrap: 35, costCores: 1,
-        batchIndex: 2, active: false, name: 'Scavenger Weapon Forge',
-        desc: 'Upgrades Rover weaponry (Scatter, Railgun, Nanite Missiles).', maxHp: 250
+        id: 'site-choke-east', x: 2020, y: 1500, type: 'wall', orientation: 'vertical', width: 44, height: 220,
+        costScrap: 35, costCores: 0, batchIndex: 2, active: false, name: 'Canyon Choke Barricade',
+        desc: 'Advance blast wall & gate sealing the Tar Pit funnel.', maxHp: 440
       }),
       createBuildSite({
-        id: 'site-choke-east', x: 1840, y: 1500, type: 'wall', costScrap: 35, costCores: 0,
-        batchIndex: 2, active: false, name: 'Canyon Choke Barricade',
-        desc: 'Advance blast wall & gate sealing the Tar Pit funnel.', maxHp: 280
+        id: 'site-choke-west', x: 980, y: 1500, type: 'wall', orientation: 'vertical', width: 44, height: 220,
+        costScrap: 35, costCores: 0, batchIndex: 2, active: false, name: 'West Basin Bastion',
+        desc: 'Frontier blast wall & gate sealing the West Basin pass.', maxHp: 440
       }),
       createBuildSite({
-        id: 'site-choke-north', x: 1500, y: 1140, type: 'wall', costScrap: 30, costCores: 0,
-        batchIndex: 2, active: false, name: 'North Gorge Bastion',
-        desc: 'Frontier wall sealing North Crevasse pass.', maxHp: 250
+        id: 'site-choke-north', x: 1500, y: 980, type: 'wall', orientation: 'horizontal', width: 220, height: 44,
+        costScrap: 30, costCores: 0, batchIndex: 2, active: false, name: 'North Gorge Bastion',
+        desc: 'Frontier wall sealing North Crevasse pass.', maxHp: 440
       }),
       createBuildSite({
-        id: 'site-choke-south', x: 1500, y: 1860, type: 'wall', costScrap: 30, costCores: 0,
-        batchIndex: 2, active: false, name: 'South Gorge Bastion',
-        desc: 'Frontier wall sealing South Crevasse pass.', maxHp: 250
+        id: 'site-choke-south', x: 1500, y: 2020, type: 'wall', orientation: 'horizontal', width: 220, height: 44,
+        costScrap: 30, costCores: 0, batchIndex: 2, active: false, name: 'South Gorge Bastion',
+        desc: 'Frontier wall sealing South Crevasse pass.', maxHp: 440
       }),
 
       // BATCH 3 (Batch 4): Heavy Apex Batteries & Citadel Spire
       createBuildSite({
-        id: 'site-apex-mortar', x: 1750, y: 1440, type: 'tower', towerType: 'plasma_mortar', costScrap: 50, costCores: 1,
+        id: 'site-apex-mortar', x: 1840, y: 1380, type: 'tower', towerType: 'plasma_mortar', costScrap: 50, costCores: 1,
         batchIndex: 3, active: false, name: 'Heavy Plasma Mortar',
-        desc: 'Long-range explosive mortar artillery for swarms.', maxHp: 220
+        desc: 'Long-range explosive mortar artillery for swarms.', maxHp: 240
       }),
       createBuildSite({
-        id: 'site-apex-tesla-n', x: 1580, y: 1300, type: 'tower', towerType: 'tesla', costScrap: 45, costCores: 0,
+        id: 'site-apex-tesla-n', x: 1620, y: 1260, type: 'tower', towerType: 'tesla', costScrap: 45, costCores: 0,
         batchIndex: 3, active: false, name: 'North Tesla Shock Coil',
-        desc: 'Chain-lightning area shock tower.', maxHp: 200
+        desc: 'Chain-lightning area shock tower.', maxHp: 220
       }),
       createBuildSite({
-        id: 'site-apex-tesla-s', x: 1580, y: 1700, type: 'tower', towerType: 'tesla', costScrap: 45, costCores: 0,
+        id: 'site-apex-tesla-s', x: 1620, y: 1740, type: 'tower', towerType: 'tesla', costScrap: 45, costCores: 0,
         batchIndex: 3, active: false, name: 'South Tesla Shock Coil',
-        desc: 'Chain-lightning area shock tower.', maxHp: 200
+        desc: 'Chain-lightning area shock tower.', maxHp: 220
       }),
       createBuildSite({
-        id: 'site-apex-pylon', x: 1500, y: 1550, type: 'tower', towerType: 'repair_pylon', costScrap: 40, costCores: 0,
+        id: 'site-apex-pylon', x: 1500, y: 1580, type: 'tower', towerType: 'repair_pylon', costScrap: 40, costCores: 0,
         batchIndex: 3, active: false, name: 'Citadel Repair Spire',
-        desc: 'Nanite aura constantly restoring base and fortifications.', maxHp: 250
+        desc: 'Nanite aura constantly restoring base and fortifications.', maxHp: 280
       })
     ];
   }
@@ -1322,9 +1543,80 @@
         }
       }
 
-      // 3. Check collision with structures and built defense walls
+      // 3. Check collision & tangential sliding with structures and built defense ramparts
       let blockedByStructure = null;
-      if (structures) {
+      let wallSlideX = 0, wallSlideY = 0;
+      let isSlidingWall = false;
+
+      if (buildSites) {
+        for (let site of buildSites) {
+          if (!site.built || site.type !== 'wall') continue;
+
+          const hw = (site.width || 180) / 2;
+          const hh = (site.height || 38) / 2;
+
+          // If gate is open, allow passage through the central gate channel (width ~54px)
+          if (site.isOpen) {
+            const inGateChannel = site.orientation === 'vertical'
+              ? Math.abs(enemy.y - site.y) < 27
+              : Math.abs(enemy.x - site.x) < 27;
+            if (inGateChannel) continue; // Rush straight through the open gate!
+          }
+
+          const nextX = enemy.x + moveX * enemySpeed;
+          const nextY = enemy.y + moveY * enemySpeed;
+
+          // Closest point on wall slab
+          const cx = Math.max(site.x - hw, Math.min(site.x + hw, nextX));
+          const cy = Math.max(site.y - hh, Math.min(site.y + hh, nextY));
+
+          const distWall = Math.hypot(nextX - cx, nextY - cy);
+          if (distWall < enemy.radius) {
+            blockedByStructure = site;
+
+            // Compute outward collision normal
+            let normX = nextX - cx;
+            let normY = nextY - cy;
+            const normLen = Math.hypot(normX, normY);
+            if (normLen > 0) {
+              normX /= normLen;
+              normY /= normLen;
+            } else {
+              normX = 0;
+              normY = -1;
+            }
+
+            // Two candidate tangential sliding directions along wall face
+            const tan1X = -normY, tan1Y = normX;
+            const tan2X = normY, tan2Y = -normX;
+
+            // Choose tangent that leads toward target (the Base Citadel in center or Rover)
+            const dot1 = dirX * tan1X + dirY * tan1Y;
+            const dot2 = dirX * tan2X + dirY * tan2Y;
+            const bestTanX = dot1 >= dot2 ? tan1X : tan2X;
+            const bestTanY = dot1 >= dot2 ? tan1Y : tan2Y;
+
+            // Apply tangential glide with slight outward repulsion so bugs flow around edges
+            wallSlideX = normX * 0.15 + bestTanX * 0.96;
+            wallSlideY = normY * 0.15 + bestTanY * 0.96;
+            const sLen = Math.hypot(wallSlideX, wallSlideY) || 1;
+            wallSlideX /= sLen;
+            wallSlideY /= sLen;
+            isSlidingWall = true;
+
+            // Push out from wall boundary if overlapping
+            const curDist = Math.hypot(enemy.x - cx, enemy.y - cy);
+            if (curDist < enemy.radius) {
+              const push = enemy.radius - curDist;
+              enemy.x += normX * push;
+              enemy.y += normY * push;
+            }
+            break;
+          }
+        }
+      }
+
+      if (!blockedByStructure && structures) {
         for (let struct of structures) {
           if (struct.type === 'gate' && struct.isOpen) continue;
           const dStruct = Math.hypot((enemy.x + moveX * enemySpeed) - struct.x, (enemy.y + moveY * enemySpeed) - struct.y);
@@ -1335,33 +1627,35 @@
         }
       }
 
-      if (!blockedByStructure && buildSites) {
-        for (let site of buildSites) {
-          if (!site.built || site.type !== 'wall') continue;
-          if (site.isOpen) continue;
-          const dSite = Math.hypot((enemy.x + moveX * enemySpeed) - site.x, (enemy.y + moveY * enemySpeed) - site.y);
-          if (dSite < enemy.radius + site.radius) {
-            blockedByStructure = site;
-            break;
-          }
-        }
-      }
-
       if (blockedByStructure) {
         // Attack the structure blocking path!
         if (enemy.attackCooldown <= 0) {
-          blockedByStructure.hp -= enemy.damage * 0.45;
+          const dmgMult = enemy.type === 'crusher' ? 2.5 : (enemy.type === 'spitter' ? 0.8 : 1.2);
+          blockedByStructure.hp -= enemy.damage * dmgMult;
           blockedByStructure.hitFlash = 6;
-          enemy.attackCooldown = 32;
+          enemy.attackCooldown = 26;
           spawnBloodSplat(blockedByStructure.x, blockedByStructure.y, 3, '#94a3b8');
           if (blockedByStructure.hp <= 0) {
-            spawnExplosion(blockedByStructure.x, blockedByStructure.y, 14);
+            spawnExplosion(blockedByStructure.x, blockedByStructure.y, 18);
+            spawnRepairPulseWave(blockedByStructure.x, blockedByStructure.y, 75);
             const bName = blockedByStructure.name || blockedByStructure.type || 'STRUCTURE';
             addFloatingText(blockedByStructure.x, blockedByStructure.y - 20, `${bName.toUpperCase()} BREACHED!`, '#ef4444');
             if (blockedByStructure.built !== undefined) {
               blockedByStructure.built = false;
+              blockedByStructure.hp = 0;
               blockedByStructure.currentScrap = 0;
             }
+          }
+        }
+
+        // KEY: Instead of freezing, slide along wall perimeter to flank around corners toward the Citadel!
+        if (isSlidingWall) {
+          const nextSlideX = enemy.x + wallSlideX * enemySpeed;
+          const nextSlideY = enemy.y + wallSlideY * enemySpeed;
+          if (isWalkable(nextSlideX, nextSlideY)) {
+            enemy.x = nextSlideX;
+            enemy.y = nextSlideY;
+            enemy.angle = Math.atan2(wallSlideY, wallSlideX);
           }
         }
       } else {
@@ -1983,8 +2277,8 @@
     base: {
       x: 1500,
       y: 1500,
-      width: 150,
-      height: 95,
+      width: 96,
+      height: 62,
       hp: 250,
       maxHp: 250,
       fuel: 100,
@@ -2107,6 +2401,8 @@
     gameState.scrapNodes = initScrapNodes(WORLD_WIDTH, WORLD_HEIGHT, reloadedMap.crystals);
     gameState.weaponCaches = initWeaponCaches(WORLD_WIDTH, WORLD_HEIGHT);
     gameState.energyCells = [];
+    showCitadelDockPanel(false);
+    updateArmoryUI();
   }
 
   let localTarget = gameState.rover;
@@ -2139,15 +2435,146 @@
     addFloatingText(gameState.base.x, gameState.base.y - 60, `BASE POWER: ${mode.toUpperCase()}`, colors[mode] || '#ffffff');
   }
 
+  function showCitadelDockPanel(show) {
+    const panel = document.getElementById('citadel-dock-panel');
+    if (!panel) return;
+    if (show) {
+      updateArmoryUI();
+      panel.style.display = 'block';
+    } else {
+      panel.style.display = 'none';
+    }
+  }
+
+  function updateArmoryUI() {
+    const activeLocalRover = (localTarget === gameState.rover2) ? gameState.rover2 : gameState.rover;
+    if (!activeLocalRover) return;
+    const currentTier = activeLocalRover.weaponTier || 1;
+    const currConfig = WEAPON_TIER_CONFIG[currentTier] || WEAPON_TIER_CONFIG[1];
+    const nextTier = Math.min(4, currentTier + 1);
+    const nextConfig = WEAPON_TIER_CONFIG[nextTier];
+    const cost = WEAPON_UPGRADE_COSTS[nextTier] || 35;
+    const baseScrap = Math.floor(gameState.baseScrap || 0);
+
+    const scrapTxt = document.getElementById('dock-scrap-txt');
+    if (scrapTxt) scrapTxt.textContent = `${baseScrap}`;
+
+    const currNameEl = document.getElementById('dock-current-name');
+    const currDescEl = document.getElementById('dock-current-desc');
+    const currStatsEl = document.getElementById('dock-current-stats');
+    if (currNameEl) currNameEl.textContent = `[Tier ${currentTier}] ${currConfig.name}`;
+    if (currDescEl) currDescEl.textContent = currConfig.desc;
+    if (currStatsEl) currStatsEl.textContent = `DMG: ${currConfig.damage} | ROF: ${currConfig.fireRate} | SPD: ${currConfig.speed}`;
+
+    const nextNameEl = document.getElementById('dock-next-name');
+    const nextDescEl = document.getElementById('dock-next-desc');
+    const nextCostEl = document.getElementById('dock-next-cost');
+    const btnUpgrade = document.getElementById('btn-dock-upgrade');
+    const btnUpgradeLabel = document.getElementById('btn-dock-upgrade-label');
+
+    if (currentTier >= 4) {
+      if (nextNameEl) nextNameEl.textContent = '✨ APEX WEAPON TIER ACTIVE';
+      if (nextDescEl) nextDescEl.textContent = 'Maximum firepower unlocked. Nanite homing missiles and piercing plasma slugs.';
+      if (nextCostEl) nextCostEl.textContent = 'MAX TIER REACHED';
+      if (btnUpgradeLabel) btnUpgradeLabel.textContent = 'MAX TIER REACHED';
+      if (btnUpgrade) btnUpgrade.disabled = true;
+    } else {
+      if (nextNameEl) nextNameEl.textContent = `[Tier ${nextTier}] ${nextConfig.name}`;
+      if (nextDescEl) nextDescEl.textContent = nextConfig.desc;
+      if (nextCostEl) nextCostEl.textContent = `Cost: ${cost} Scrap 📦`;
+      if (btnUpgradeLabel) btnUpgradeLabel.textContent = `FORGE UPGRADE (${cost} 📦) [U]`;
+      if (btnUpgrade) btnUpgrade.disabled = (baseScrap < cost);
+    }
+
+    // Touch upgrade button in touch-actions
+    const btnTouchUpgrade = document.getElementById('btn-touch-upgrade');
+    const touchUpgradeLabel = document.getElementById('touch-upgrade-label');
+    if (btnTouchUpgrade && touchUpgradeLabel) {
+      const d = Math.hypot(activeLocalRover.x - gameState.base.x, activeLocalRover.y - gameState.base.y);
+      if (currentTier < 4 && (activeLocalRover.isBoarded || d <= 140)) {
+        btnTouchUpgrade.style.display = 'flex';
+        touchUpgradeLabel.textContent = `UPG (${cost})`;
+        if (baseScrap >= cost) {
+          btnTouchUpgrade.classList.add('in-range');
+        } else {
+          btnTouchUpgrade.classList.remove('in-range');
+        }
+      } else {
+        btnTouchUpgrade.style.display = 'none';
+      }
+    }
+  }
+
+  function upgradeRoverWeapon(targetRover) {
+    const rover = targetRover || ((localTarget === gameState.rover2) ? gameState.rover2 : gameState.rover);
+    const base = gameState.base;
+    const d = Math.hypot(rover.x - base.x, rover.y - base.y);
+
+    if (!rover.isBoarded && d > 150) {
+      addFloatingText(rover.x, rover.y - 35, `DOCK OR DRIVE TO CITADEL TO FORGE UPGRADE (${Math.round(d)}m AWAY)`, '#ef4444');
+      return false;
+    }
+
+    const currentTier = rover.weaponTier || 1;
+    if (currentTier >= 4) {
+      addFloatingText(base.x, base.y - 65, '⚔️ APEX WEAPON TIER ALREADY ACTIVE (MAX)!', '#ec4899');
+      return false;
+    }
+
+    const nextTier = currentTier + 1;
+    const cost = WEAPON_UPGRADE_COSTS[nextTier] || 35;
+
+    // Check available scrap: baseScrap + rover cargo
+    const totalScrap = (gameState.baseScrap || 0) + (rover.cargo || 0);
+    if (totalScrap < cost) {
+      addFloatingText(base.x, base.y - 65, `NEED ${cost} SCRAP FOR ${WEAPON_TIER_CONFIG[nextTier].name.toUpperCase()} (HAVE ${Math.floor(totalScrap)})`, '#ef4444');
+      return false;
+    }
+
+    // Deduct scrap
+    if (gameState.baseScrap >= cost) {
+      gameState.baseScrap -= cost;
+    } else {
+      const rem = cost - gameState.baseScrap;
+      gameState.baseScrap = 0;
+      rover.cargo = Math.max(0, rover.cargo - rem);
+    }
+
+    // Advance weapon tier for rovers and update shared stats
+    rover.weaponTier = nextTier;
+    if (gameState.rover) gameState.rover.weaponTier = nextTier;
+    if (gameState.rover2) gameState.rover2.weaponTier = nextTier;
+    gameState.weaponStats = Object.assign({}, WEAPON_TIER_CONFIG[nextTier]);
+
+    // Reset temporary cache weapon so shiny new forged weapon is immediately deployed
+    rover.weapon = null;
+    if (gameState.rover) gameState.rover.weapon = null;
+    if (gameState.rover2) gameState.rover2.weapon = null;
+
+    // Audio-visual celebration
+    spawnRepairPulseWave(base.x, base.y, 140);
+    spawnExplosion(base.x, base.y, 22);
+    addFloatingText(base.x, base.y - 65, `⚔️ FORGED: [TIER ${nextTier}] ${WEAPON_TIER_CONFIG[nextTier].name.toUpperCase()}!`, WEAPON_TIER_CONFIG[nextTier].color || '#ec4899');
+
+    // Broadcast in multiplayer
+    if (!isHost && !isSolo && network) {
+      network.send({ type: 'UPGRADE_WEAPON', roverId: rover.id, tier: nextTier });
+    }
+
+    updateArmoryUI();
+    return true;
+  }
+
   function toggleBoarding(rover = gameState.rover) {
     const base = gameState.base;
     const d = Math.hypot(rover.x - base.x, rover.y - base.y);
 
     if (rover.isBoarded) {
       rover.isBoarded = false;
-      rover.x = base.x + (rover.id === 'rover2' ? -95 : 95);
+      rover.x = base.x + (rover.id === 'rover2' ? -75 : 75);
       rover.y = base.y;
       addFloatingText(rover.x, rover.y - 25, `${rover.name || 'ROVER'} DEPLOYED`, '#38bdf8');
+      showCitadelDockPanel(false);
     } else if (d <= 140) {
       rover.isBoarded = true;
       if (rover.cargo > 0) {
@@ -2155,9 +2582,11 @@
         rover.cargo = 0;
       }
       addFloatingText(base.x, base.y - 60, `${rover.name || 'ROVER'} DOCKED IN BASE`, '#22c55e');
+      showCitadelDockPanel(true);
     } else {
       addFloatingText(rover.x, rover.y - 25, 'TOO FAR FROM BASE TO DOCK', '#ef4444');
     }
+    updateArmoryUI();
   }
 
   // --- IN-WORLD PROXIMITY INTERACTION & BUILD SITES UPDATE ("KINGDOM" SYSTEM) ---
@@ -2220,16 +2649,6 @@
                 spawnRepairPulseWave(site.x, site.y, 110);
                 addFloatingText(site.x, site.y - 35, `+${site.name.toUpperCase()} COMPLETE!`, '#22c55e');
 
-                // If weapon forge, upgrade both rovers weapon tier!
-                if (site.type === 'weapon_forge') {
-                  const nextTier = Math.min(4, ((rover.weaponTier || 1) + 1));
-                  rover.weaponTier = nextTier;
-                  if (rover2) rover2.weaponTier = nextTier;
-                  gameState.weaponStats = Object.assign({}, WEAPON_TIER_CONFIG[nextTier]);
-                  spawnExplosion(r.x, r.y, 14);
-                  addFloatingText(r.x, r.y - 45, `⚔️ WEAPON UPGRADED: ${gameState.weaponStats.name.toUpperCase()}!`, '#ec4899');
-                }
-
                 checkBatchProgression(gameState);
               }
             }
@@ -2241,7 +2660,8 @@
       if (site.built) {
         // WALLS with Gate: open when ANY rover is close
         if (site.type === 'wall') {
-          site.isOpen = activeRovers.some(r => !r.isDead && Math.hypot(r.x - site.x, r.y - site.y) < 70);
+          const openDist = (site.radius || 90) + 25;
+          site.isOpen = activeRovers.some(r => !r.isDead && Math.hypot(r.x - site.x, r.y - site.y) < openDist);
         }
 
         // TOWERS: autonomous targeting and firing
@@ -2344,6 +2764,10 @@
       if (remoteKeys.toggleBoard && gameState.rover2) toggleBoarding(gameState.rover2);
     } else if (data.type === 'POWER_MODE') {
       setPowerMode(data.mode);
+    } else if (data.type === 'UPGRADE_WEAPON') {
+      if (isHost) {
+        upgradeRoverWeapon(gameState.rover2);
+      }
     } else if (data.type === 'BUILD_DEPOSIT') {
       if (isHost && gameState.buildSites) {
         const site = gameState.buildSites.find(s => s.id === data.siteId);
@@ -2370,10 +2794,16 @@
       if (s.energyCells) gameState.energyCells = s.energyCells;
       if (s.ruins) gameState.ruins = s.ruins;
       if (typeof s.techCores === 'number') gameState.techCores = s.techCores;
-      if (typeof s.baseScrap === 'number') gameState.baseScrap = s.baseScrap;
+      if (typeof s.baseScrap === 'number') {
+        gameState.baseScrap = s.baseScrap;
+        updateArmoryUI();
+      }
       if (s.buildSites) gameState.buildSites = s.buildSites;
       if (s.looseScraps) gameState.looseScraps = s.looseScraps;
-      if (s.weaponStats) gameState.weaponStats = s.weaponStats;
+      if (s.weaponStats) {
+        gameState.weaponStats = s.weaponStats;
+        updateArmoryUI();
+      }
       if (s.upgrades) gameState.upgrades = s.upgrades;
       if (s.weaponCaches) gameState.weaponCaches = s.weaponCaches;
       if (typeof s.kills === 'number') gameState.kills = s.kills;
@@ -2560,7 +2990,7 @@
         rover.hp = rover.maxHp;
         rover.fuel = rover.maxFuel;
         rover.cargo = 0;
-        rover.x = gameState.base.x + (rover.id === 'rover2' ? -95 : 95);
+        rover.x = gameState.base.x + (rover.id === 'rover2' ? -75 : 75);
         rover.y = gameState.base.y;
         rover.vx = 0;
         rover.vy = 0;
@@ -2931,10 +3361,9 @@
     if (rover2 && !isSolo) activeRovers.push(rover2);
     const activeLocalRover = (localTarget === rover2) ? rover2 : rover;
 
-    const camX = canvas.width / 2 - localTarget.x;
-    const camY = canvas.height / 2 - localTarget.y;
-    const mouseWorldX = keys.mouse.x - camX;
-    const mouseWorldY = keys.mouse.y - camY;
+    const currentZoom = getCameraZoom();
+    const mouseWorldX = (keys.mouse.x - canvas.width / 2) / currentZoom + localTarget.x;
+    const mouseWorldY = (keys.mouse.y - canvas.height / 2) / currentZoom + localTarget.y;
 
     // Hotkeys: Tab toggles camera between local rover and base citadel
     if (keys.justPressed.Tab) {
@@ -2954,6 +3383,11 @@
       if (activeLocalRover.isBoarded || d <= 140) {
         toggleBoarding(activeLocalRover);
       }
+    }
+
+    // Hotkey [U] to upgrade Rover Weapon at Citadel Base
+    if (keys.justPressed.u) {
+      upgradeRoverWeapon(activeLocalRover);
     }
 
     // Quick Hotkey [M] to open Map Editor in new tab
@@ -2976,6 +3410,17 @@
       } else {
         btnTouchDock.classList.remove('active', 'in-range');
         btnTouchDock.innerHTML = '<span class="touch-btn-icon">🚪</span><span class="touch-btn-label">BASE</span>';
+      }
+    }
+
+    // Refresh Armory UI if dock panel is open or rover is in base proximity
+    const dBaseForArmory = Math.hypot(activeLocalRover.x - base.x, activeLocalRover.y - base.y);
+    if (activeLocalRover.isBoarded || dBaseForArmory <= 160) {
+      updateArmoryUI();
+    } else {
+      const btnTouchUpgrade = document.getElementById('btn-touch-upgrade');
+      if (btnTouchUpgrade && btnTouchUpgrade.style.display !== 'none') {
+        btnTouchUpgrade.style.display = 'none';
       }
     }
 
@@ -3029,7 +3474,7 @@
           base.muzzleFlash = 4;
           if (isTurretOverdrive) base.fuel = Math.max(0, base.fuel - 0.5);
 
-          const barrelLen = 52;
+          const barrelLen = 38;
           const bX = base.x + Math.cos(base.cannonAngle) * barrelLen;
           const bY = base.y + Math.sin(base.cannonAngle) * barrelLen;
           const cSpeed = isTurretOverdrive ? 19 : 16;
@@ -3052,7 +3497,7 @@
       // 2. BASE SHIELD FORCEFIELD (Consumes Fuel)
       if (base.powerMode === 'shields' && base.fuel > 0) {
         base.fuel = Math.max(0, base.fuel - 0.025);
-        const shieldRadius = 110;
+        const shieldRadius = 78;
 
         for (let eIdx = gameState.enemies.length - 1; eIdx >= 0; eIdx--) {
           const enemy = gameState.enemies[eIdx];
@@ -3253,7 +3698,7 @@
         if (p.type === 'acid_glob') {
           let hitPlayer = false;
           const dBase = Math.hypot(base.x - p.x, base.y - p.y);
-          if (dBase < 65) {
+          if (dBase < 48) {
             base.hp = Math.max(0, base.hp - p.damage);
             hitPlayer = true;
             spawnBloodSplat(p.x, p.y, 4, '#22c55e');
@@ -3403,7 +3848,7 @@
       for (let enemy of gameState.enemies) {
         // Attack Base
         const dBase = Math.hypot(base.x - enemy.x, base.y - enemy.y);
-        if (dBase < 65) {
+        if (dBase < 48) {
           if (base.powerMode === 'shields' && base.fuel > 0) {
             base.shieldPulse = 8;
             base.fuel = Math.max(0, base.fuel - 0.2);
@@ -3462,6 +3907,7 @@
               isBoarded: rover.isBoarded, angle: rover.angle, aimAngle: rover.aimAngle,
               muzzleFlash: rover.muzzleFlash,
               weapon: rover.weapon,
+              weaponTier: rover.weaponTier,
               autoWeaponAngle: rover.autoWeaponAngle,
               autoWeaponFlash: rover.autoWeaponFlash,
               isDead: rover.isDead,
@@ -3475,6 +3921,7 @@
               isBoarded: rover2.isBoarded, angle: rover2.angle, aimAngle: rover2.aimAngle,
               muzzleFlash: rover2.muzzleFlash,
               weapon: rover2.weapon,
+              weaponTier: rover2.weaponTier,
               autoWeaponAngle: rover2.autoWeaponAngle,
               autoWeaponFlash: rover2.autoWeaponFlash,
               isDead: rover2.isDead,
@@ -3668,9 +4115,10 @@
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
-    const camX = canvas.width / 2 - localTarget.x;
-    const camY = canvas.height / 2 - localTarget.y;
-    ctx.translate(camX, camY);
+    const currentZoom = getCameraZoom();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.scale(currentZoom, currentZoom);
+    ctx.translate(-localTarget.x, -localTarget.y);
 
     // Wasteland Background: clean blank light gray as requested
     ctx.fillStyle = '#e2e8f0';
@@ -3826,6 +4274,40 @@
     // Central Base Fortress
     drawBase(ctx, gameState.base, gameState.upgrades);
 
+    // In-world Citadel Docking / Armory prompt above base
+    const activeScav = (localTarget === gameState.rover2) ? gameState.rover2 : gameState.rover;
+    const dBaseP = Math.hypot(activeScav.x - gameState.base.x, activeScav.y - gameState.base.y);
+    if (activeScav.isBoarded || dBaseP <= 150) {
+      const armoryTier = activeScav.weaponTier || 1;
+      const nextArmoryTier = Math.min(4, armoryTier + 1);
+      const armoryCost = WEAPON_UPGRADE_COSTS[nextArmoryTier] || 35;
+
+      ctx.save();
+      ctx.translate(gameState.base.x, gameState.base.y - 58);
+      const promptH = 22;
+      const promptW = activeScav.isBoarded ? 290 : 310;
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.5;
+      safeRoundRect(ctx, -promptW / 2, -promptH / 2, promptW, promptH, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.font = 'bold 10.5px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      if (activeScav.isBoarded) {
+        ctx.fillStyle = '#22c55e';
+        const upgText = armoryTier < 4 ? ` | [U] FORGE GUN (${armoryCost} 📦)` : ' | [MAX GUN]';
+        ctx.fillText(`[E] DEPLOY ROVER${upgText}`, 0, 0);
+      } else {
+        ctx.fillStyle = '#38bdf8';
+        const upgText = armoryTier < 4 ? ` | [U] FORGE GUN (${armoryCost} 📦)` : '';
+        ctx.fillText(`[E] DOCK AT BASE${upgText}`, 0, 0);
+      }
+      ctx.restore();
+    }
+
     // Rover 1 (Scavenger Alpha)
     if (!gameState.rover.isBoarded) {
       drawRover(ctx, gameState.rover, gameState.upgrades);
@@ -3931,41 +4413,41 @@
     ctx.save();
     ctx.translate(base.x, base.y);
 
-    // Heavy Treads
-    const treadW = base.width + 16;
-    const treadH = 24;
+    // Heavy Treads (Proportionally scaled to 96x62 base)
+    const treadW = base.width + 10;
+    const treadH = 15;
     ctx.fillStyle = '#0f172a';
-    ctx.fillRect(-treadW / 2, -base.height / 2 - 4, treadW, treadH);
-    ctx.fillRect(-treadW / 2, base.height / 2 - treadH + 4, treadW, treadH);
+    ctx.fillRect(-treadW / 2, -base.height / 2 - 3, treadW, treadH);
+    ctx.fillRect(-treadW / 2, base.height / 2 - treadH + 3, treadW, treadH);
 
     ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 2.5;
-    for (let x = -treadW / 2 + 6; x < treadW / 2; x += 14) {
+    ctx.lineWidth = 2;
+    for (let x = -treadW / 2 + 5; x < treadW / 2; x += 10) {
       ctx.beginPath();
-      ctx.moveTo(x, -base.height / 2 - 4);
-      ctx.lineTo(x, -base.height / 2 + treadH - 4);
-      ctx.moveTo(x, base.height / 2 - treadH + 4);
-      ctx.lineTo(x, base.height / 2 + 4);
+      ctx.moveTo(x, -base.height / 2 - 3);
+      ctx.lineTo(x, -base.height / 2 + treadH - 3);
+      ctx.moveTo(x, base.height / 2 - treadH + 3);
+      ctx.lineTo(x, base.height / 2 + 3);
       ctx.stroke();
     }
 
     // Armored Hull
     ctx.fillStyle = '#1e293b';
-    ctx.fillRect(-base.width / 2, -base.height / 2 + 10, base.width, base.height - 20);
+    ctx.fillRect(-base.width / 2, -base.height / 2 + 6, base.width, base.height - 12);
     ctx.strokeStyle = '#475569';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(-base.width / 2, -base.height / 2 + 10, base.width, base.height - 20);
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(-base.width / 2, -base.height / 2 + 6, base.width, base.height - 12);
 
     // Armor plating decals
     ctx.fillStyle = '#334155';
-    ctx.fillRect(-base.width / 2 + 12, -base.height / 2 + 16, 28, base.height - 32);
-    ctx.fillRect(base.width / 2 - 40, -base.height / 2 + 16, 28, base.height - 32);
+    ctx.fillRect(-base.width / 2 + 8, -base.height / 2 + 10, 18, base.height - 20);
+    ctx.fillRect(base.width / 2 - 26, -base.height / 2 + 10, 18, base.height - 20);
 
     // Generator core glow
     const corePulse = Math.sin(Date.now() * 0.005) * 0.15;
     ctx.fillStyle = base.powerMode === 'engines' ? '#f59e0b' : (base.powerMode === 'shields' ? '#38bdf8' : '#ec4899');
     ctx.beginPath();
-    ctx.arc(0, 0, 16 * (1 + corePulse), 0, Math.PI * 2);
+    ctx.arc(0, 0, 10 * (1 + corePulse), 0, Math.PI * 2);
     ctx.fill();
 
     // Auto-Firing Heavy Cannon Turret
@@ -3975,46 +4457,46 @@
 
     // Barrel
     ctx.fillStyle = '#0f172a';
-    ctx.fillRect(12 - recoil, -6, 42, 12);
+    ctx.fillRect(8 - recoil, -4, 28, 8);
     ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(12 - recoil, -6, 42, 12);
+    ctx.lineWidth = 1.8;
+    ctx.strokeRect(8 - recoil, -4, 28, 8);
 
     // Muzzle Brake
     ctx.fillStyle = '#334155';
-    ctx.fillRect(50 - recoil, -8, 8, 16);
+    ctx.fillRect(34 - recoil, -5, 5, 10);
 
     // Swivel Turret Cap
     ctx.fillStyle = '#1e293b';
     ctx.beginPath();
-    ctx.arc(0, 0, 24, 0, Math.PI * 2);
+    ctx.arc(0, 0, 16, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2;
     ctx.stroke();
 
     // Command Viewport
     ctx.fillStyle = '#0284c7';
-    ctx.fillRect(6, -6, 10, 12);
+    ctx.fillRect(4, -4, 7, 8);
 
     // Muzzle flash
     if (base.muzzleFlash > 0) {
       ctx.fillStyle = '#fef08a';
       ctx.beginPath();
-      ctx.arc(62 - recoil, 0, 18, 0, Math.PI * 2);
+      ctx.arc(42 - recoil, 0, 12, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#f59e0b';
       ctx.beginPath();
-      ctx.arc(62 - recoil, 0, 11, 0, Math.PI * 2);
+      ctx.arc(42 - recoil, 0, 7, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
 
     // Shield Forcefield Bubble
     if (base.powerMode === 'shields' && base.fuel > 0) {
-      const sRadius = 110 + Math.sin(Date.now() * 0.006) * 5;
+      const sRadius = 78 + Math.sin(Date.now() * 0.006) * 4;
       ctx.strokeStyle = 'rgba(56, 189, 248, 0.75)';
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 2.2;
       ctx.fillStyle = 'rgba(56, 189, 248, 0.12)';
       ctx.beginPath();
       ctx.arc(0, 0, sRadius, 0, Math.PI * 2);
@@ -4023,10 +4505,10 @@
     }
 
     // Health bar above base
-    const barW = 100;
-    const barH = 7;
+    const barW = 68;
+    const barH = 5;
     const barX = -barW / 2;
-    const barY = -base.height / 2 - 16;
+    const barY = -base.height / 2 - 12;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
     ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
     const hpRatio = Math.max(0, base.hp / base.maxHp);
@@ -4674,13 +5156,25 @@
 
         // 4. In-world type icon & blueprint silhouette
         if (site.type === 'wall') {
-          ctx.fillStyle = 'rgba(100, 116, 139, 0.35)';
-          ctx.strokeStyle = isNear ? '#38bdf8' : 'rgba(56, 189, 248, 0.5)';
-          ctx.lineWidth = 1.5;
-          ctx.fillRect(-20, -14, 40, 28);
-          ctx.strokeRect(-20, -14, 40, 28);
+          const bw = site.width || 180;
+          const bh = site.height || 38;
+          ctx.fillStyle = isNear ? 'rgba(56, 189, 248, 0.28)' : 'rgba(100, 116, 139, 0.2)';
+          ctx.strokeStyle = isNear ? '#38bdf8' : 'rgba(56, 189, 248, 0.55)';
+          ctx.lineWidth = 2;
+          ctx.fillRect(-bw / 2, -bh / 2, bw, bh);
+          ctx.strokeRect(-bw / 2, -bh / 2, bw, bh);
 
-          ctx.font = '14px sans-serif';
+          // Blueprint Gate Cutout
+          ctx.strokeStyle = '#22c55e';
+          ctx.setLineDash([4, 4]);
+          if (site.orientation === 'vertical') {
+            ctx.strokeRect(-bw / 2 - 2, -26, bw + 4, 52);
+          } else {
+            ctx.strokeRect(-26, -bh / 2 - 2, 52, bh + 4);
+          }
+          ctx.setLineDash([]);
+
+          ctx.font = '16px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText('🛡️', 0, 0);
@@ -4697,26 +5191,6 @@
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText('⚡', 0, 0);
-        } else if (site.type === 'weapon_forge') {
-          ctx.fillStyle = 'rgba(76, 29, 149, 0.4)';
-          ctx.strokeStyle = '#ec4899';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          for (let a = 0; a < 6; a++) {
-            const ang = a * Math.PI / 3 + pulse * 0.2;
-            const px = Math.cos(ang) * 18;
-            const py = Math.sin(ang) * 18;
-            if (a === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
-          }
-          ctx.closePath();
-          ctx.fill();
-          ctx.stroke();
-
-          ctx.font = '14px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('⚔️', 0, 0);
         }
 
         // 5. Blueprint Site Title & Cost
@@ -4742,8 +5216,7 @@
           ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
           ctx.strokeStyle = '#facc15';
           ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.roundRect(-txtW / 2, promptY - 12, txtW, 18, 4);
+          safeRoundRect(ctx, -txtW / 2, promptY - 12, txtW, 18, 4);
           ctx.fill();
           ctx.stroke();
 
@@ -4756,28 +5229,56 @@
         // BUILT FORTIFICATION OR WEAPON FORGE
         // ==========================================
         if (site.type === 'wall') {
-          // Blast Wall with Gate
-          const w = 46;
-          const h = 32;
-          ctx.fillStyle = site.hitFlash > 0 ? '#ffffff' : '#334155';
-          ctx.fillRect(-w / 2, -h / 2, w, h);
-          ctx.strokeStyle = '#64748b';
-          ctx.lineWidth = 2.5;
-          ctx.strokeRect(-w / 2, -h / 2, w, h);
+          // Substantial Blast Rampart with Automated Hydraulic Gate
+          const bw = site.width || 180;
+          const bh = site.height || 38;
 
-          // Gate opening/closing mechanism
-          if (site.isOpen) {
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(-12, -h / 2 - 1, 24, h + 2);
-            ctx.fillStyle = '#22c55e';
-            ctx.fillRect(-w / 2 + 3, -5, 6, 10);
-            ctx.fillRect(w / 2 - 9, -5, 6, 10);
+          // Main Armored Barrier Slab
+          ctx.fillStyle = site.hitFlash > 0 ? '#ffffff' : '#334155';
+          ctx.fillRect(-bw / 2, -bh / 2, bw, bh);
+          ctx.strokeStyle = '#64748b';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(-bw / 2, -bh / 2, bw, bh);
+
+          // Reinforced Armor Endcaps
+          ctx.fillStyle = '#1e293b';
+          if (site.orientation === 'vertical') {
+            ctx.fillRect(-bw / 2 + 4, -bh / 2 + 4, bw - 8, 32);
+            ctx.fillRect(-bw / 2 + 4, bh / 2 - 36, bw - 8, 32);
           } else {
-            ctx.fillStyle = '#0284c7';
-            ctx.fillRect(-8, -h / 2 + 4, 16, h - 8);
-            ctx.fillStyle = '#f59e0b';
-            ctx.fillRect(-w / 2 + 4, -h / 2 + 4, 6, 6);
-            ctx.fillRect(w / 2 - 10, h / 2 - 10, 6, 6);
+            ctx.fillRect(-bw / 2 + 4, -bh / 2 + 4, 32, bh - 8);
+            ctx.fillRect(bw / 2 - 36, -bh / 2 + 4, 32, bh - 8);
+          }
+
+          // Gate opening/closing mechanism in center
+          if (site.isOpen) {
+            // Open passage for Rovers & units
+            ctx.fillStyle = '#0f172a';
+            if (site.orientation === 'vertical') {
+              ctx.fillRect(-bw / 2 - 2, -27, bw + 4, 54);
+              // Green LED runway lines
+              ctx.fillStyle = '#22c55e';
+              ctx.fillRect(-bw / 2, -27, 4, 54);
+              ctx.fillRect(bw / 2 - 4, -27, 4, 54);
+            } else {
+              ctx.fillRect(-27, -bh / 2 - 2, 54, bh + 4);
+              // Green LED runway lines
+              ctx.fillStyle = '#22c55e';
+              ctx.fillRect(-27, -bh / 2, 54, 4);
+              ctx.fillRect(-27, bh / 2 - 4, 54, 4);
+            }
+          } else {
+            // Closed Armored Blast Door with security locks
+            ctx.fillStyle = '#0f172a';
+            if (site.orientation === 'vertical') {
+              ctx.fillRect(-bw / 2 + 3, -25, bw - 6, 50);
+              ctx.fillStyle = '#f59e0b';
+              ctx.fillRect(-4, -18, 8, 36);
+            } else {
+              ctx.fillRect(-25, -bh / 2 + 3, 50, bh - 6);
+              ctx.fillStyle = '#f59e0b';
+              ctx.fillRect(-18, -4, 36, 8);
+            }
           }
 
           // Visual wear / cracked fissures if damaged
@@ -4852,37 +5353,6 @@
           }
 
           ctx.restore();
-
-        } else if (site.type === 'weapon_forge') {
-          // Futuristic Hex Forge platform
-          const fPulse = site.pulse || 0;
-          ctx.fillStyle = '#1e1b4b';
-          ctx.strokeStyle = '#ec4899';
-          ctx.lineWidth = 2.5;
-          ctx.beginPath();
-          for (let a = 0; a < 6; a++) {
-            const ang = a * Math.PI / 3;
-            const px = Math.cos(ang) * 26;
-            const py = Math.sin(ang) * 26;
-            if (a === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
-          }
-          ctx.closePath();
-          ctx.fill();
-          ctx.stroke();
-
-          // Rotating weapon hologram projection
-          ctx.save();
-          ctx.rotate(fPulse * 0.4);
-          ctx.strokeStyle = '#38bdf8';
-          ctx.lineWidth = 1.5;
-          ctx.strokeRect(-10, -10, 20, 20);
-          ctx.restore();
-
-          ctx.font = 'bold 9px monospace';
-          ctx.fillStyle = '#ec4899';
-          ctx.textAlign = 'center';
-          ctx.fillText(`FORGE TIER ${site.tier}`, 0, 3);
         }
 
         // Overhead health bar if damaged
@@ -5553,10 +6023,9 @@
 
     if (!nearest) return;
 
-    const camX = canvas.width / 2 - rover.x;
-    const camY = canvas.height / 2 - rover.y;
-    const screenX = nearest.x + camX;
-    const screenY = nearest.y + camY;
+    const curZoom = getCameraZoom();
+    const screenX = (nearest.x - rover.x) * curZoom + canvas.width / 2;
+    const screenY = (nearest.y - rover.y) * curZoom + canvas.height / 2;
 
     // If already comfortably on screen, don't draw border pointer
     const margin = 60;
@@ -5705,9 +6174,16 @@
           ctx.arc(sx, sy, 3, 0, Math.PI * 2);
           ctx.stroke();
         } else {
-          // Built site: solid colored dot
-          ctx.fillStyle = s.type === 'weapon_forge' ? '#ec4899' : (s.type === 'wall' ? '#0ea5e9' : '#f59e0b');
-          ctx.fillRect(sx - 1.5, sy - 1.5, 3, 3);
+          // Built site: rampart segment or sentry dot
+          if (s.type === 'wall') {
+            ctx.fillStyle = '#0ea5e9';
+            const rw = Math.max(2, ((s.width || 180) / WORLD_WIDTH) * radarSize);
+            const rh = Math.max(2, ((s.height || 38) / WORLD_WIDTH) * radarSize);
+            ctx.fillRect(sx - rw / 2, sy - rh / 2, rw, rh);
+          } else {
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(sx - 2, sy - 2, 4, 4);
+          }
         }
       }
     }
@@ -5720,9 +6196,9 @@
       }
     }
 
-    // 4. Base fortress icon on radar
+    // 4. Base fortress icon on radar (proportional to 96x62 base)
     ctx.fillStyle = '#38bdf8';
-    ctx.fillRect(toRadarX(gameState.base.x) - 4, toRadarY(gameState.base.y) - 3, 8, 6);
+    ctx.fillRect(toRadarX(gameState.base.x) - 3, toRadarY(gameState.base.y) - 2.5, 6, 5);
 
     // 5. Dual Rover icons on radar (P1 Alpha & P2 Beta)
     if (gameState.rover && !gameState.rover.isBoarded) {
@@ -5772,6 +6248,18 @@
     ctx.moveTo(centerRadarX, centerRadarY);
     ctx.lineTo(centerRadarX + Math.cos(radarSweepAngle) * sweepRadius, centerRadarY + Math.sin(radarSweepAngle) * sweepRadius);
     ctx.stroke();
+
+    // 9. Camera Viewport Frustum on radar
+    const curZoom = getCameraZoom();
+    const vpWorldW = canvas.width / curZoom;
+    const vpWorldH = canvas.height / curZoom;
+    const vpLeft = toRadarX(localTarget.x - vpWorldW / 2);
+    const vpTop = toRadarY(localTarget.y - vpWorldH / 2);
+    const vpW = (vpWorldW / WORLD_WIDTH) * radarSize;
+    const vpH = (vpWorldH / WORLD_HEIGHT) * radarSize;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(vpLeft, vpTop, vpW, vpH);
 
     ctx.restore();
   }

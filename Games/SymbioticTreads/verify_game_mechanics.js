@@ -268,6 +268,131 @@ assert(freshGameCode.includes('touchmove'), 'game.js must handle touchmove event
 assert(freshGameCode.includes('touchend'), 'game.js must handle touchend events');
 console.log('✅ Touchscreen joystick, action buttons, analog steering, and iOS Safari viewport verified.\n');
 
+// 15. Test Citadel Base Weapon Armory & Scavenger Weapons Forge Removal
+console.log('--- ⚔️ VERIFYING CITADEL BASE WEAPON ARMORY & FORGE REMOVAL ---');
+// Verify removal of hidden/obscured in-world blueprint site
+assert(!freshGameCode.includes("id: 'site-weapon-forge'"), 'Obsolete site-weapon-forge must be eliminated from game.js');
+assert(!freshGameCode.includes('type: "weapon_forge"'), 'weapon_forge build type must not be in game.js');
+
+// Verify Batch 2 outer choke bastions
+assert(freshGameCode.includes("id: 'site-choke-east'"), 'Batch 2 must include Canyon Choke Barricade');
+assert(freshGameCode.includes("id: 'site-choke-west'"), 'Batch 2 must include West Basin Bastion');
+assert(freshGameCode.includes("id: 'site-choke-north'"), 'Batch 2 must include North Gorge Bastion');
+assert(freshGameCode.includes("id: 'site-choke-south'"), 'Batch 2 must include South Gorge Bastion');
+
+// Verify WEAPON_TIER_CONFIG and costs
+assert(freshGameCode.includes('WEAPON_TIER_CONFIG'), 'WEAPON_TIER_CONFIG must be defined in game.js');
+assert(freshGameCode.includes('WEAPON_UPGRADE_COSTS'), 'WEAPON_UPGRADE_COSTS must be defined in game.js');
+assert(freshGameCode.includes('Kinetic Scout Rifle'), 'Tier 1 weapon must be Kinetic Scout Rifle');
+assert(freshGameCode.includes('Scatter-Shot Cannon'), 'Tier 2 weapon must be Scatter-Shot Cannon');
+assert(freshGameCode.includes('Piercing Plasma Railgun'), 'Tier 3 weapon must be Piercing Plasma Railgun');
+assert(freshGameCode.includes('Apex Nanite Missile Array'), 'Tier 4 weapon must be Apex Nanite Missile Array');
+
+// Verify Citadel Armory Functions & Hotkey
+assert(freshGameCode.includes('function upgradeRoverWeapon('), 'upgradeRoverWeapon function must be defined');
+assert(freshGameCode.includes('function showCitadelDockPanel('), 'showCitadelDockPanel function must be defined');
+assert(freshGameCode.includes('function updateArmoryUI('), 'updateArmoryUI function must be defined');
+assert(freshGameCode.includes('keys.justPressed.u'), 'Key [U] must be wired to upgrade rover weapon');
+
+// Verify In-Game Citadel Dock Panel & Touch Upgrade in index.html
+assert(freshIndex.includes('id="citadel-dock-panel"'), 'index.html must include citadel-dock-panel modal');
+assert(freshIndex.includes('id="dock-scrap-txt"'), 'index.html must display base scrap in dock panel');
+assert(freshIndex.includes('id="dock-current-name"'), 'index.html must display current weapon tier name');
+assert(freshIndex.includes('id="dock-next-name"'), 'index.html must display next weapon tier name');
+assert(freshIndex.includes('id="btn-dock-upgrade"'), 'index.html must provide forge upgrade button in dock panel');
+assert(freshIndex.includes('id="btn-dock-deploy"'), 'index.html must provide rover deploy button in dock panel');
+assert(freshIndex.includes('id="btn-touch-upgrade"'), 'index.html must include mobile touch-upgrade button');
+
+// Verify CSS Styling for Armory Overlay & Touch Button
+assert(freshCss.includes('.citadel-dock-panel'), 'css/style.css must style citadel-dock-panel');
+assert(freshCss.includes('.touch-btn-upgrade'), 'css/style.css must style touch-btn-upgrade');
+assert(freshCss.includes('.current-weapon-card'), 'css/style.css must style current weapon card');
+assert(freshCss.includes('.next-weapon-card'), 'css/style.css must style next weapon card');
+
+// Verify Multiplayer Synchronization of Weapon Upgrades
+assert(freshGameCode.includes("type: 'UPGRADE_WEAPON'"), 'game.js network handler must process UPGRADE_WEAPON packets');
+assert(freshGameCode.includes('weaponTier: rover.weaponTier'), 'game.js P2P state broadcast must synchronize weaponTier');
+
+console.log('✅ Citadel Base Armory, 4-tier weapon progression, UI modal, mobile touch button, and forge removal verified.\n');
+
+// 16. Test Wall Sizing Expansion, Bug Tangential Sliding, and Global Wasteland Tree Coverage
+console.log('--- 🛡️ VERIFYING WALL EXPANSION, BUG WALL SLIDING & GLOBAL TREE COVERAGE ---');
+// Verify expanded perimeter wall sizing (180px ramparts instead of 46px nubs)
+assert(freshGameCode.includes("width: 180, height: 38"), 'Horizontal perimeter blast walls must be 180px wide');
+assert(freshGameCode.includes("width: 38, height: 180"), 'Vertical perimeter blast walls must be 180px tall');
+assert(freshGameCode.includes('North Blast Rampart & Gate'), 'North wall name must reflect rampart expansion');
+assert(freshGameCode.includes('South Blast Rampart & Gate'), 'South wall name must reflect rampart expansion');
+assert(freshGameCode.includes('East Blast Rampart & Gate'), 'East wall name must reflect rampart expansion');
+assert(freshGameCode.includes('West Blast Rampart & Gate'), 'West wall name must reflect rampart expansion');
+
+// Verify bug wall navigation & tangential sliding (prevent bugs freezing at walls)
+assert(freshGameCode.includes('isSlidingWall'), 'Swarm AI must track wall sliding state');
+assert(freshGameCode.includes('wallSlideX'), 'Swarm AI must compute tangential wall sliding X velocity');
+assert(freshGameCode.includes('wallSlideY'), 'Swarm AI must compute tangential wall sliding Y velocity');
+assert(freshGameCode.includes('inGateChannel'), 'Swarm AI must allow passage through open wall gate channels');
+
+// Verify safe cross-browser rounded rect helper (prevents iOS Safari roundRect crashes)
+assert(freshGameCode.includes('function safeRoundRect('), 'game.js must define safeRoundRect helper for cross-browser iOS support');
+
+// Verify light gray canvas and body backgrounds in css/style.css
+assert(freshCss.includes('background-color: #e2e8f0'), 'css/style.css must enforce light gray #e2e8f0 background');
+
+// Verify global wasteland tree distribution (12+ trees across regions)
+const matchTrees = freshGameCode.match(/trees:\s*(\[[\s\S]*?\])\s*};/);
+assert(matchTrees, 'DEFAULT_MAP.trees must be defined');
+const parsedTrees = eval(matchTrees[1]);
+assert(parsedTrees.length >= 10, `DEFAULT_MAP must contain at least 10 trees distributed across wasteland, found ${parsedTrees.length}`);
+console.log(`✅ ${parsedTrees.length} Alien Oxygen Trees distributed across all wasteland sectors.`);
+console.log('✅ Expanded 180px blast ramparts, tangential bug sliding, open gate rushing, and iOS light gray background verified.\n');
+
+// 17. Test Base Tank Sizing Scale-down & Mobile iPhone Camera Zoom
+console.log('--- 🔬 VERIFYING CITADEL TANK SCALING & IPHONE CAMERA ZOOM ---');
+// Verify scaled base fortress tank dimensions (96x62 instead of 150x95)
+assert(freshGameCode.includes("width: 96,\n      height: 62"), 'Base fortress tank must be scaled down to 96x62 for proper courtyard proportions');
+assert(freshGameCode.includes("treadW = base.width + 10"), 'Treads must scale proportionally to base width');
+assert(freshGameCode.includes("barrelLen = 38"), 'Base cannon barrel length must be scaled to 38px');
+assert(freshGameCode.includes("shieldRadius = 78"), 'Base shield radius must scale to 78px');
+assert(freshGameCode.includes("if (dBase < 48)"), 'Base collision radius must scale to 48px');
+
+// Verify rover deployment & respawn courtyard clearance
+assert(freshGameCode.includes("rover.id === 'rover2' ? -75 : 75"), 'Rovers must deploy/respawn with 75px offset beside base');
+
+// Verify Responsive Camera Zoom Controller & Helpers
+assert(freshGameCode.includes("function getCameraZoom()"), 'game.js must define getCameraZoom helper');
+assert(freshGameCode.includes("function setCameraZoom("), 'game.js must define setCameraZoom helper');
+assert(freshGameCode.includes("function updateZoomUI()"), 'game.js must define updateZoomUI helper');
+
+// Verify Mobile/iPhone responsive detection & zoom scaling
+assert(freshGameCode.includes("if (minDim <= 430) return 0.58;"), 'iPhone portrait screens must default to 0.58x zoom');
+assert(freshGameCode.includes("if (minDim <= 640) return 0.64;"), 'iPhone landscape screens must default to 0.64x zoom');
+
+// Verify Pinch-to-zoom and canvas touch/wheel handlers
+assert(freshGameCode.includes("if (e.touches.length === 2)"), 'game.js must handle two-finger touch gestures on canvas');
+assert(freshGameCode.includes("canvas.addEventListener('wheel'"), 'game.js must support wheel zoom on desktop canvas');
+
+// Verify Keyboard hotkeys for zoom
+assert(freshGameCode.includes("e.key === '[' || e.key === '-'"), 'game.js must support [ and - keys for zooming out');
+assert(freshGameCode.includes("e.key === ']' || e.key === '=' || e.key === '+'"), 'game.js must support ] and + keys for zooming in');
+
+// Verify Mobile Zoom button in index.html & style.css
+assert(freshIndex.includes('id="btn-touch-zoom"'), 'index.html must include btn-touch-zoom button');
+assert(freshIndex.includes('id="touch-zoom-label"'), 'index.html must include touch-zoom-label span');
+assert(freshCss.includes('.touch-btn-zoom'), 'css/style.css must style touch-btn-zoom');
+
+// Verify Camera transform in draw() applies zoom
+assert(freshGameCode.includes("ctx.scale(currentZoom, currentZoom)"), 'Rendering pipeline must scale canvas world by camera zoom');
+
+// Verify Screen-to-World coordinate mapping factors in zoom
+assert(freshGameCode.includes("(keys.mouse.x - canvas.width / 2) / currentZoom + localTarget.x"), 'World mouse X calculation must divide screen offset by zoom');
+assert(freshGameCode.includes("(keys.mouse.y - canvas.height / 2) / currentZoom + localTarget.y"), 'World mouse Y calculation must divide screen offset by zoom');
+
+// Verify Radar Frustum box
+assert(freshGameCode.includes("vpWorldW = canvas.width / curZoom"), 'Radar must calculate camera viewport frustum width from zoom');
+assert(freshGameCode.includes("ctx.strokeRect(vpLeft, vpTop, vpW, vpH)"), 'Radar must render visible camera viewport frustum on minimap');
+
+console.log('✅ Base fortress tank scaled to 96x62 (58% footprint reduction) with generous courtyard clearance.');
+console.log('✅ iPhone camera zoom system (0.58x-0.64x responsive default, pinch-to-zoom, touch button, radar frustum) verified.\n');
+
 console.log('🎉🎉 ALL MECHANICS, ASSETS, NETWORKING, MAP EDITOR, AND IPHONE TOUCH CONTROLS PASSED SUCCESSFULLY! 🎉🎉');
 
 

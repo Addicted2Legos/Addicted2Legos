@@ -14,8 +14,8 @@ html, body {
   -webkit-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
-  background-color: #0b0f12;
-  color: #e2e8f0;
+  background-color: #e2e8f0;
+  color: #1e293b;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
 }
 
@@ -278,7 +278,7 @@ input[type="text"]:focus {
   width: 100%;
   height: 100%;
   border: none;
-  background-color: #141b22;
+  background-color: #e2e8f0;
   display: block;
   touch-action: none;
   cursor: crosshair;
@@ -716,9 +716,18 @@ input[type="text"]:focus {
   pointer-events: none;
 }
 
-.touch-btn-dock, .touch-btn-focus {
+.touch-btn-dock, .touch-btn-focus, .touch-btn-zoom {
   width: 56px;
   height: 56px;
+}
+
+.touch-btn-zoom {
+  border-color: #a855f7;
+}
+
+.touch-btn-zoom:active {
+  background: radial-gradient(circle at 35% 35%, rgba(168, 85, 247, 0.85), rgba(126, 34, 206, 0.9));
+  border-color: #f3e8ff;
 }
 
 .touch-btn-dock {
@@ -793,7 +802,7 @@ input[type="text"]:focus {
     width: 68px;
     height: 68px;
   }
-  .touch-btn-dock, .touch-btn-focus {
+  .touch-btn-dock, .touch-btn-focus, .touch-btn-upgrade, .touch-btn-zoom {
     width: 48px;
     height: 48px;
   }
@@ -801,6 +810,252 @@ input[type="text"]:focus {
     right: 14px;
     top: 75px;
   }
+  .citadel-dock-panel {
+    padding: 14px;
+    width: 95%;
+  }
+  .dock-armory-body {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .armory-arrow {
+    transform: rotate(90deg);
+    margin: -2px 0;
+  }
+  .armory-card {
+    min-height: auto;
+    width: 100%;
+  }
+  .dock-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+/* =====================================================================
+   CITADEL DOCK & WEAPON ARMORY OVERLAY
+   ===================================================================== */
+.citadel-dock-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 50;
+  width: 90%;
+  max-width: 530px;
+  background: rgba(15, 23, 42, 0.96);
+  border: 2px solid #38bdf8;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 0 35px rgba(56, 189, 248, 0.35), 0 20px 40px rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+  color: #f1f5f9;
+  animation: fadeInDock 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeInDock {
+  from { opacity: 0; transform: translate(-50%, -46%) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+.dock-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.3);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.dock-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dock-icon {
+  font-size: 28px;
+}
+
+.dock-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #38bdf8;
+  letter-spacing: 1px;
+}
+
+.dock-subtitle {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.dock-scrap-highlight {
+  color: #facc15;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.dock-close-btn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  width: auto;
+  padding: 4px 8px;
+}
+
+.dock-close-btn:hover {
+  color: #ef4444;
+  transform: none;
+  box-shadow: none;
+}
+
+.dock-armory-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.armory-card {
+  flex: 1;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 12px;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.current-weapon-card {
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.next-weapon-card {
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(30, 41, 59, 0.9);
+}
+
+.card-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+
+.armory-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 4px;
+}
+
+.armory-desc {
+  font-size: 10.5px;
+  color: #cbd5e1;
+  line-height: 1.35;
+  margin-bottom: 6px;
+  flex-grow: 1;
+}
+
+.armory-stats {
+  font-size: 10px;
+  font-family: monospace;
+  color: #38bdf8;
+  background: rgba(15, 23, 42, 0.6);
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+.armory-cost {
+  font-size: 11px;
+  font-weight: 700;
+  color: #facc15;
+  background: rgba(15, 23, 42, 0.8);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(250, 204, 21, 0.3);
+}
+
+.armory-arrow {
+  font-size: 18px;
+  color: #f59e0b;
+  font-weight: bold;
+}
+
+.dock-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.dock-upgrade-btn {
+  flex: 1.4;
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  border: 1px solid #38bdf8;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
+}
+
+.dock-upgrade-btn:disabled {
+  background: #1e293b;
+  border-color: #334155;
+  color: #64748b;
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.dock-deploy-btn {
+  flex: 1;
+  background: #1e293b;
+  border: 1px solid #475569;
+  color: #cbd5e1;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.dock-deploy-btn:hover {
+  background: #334155;
+  color: #ffffff;
+  border-color: #94a3b8;
+}
+
+/* Touch upgrade button in touch-actions */
+.touch-btn-upgrade {
+  width: 56px;
+  height: 56px;
+  border-color: #f59e0b;
+  background: radial-gradient(circle at 35% 35%, rgba(245, 158, 11, 0.85), rgba(180, 83, 9, 0.9));
+  animation: glowPulseUpgrade 1.6s infinite;
+}
+
+@keyframes glowPulseUpgrade {
+  0% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.9); }
+  100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.5); }
 }
 
 
