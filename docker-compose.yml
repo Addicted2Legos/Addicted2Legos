@@ -8,3 +8,10 @@ services:
       - ./:/usr/share/nginx/html
     ports:
       - "127.0.0.1:8080:80" # Binds strictly to localhost
+  my_web_app:
+    image: nginx:latest
+    user: "1002:1002"       # Forces the container to run as svc_webapps
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./app_data:/var/www/html
